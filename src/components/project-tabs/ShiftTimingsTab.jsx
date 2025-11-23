@@ -37,20 +37,23 @@ export default function ShiftTimingsTab({ project }) {
         reader.onload = (e) => {
             const text = e.target.result;
             const lines = text.split('\n').filter(line => line.trim());
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             
             const data = [];
             const newWarnings = [];
 
+            // Skip header row
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
-                if (values.length >= 5) {
+                if (values.length >= 7) {
                     const attendance_id = values[0];
-                    const date = values[1]; // Can be empty for general shift
-                    const am_start = values[2];
-                    const am_end = values[3];
-                    const pm_start = values[4];
-                    const pm_end = values[5];
+                    // values[1] = name (not needed for shift timing)
+                    // values[2] = department (not needed)
+                    const am_start = values[3]; // morning start
+                    const am_end = values[4];   // morning end
+                    const pm_start = values[5]; // evening start
+                    const pm_end = values[6];   // evening end
+                    // values[7] = total hours (optional)
+                    const applicableDays = values[8] || ''; // applicable days
 
                     // Check if employee exists
                     const employeeExists = employees.some(e => e.attendance_id === attendance_id);
@@ -58,22 +61,12 @@ export default function ShiftTimingsTab({ project }) {
                         newWarnings.push(`Unknown employee: ${attendance_id}`);
                     }
 
-                    // Detect Friday shift
-                    let parsedDate = null;
-                    let is_friday_shift = false;
-                    if (date) {
-                        const dateMatch = date.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-                        if (dateMatch) {
-                            const [, day, month, year] = dateMatch;
-                            parsedDate = `${year}-${month}-${day}`;
-                            const dayOfWeek = new Date(parsedDate).getDay();
-                            is_friday_shift = dayOfWeek === 5; // Friday = 5
-                        }
-                    }
+                    // Parse applicable days to detect Friday shifts
+                    const is_friday_shift = applicableDays.toLowerCase().includes('friday');
 
                     data.push({
                         attendance_id,
-                        date: parsedDate,
+                        date: null, // General shift, no specific date
                         is_friday_shift,
                         am_start,
                         am_end,
@@ -137,10 +130,10 @@ export default function ShiftTimingsTab({ project }) {
                             onChange={handleFileChange}
                         />
                         <p className="text-sm text-slate-500 mt-2">
-                            CSV format: attendance_id, date (optional), am_start, am_end, pm_start, pm_end
+                            CSV format: attendance_id, name, department, morning_start, morning_end, evening_start, evening_end, total_hours, applicable_days
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                            Leave date empty for general shifts. System auto-detects Friday shifts.
+                            System auto-detects Friday shifts from applicable_days column.
                         </p>
                     </div>
 
