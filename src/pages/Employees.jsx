@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, UserX, UserCheck } from 'lucide-react';
+import { Plus, Search, Pencil, UserX, UserCheck, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
 
@@ -13,6 +13,7 @@ export default function Employees() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showDialog, setShowDialog] = useState(false);
+    const [importFile, setImportFile] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: employees = [], isLoading } = useQuery({
@@ -44,6 +45,53 @@ export default function Employees() {
         toggleStatusMutation.mutate({ id: employee.id, status: newStatus });
     };
 
+    const importMutation = useMutation({
+        mutationFn: async (employeeList) => {
+            return base44.entities.Employee.bulkCreate(employeeList);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['employees']);
+            toast.success('Employees imported successfully');
+            setImportFile(null);
+        },
+        onError: () => {
+            toast.error('Failed to import employees');
+        }
+    });
+
+    const handleImport = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target.result;
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            const employeeList = [];
+            
+            // Skip header, parse rows
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                if (values.length >= 2 && values[0] && values[1]) {
+                    employeeList.push({
+                        attendance_id: values[0],
+                        name: values[1],
+                        status: 'active'
+                    });
+                }
+            }
+
+            if (employeeList.length > 0) {
+                importMutation.mutate(employeeList);
+            } else {
+                toast.error('No valid employee data found in file');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -51,16 +99,34 @@ export default function Employees() {
                     <h1 className="text-3xl font-bold text-slate-900">Employees</h1>
                     <p className="text-slate-600 mt-2">Manage employee master list</p>
                 </div>
-                <Button 
-                    onClick={() => {
-                        setSelectedEmployee(null);
-                        setShowDialog(true);
-                    }}
-                    className="bg-indigo-600 hover:bg-indigo-700"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Employee
-                </Button>
+                <div className="flex gap-3">
+                    <label>
+                        <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleImport}
+                            className="hidden"
+                        />
+                        <Button 
+                            onClick={(e) => e.currentTarget.previousElementSibling.click()}
+                            variant="outline"
+                            disabled={importMutation.isPending}
+                        >
+                            <Upload className="w-4 h-4 mr-2" />
+                            {importMutation.isPending ? 'Importing...' : 'Import CSV'}
+                        </Button>
+                    </label>
+                    <Button 
+                        onClick={() => {
+                            setSelectedEmployee(null);
+                            setShowDialog(true);
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Employee
+                    </Button>
+                </div>
             </div>
 
             {/* Search */}
