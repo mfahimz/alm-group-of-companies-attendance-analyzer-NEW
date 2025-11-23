@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, UserX, UserCheck, Upload } from 'lucide-react';
+import { Plus, Search, Pencil, UserX, UserCheck, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
 
@@ -29,6 +29,17 @@ export default function Employees() {
         }
     });
 
+    const deleteMutation = useMutation({
+        mutationFn: (id) => base44.entities.Employee.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['employees']);
+            toast.success('Employee deleted successfully');
+        },
+        onError: () => {
+            toast.error('Failed to delete employee');
+        }
+    });
+
     const filteredEmployees = employees.filter(emp =>
         emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -43,6 +54,12 @@ export default function Employees() {
     const handleToggleStatus = (employee) => {
         const newStatus = employee.status === 'active' ? 'inactive' : 'active';
         toggleStatusMutation.mutate({ id: employee.id, status: newStatus });
+    };
+
+    const handleDelete = (employee) => {
+        if (window.confirm(`Are you sure you want to delete ${employee.name}?`)) {
+            deleteMutation.mutate(employee.id);
+        }
     };
 
     const importMutation = useMutation({
@@ -243,6 +260,14 @@ export default function Employees() {
                                                     ) : (
                                                         <UserCheck className="w-4 h-4 text-green-600" />
                                                     )}
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleDelete(employee)}
+                                                    title="Delete employee"
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-red-600" />
                                                 </Button>
                                             </div>
                                         </TableCell>
