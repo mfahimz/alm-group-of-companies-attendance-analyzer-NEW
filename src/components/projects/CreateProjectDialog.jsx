@@ -1,0 +1,127 @@
+import React, { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '../../utils';
+
+export default function CreateProjectDialog({ open, onClose }) {
+    const [formData, setFormData] = useState({
+        name: '',
+        date_from: '',
+        date_to: '',
+        department: ''
+    });
+    const queryClient = useQueryClient();
+    const navigate = useNavigate();
+
+    const createMutation = useMutation({
+        mutationFn: (data) => base44.entities.Project.create(data),
+        onSuccess: (project) => {
+            queryClient.invalidateQueries(['projects']);
+            toast.success('Project created successfully');
+            onClose();
+            navigate(createPageUrl(`ProjectDetail?id=${project.id}`));
+        },
+        onError: () => {
+            toast.error('Failed to create project');
+        }
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        if (!formData.name || !formData.date_from || !formData.date_to) {
+            toast.error('Please fill in all required fields');
+            return;
+        }
+
+        const dateFrom = new Date(formData.date_from);
+        const dateTo = new Date(formData.date_to);
+        
+        if (dateTo < dateFrom) {
+            toast.error('End date must be after start date');
+            return;
+        }
+
+        const daysDiff = Math.ceil((dateTo - dateFrom) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 10) {
+            toast.error('Project duration should not exceed 10 days');
+            return;
+        }
+
+        createMutation.mutate({
+            ...formData,
+            status: 'draft'
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Create New Project</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="name">Project Name *</Label>
+                        <Input
+                            id="name"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            placeholder="e.g. October Week 1"
+                        />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="date_from">Start Date *</Label>
+                            <Input
+                                id="date_from"
+                                type="date"
+                                value={formData.date_from}
+                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="date_to">End Date *</Label>
+                            <Input
+                                id="date_to"
+                                type="date"
+                                value={formData.date_to}
+                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="department">Department</Label>
+                        <Input
+                            id="department"
+                            value={formData.department}
+                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                            placeholder="Optional"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4">
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            type="submit" 
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                            disabled={createMutation.isPending}
+                        >
+                            {createMutation.isPending ? 'Creating...' : 'Create Project'}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
