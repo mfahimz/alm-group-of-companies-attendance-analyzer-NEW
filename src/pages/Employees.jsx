@@ -50,15 +50,24 @@ export default function Employees() {
 
     const importMutation = useMutation({
         mutationFn: async (employeeList) => {
-            return base44.entities.Employee.bulkCreate(employeeList);
+            const results = [];
+            for (const emp of employeeList) {
+                try {
+                    const result = await base44.entities.Employee.create(emp);
+                    results.push(result);
+                } catch (error) {
+                    console.error('Failed to create employee:', emp, error);
+                }
+            }
+            return results;
         },
-        onSuccess: () => {
+        onSuccess: (results) => {
             queryClient.invalidateQueries(['employees']);
-            toast.success('Employees imported successfully');
+            toast.success(`${results.length} employees imported successfully`);
             setImportFile(null);
         },
-        onError: () => {
-            toast.error('Failed to import employees');
+        onError: (error) => {
+            toast.error('Failed to import employees: ' + error.message);
         }
     });
 
@@ -95,13 +104,20 @@ export default function Employees() {
                 });
 
                 if (result.status === 'success' && result.output?.employees) {
-                    const employeeList = result.output.employees.map(emp => ({
-                        attendance_id: emp.attendance_id,
-                        name: emp.name
-                    }));
-                    importMutation.mutate(employeeList);
+                    const employeeList = result.output.employees
+                        .filter(emp => emp.attendance_id && emp.name)
+                        .map(emp => ({
+                            attendance_id: String(emp.attendance_id).trim(),
+                            name: String(emp.name).trim()
+                        }));
+                    
+                    if (employeeList.length > 0) {
+                        importMutation.mutate(employeeList);
+                    } else {
+                        toast.error('No valid employees found in file');
+                    }
                 } else {
-                    toast.error('Failed to extract data from Excel file');
+                    toast.error('Failed to extract data from Excel file: ' + (result.details || 'Unknown error'));
                 }
             } catch (error) {
                 toast.error('Error processing Excel file: ' + error.message);
@@ -117,11 +133,11 @@ export default function Employees() {
                 
                 // Skip header, parse rows
                 for (let i = 1; i < lines.length; i++) {
-                    const values = lines[i].split(',').map(v => v.trim());
+                    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
                     if (values.length >= 2 && values[0] && values[1]) {
                         employeeList.push({
-                            attendance_id: values[0],
-                            name: values[1]
+                            attendance_id: String(values[0]).trim(),
+                            name: String(values[1]).trim()
                         });
                     }
                 }
