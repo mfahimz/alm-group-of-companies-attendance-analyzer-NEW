@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, UserX, UserCheck, Upload, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
 
@@ -21,14 +21,6 @@ export default function Employees() {
         queryFn: () => base44.entities.Employee.list('-created_date')
     });
 
-    const toggleStatusMutation = useMutation({
-        mutationFn: ({ id, status }) => base44.entities.Employee.update(id, { status }),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['employees']);
-            toast.success('Employee status updated');
-        }
-    });
-
     const deleteMutation = useMutation({
         mutationFn: (id) => base44.entities.Employee.delete(id),
         onSuccess: () => {
@@ -42,18 +34,12 @@ export default function Employees() {
 
     const filteredEmployees = employees.filter(emp =>
         emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.department?.toLowerCase().includes(searchTerm.toLowerCase())
+        emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleEdit = (employee) => {
         setSelectedEmployee(employee);
         setShowDialog(true);
-    };
-
-    const handleToggleStatus = (employee) => {
-        const newStatus = employee.status === 'active' ? 'inactive' : 'active';
-        toggleStatusMutation.mutate({ id: employee.id, status: newStatus });
     };
 
     const handleDelete = (employee) => {
@@ -111,8 +97,7 @@ export default function Employees() {
                 if (result.status === 'success' && result.output?.employees) {
                     const employeeList = result.output.employees.map(emp => ({
                         attendance_id: emp.attendance_id,
-                        name: emp.name,
-                        status: 'active'
+                        name: emp.name
                     }));
                     importMutation.mutate(employeeList);
                 } else {
@@ -136,8 +121,7 @@ export default function Employees() {
                     if (values.length >= 2 && values[0] && values[1]) {
                         employeeList.push({
                             attendance_id: values[0],
-                            name: values[1],
-                            status: 'active'
+                            name: values[1]
                         });
                     }
                 }
@@ -195,7 +179,7 @@ export default function Employees() {
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
-                    placeholder="Search by name, attendance ID, or department..."
+                    placeholder="Search by name or attendance ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -217,9 +201,6 @@ export default function Employees() {
                                 <TableRow>
                                     <TableHead>Attendance ID</TableHead>
                                     <TableHead>Name</TableHead>
-                                    <TableHead>Department</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Created</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -228,18 +209,6 @@ export default function Employees() {
                                     <TableRow key={employee.id}>
                                         <TableCell className="font-medium">{employee.attendance_id}</TableCell>
                                         <TableCell>{employee.name}</TableCell>
-                                        <TableCell>{employee.department || '-'}</TableCell>
-                                        <TableCell>
-                                            <span className={`
-                                                px-2.5 py-1 rounded-full text-xs font-medium
-                                                ${employee.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}
-                                            `}>
-                                                {employee.status}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="text-slate-600">
-                                            {new Date(employee.created_date).toLocaleDateString()}
-                                        </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <Button
@@ -248,18 +217,6 @@ export default function Employees() {
                                                     onClick={() => handleEdit(employee)}
                                                 >
                                                     <Pencil className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleToggleStatus(employee)}
-                                                    title={employee.status === 'active' ? 'Deactivate' : 'Activate'}
-                                                >
-                                                    {employee.status === 'active' ? (
-                                                        <UserX className="w-4 h-4 text-amber-600" />
-                                                    ) : (
-                                                        <UserCheck className="w-4 h-4 text-green-600" />
-                                                    )}
                                                 </Button>
                                                 <Button
                                                     size="sm"

@@ -11,9 +11,7 @@ import { toast } from 'sonner';
 export default function EmployeeDialog({ open, onClose, employee }) {
     const [formData, setFormData] = useState({
         attendance_id: '',
-        name: '',
-        department: '',
-        status: 'active'
+        name: ''
     });
     const queryClient = useQueryClient();
 
@@ -21,16 +19,12 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         if (employee) {
             setFormData({
                 attendance_id: employee.attendance_id || '',
-                name: employee.name || '',
-                department: employee.department || '',
-                status: employee.status || 'active'
+                name: employee.name || ''
             });
         } else {
             setFormData({
                 attendance_id: '',
-                name: '',
-                department: '',
-                status: 'active'
+                name: ''
             });
         }
     }, [employee]);
@@ -117,32 +111,6 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="Full name"
                         />
-                    </div>
-
-                    <div>
-                        <Label htmlFor="department">Department</Label>
-                        <Input
-                            id="department"
-                            value={formData.department}
-                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                            placeholder="Optional"
-                        />
-                    </div>
-
-                    <div>
-                        <Label htmlFor="status">Status</Label>
-                        <Select
-                            value={formData.status}
-                            onValueChange={(value) => setFormData({ ...formData, status: value })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="active">Active</SelectItem>
-                                <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                        </Select>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4">
