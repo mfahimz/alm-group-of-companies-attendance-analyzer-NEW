@@ -59,36 +59,81 @@ export default function Employees() {
         }
     });
 
-    const handleImport = (e) => {
+    const handleImport = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const text = event.target.result;
-            const lines = text.split('\n').filter(line => line.trim());
-            
-            const employeeList = [];
-            
-            // Skip header, parse rows
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
-                if (values.length >= 2 && values[0] && values[1]) {
-                    employeeList.push({
-                        attendance_id: values[0],
-                        name: values[1],
-                        status: 'active'
-                    });
-                }
-            }
+        const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
-            if (employeeList.length > 0) {
-                importMutation.mutate(employeeList);
-            } else {
-                toast.error('No valid employee data found in file');
+        if (isExcel) {
+            // Handle Excel files using integration
+            try {
+                toast.info('Uploading file...');
+                const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                
+                toast.info('Extracting data...');
+                const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+                    file_url,
+                    json_schema: {
+                        type: 'object',
+                        properties: {
+                            employees: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        attendance_id: { type: 'string' },
+                                        name: { type: 'string' }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                if (result.status === 'success' && result.output?.employees) {
+                    const employeeList = result.output.employees.map(emp => ({
+                        attendance_id: emp.attendance_id,
+                        name: emp.name,
+                        status: 'active'
+                    }));
+                    importMutation.mutate(employeeList);
+                } else {
+                    toast.error('Failed to extract data from Excel file');
+                }
+            } catch (error) {
+                toast.error('Error processing Excel file: ' + error.message);
             }
-        };
-        reader.readAsText(file);
+        } else {
+            // Handle CSV files
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const text = event.target.result;
+                const lines = text.split('\n').filter(line => line.trim());
+                
+                const employeeList = [];
+                
+                // Skip header, parse rows
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',').map(v => v.trim());
+                    if (values.length >= 2 && values[0] && values[1]) {
+                        employeeList.push({
+                            attendance_id: values[0],
+                            name: values[1],
+                            status: 'active'
+                        });
+                    }
+                }
+
+                if (employeeList.length > 0) {
+                    importMutation.mutate(employeeList);
+                } else {
+                    toast.error('No valid employee data found in file');
+                }
+            };
+            reader.readAsText(file);
+        }
+        
         e.target.value = '';
     };
 
@@ -103,7 +148,7 @@ export default function Employees() {
                     <label>
                         <input
                             type="file"
-                            accept=".csv"
+                            accept=".csv,.xlsx,.xls"
                             onChange={handleImport}
                             className="hidden"
                         />
@@ -113,7 +158,7 @@ export default function Employees() {
                             disabled={importMutation.isPending}
                         >
                             <Upload className="w-4 h-4 mr-2" />
-                            {importMutation.isPending ? 'Importing...' : 'Import CSV'}
+                            {importMutation.isPending ? 'Importing...' : 'Import'}
                         </Button>
                     </label>
                     <Button 
