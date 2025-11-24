@@ -89,20 +89,31 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
         }
     }, [dayRecord, punches, open]);
 
+    const { data: exceptions = [] } = useQuery({
+        queryKey: ['exceptions', project.id],
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        enabled: !!dayRecord
+    });
+
     const updateDayMutation = useMutation({
         mutationFn: async (data) => {
-            // This would typically update the analysis result directly
-            // For now, we create an exception to track manual overrides
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${month}-${day}`;
 
-            // Store the punch selections and adjustments
-            return await base44.entities.Exception.create({
+            // Check if exception already exists for this date and employee
+            const existingException = exceptions.find(ex => 
+                ex.attendance_id === attendanceId &&
+                ex.date_from === dateStr &&
+                ex.date_to === dateStr &&
+                (ex.type === 'MANUAL_ADJUSTMENT' || ex.type === data.type)
+            );
+
+            const exceptionData = {
                 project_id: project.id,
                 attendance_id: attendanceId,
                 date_from: dateStr,
                 date_to: dateStr,
-                type: 'MANUAL_ADJUSTMENT',
+                type: data.type,
                 details: JSON.stringify({
                     selectedPunches: data.selectedPunches,
                     lateMinutes: data.lateMinutes,
@@ -110,12 +121,18 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                     isAbnormal: data.isAbnormal,
                     notes: data.details
                 })
-            });
+            };
+
+            if (existingException) {
+                return await base44.entities.Exception.update(existingException.id, exceptionData);
+            } else {
+                return await base44.entities.Exception.create(exceptionData);
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['results', project.id]);
-            toast.success('Day record updated successfully. Re-run analysis to apply changes.');
+            toast.success('Day record updated. Re-run analysis to apply changes.');
             onClose();
         },
         onError: () => {
