@@ -163,14 +163,18 @@ export default function RunAnalysisTab({ project }) {
 
             // Get shift for this day
             let shift = null;
-            if (dayOfWeek === 5 && rules.shift_rules?.friday_uses_friday_shift) {
-                shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
-            }
+            // First check for date-specific shift
+            shift = employeeShifts.find(s => s.date === dateStr);
+            
+            // If no date-specific shift, check for day-based shift
             if (!shift) {
-                shift = employeeShifts.find(s => s.date === dateStr);
-            }
-            if (!shift && rules.shift_rules?.fallback_to_general_shift_if_missing) {
-                shift = employeeShifts.find(s => !s.date && !s.is_friday_shift);
+                if (dayOfWeek === 5) { // Friday
+                    // Look for Friday shift
+                    shift = employeeShifts.find(s => s.is_friday_shift);
+                } else {
+                    // Look for regular working day shift (not Friday)
+                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                }
             }
 
             // Check for shift override exception
