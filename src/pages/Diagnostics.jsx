@@ -1,11 +1,21 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, Users, FolderKanban, Clock, AlertCircle, CheckCircle, FileText, Calendar, Shield } from 'lucide-react';
+import { Database, Users, FolderKanban, Clock, AlertCircle, CheckCircle, FileText, Calendar, Shield, Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
 
 export default function Diagnostics() {
+    const [selectedProjectId, setSelectedProjectId] = useState('');
+    const [analysisProgress, setAnalysisProgress] = useState(0);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const queryClient = useQueryClient();
+
     const { data: projects = [], isLoading: projectsLoading } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list()
@@ -51,9 +61,158 @@ export default function Diagnostics() {
         queryFn: () => base44.entities.PagePermission.list()
     });
 
+    const { data: allShifts = [] } = useQuery({
+        queryKey: ['shiftsForAnalysis'],
+        queryFn: () => base44.entities.ShiftTiming.list(),
+        enabled: isAnalyzing
+    });
+
+    const { data: allExceptions = [] } = useQuery({
+        queryKey: ['exceptionsForAnalysis'],
+        queryFn: () => base44.entities.Exception.list(),
+        enabled: isAnalyzing
+    });
+
+    const { data: rules } = useQuery({
+        queryKey: ['attendanceRules'],
+        queryFn: async () => {
+            const rulesList = await base44.entities.AttendanceRules.list();
+            return rulesList[0];
+        },
+        enabled: isAnalyzing
+    });
+
     const isLoading = projectsLoading || employeesLoading || punchesLoading || 
                       shiftsLoading || exceptionsLoading || resultsLoading || 
                       reportRunsLoading || usersLoading || permissionsLoading;
+
+    const runAnalysisMutation = useMutation({
+        mutationFn: async (projectId) => {
+            const project = projects.find(p => p.id === projectId);
+            if (!project) throw new Error('Project not found');
+
+            setIsAnalyzing(true);
+            setAnalysisProgress(0);
+
+            const projectPunches = punches.filter(p => p.project_id === projectId);
+            const projectShifts = allShifts.filter(s => s.project_id === projectId);
+            const projectExceptions = allExceptions.filter(e => e.project_id === projectId);
+
+            const employeeIds = [...new Set(projectPunches.map(p => p.attendance_id))];
+            
+            const reportRun = await base44.entities.ReportRun.create({
+                project_id: projectId,
+                employee_count: employeeIds.length
+            });
+
+            const rulesConfig = rules?.rules_json ? JSON.parse(rules.rules_json) : {};
+            const results = [];
+
+            for (let i = 0; i < employeeIds.length; i++) {
+                const attendanceId = employeeIds[i];
+                const result = await analyzeEmployee(
+                    attendanceId, 
+                    project, 
+                    projectPunches, 
+                    projectShifts, 
+                    projectExceptions,
+                    employees,
+                    rulesConfig
+                );
+                
+                const analysisResult = await base44.entities.AnalysisResult.create({
+                    project_id: projectId,
+                    report_run_id: reportRun.id,
+                    attendance_id: attendanceId,
+                    ...result
+                });
+                
+                results.push(analysisResult);
+                setAnalysisProgress(Math.round(((i + 1) / employeeIds.length) * 100));
+            }
+
+            await base44.entities.Project.update(projectId, { status: 'analyzed' });
+            return results;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['projects']);
+            queryClient.invalidateQueries(['allResults']);
+            queryClient.invalidateQueries(['allReportRuns']);
+            setIsAnalyzing(false);
+            setAnalysisProgress(0);
+            toast.success('Analysis completed successfully');
+        },
+        onError: (error) => {
+            setIsAnalyzing(false);
+            setAnalysisProgress(0);
+            toast.error('Analysis failed: ' + error.message);
+        }
+    });
+
+    const analyzeEmployee = async (attendanceId, project, punches, shifts, exceptions, employees, rules) => {
+        let workingDays = 0;
+        let presentDays = 0;
+        let fullAbsenceCount = 0;
+        let halfAbsenceCount = 0;
+        let lateMinutes = 0;
+        let earlyCheckoutMinutes = 0;
+        const abnormalDates = [];
+
+        const startDate = new Date(project.date_from);
+        const endDate = new Date(project.date_to);
+        
+        const employeePunches = punches.filter(p => p.attendance_id === attendanceId);
+        const employeeShifts = shifts.filter(s => s.attendance_id === attendanceId);
+        const employeeExceptions = exceptions.filter(e => e.attendance_id === attendanceId);
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const currentDate = new Date(d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay();
+
+            if (dayOfWeek === 0) continue;
+
+            const dateException = employeeExceptions.find(ex => {
+                const exFrom = new Date(ex.date_from);
+                const exTo = new Date(ex.date_to);
+                return currentDate >= exFrom && currentDate <= exTo;
+            });
+
+            if (dateException?.type === 'OFF') continue;
+
+            workingDays++;
+
+            const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+            
+            let dayStatus = 'absent';
+            if (dateException?.type === 'MANUAL_PRESENT') {
+                dayStatus = 'present';
+            } else if (dateException?.type === 'MANUAL_ABSENT') {
+                dayStatus = 'absent';
+            } else if (dateException?.type === 'MANUAL_HALF') {
+                dayStatus = 'half';
+            } else if (dayPunches.length >= 2) {
+                dayStatus = 'present';
+            } else if (dayPunches.length === 1) {
+                dayStatus = 'half';
+            }
+
+            if (dayStatus === 'present') presentDays++;
+            else if (dayStatus === 'absent') fullAbsenceCount++;
+            else if (dayStatus === 'half') halfAbsenceCount++;
+        }
+
+        return {
+            working_days: workingDays,
+            present_days: presentDays,
+            full_absence_count: fullAbsenceCount,
+            half_absence_count: halfAbsenceCount,
+            late_minutes: lateMinutes,
+            early_checkout_minutes: earlyCheckoutMinutes,
+            abnormal_dates: abnormalDates.join(', '),
+            notes: abnormalDates.join(', ')
+        };
+    };
 
     const entityStats = [
         {
@@ -154,6 +313,50 @@ export default function Diagnostics() {
                 <h1 className="text-3xl font-bold text-slate-900">System Diagnostics</h1>
                 <p className="text-slate-600 mt-2">Overview of system health and data statistics</p>
             </div>
+
+            {/* Quick Analysis */}
+            <Card className="border-0 shadow-sm">
+                <CardHeader>
+                    <CardTitle>Quick Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-end gap-4">
+                        <div className="flex-1">
+                            <Label className="text-sm font-medium mb-2">Select Project</Label>
+                            <Select 
+                                value={selectedProjectId} 
+                                onValueChange={setSelectedProjectId}
+                                disabled={isAnalyzing}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Choose a project..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {projects.map(project => (
+                                        <SelectItem key={project.id} value={project.id}>
+                                            {project.name} ({project.status})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button
+                            onClick={() => runAnalysisMutation.mutate(selectedProjectId)}
+                            disabled={!selectedProjectId || isAnalyzing}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            <Play className="w-4 h-4 mr-2" />
+                            {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+                        </Button>
+                    </div>
+                    {isAnalyzing && (
+                        <div className="mt-4 space-y-2">
+                            <Progress value={analysisProgress} className="h-2" />
+                            <p className="text-sm text-slate-600 text-center">{analysisProgress}% complete</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* System Health */}
             <Card className="border-0 shadow-sm">
