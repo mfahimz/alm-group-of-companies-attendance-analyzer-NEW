@@ -47,7 +47,10 @@ export default function PunchUploadTab({ project }) {
                 const values = lines[i].split(',').map(v => v.trim());
                 if (values.length >= 2) {
                     const attendance_id = values[0];
-                    const timestamp_raw = values[1];
+                    // Handle both formats: (ID, timestamp) and (ID, name, timestamp)
+                    const timestamp_raw = values.length >= 3 && values[2].match(/\d{2}\/\d{2}\/\d{4}/) 
+                        ? values[2] 
+                        : values[1];
 
                     // Extract date from timestamp (DD/MM/YYYY HH:MM AM/PM)
                     const dateMatch = timestamp_raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
@@ -132,7 +135,7 @@ export default function PunchUploadTab({ project }) {
                             onChange={handleFileChange}
                         />
                         <p className="text-sm text-slate-500 mt-2">
-                            CSV format: attendance_id, timestamp (DD/MM/YYYY HH:MM AM/PM)
+                            CSV format: attendance_id, name (optional), timestamp (DD/MM/YYYY HH:MM AM/PM)
                         </p>
                     </div>
 
