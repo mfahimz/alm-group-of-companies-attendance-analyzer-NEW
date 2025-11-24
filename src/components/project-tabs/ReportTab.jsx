@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye } from 'lucide-react';
+import { Download, Search, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ReportTab({ project }) {
@@ -14,6 +14,7 @@ export default function ReportTab({ project }) {
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [selectedReportRun, setSelectedReportRun] = useState(null);
+    const queryClient = useQueryClient();
 
     const { data: reportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
@@ -35,6 +36,32 @@ export default function ReportTab({ project }) {
     const results = selectedReportRun 
         ? allResults.filter(r => r.report_run_id === selectedReportRun)
         : [];
+
+    const deleteReportMutation = useMutation({
+        mutationFn: async (reportRunId) => {
+            // Delete all analysis results for this report run
+            const resultsToDelete = allResults.filter(r => r.report_run_id === reportRunId);
+            await Promise.all(resultsToDelete.map(r => base44.entities.AnalysisResult.delete(r.id)));
+            
+            // Delete the report run
+            await base44.entities.ReportRun.delete(reportRunId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['reportRuns', project.id]);
+            queryClient.invalidateQueries(['results', project.id]);
+            setSelectedReportRun(null);
+            toast.success('Report deleted successfully');
+        },
+        onError: () => {
+            toast.error('Failed to delete report');
+        }
+    });
+
+    const handleDeleteReport = (reportRunId) => {
+        if (window.confirm('Delete this report? This will permanently remove all analysis results from this run.')) {
+            deleteReportMutation.mutate(reportRunId);
+        }
+    };
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees'],
@@ -190,32 +217,44 @@ export default function ReportTab({ project }) {
                     <CardContent>
                         <div className="space-y-2">
                             {reportRuns.map((run) => (
-                                <button
+                                <div
                                     key={run.id}
-                                    onClick={() => setSelectedReportRun(run.id)}
-                                    className={`w-full text-left p-4 rounded-lg border transition-all ${
+                                    className={`flex items-center gap-3 p-4 rounded-lg border transition-all ${
                                         selectedReportRun === run.id
                                             ? 'bg-indigo-50 border-indigo-300'
-                                            : 'bg-white border-slate-200 hover:border-slate-300'
+                                            : 'bg-white border-slate-200'
                                     }`}
                                 >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-medium text-slate-900">
-                                                Report Generated: {new Date(run.created_date).toLocaleString('en-US', {
-                                                    dateStyle: 'medium',
-                                                    timeStyle: 'short'
-                                                })}
-                                            </p>
-                                            <p className="text-sm text-slate-600 mt-1">
-                                                {run.employee_count} employee{run.employee_count !== 1 ? 's' : ''} analyzed
-                                            </p>
+                                    <button
+                                        onClick={() => setSelectedReportRun(run.id)}
+                                        className="flex-1 text-left"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="font-medium text-slate-900">
+                                                    Report Generated: {new Date(run.created_date).toLocaleString('en-US', {
+                                                        dateStyle: 'medium',
+                                                        timeStyle: 'short'
+                                                    })}
+                                                </p>
+                                                <p className="text-sm text-slate-600 mt-1">
+                                                    {run.employee_count} employee{run.employee_count !== 1 ? 's' : ''} analyzed
+                                                </p>
+                                            </div>
+                                            {selectedReportRun === run.id && (
+                                                <span className="text-indigo-600 font-medium text-sm">Viewing</span>
+                                            )}
                                         </div>
-                                        {selectedReportRun === run.id && (
-                                            <span className="text-indigo-600 font-medium text-sm">Viewing</span>
-                                        )}
-                                    </div>
-                                </button>
+                                    </button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleDeleteReport(run.id)}
+                                        disabled={deleteReportMutation.isPending}
+                                    >
+                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                </div>
                             ))}
                         </div>
                     </CardContent>
