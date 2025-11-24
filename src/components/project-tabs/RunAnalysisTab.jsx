@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { parseTimeUAE, getUAEDate } from '../../utils/timezone';
 
 export default function RunAnalysisTab({ project }) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -469,41 +470,7 @@ export default function RunAnalysisTab({ project }) {
         return filtered.map(fp => punches.find(p => p.id === fp.id)).filter(Boolean);
     };
 
-    const parseTime = (timeStr) => {
-        try {
-            if (!timeStr || timeStr === '—') return null;
-            
-            // Try AM/PM format first: "8:00 AM" or "08:00 AM" or "DD/MM/YYYY 8:00 AM"
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-            if (timeMatch) {
-                let hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const period = timeMatch[3].toUpperCase();
-                
-                if (period === 'PM' && hours !== 12) hours += 12;
-                if (period === 'AM' && hours === 12) hours = 0;
-                
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-            
-            // Fallback: Try 24-hour format for backwards compatibility: "08:00:00", "08:00"
-            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-            if (timeMatch) {
-                const hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-            
-            return null;
-        } catch {
-            return null;
-        }
-    };
+    const parseTime = parseTimeUAE;
 
     return (
         <div className="space-y-6">

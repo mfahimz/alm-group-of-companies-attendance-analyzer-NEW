@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatUAEDateTime } from './utils/timezone';
 
 export default function Layout({ children, currentPageName }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -111,7 +112,16 @@ export default function Layout({ children, currentPageName }) {
             )}>
                 <div className="flex flex-col h-full">
                     {/* Logo */}
-                    <div className="flex items-center justify-between px-6 h-16 border-b border-slate-200">
+                    <div className="flex flex-col px-6 py-3 border-b border-slate-200">
+                        <div className="flex items-center space-x-3 mb-1">
+                            <BarChart3 className="w-7 h-7 text-indigo-600" />
+                            <span className="text-xl font-semibold text-slate-900">Attendance</span>
+                        </div>
+                        <span className="text-xs text-slate-500 ml-10">
+                            🕐 UAE Time: {formatUAEDateTime(new Date(), { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                    <div className="lg:hidden px-6 h-16 border-b border-slate-200 flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                             <BarChart3 className="w-7 h-7 text-indigo-600" />
                             <span className="text-xl font-semibold text-slate-900">Attendance</span>
