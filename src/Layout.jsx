@@ -114,7 +114,11 @@ export default function Layout({ children, currentPageName }) {
                     {/* Logo */}
                     <div className="flex items-center justify-between px-6 h-16 border-b border-slate-200">
                         <div className="flex items-center space-x-3">
-                            <BarChart3 className="w-7 h-7 text-indigo-600" />
+                            <img 
+                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69230930412bf36e97f1ff37/a5cd1bc1e_almaraghi.pdf" 
+                                alt="ALMARAGHI Logo" 
+                                className="h-10 w-auto"
+                            />
                             <span className="text-xl font-semibold text-slate-900">Attendance</span>
                         </div>
                         <Button
@@ -241,8 +245,12 @@ export default function Layout({ children, currentPageName }) {
                         onClick={() => setSidebarOpen(true)}
                     >
                         <Menu className="w-6 h-6" />
-                    </Button>
-                    <span className="ml-4 text-lg font-semibold text-slate-900">Attendance</span>
+                        </Button>
+                        <img 
+                        src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69230930412bf36e97f1ff37/a5cd1bc1e_almaraghi.pdf" 
+                        alt="ALMARAGHI Logo" 
+                        className="ml-4 h-8 w-auto"
+                        />
                 </header>
 
                 {/* Page Content */}
