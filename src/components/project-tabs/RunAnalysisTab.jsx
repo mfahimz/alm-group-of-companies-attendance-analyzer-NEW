@@ -265,12 +265,13 @@ export default function RunAnalysisTab({ project }) {
 
     const parseTime = (timeStr) => {
         try {
-            const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-            if (!match) return null;
+            // Handle both "HH:MM AM/PM" format and full timestamp "DD/MM/YYYY HH:MM AM/PM"
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (!timeMatch) return null;
             
-            let hours = parseInt(match[1]);
-            const minutes = parseInt(match[2]);
-            const period = match[3].toUpperCase();
+            let hours = parseInt(timeMatch[1]);
+            const minutes = parseInt(timeMatch[2]);
+            const period = timeMatch[3].toUpperCase();
             
             if (period === 'PM' && hours !== 12) hours += 12;
             if (period === 'AM' && hours === 12) hours = 0;

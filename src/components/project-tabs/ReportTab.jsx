@@ -102,14 +102,13 @@ export default function ReportTab({ project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'Full Absences', 'Half Absences', 'Late Minutes', 'Notes'];
+        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'Full Absences', 'Late Minutes', 'Notes'];
         const rows = filteredResults.map(r => [
             r.attendance_id,
             r.name,
             r.working_days,
             r.present_days,
             r.full_absence_count,
-            r.half_absence_count,
             r.late_minutes,
             r.notes || ''
         ]);
@@ -311,7 +310,6 @@ export default function ReportTab({ project }) {
                                         <TableHead>Working Days</TableHead>
                                         <TableHead>Present Days</TableHead>
                                         <TableHead>Full Absences</TableHead>
-                                        <TableHead>Half Absences</TableHead>
                                         <TableHead>Late Minutes</TableHead>
                                         <TableHead>Notes</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
@@ -327,11 +325,6 @@ export default function ReportTab({ project }) {
                                             <TableCell>
                                                 <span className={`${result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}`}>
                                                     {result.full_absence_count}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className={`${result.half_absence_count > 0 ? 'text-amber-600 font-medium' : ''}`}>
-                                                    {result.half_absence_count}
                                                 </span>
                                             </TableCell>
                                             <TableCell>
