@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Copy } from 'lucide-react';
+import { Plus, Search, Copy, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
@@ -92,6 +92,37 @@ export default function Projects() {
         }
     });
 
+    const deleteMutation = useMutation({
+        mutationFn: async (projectId) => {
+            // Delete all ReportRuns first
+            const reportRuns = await base44.entities.ReportRun.filter({ project_id: projectId });
+            await Promise.all(reportRuns.map(item => base44.entities.ReportRun.delete(item.id)));
+            
+            // Delete all related data
+            const punchItems = await base44.entities.Punch.filter({ project_id: projectId });
+            await Promise.all(punchItems.map(item => base44.entities.Punch.delete(item.id)));
+            
+            const exceptionItems = await base44.entities.Exception.filter({ project_id: projectId });
+            await Promise.all(exceptionItems.map(item => base44.entities.Exception.delete(item.id)));
+            
+            const resultItems = await base44.entities.AnalysisResult.filter({ project_id: projectId });
+            await Promise.all(resultItems.map(item => base44.entities.AnalysisResult.delete(item.id)));
+            
+            const shiftItems = await base44.entities.ShiftTiming.filter({ project_id: projectId });
+            await Promise.all(shiftItems.map(item => base44.entities.ShiftTiming.delete(item.id)));
+            
+            // Finally delete the project
+            await base44.entities.Project.delete(projectId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['projects']);
+            toast.success('Project deleted successfully');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete project: ' + error.message);
+        }
+    });
+
     const filteredProjects = projects.filter(project =>
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.department?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -173,11 +204,11 @@ export default function Projects() {
                                     </div>
                                 </Link>
                                 
-                                <div className="mt-4 pt-4 border-t border-slate-100">
+                                <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="w-full"
+                                        className="flex-1"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             duplicateMutation.mutate(project.id);
@@ -185,7 +216,21 @@ export default function Projects() {
                                         disabled={duplicateMutation.isPending}
                                     >
                                         <Copy className="w-4 h-4 mr-2" />
-                                        Duplicate Project
+                                        Duplicate
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            if (window.confirm('Delete this project? This action cannot be undone.')) {
+                                                deleteMutation.mutate(project.id);
+                                            }
+                                        }}
+                                        disabled={deleteMutation.isPending}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
                                     </Button>
                                 </div>
                             </CardContent>
