@@ -75,24 +75,33 @@ export default function OverviewTab({ project }) {
 
     const deleteMutation = useMutation({
         mutationFn: async () => {
-            await base44.entities.Punch.filter({ project_id: project.id }).then(items => 
-                Promise.all(items.map(item => base44.entities.Punch.delete(item.id)))
-            );
-            await base44.entities.Exception.filter({ project_id: project.id }).then(items => 
-                Promise.all(items.map(item => base44.entities.Exception.delete(item.id)))
-            );
-            await base44.entities.AnalysisResult.filter({ project_id: project.id }).then(items => 
-                Promise.all(items.map(item => base44.entities.AnalysisResult.delete(item.id)))
-            );
-            await base44.entities.ShiftTiming.filter({ project_id: project.id }).then(items => 
-                Promise.all(items.map(item => base44.entities.ShiftTiming.delete(item.id)))
-            );
+            // Delete all ReportRuns first
+            const reportRuns = await base44.entities.ReportRun.filter({ project_id: project.id });
+            await Promise.all(reportRuns.map(item => base44.entities.ReportRun.delete(item.id)));
+            
+            // Delete all related data
+            const punchItems = await base44.entities.Punch.filter({ project_id: project.id });
+            await Promise.all(punchItems.map(item => base44.entities.Punch.delete(item.id)));
+            
+            const exceptionItems = await base44.entities.Exception.filter({ project_id: project.id });
+            await Promise.all(exceptionItems.map(item => base44.entities.Exception.delete(item.id)));
+            
+            const resultItems = await base44.entities.AnalysisResult.filter({ project_id: project.id });
+            await Promise.all(resultItems.map(item => base44.entities.AnalysisResult.delete(item.id)));
+            
+            const shiftItems = await base44.entities.ShiftTiming.filter({ project_id: project.id });
+            await Promise.all(shiftItems.map(item => base44.entities.ShiftTiming.delete(item.id)));
+            
+            // Finally delete the project
             await base44.entities.Project.delete(project.id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['projects']);
             toast.success('Project deleted successfully');
             navigate(createPageUrl('Projects'));
+        },
+        onError: (error) => {
+            toast.error('Failed to delete project: ' + error.message);
         }
     });
 
