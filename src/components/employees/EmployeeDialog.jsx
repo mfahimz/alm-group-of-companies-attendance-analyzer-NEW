@@ -13,6 +13,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     const [formData, setFormData] = useState({
         attendance_id: '',
         name: '',
+        company: '',
         active: true
     });
     const queryClient = useQueryClient();
@@ -22,12 +23,14 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             setFormData({
                 attendance_id: employee.attendance_id || '',
                 name: employee.name || '',
+                company: employee.company || '',
                 active: employee.active ?? true
             });
         } else {
             setFormData({
                 attendance_id: '',
                 name: '',
+                company: '',
                 active: true
             });
         }
@@ -114,6 +117,16 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="Full name"
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="company">Company</Label>
+                        <Input
+                            id="company"
+                            value={formData.company}
+                            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                            placeholder="Company name"
                         />
                     </div>
 

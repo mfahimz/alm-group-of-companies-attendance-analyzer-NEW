@@ -340,6 +340,7 @@ export default function Employees() {
                                     </TableHead>
                                     <TableHead>Attendance ID</TableHead>
                                     <TableHead>Name</TableHead>
+                                    <TableHead>Company</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -371,6 +372,7 @@ export default function Employees() {
                                                     )}
                                                 </div>
                                             </TableCell>
+                                            <TableCell className="text-slate-600">{employee.company || '-'}</TableCell>
                                             <TableCell>
                                                 <span className={`
                                                     px-2 py-1 rounded-full text-xs font-medium
