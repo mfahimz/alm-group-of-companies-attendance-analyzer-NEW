@@ -4,19 +4,92 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Plus, Search, Copy } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
+import { toast } from 'sonner';
 
 export default function Projects() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
 
     const { data: projects = [], isLoading } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list('-created_date')
+    });
+
+    const duplicateMutation = useMutation({
+        mutationFn: async (projectId) => {
+            const project = projects.find(p => p.id === projectId);
+            const punches = await base44.entities.Punch.filter({ project_id: projectId });
+            const shifts = await base44.entities.ShiftTiming.filter({ project_id: projectId });
+            const exceptions = await base44.entities.Exception.filter({ project_id: projectId });
+
+            const newProject = await base44.entities.Project.create({
+                name: `${project.name} (Copy)`,
+                date_from: project.date_from,
+                date_to: project.date_to,
+                department: project.department,
+                status: 'draft'
+            });
+
+            if (punches.length > 0) {
+                await base44.entities.Punch.bulkCreate(
+                    punches.map(p => ({
+                        project_id: newProject.id,
+                        attendance_id: p.attendance_id,
+                        timestamp_raw: p.timestamp_raw,
+                        punch_date: p.punch_date
+                    }))
+                );
+            }
+
+            if (shifts.length > 0) {
+                await base44.entities.ShiftTiming.bulkCreate(
+                    shifts.map(s => ({
+                        project_id: newProject.id,
+                        attendance_id: s.attendance_id,
+                        date: s.date,
+                        is_friday_shift: s.is_friday_shift,
+                        applicable_days: s.applicable_days,
+                        am_start: s.am_start,
+                        am_end: s.am_end,
+                        pm_start: s.pm_start,
+                        pm_end: s.pm_end
+                    }))
+                );
+            }
+
+            if (exceptions.length > 0) {
+                await base44.entities.Exception.bulkCreate(
+                    exceptions.map(e => ({
+                        project_id: newProject.id,
+                        attendance_id: e.attendance_id,
+                        date_from: e.date_from,
+                        date_to: e.date_to,
+                        type: e.type,
+                        new_am_start: e.new_am_start,
+                        new_am_end: e.new_am_end,
+                        new_pm_start: e.new_pm_start,
+                        new_pm_end: e.new_pm_end,
+                        details: e.details
+                    }))
+                );
+            }
+
+            return newProject;
+        },
+        onSuccess: (newProject) => {
+            queryClient.invalidateQueries(['projects']);
+            toast.success('Project duplicated successfully');
+            navigate(createPageUrl(`ProjectDetail?id=${newProject.id}`));
+        },
+        onError: () => {
+            toast.error('Failed to duplicate project');
+        }
     });
 
     const filteredProjects = projects.filter(project =>
@@ -63,12 +136,9 @@ export default function Projects() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProjects.map((project) => (
-                        <Link
-                            key={project.id}
-                            to={createPageUrl(`ProjectDetail?id=${project.id}`)}
-                        >
-                            <Card className="border-0 shadow-sm hover:shadow-md transition-shadow h-full">
-                                <CardContent className="p-6">
+                        <Card key={project.id} className="border-0 shadow-sm hover:shadow-md transition-shadow h-full">
+                            <CardContent className="p-6">
+                                <Link to={createPageUrl(`ProjectDetail?id=${project.id}`)}>
                                     <div className="flex items-start justify-between mb-4">
                                         <h3 className="font-semibold text-slate-900 text-lg">{project.name}</h3>
                                         <span className={`
@@ -101,9 +171,25 @@ export default function Projects() {
                                             </span>
                                         </div>
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
+                                </Link>
+                                
+                                <div className="mt-4 pt-4 border-t border-slate-100">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            duplicateMutation.mutate(project.id);
+                                        }}
+                                        disabled={duplicateMutation.isPending}
+                                    >
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Duplicate Project
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
                     ))}
                 </div>
             )}
