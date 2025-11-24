@@ -26,10 +26,11 @@ export default function Layout({ children, currentPageName }) {
     const isAdmin = currentUser?.role === 'admin';
 
     const hasPageAccess = (pageName) => {
+        if (!currentUser) return false;
         const permission = permissions.find(p => p.page_name === pageName);
-        if (!permission) return true;
+        if (!permission) return true; // If no permission configured, allow by default
         const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-        return allowedRoles.includes(currentUser?.role);
+        return allowedRoles.includes(currentUser.role);
     };
 
     const menuGroups = [
@@ -69,14 +70,28 @@ export default function Layout({ children, currentPageName }) {
         }
     ];
 
-    const filteredMenuGroups = menuGroups.map(group => ({
-        ...group,
-        items: group.items.filter(item => hasPageAccess(item.path))
-    })).filter(group => group.items.length > 0);
+    // Filter menu items based on user permissions
+    const filteredMenuGroups = React.useMemo(() => {
+        if (!currentUser) return [];
+        
+        return menuGroups.map(group => ({
+            ...group,
+            items: group.items.filter(item => hasPageAccess(item.path))
+        })).filter(group => group.items.length > 0);
+    }, [currentUser, permissions]);
 
     const toggleGroup = (groupId) => {
         setExpandedGroup(expandedGroup === groupId ? null : groupId);
     };
+
+    // Don't render sidebar until user is loaded
+    if (!currentUser) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-500">Loading...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
