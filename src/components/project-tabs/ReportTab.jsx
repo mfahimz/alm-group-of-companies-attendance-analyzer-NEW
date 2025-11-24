@@ -102,7 +102,7 @@ export default function ReportTab({ project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'Full Absences', 'Late Minutes', 'Notes'];
+        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'Full Absences', 'Late Minutes', 'Early Checkout Minutes', 'Notes'];
         const rows = filteredResults.map(r => [
             r.attendance_id,
             r.name,
@@ -110,6 +110,7 @@ export default function ReportTab({ project }) {
             r.present_days,
             r.full_absence_count,
             r.late_minutes,
+            r.early_checkout_minutes || 0,
             r.notes || ''
         ]);
 
@@ -311,6 +312,7 @@ export default function ReportTab({ project }) {
                                         <TableHead>Present Days</TableHead>
                                         <TableHead>Full Absences</TableHead>
                                         <TableHead>Late Minutes</TableHead>
+                                        <TableHead>Early Checkout Minutes</TableHead>
                                         <TableHead>Notes</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -330,6 +332,11 @@ export default function ReportTab({ project }) {
                                             <TableCell>
                                                 <span className={`${result.late_minutes > 0 ? 'text-orange-600 font-medium' : ''}`}>
                                                     {result.late_minutes}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`${result.early_checkout_minutes > 0 ? 'text-blue-600 font-medium' : ''}`}>
+                                                    {result.early_checkout_minutes || 0}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-xs text-slate-600 max-w-xs truncate">

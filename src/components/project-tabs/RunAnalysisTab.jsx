@@ -93,6 +93,7 @@ export default function RunAnalysisTab({ project }) {
                     full_absence_count: result.full_absence_count,
                     half_absence_count: result.half_absence_count,
                     late_minutes: result.late_minutes,
+                    early_checkout_minutes: result.early_checkout_minutes,
                     abnormal_dates: result.abnormal_dates,
                     notes: result.notes
                 });
@@ -127,6 +128,7 @@ export default function RunAnalysisTab({ project }) {
         let full_absence_count = 0;
         let half_absence_count = 0;
         let late_minutes = 0;
+        let early_checkout_minutes = 0;
         const abnormal_dates_list = [];
 
         const startDate = new Date(project.date_from);
@@ -208,14 +210,53 @@ export default function RunAnalysisTab({ project }) {
             if (dayPunches.length > 0) {
                 present_days++;
 
-                // Calculate late minutes if shift exists
-                if (shift && shift.am_start && dayPunches.length > 0) {
-                    const firstPunch = dayPunches[0];
-                    const punchTime = parseTime(firstPunch.timestamp_raw);
-                    const shiftStart = parseTime(shift.am_start);
+                // Calculate late minutes for both AM and PM shifts
+                if (shift) {
+                    // AM shift late check
+                    if (shift.am_start && dayPunches.length > 0) {
+                        const firstPunch = dayPunches[0];
+                        const punchTime = parseTime(firstPunch.timestamp_raw);
+                        const shiftStart = parseTime(shift.am_start);
 
-                    if (punchTime && shiftStart && punchTime > shiftStart) {
-                        late_minutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                        if (punchTime && shiftStart && punchTime > shiftStart) {
+                            late_minutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                        }
+                    }
+
+                    // PM shift late check (second punch in)
+                    if (shift.pm_start && dayPunches.length >= 3) {
+                        // Find the first punch after lunch (around PM shift start)
+                        const pmPunches = dayPunches.filter((p, idx) => idx >= 2); // After first 2 punches
+                        if (pmPunches.length > 0) {
+                            const pmFirstPunch = pmPunches[0];
+                            const punchTime = parseTime(pmFirstPunch.timestamp_raw);
+                            const shiftStart = parseTime(shift.pm_start);
+
+                            if (punchTime && shiftStart && punchTime > shiftStart) {
+                                late_minutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                            }
+                        }
+                    }
+
+                    // Early checkout check (AM and PM)
+                    if (shift.am_end && dayPunches.length >= 2) {
+                        const secondPunch = dayPunches[1];
+                        const punchTime = parseTime(secondPunch.timestamp_raw);
+                        const shiftEnd = parseTime(shift.am_end);
+
+                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                            early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                        }
+                    }
+
+                    if (shift.pm_end && dayPunches.length >= 4) {
+                        const lastPunch = dayPunches[dayPunches.length - 1];
+                        const punchTime = parseTime(lastPunch.timestamp_raw);
+                        const shiftEnd = parseTime(shift.pm_end);
+
+                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                            early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                        }
                     }
                 }
 
@@ -236,7 +277,36 @@ export default function RunAnalysisTab({ project }) {
                 abnormal_dates_list.push(dateStr);
             }
             if (rules.abnormality_rules?.detect_extra_punches && dayPunches.length > expectedPunches) {
-                abnormal_dates_list.push(dateStr);
+                // Check if extra punches are within 10-minute range
+                let hasRealExtraPunches = false;
+                const punchTimes = dayPunches.map(p => parseTime(p.timestamp_raw));
+                
+                // Group punches that are within 10 minutes of each other
+                const groups = [];
+                punchTimes.forEach((time, idx) => {
+                    if (!time) return;
+                    
+                    let addedToGroup = false;
+                    for (let group of groups) {
+                        if (Math.abs(time - group[0]) <= 10 * 60 * 1000) { // 10 minutes
+                            group.push(time);
+                            addedToGroup = true;
+                            break;
+                        }
+                    }
+                    if (!addedToGroup) {
+                        groups.push([time]);
+                    }
+                });
+                
+                // If we have more distinct groups than expected punches, flag it
+                if (groups.length > expectedPunches) {
+                    hasRealExtraPunches = true;
+                }
+                
+                if (hasRealExtraPunches) {
+                    abnormal_dates_list.push(dateStr);
+                }
             }
 
             // Special abnormal dates
@@ -258,6 +328,7 @@ export default function RunAnalysisTab({ project }) {
             full_absence_count,
             half_absence_count,
             late_minutes,
+            early_checkout_minutes,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
             notes: [...new Set(abnormal_dates_list)].map(d => new Date(d).toLocaleDateString()).join(', ')
         };
