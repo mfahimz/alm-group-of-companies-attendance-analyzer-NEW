@@ -363,7 +363,7 @@ export default function RunAnalysisTab({ project }) {
     };
 
     const filterMultiplePunches = (punches, shift) => {
-        if (punches.length <= 4) return punches; // No filtering needed for 4 or fewer punches
+        if (punches.length <= 4) return punches;
         
         const punchesWithTime = punches.map(p => ({
             ...p,
@@ -372,104 +372,108 @@ export default function RunAnalysisTab({ project }) {
         
         if (punchesWithTime.length === 0) return punches;
 
-        // 1. Morning Punch-In: Keep first punch in a rolling 10-minute window
-        let morningPunchIn = null;
-        const morningCandidates = [];
-        for (let i = 0; i < punchesWithTime.length; i++) {
-            if (morningCandidates.length === 0) {
-                morningCandidates.push(punchesWithTime[i]);
-            } else {
-                const lastInCluster = morningCandidates[morningCandidates.length - 1];
-                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
+        // Helper: Find cluster of punches within 10 minutes
+        const findCluster = (startIdx, maxSize = null) => {
+            const cluster = [punchesWithTime[startIdx]];
+            for (let i = startIdx + 1; i < punchesWithTime.length; i++) {
+                const timeDiff = (punchesWithTime[i].time - cluster[cluster.length - 1].time) / (1000 * 60);
                 if (timeDiff <= 10) {
-                    morningCandidates.push(punchesWithTime[i]);
+                    cluster.push(punchesWithTime[i]);
+                    if (maxSize && cluster.length >= maxSize) break;
                 } else {
-                    break; // End of morning cluster
+                    break;
                 }
             }
-        }
-        morningPunchIn = morningCandidates[0]; // Keep first in cluster
+            return cluster;
+        };
 
-        // 2. Morning Punch-Out: Keep last punch in afternoon shift window within 10-minute cluster
-        let morningPunchOut = null;
-        if (shift && shift.am_end && punchesWithTime.length > 1) {
+        // 1. Morning In: First punch of day (from first cluster)
+        const morningInCluster = findCluster(0);
+        const morningIn = morningInCluster[0];
+
+        // 2. Morning Out: Find punches around AM end time
+        let morningOut = null;
+        if (shift && shift.am_end) {
             const amEndTime = parseTime(shift.am_end);
             const pmStartTime = shift.pm_start ? parseTime(shift.pm_start) : null;
             
-            // Find punches in the AM end window (before PM start or around AM end)
-            const amEndCandidates = [];
-            for (let i = 1; i < punchesWithTime.length; i++) {
-                const punch = punchesWithTime[i];
-                // Skip if this is definitely PM punch-in or later
-                if (pmStartTime && punch.time >= pmStartTime) continue;
-                
-                // Consider punches around AM end time
-                if (amEndCandidates.length === 0) {
-                    amEndCandidates.push(punch);
-                } else {
-                    const lastInCluster = amEndCandidates[amEndCandidates.length - 1];
-                    const timeDiff = Math.abs(punch.time - lastInCluster.time) / (1000 * 60);
+            // Find punches between morning-in and before PM start
+            const amOutCandidates = punchesWithTime.filter((p, idx) => {
+                if (idx === 0) return false; // Skip morning-in
+                if (pmStartTime && p.time >= pmStartTime) return false;
+                // Look for punches within 30 min before/after AM end
+                const diffFromAmEnd = Math.abs(p.time - amEndTime) / (1000 * 60);
+                return diffFromAmEnd <= 30;
+            });
+            
+            if (amOutCandidates.length > 0) {
+                // Group into clusters and pick last punch from last cluster
+                let lastCluster = [amOutCandidates[0]];
+                for (let i = 1; i < amOutCandidates.length; i++) {
+                    const timeDiff = (amOutCandidates[i].time - lastCluster[lastCluster.length - 1].time) / (1000 * 60);
                     if (timeDiff <= 10) {
-                        amEndCandidates.push(punch);
+                        lastCluster.push(amOutCandidates[i]);
+                    } else {
+                        lastCluster = [amOutCandidates[i]];
                     }
                 }
-            }
-            if (amEndCandidates.length > 0) {
-                morningPunchOut = amEndCandidates[amEndCandidates.length - 1]; // Keep last in cluster
+                morningOut = lastCluster[lastCluster.length - 1];
             }
         }
 
-        // 3. PM Punch-In: Similar to morning punch-in, find first punch after AM punch-out
-        let pmPunchIn = null;
-        const morningOutIndex = morningPunchOut ? punchesWithTime.indexOf(morningPunchOut) : 0;
-        const pmInCandidates = [];
-        for (let i = morningOutIndex + 1; i < punchesWithTime.length; i++) {
-            if (pmInCandidates.length === 0) {
-                pmInCandidates.push(punchesWithTime[i]);
+        // Fallback: If no morning out found, use 2nd punch
+        if (!morningOut && punchesWithTime.length > 1) {
+            morningOut = punchesWithTime[1];
+        }
+
+        // 3. PM In: Find first punch after morning-out
+        let pmIn = null;
+        const morningOutIdx = punchesWithTime.indexOf(morningOut);
+        if (morningOutIdx >= 0 && morningOutIdx < punchesWithTime.length - 1) {
+            // Skip punches in same cluster as morning-out, find next distinct cluster
+            let searchIdx = morningOutIdx + 1;
+            while (searchIdx < punchesWithTime.length) {
+                const timeDiff = (punchesWithTime[searchIdx].time - morningOut.time) / (1000 * 60);
+                if (timeDiff > 10) { // Found distinct punch after break
+                    const pmInCluster = findCluster(searchIdx);
+                    pmIn = pmInCluster[0];
+                    break;
+                }
+                searchIdx++;
+            }
+        }
+
+        // 4. Evening Out: Last punch of the day (from last cluster)
+        const lastClusterStart = Math.max(0, punchesWithTime.length - 5);
+        let lastCluster = [];
+        for (let i = punchesWithTime.length - 1; i >= lastClusterStart; i--) {
+            if (lastCluster.length === 0) {
+                lastCluster.unshift(punchesWithTime[i]);
             } else {
-                const lastInCluster = pmInCandidates[pmInCandidates.length - 1];
-                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
+                const timeDiff = (lastCluster[0].time - punchesWithTime[i].time) / (1000 * 60);
                 if (timeDiff <= 10) {
-                    pmInCandidates.push(punchesWithTime[i]);
+                    lastCluster.unshift(punchesWithTime[i]);
                 } else {
                     break;
                 }
             }
         }
-        if (pmInCandidates.length > 0) {
-            pmPunchIn = pmInCandidates[0]; // Keep first in cluster
-        }
+        const eveningOut = lastCluster[lastCluster.length - 1];
 
-        // 4. Evening Punch-Out: Keep last punch after shift end time
-        let eveningPunchOut = null;
-        if (shift && shift.pm_end) {
-            const pmEndTime = parseTime(shift.pm_end);
-            const afterShiftPunches = punchesWithTime.filter(p => p.time >= pmEndTime);
-            
-            if (afterShiftPunches.length > 0) {
-                eveningPunchOut = afterShiftPunches[afterShiftPunches.length - 1]; // Keep last
-            } else if (punchesWithTime.length > 0) {
-                // If no punches after shift end, take the last punch overall
-                eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+        // Build result ensuring no duplicates
+        const result = [];
+        const addUnique = (punch) => {
+            if (punch && !result.find(p => p.id === punch.id)) {
+                result.push(punch);
             }
-        } else if (punchesWithTime.length > 0) {
-            eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
-        }
+        };
 
-        // Build filtered result: [morning-in, morning-out, pm-in, evening-out]
-        const filtered = [];
-        if (morningPunchIn) filtered.push(morningPunchIn);
-        if (morningPunchOut && morningPunchOut !== morningPunchIn) filtered.push(morningPunchOut);
-        if (pmPunchIn && pmPunchIn !== morningPunchOut && pmPunchIn !== morningPunchIn) filtered.push(pmPunchIn);
-        if (eveningPunchOut && 
-            eveningPunchOut !== pmPunchIn && 
-            eveningPunchOut !== morningPunchOut && 
-            eveningPunchOut !== morningPunchIn) {
-            filtered.push(eveningPunchOut);
-        }
+        addUnique(morningIn);
+        addUnique(morningOut);
+        addUnique(pmIn);
+        addUnique(eveningOut);
 
-        // Return original punch objects (without added time property)
-        return filtered.map(fp => punches.find(p => p.id === fp.id)).filter(Boolean);
+        return result.map(p => punches.find(orig => orig.id === p.id)).filter(Boolean);
     };
 
     const parseTime = parseTimeUAE;
