@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Check } from 'lucide-react';
+import { Upload, AlertTriangle, Check, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function PunchUploadTab({ project }) {
     const [file, setFile] = useState(null);
     const [parsedData, setParsedData] = useState([]);
     const [warnings, setWarnings] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -182,9 +183,20 @@ export default function PunchUploadTab({ project }) {
                         <p className="text-slate-500 text-center py-8">No punches uploaded yet</p>
                     ) : (
                         <div className="space-y-4">
-                            <p className="text-sm text-slate-600">
-                                Total: {punches.length} punch records from {new Set(punches.map(p => p.attendance_id)).size} employees
-                            </p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-slate-600">
+                                    Total: {punches.length} punch records from {new Set(punches.map(p => p.attendance_id)).size} employees
+                                </p>
+                                <div className="relative w-64">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <Input
+                                        placeholder="Filter by attendance ID..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="pl-9"
+                                    />
+                                </div>
+                            </div>
                             <div className="max-h-96 overflow-auto">
                                 <Table>
                                     <TableHeader>
@@ -195,13 +207,18 @@ export default function PunchUploadTab({ project }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {Object.values(punchSummary).map((item, idx) => (
-                                            <TableRow key={idx}>
-                                                <TableCell className="font-medium">{item.attendance_id}</TableCell>
-                                                <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
-                                                <TableCell>{item.count}</TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {Object.values(punchSummary)
+                                            .filter(item => 
+                                                !searchTerm || 
+                                                item.attendance_id.toLowerCase().includes(searchTerm.toLowerCase())
+                                            )
+                                            .map((item, idx) => (
+                                                <TableRow key={idx}>
+                                                    <TableCell className="font-medium">{item.attendance_id}</TableCell>
+                                                    <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
+                                                    <TableCell>{item.count}</TableCell>
+                                                </TableRow>
+                                            ))}
                                     </TableBody>
                                 </Table>
                             </div>
