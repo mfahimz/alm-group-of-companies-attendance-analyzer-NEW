@@ -206,15 +206,18 @@ export default function RunAnalysisTab({ project }) {
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
 
+            // Filter multiple punches before analysis
+            const filteredPunches = filterMultiplePunches(dayPunches, shift);
+
             // Presence rule
-            if (dayPunches.length > 0) {
+            if (filteredPunches.length > 0) {
                 present_days++;
 
                 // Calculate late minutes for both AM and PM shifts
                 if (shift) {
                     // AM shift late check (first punch of the day)
-                    if (shift.am_start && dayPunches.length > 0) {
-                        const firstPunch = dayPunches[0];
+                    if (shift.am_start && filteredPunches.length > 0) {
+                        const firstPunch = filteredPunches[0];
                         const punchTime = parseTime(firstPunch.timestamp_raw);
                         const shiftStart = parseTime(shift.am_start);
 
@@ -234,8 +237,8 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // PM shift late check (third punch - PM check-in)
-                    if (shift.pm_start && dayPunches.length >= 3) {
-                        const pmCheckIn = dayPunches[2]; // 3rd punch is PM check-in
+                    if (shift.pm_start && filteredPunches.length >= 3) {
+                        const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
 
@@ -255,8 +258,8 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // Early checkout check (AM and PM)
-                    if (shift.am_end && dayPunches.length >= 2) {
-                        const secondPunch = dayPunches[1];
+                    if (shift.am_end && filteredPunches.length >= 2) {
+                        const secondPunch = filteredPunches[1];
                         const punchTime = parseTime(secondPunch.timestamp_raw);
                         const shiftEnd = parseTime(shift.am_end);
 
@@ -265,8 +268,8 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
 
-                    if (shift.pm_end && dayPunches.length >= 4) {
-                        const lastPunch = dayPunches[dayPunches.length - 1];
+                    if (shift.pm_end && filteredPunches.length >= 4) {
+                        const lastPunch = filteredPunches[filteredPunches.length - 1];
                         const punchTime = parseTime(lastPunch.timestamp_raw);
                         const shiftEnd = parseTime(shift.pm_end);
 
@@ -278,7 +281,7 @@ export default function RunAnalysisTab({ project }) {
 
                 // Half day detection (simple rule: less than 2 punches)
                 if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration') {
-                    if (dayPunches.length < 2) {
+                    if (filteredPunches.length < 2) {
                         half_absence_count++;
                     }
                 }
@@ -287,42 +290,13 @@ export default function RunAnalysisTab({ project }) {
                 full_absence_count++;
             }
 
-            // Abnormality detection
+            // Abnormality detection (use filtered punches)
             const expectedPunches = 4; // 2 AM + 2 PM typically
-            if (rules.abnormality_rules?.detect_missing_punches && dayPunches.length > 0 && dayPunches.length < expectedPunches) {
+            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
                 abnormal_dates_list.push(dateStr);
             }
-            if (rules.abnormality_rules?.detect_extra_punches && dayPunches.length > expectedPunches) {
-                // Check if extra punches are within 10-minute range
-                let hasRealExtraPunches = false;
-                const punchTimes = dayPunches.map(p => parseTime(p.timestamp_raw));
-                
-                // Group punches that are within 10 minutes of each other
-                const groups = [];
-                punchTimes.forEach((time, idx) => {
-                    if (!time) return;
-                    
-                    let addedToGroup = false;
-                    for (let group of groups) {
-                        if (Math.abs(time - group[0]) <= 10 * 60 * 1000) { // 10 minutes
-                            group.push(time);
-                            addedToGroup = true;
-                            break;
-                        }
-                    }
-                    if (!addedToGroup) {
-                        groups.push([time]);
-                    }
-                });
-                
-                // If we have more distinct groups than expected punches, flag it
-                if (groups.length > expectedPunches) {
-                    hasRealExtraPunches = true;
-                }
-                
-                if (hasRealExtraPunches) {
-                    abnormal_dates_list.push(dateStr);
-                }
+            if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
+                abnormal_dates_list.push(dateStr);
             }
 
             // Special abnormal dates
@@ -348,6 +322,116 @@ export default function RunAnalysisTab({ project }) {
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
             notes: [...new Set(abnormal_dates_list)].map(d => new Date(d).toLocaleDateString()).join(', ')
         };
+    };
+
+    const filterMultiplePunches = (punches, shift) => {
+        if (punches.length <= 4) return punches; // No filtering needed for 4 or fewer punches
+        
+        const punchesWithTime = punches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time);
+        
+        if (punchesWithTime.length === 0) return punches;
+
+        // 1. Morning Punch-In: Keep first punch in a rolling 10-minute window
+        let morningPunchIn = null;
+        const morningCandidates = [];
+        for (let i = 0; i < punchesWithTime.length; i++) {
+            if (morningCandidates.length === 0) {
+                morningCandidates.push(punchesWithTime[i]);
+            } else {
+                const lastInCluster = morningCandidates[morningCandidates.length - 1];
+                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
+                if (timeDiff <= 10) {
+                    morningCandidates.push(punchesWithTime[i]);
+                } else {
+                    break; // End of morning cluster
+                }
+            }
+        }
+        morningPunchIn = morningCandidates[0]; // Keep first in cluster
+
+        // 2. Morning Punch-Out: Keep last punch in afternoon shift window within 10-minute cluster
+        let morningPunchOut = null;
+        if (shift && shift.am_end && punchesWithTime.length > 1) {
+            const amEndTime = parseTime(shift.am_end);
+            const pmStartTime = shift.pm_start ? parseTime(shift.pm_start) : null;
+            
+            // Find punches in the AM end window (before PM start or around AM end)
+            const amEndCandidates = [];
+            for (let i = 1; i < punchesWithTime.length; i++) {
+                const punch = punchesWithTime[i];
+                // Skip if this is definitely PM punch-in or later
+                if (pmStartTime && punch.time >= pmStartTime) continue;
+                
+                // Consider punches around AM end time
+                if (amEndCandidates.length === 0) {
+                    amEndCandidates.push(punch);
+                } else {
+                    const lastInCluster = amEndCandidates[amEndCandidates.length - 1];
+                    const timeDiff = Math.abs(punch.time - lastInCluster.time) / (1000 * 60);
+                    if (timeDiff <= 10) {
+                        amEndCandidates.push(punch);
+                    }
+                }
+            }
+            if (amEndCandidates.length > 0) {
+                morningPunchOut = amEndCandidates[amEndCandidates.length - 1]; // Keep last in cluster
+            }
+        }
+
+        // 3. PM Punch-In: Similar to morning punch-in, find first punch after AM punch-out
+        let pmPunchIn = null;
+        const morningOutIndex = morningPunchOut ? punchesWithTime.indexOf(morningPunchOut) : 0;
+        const pmInCandidates = [];
+        for (let i = morningOutIndex + 1; i < punchesWithTime.length; i++) {
+            if (pmInCandidates.length === 0) {
+                pmInCandidates.push(punchesWithTime[i]);
+            } else {
+                const lastInCluster = pmInCandidates[pmInCandidates.length - 1];
+                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
+                if (timeDiff <= 10) {
+                    pmInCandidates.push(punchesWithTime[i]);
+                } else {
+                    break;
+                }
+            }
+        }
+        if (pmInCandidates.length > 0) {
+            pmPunchIn = pmInCandidates[0]; // Keep first in cluster
+        }
+
+        // 4. Evening Punch-Out: Keep last punch after shift end time
+        let eveningPunchOut = null;
+        if (shift && shift.pm_end) {
+            const pmEndTime = parseTime(shift.pm_end);
+            const afterShiftPunches = punchesWithTime.filter(p => p.time >= pmEndTime);
+            
+            if (afterShiftPunches.length > 0) {
+                eveningPunchOut = afterShiftPunches[afterShiftPunches.length - 1]; // Keep last
+            } else if (punchesWithTime.length > 0) {
+                // If no punches after shift end, take the last punch overall
+                eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+            }
+        } else if (punchesWithTime.length > 0) {
+            eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+        }
+
+        // Build filtered result: [morning-in, morning-out, pm-in, evening-out]
+        const filtered = [];
+        if (morningPunchIn) filtered.push(morningPunchIn);
+        if (morningPunchOut && morningPunchOut !== morningPunchIn) filtered.push(morningPunchOut);
+        if (pmPunchIn && pmPunchIn !== morningPunchOut && pmPunchIn !== morningPunchIn) filtered.push(pmPunchIn);
+        if (eveningPunchOut && 
+            eveningPunchOut !== pmPunchIn && 
+            eveningPunchOut !== morningPunchOut && 
+            eveningPunchOut !== morningPunchIn) {
+            filtered.push(eveningPunchOut);
+        }
+
+        // Return original punch objects (without added time property)
+        return filtered.map(fp => punches.find(p => p.id === fp.id)).filter(Boolean);
     };
 
     const parseTime = (timeStr) => {
