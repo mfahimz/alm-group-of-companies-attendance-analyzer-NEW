@@ -6,14 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Trash2 } from 'lucide-react';
+import { Download, Search, Eye, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
+import EditDayRecordDialog from './EditDayRecordDialog';
 
 export default function ReportTab({ project }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [selectedReportRun, setSelectedReportRun] = useState(null);
+    const [editingDay, setEditingDay] = useState(null);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -505,6 +507,7 @@ export default function ReportTab({ project }) {
                                     <TableHead>Late Minutes</TableHead>
                                     <TableHead>Early Checkout Minutes</TableHead>
                                     <TableHead>Abnormal</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -545,6 +548,15 @@ export default function ReportTab({ project }) {
                                                 <span className="text-amber-600 font-medium">Yes</span>
                                             )}
                                         </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => setEditingDay(day)}
+                                            >
+                                                <Edit className="w-4 h-4 text-indigo-600" />
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -552,6 +564,15 @@ export default function ReportTab({ project }) {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Edit Day Record Dialog */}
+            <EditDayRecordDialog
+                open={!!editingDay}
+                onClose={() => setEditingDay(null)}
+                dayRecord={editingDay}
+                project={project}
+                attendanceId={selectedEmployee?.attendance_id}
+            />
         </div>
     );
 }
