@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 export default function EditShiftDialog({ open, onClose, shift, projectId }) {
@@ -93,15 +94,20 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                         </div>
                     </div>
                     <div>
-                        <Label>Applicable Days</Label>
-                        <Input
-                            placeholder="e.g., Saturday-Wednesday, Friday only"
+                        <Label>Applicable Days *</Label>
+                        <Select
                             value={formData.applicable_days}
-                            onChange={(e) => setFormData({ ...formData, applicable_days: e.target.value })}
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                            Include "Friday" in the text to mark as a Friday shift
-                        </p>
+                            onValueChange={(value) => setFormData({ ...formData, applicable_days: value })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Monday to Thursday and Saturday">Monday to Thursday and Saturday</SelectItem>
+                                <SelectItem value="Friday">Friday</SelectItem>
+                                <SelectItem value="Monday to Saturday">Monday to Saturday</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex gap-3 pt-4">
                         <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={updateMutation.isPending}>
