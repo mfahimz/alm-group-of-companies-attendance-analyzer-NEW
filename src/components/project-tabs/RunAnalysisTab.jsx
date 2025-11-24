@@ -225,6 +225,55 @@ export default function RunAnalysisTab({ project }) {
             // Filter multiple punches before analysis
             const filteredPunches = filterMultiplePunches(dayPunches, shift);
 
+            // Calculate late/early minutes first
+            let dayLateMinutes = 0;
+            let dayEarlyMinutes = 0;
+
+            if (shift && filteredPunches.length > 0) {
+                // AM shift late check (first punch of the day)
+                if (shift.am_start && filteredPunches.length > 0) {
+                    const firstPunch = filteredPunches[0];
+                    const punchTime = parseTime(firstPunch.timestamp_raw);
+                    const shiftStart = parseTime(shift.am_start);
+
+                    if (punchTime && shiftStart && punchTime > shiftStart) {
+                        dayLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                    }
+                }
+
+                // PM shift late check (third punch - PM check-in)
+                if (shift.pm_start && filteredPunches.length >= 3) {
+                    const pmCheckIn = filteredPunches[2];
+                    const punchTime = parseTime(pmCheckIn.timestamp_raw);
+                    const shiftStart = parseTime(shift.pm_start);
+
+                    if (punchTime && shiftStart && punchTime > shiftStart) {
+                        dayLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                    }
+                }
+
+                // Early checkout check (AM and PM)
+                if (shift.am_end && filteredPunches.length >= 2) {
+                    const secondPunch = filteredPunches[1];
+                    const punchTime = parseTime(secondPunch.timestamp_raw);
+                    const shiftEnd = parseTime(shift.am_end);
+
+                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                        dayEarlyMinutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                    }
+                }
+
+                if (shift.pm_end && filteredPunches.length >= 4) {
+                    const lastPunch = filteredPunches[filteredPunches.length - 1];
+                    const punchTime = parseTime(lastPunch.timestamp_raw);
+                    const shiftEnd = parseTime(shift.pm_end);
+
+                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                        dayEarlyMinutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                    }
+                }
+            }
+
             // Apply day-level custom edits or calculate normally
             if (dayEdit && dayEdit.custom_status) {
                 // User has forced a status for this day
@@ -237,80 +286,37 @@ export default function RunAnalysisTab({ project }) {
                     full_absence_count++;
                 }
 
-                // For custom status, always use custom minutes (default to 0 if not provided)
-                late_minutes += dayEdit.custom_late_minutes || 0;
-                early_checkout_minutes += dayEdit.custom_early_minutes || 0;
+                // Use custom minutes if provided, otherwise use calculated
+                if (dayEdit.custom_late_minutes !== null && dayEdit.custom_late_minutes !== undefined) {
+                    late_minutes += dayEdit.custom_late_minutes;
+                } else {
+                    late_minutes += dayLateMinutes;
+                }
+
+                if (dayEdit.custom_early_minutes !== null && dayEdit.custom_early_minutes !== undefined) {
+                    early_checkout_minutes += dayEdit.custom_early_minutes;
+                } else {
+                    early_checkout_minutes += dayEarlyMinutes;
+                }
             } else {
                 // Normal calculation
-                // Presence rule
                 if (filteredPunches.length > 0) {
                     present_days++;
 
-                    // Calculate late minutes for both AM and PM shifts
-                    if (shift) {
-                        let dayLateMinutes = 0;
-                        let dayEarlyMinutes = 0;
-
-                        // AM shift late check (first punch of the day)
-                        if (shift.am_start && filteredPunches.length > 0) {
-                            const firstPunch = filteredPunches[0];
-                            const punchTime = parseTime(firstPunch.timestamp_raw);
-                            const shiftStart = parseTime(shift.am_start);
-
-                            if (punchTime && shiftStart && punchTime > shiftStart) {
-                                const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
-                                dayLateMinutes += minutes;
-                            }
-                        }
-
-                        // PM shift late check (third punch - PM check-in)
-                        if (shift.pm_start && filteredPunches.length >= 3) {
-                            const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
-                            const punchTime = parseTime(pmCheckIn.timestamp_raw);
-                            const shiftStart = parseTime(shift.pm_start);
-
-                            if (punchTime && shiftStart && punchTime > shiftStart) {
-                                const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
-                                dayLateMinutes += minutes;
-                            }
-                        }
-
-                        // Early checkout check (AM and PM)
-                        if (shift.am_end && filteredPunches.length >= 2) {
-                            const secondPunch = filteredPunches[1];
-                            const punchTime = parseTime(secondPunch.timestamp_raw);
-                            const shiftEnd = parseTime(shift.am_end);
-
-                            if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                                dayEarlyMinutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
-                            }
-                        }
-
-                        if (shift.pm_end && filteredPunches.length >= 4) {
-                            const lastPunch = filteredPunches[filteredPunches.length - 1];
-                            const punchTime = parseTime(lastPunch.timestamp_raw);
-                            const shiftEnd = parseTime(shift.pm_end);
-
-                            if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                                dayEarlyMinutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
-                            }
-                        }
-
-                        // Apply custom overrides if provided, otherwise use calculated
-                        if (dayEdit && dayEdit.custom_late_minutes !== null && dayEdit.custom_late_minutes !== undefined) {
-                            late_minutes += dayEdit.custom_late_minutes;
-                        } else {
-                            late_minutes += dayLateMinutes;
-                        }
-
-                        if (dayEdit && dayEdit.custom_early_minutes !== null && dayEdit.custom_early_minutes !== undefined) {
-                            early_checkout_minutes += dayEdit.custom_early_minutes;
-                        } else {
-                            early_checkout_minutes += dayEarlyMinutes;
-                        }
+                    // Use custom overrides if provided, otherwise use calculated
+                    if (dayEdit && dayEdit.custom_late_minutes !== null && dayEdit.custom_late_minutes !== undefined) {
+                        late_minutes += dayEdit.custom_late_minutes;
+                    } else {
+                        late_minutes += dayLateMinutes;
                     }
 
-                    // Half day detection (simple rule: less than 2 punches)
+                    if (dayEdit && dayEdit.custom_early_minutes !== null && dayEdit.custom_early_minutes !== undefined) {
+                        early_checkout_minutes += dayEdit.custom_early_minutes;
+                    } else {
+                        early_checkout_minutes += dayEarlyMinutes;
+                    }
+
+                    // Half day detection
                     if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration') {
                         if (filteredPunches.length < 2) {
                             half_absence_count++;
