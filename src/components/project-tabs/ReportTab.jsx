@@ -160,6 +160,40 @@ export default function ReportTab({ project }) {
         return `${day}/${month}/${year}`;
     };
 
+    const parseTime = (timeStr) => {
+        try {
+            if (!timeStr || timeStr === '—') return null;
+
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = timeMatch[3].toUpperCase();
+
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+
+            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (timeMatch) {
+                const hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
     const getDailyBreakdown = () => {
         if (!selectedEmployee) return [];
 
@@ -182,8 +216,13 @@ export default function ReportTab({ project }) {
 
             if (dayOfWeek === 0) continue; // Skip Sundays
 
-            const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
-            
+            const dayPunches = employeePunches.filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+
             const dateException = employeeExceptions.find(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
@@ -207,6 +246,32 @@ export default function ReportTab({ project }) {
                 };
             }
 
+            // Calculate late minutes
+            let lateInfo = '';
+            if (shift && dayPunches.length > 0) {
+                // AM shift late check
+                if (shift.am_start) {
+                    const firstPunch = dayPunches[0];
+                    const punchTime = parseTime(firstPunch.timestamp_raw);
+                    const shiftStart = parseTime(shift.am_start);
+                    if (punchTime && shiftStart && punchTime > shiftStart) {
+                        const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
+                        lateInfo += `AM: ${minutes} min late`;
+                    }
+                }
+                // PM shift late check
+                if (shift.pm_start && dayPunches.length >= 3) {
+                    const pmCheckIn = dayPunches[2];
+                    const punchTime = parseTime(pmCheckIn.timestamp_raw);
+                    const shiftStart = parseTime(shift.pm_start);
+                    if (punchTime && shiftStart && punchTime > shiftStart) {
+                        const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
+                        if (lateInfo) lateInfo += ' | ';
+                        lateInfo += `PM: ${minutes} min late`;
+                    }
+                }
+            }
+
             let status = 'Absent';
             if (dateException) {
                 if (dateException.type === 'OFF') status = 'Off';
@@ -227,7 +292,8 @@ export default function ReportTab({ project }) {
                 shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
                 exception: dateException ? dateException.type : '-',
                 status,
-                abnormal: isAbnormal
+                abnormal: isAbnormal,
+                lateInfo: lateInfo || '-'
             });
         }
 
@@ -406,6 +472,7 @@ export default function ReportTab({ project }) {
                                     <TableHead>Shift (HH:MM AM/PM)</TableHead>
                                     <TableHead>Exception</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Late Minutes</TableHead>
                                     <TableHead>Abnormal</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -427,6 +494,13 @@ export default function ReportTab({ project }) {
                                             `}>
                                                 {day.status}
                                             </span>
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.lateInfo !== '-' ? (
+                                                <span className="text-orange-600 font-medium">{day.lateInfo}</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             {day.abnormal && (
