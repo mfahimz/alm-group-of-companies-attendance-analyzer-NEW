@@ -106,19 +106,16 @@ export default function PunchUploadTab({ project }) {
         }
     });
 
-    // Group punches by employee and date for preview
-    const punchSummary = punches.reduce((acc, punch) => {
-        const key = `${punch.attendance_id}_${punch.punch_date}`;
-        if (!acc[key]) {
-            acc[key] = {
-                attendance_id: punch.attendance_id,
-                date: punch.punch_date,
-                count: 0
-            };
-        }
-        acc[key].count++;
-        return acc;
-    }, {});
+    // Filter punches based on search
+    const filteredPunches = punches.filter(punch => 
+        !searchTerm || punch.attendance_id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Enrich punches with employee names
+    const enrichedPunches = filteredPunches.map(punch => ({
+        ...punch,
+        employee_name: employees.find(e => e.attendance_id === punch.attendance_id)?.name || '-'
+    }));
 
     return (
         <div className="space-y-6">
@@ -201,24 +198,19 @@ export default function PunchUploadTab({ project }) {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Employee</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Punches</TableHead>
+                                            <TableHead>Employee ID</TableHead>
+                                            <TableHead>Employee Name</TableHead>
+                                            <TableHead>Time</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {Object.values(punchSummary)
-                                            .filter(item => 
-                                                !searchTerm || 
-                                                item.attendance_id.toLowerCase().includes(searchTerm.toLowerCase())
-                                            )
-                                            .map((item, idx) => (
-                                                <TableRow key={idx}>
-                                                    <TableCell className="font-medium">{item.attendance_id}</TableCell>
-                                                    <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
-                                                    <TableCell>{item.count}</TableCell>
-                                                </TableRow>
-                                            ))}
+                                        {enrichedPunches.map((punch) => (
+                                            <TableRow key={punch.id}>
+                                                <TableCell className="font-medium">{punch.attendance_id}</TableCell>
+                                                <TableCell>{punch.employee_name}</TableCell>
+                                                <TableCell>{punch.timestamp_raw}</TableCell>
+                                            </TableRow>
+                                        ))}
                                     </TableBody>
                                 </Table>
                             </div>
