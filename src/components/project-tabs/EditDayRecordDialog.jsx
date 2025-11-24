@@ -138,8 +138,21 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                     <div>
-                        <Label>Current Status</Label>
-                        <Input value={dayRecord.status} disabled className="bg-slate-50" />
+                        <Label>Status Override</Label>
+                        <Select
+                            value={formData.type}
+                            onValueChange={(value) => setFormData({ ...formData, type: value })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="MANUAL_PRESENT">Present</SelectItem>
+                                <SelectItem value="MANUAL_ABSENT">Absent</SelectItem>
+                                <SelectItem value="MANUAL_HALF">Half Day</SelectItem>
+                                <SelectItem value="OFF">Off/Leave</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Punch Selection */}
