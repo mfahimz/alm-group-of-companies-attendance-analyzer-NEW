@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
 
@@ -15,6 +16,7 @@ export default function Employees() {
     const [showDialog, setShowDialog] = useState(false);
     const [importFile, setImportFile] = useState(null);
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
+    const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
     const queryClient = useQueryClient();
 
     const { data: employees = [], isLoading } = useQuery({
@@ -30,6 +32,29 @@ export default function Employees() {
         },
         onError: () => {
             toast.error('Failed to delete employee');
+        }
+    });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (ids) => {
+            const results = [];
+            for (const id of ids) {
+                try {
+                    await base44.entities.Employee.delete(id);
+                    results.push(id);
+                } catch (error) {
+                    console.error('Failed to delete employee:', id, error);
+                }
+            }
+            return results;
+        },
+        onSuccess: (results) => {
+            queryClient.invalidateQueries(['employees']);
+            setSelectedEmployeeIds([]);
+            toast.success(`${results.length} employee${results.length > 1 ? 's' : ''} deleted successfully`);
+        },
+        onError: (error) => {
+            toast.error('Failed to delete employees: ' + error.message);
         }
     });
 
@@ -79,6 +104,26 @@ export default function Employees() {
         if (window.confirm(`Are you sure you want to delete ${employee.name}?`)) {
             deleteMutation.mutate(employee.id);
         }
+    };
+
+    const handleBulkDelete = () => {
+        if (window.confirm(`Are you sure you want to delete ${selectedEmployeeIds.length} selected employee${selectedEmployeeIds.length > 1 ? 's' : ''}?`)) {
+            bulkDeleteMutation.mutate(selectedEmployeeIds);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedEmployeeIds.length === filteredEmployees.length) {
+            setSelectedEmployeeIds([]);
+        } else {
+            setSelectedEmployeeIds(filteredEmployees.map(emp => emp.id));
+        }
+    };
+
+    const toggleSelectEmployee = (id) => {
+        setSelectedEmployeeIds(prev => 
+            prev.includes(id) ? prev.filter(empId => empId !== id) : [...prev, id]
+        );
     };
 
     const importMutation = useMutation({
@@ -195,6 +240,16 @@ export default function Employees() {
                     <p className="text-slate-600 mt-2">Manage employee master list</p>
                 </div>
                 <div className="flex gap-3">
+                    {selectedEmployeeIds.length > 0 && (
+                        <Button 
+                            onClick={handleBulkDelete}
+                            variant="destructive"
+                            disabled={bulkDeleteMutation.isPending}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete {selectedEmployeeIds.length} Selected
+                        </Button>
+                    )}
                     <label>
                         <input
                             type="file"
@@ -277,6 +332,12 @@ export default function Employees() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-12">
+                                        <Checkbox
+                                            checked={selectedEmployeeIds.length === filteredEmployees.length && filteredEmployees.length > 0}
+                                            onCheckedChange={toggleSelectAll}
+                                        />
+                                    </TableHead>
                                     <TableHead>Attendance ID</TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -287,6 +348,12 @@ export default function Employees() {
                                     const hasDuplicate = isDuplicate(employee);
                                     return (
                                         <TableRow key={employee.id} className={hasDuplicate ? "bg-amber-50" : ""}>
+                                            <TableCell>
+                                                <Checkbox
+                                                    checked={selectedEmployeeIds.includes(employee.id)}
+                                                    onCheckedChange={() => toggleSelectEmployee(employee.id)}
+                                                />
+                                            </TableCell>
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-2">
                                                     {employee.attendance_id}
