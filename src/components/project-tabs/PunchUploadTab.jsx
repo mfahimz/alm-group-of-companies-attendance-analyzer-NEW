@@ -14,7 +14,8 @@ export default function PunchUploadTab({ project }) {
     const [parsedData, setParsedData] = useState([]);
     const [warnings, setWarnings] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [dateFilter, setDateFilter] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [selectedPunches, setSelectedPunches] = useState([]);
     const queryClient = useQueryClient();
 
@@ -146,11 +147,20 @@ export default function PunchUploadTab({ project }) {
         }
     });
 
-    // Filter punches based on search and date
+    // Filter punches based on search and date range
     const filteredPunches = punches.filter(punch => {
         const matchesSearch = !searchTerm || punch.attendance_id.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesDate = !dateFilter || punch.punch_date === dateFilter;
-        return matchesSearch && matchesDate;
+        
+        let matchesDateRange = true;
+        if (dateFrom && dateTo) {
+            matchesDateRange = punch.punch_date >= dateFrom && punch.punch_date <= dateTo;
+        } else if (dateFrom) {
+            matchesDateRange = punch.punch_date >= dateFrom;
+        } else if (dateTo) {
+            matchesDateRange = punch.punch_date <= dateTo;
+        }
+        
+        return matchesSearch && matchesDateRange;
     });
 
     // Enrich punches with employee names
@@ -261,10 +271,17 @@ export default function PunchUploadTab({ project }) {
                                     )}
                                     <Input
                                         type="date"
-                                        value={dateFilter}
-                                        onChange={(e) => setDateFilter(e.target.value)}
-                                        className="w-48"
-                                        placeholder="Filter by date"
+                                        value={dateFrom}
+                                        onChange={(e) => setDateFrom(e.target.value)}
+                                        className="w-40"
+                                        placeholder="From date"
+                                    />
+                                    <Input
+                                        type="date"
+                                        value={dateTo}
+                                        onChange={(e) => setDateTo(e.target.value)}
+                                        className="w-40"
+                                        placeholder="To date"
                                     />
                                     <div className="relative w-64">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
