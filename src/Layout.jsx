@@ -13,16 +13,32 @@ export default function Layout({ children, currentPageName }) {
         queryFn: () => base44.auth.me()
     });
 
+    const { data: permissions = [] } = useQuery({
+        queryKey: ['pagePermissions'],
+        queryFn: () => base44.entities.PagePermission.list(),
+        enabled: !!currentUser
+    });
+
     const isAdmin = currentUser?.role === 'admin';
 
-    const navigation = [
-        { name: 'Dashboard', path: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'user'] },
-        { name: 'Projects', path: 'Projects', icon: FolderKanban, roles: ['admin'] },
-        { name: 'Employees', path: 'Employees', icon: Users, roles: ['admin'] },
-        { name: 'Users', path: 'Users', icon: Shield, roles: ['admin'] },
-        { name: 'Rules Settings', path: 'RulesSettings', icon: Settings, roles: ['admin'] },
-        { name: 'My Profile', path: 'UserProfile', icon: UserIcon, roles: ['user'] }
-    ].filter(item => item.roles.includes(currentUser?.role));
+    const hasPageAccess = (pageName) => {
+        const permission = permissions.find(p => p.page_name === pageName);
+        if (!permission) return true; // Default allow if not configured
+        const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
+        return allowedRoles.includes(currentUser?.role);
+    };
+
+    const allPages = [
+        { name: 'Dashboard', path: 'Dashboard', icon: LayoutDashboard },
+        { name: 'Projects', path: 'Projects', icon: FolderKanban },
+        { name: 'Employees', path: 'Employees', icon: Users },
+        { name: 'Users', path: 'Users', icon: Shield },
+        { name: 'Page Permissions', path: 'PagePermissions', icon: Settings },
+        { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
+        { name: 'My Profile', path: 'UserProfile', icon: UserIcon }
+    ];
+
+    const navigation = allPages.filter(item => hasPageAccess(item.path));
 
     return (
         <div className="min-h-screen bg-slate-50">

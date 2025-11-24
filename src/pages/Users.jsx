@@ -18,18 +18,30 @@ export default function Users() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
-    // Check if current user is admin
+    // Check page access
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
 
+    const { data: permissions = [] } = useQuery({
+        queryKey: ['pagePermissions'],
+        queryFn: () => base44.entities.PagePermission.list(),
+        enabled: !!currentUser
+    });
+
     useEffect(() => {
-        if (currentUser && currentUser.role !== 'admin') {
-            toast.error('Access denied. Admin only.');
-            navigate(createPageUrl('Dashboard'));
+        if (currentUser && permissions.length > 0) {
+            const permission = permissions.find(p => p.page_name === 'Users');
+            if (permission) {
+                const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
+                if (!allowedRoles.includes(currentUser.role)) {
+                    toast.error('Access denied.');
+                    navigate(createPageUrl('Dashboard'));
+                }
+            }
         }
-    }, [currentUser, navigate]);
+    }, [currentUser, permissions, navigate]);
 
     const { data: users = [], isLoading } = useQuery({
         queryKey: ['users'],
@@ -67,7 +79,15 @@ export default function Users() {
         user.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    if (!currentUser || currentUser.role !== 'admin') {
+    const hasAccess = () => {
+        if (!currentUser || permissions.length === 0) return false;
+        const permission = permissions.find(p => p.page_name === 'Users');
+        if (!permission) return true;
+        const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
+        return allowedRoles.includes(currentUser.role);
+    };
+
+    if (!hasAccess()) {
         return null;
     }
 

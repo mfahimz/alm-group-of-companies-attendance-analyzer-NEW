@@ -5,6 +5,7 @@ import Employees from './pages/Employees';
 import RulesSettings from './pages/RulesSettings';
 import Users from './pages/Users';
 import UserProfile from './pages/UserProfile';
+import PagePermissions from './pages/PagePermissions';
 import __Layout from './Layout.jsx';
 
 
@@ -16,6 +17,7 @@ export const PAGES = {
     "RulesSettings": RulesSettings,
     "Users": Users,
     "UserProfile": UserProfile,
+    "PagePermissions": PagePermissions,
 }
 
 export const pagesConfig = {
