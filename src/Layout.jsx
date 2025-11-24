@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard, Shield, User as UserIcon, LogOut, Menu, X, ChevronDown, Book, Activity, CalendarCheck, FileCheck } from 'lucide-react';
+import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard, Shield, User as UserIcon, LogOut, Menu, X, ChevronDown, Book, Activity } from 'lucide-react';
 import { Toaster } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -60,22 +60,6 @@ export default function Layout({ children, currentPageName }) {
                 { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
                 { name: 'Diagnostics', path: 'Diagnostics', icon: Activity },
                 { name: 'Documentation', path: 'Documentation', icon: Book }
-            ]
-        },
-        {
-            id: 'employee',
-            name: 'Self-Service',
-            icon: CalendarCheck,
-            items: [
-                { name: 'Employee Portal', path: 'EmployeePortal', icon: CalendarCheck }
-            ]
-        },
-        {
-            id: 'approvals',
-            name: 'Management',
-            icon: FileCheck,
-            items: [
-                { name: 'Leave Approvals', path: 'LeaveApprovals', icon: FileCheck }
             ]
         },
         {
