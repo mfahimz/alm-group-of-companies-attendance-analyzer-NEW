@@ -54,7 +54,7 @@ export default function RulesSettings() {
         queryFn: () => base44.auth.me()
     });
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (currentUser && currentUser.role !== 'admin') {
             toast.error('Access denied. Admin only.');
             navigate(createPageUrl('Dashboard'));

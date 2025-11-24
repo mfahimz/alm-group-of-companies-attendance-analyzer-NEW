@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,7 @@ export default function Users() {
         queryFn: () => base44.auth.me()
     });
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (currentUser && currentUser.role !== 'admin') {
             toast.error('Access denied. Admin only.');
             navigate(createPageUrl('Dashboard'));
