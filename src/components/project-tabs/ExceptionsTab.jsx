@@ -73,11 +73,24 @@ export default function ExceptionsTab({ project }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.attendance_id || !formData.date_from || !formData.date_to) {
-            toast.error('Please fill in all required fields');
+        
+        // For PUBLIC_HOLIDAY, attendance_id is not required
+        if (formData.type !== 'PUBLIC_HOLIDAY' && !formData.attendance_id) {
+            toast.error('Please select an employee');
             return;
         }
-        createMutation.mutate(formData);
+        
+        if (!formData.date_from || !formData.date_to) {
+            toast.error('Please fill in date range');
+            return;
+        }
+        
+        // For PUBLIC_HOLIDAY, set attendance_id to 'ALL'
+        const submitData = formData.type === 'PUBLIC_HOLIDAY' 
+            ? { ...formData, attendance_id: 'ALL' }
+            : formData;
+        
+        createMutation.mutate(submitData);
     };
 
     const filteredExceptions = exceptions.filter(ex => {
@@ -100,22 +113,30 @@ export default function ExceptionsTab({ project }) {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Employee *</Label>
-                                    <Select
-                                        value={formData.attendance_id}
-                                        onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select employee" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {employees.map(emp => (
-                                                <SelectItem key={emp.id} value={emp.attendance_id}>
-                                                    {emp.attendance_id} - {emp.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && '*'}</Label>
+                                    {formData.type === 'PUBLIC_HOLIDAY' ? (
+                                        <Input 
+                                            value="All Employees" 
+                                            disabled 
+                                            className="bg-slate-50"
+                                        />
+                                    ) : (
+                                        <Select
+                                            value={formData.attendance_id}
+                                            onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select employee" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {employees.map(emp => (
+                                                    <SelectItem key={emp.id} value={emp.attendance_id}>
+                                                        {emp.attendance_id} - {emp.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Exception Type *</Label>
@@ -128,6 +149,7 @@ export default function ExceptionsTab({ project }) {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="OFF">Off / Leave</SelectItem>
+                                            <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
                                             <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                             <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                             <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
@@ -254,6 +276,7 @@ export default function ExceptionsTab({ project }) {
                             <SelectContent>
                                 <SelectItem value={null}>All types</SelectItem>
                                 <SelectItem value="OFF">Off / Leave</SelectItem>
+                                <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
                                 <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                 <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                 <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
@@ -285,6 +308,7 @@ export default function ExceptionsTab({ project }) {
                                             <span className={`
                                                 px-2 py-1 rounded text-xs font-medium
                                                 ${exception.type === 'OFF' ? 'bg-slate-100 text-slate-700' : ''}
+                                                ${exception.type === 'PUBLIC_HOLIDAY' ? 'bg-purple-100 text-purple-700' : ''}
                                                 ${exception.type === 'SHIFT_OVERRIDE' ? 'bg-blue-100 text-blue-700' : ''}
                                                 ${exception.type === 'MANUAL_PRESENT' ? 'bg-green-100 text-green-700' : ''}
                                                 ${exception.type === 'MANUAL_ABSENT' ? 'bg-red-100 text-red-700' : ''}

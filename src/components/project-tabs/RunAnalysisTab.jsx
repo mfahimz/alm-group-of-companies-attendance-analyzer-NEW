@@ -137,15 +137,16 @@ export default function RunAnalysisTab({ project }) {
 
             working_days++;
 
-            // Check for exceptions on this date
+            // Check for exceptions on this date (employee-specific or public holidays)
             const dateException = employeeExceptions.find(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo;
+                return currentDate >= exFrom && currentDate <= exTo && 
+                       (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
             });
 
             if (dateException) {
-                if (dateException.type === 'OFF') {
+                if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
                     working_days--;
                     continue;
                 } else if (dateException.type === 'MANUAL_PRESENT') {

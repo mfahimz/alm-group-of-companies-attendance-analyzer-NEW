@@ -29,6 +29,24 @@ export default function OverviewTab({ project }) {
 
     const uniqueEmployees = new Set(punches.map(p => p.attendance_id)).size;
 
+    // Calculate working days (Monday to Saturday, excluding Sundays)
+    const calculateWorkingDays = () => {
+        const startDate = new Date(project.date_from);
+        const endDate = new Date(project.date_to);
+        let workingDays = 0;
+        
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dayOfWeek = d.getDay();
+            if (dayOfWeek !== 0) { // Exclude Sunday
+                workingDays++;
+            }
+        }
+        
+        return workingDays;
+    };
+
+    const workingDays = calculateWorkingDays();
+
     const lockMutation = useMutation({
         mutationFn: () => base44.entities.Project.update(project.id, { status: 'locked' }),
         onSuccess: () => {
@@ -85,10 +103,10 @@ export default function OverviewTab({ project }) {
     };
 
     const stats = [
+        { label: 'Working Days', value: workingDays, icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' },
         { label: 'Employees', value: uniqueEmployees, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
         { label: 'Punches', value: punches.length, icon: FileText, color: 'text-green-600', bg: 'bg-green-50' },
-        { label: 'Exceptions', value: exceptions.length, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-        { label: 'Results', value: results.length, icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' }
+        { label: 'Exceptions', value: exceptions.length, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' }
     ];
 
     return (
