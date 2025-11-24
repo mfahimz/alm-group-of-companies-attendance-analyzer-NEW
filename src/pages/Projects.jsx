@@ -119,22 +119,12 @@ export default function Projects() {
 
     const deleteMutation = useMutation({
         mutationFn: async (projectId) => {
-            // Delete all ReportRuns first
-            const reportRuns = await base44.entities.ReportRun.filter({ project_id: projectId });
-            await Promise.all(reportRuns.map(item => base44.entities.ReportRun.delete(item.id)));
-            
-            // Delete all related data
-            const punchItems = await base44.entities.Punch.filter({ project_id: projectId });
-            await Promise.all(punchItems.map(item => base44.entities.Punch.delete(item.id)));
-            
-            const exceptionItems = await base44.entities.Exception.filter({ project_id: projectId });
-            await Promise.all(exceptionItems.map(item => base44.entities.Exception.delete(item.id)));
-            
-            const resultItems = await base44.entities.AnalysisResult.filter({ project_id: projectId });
-            await Promise.all(resultItems.map(item => base44.entities.AnalysisResult.delete(item.id)));
-            
-            const shiftItems = await base44.entities.ShiftTiming.filter({ project_id: projectId });
-            await Promise.all(shiftItems.map(item => base44.entities.ShiftTiming.delete(item.id)));
+            // Use bulk delete by query filter instead of fetching and deleting one-by-one
+            await base44.entities.ReportRun.deleteMany({ project_id: projectId });
+            await base44.entities.AnalysisResult.deleteMany({ project_id: projectId });
+            await base44.entities.Punch.deleteMany({ project_id: projectId });
+            await base44.entities.Exception.deleteMany({ project_id: projectId });
+            await base44.entities.ShiftTiming.deleteMany({ project_id: projectId });
             
             // Finally delete the project
             await base44.entities.Project.delete(projectId);
