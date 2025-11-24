@@ -67,9 +67,11 @@ export default function RunAnalysisTab({ project }) {
         setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Processing...' });
 
         try {
-            // Delete existing results
-            const existingResults = await base44.entities.AnalysisResult.filter({ project_id: project.id });
-            await Promise.all(existingResults.map(r => base44.entities.AnalysisResult.delete(r.id)));
+            // Create a new report run
+            const reportRun = await base44.entities.ReportRun.create({
+                project_id: project.id,
+                employee_count: uniqueEmployeeIds.length
+            });
 
             // Process each employee
             for (let i = 0; i < uniqueEmployeeIds.length; i++) {
@@ -84,6 +86,7 @@ export default function RunAnalysisTab({ project }) {
                 
                 await base44.entities.AnalysisResult.create({
                     project_id: project.id,
+                    report_run_id: reportRun.id,
                     attendance_id: result.attendance_id,
                     working_days: result.working_days,
                     present_days: result.present_days,

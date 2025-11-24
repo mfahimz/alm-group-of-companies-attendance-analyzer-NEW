@@ -13,11 +13,28 @@ export default function ReportTab({ project }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
+    const [selectedReportRun, setSelectedReportRun] = useState(null);
 
-    const { data: results = [] } = useQuery({
+    const { data: reportRuns = [] } = useQuery({
+        queryKey: ['reportRuns', project.id],
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date')
+    });
+
+    const { data: allResults = [] } = useQuery({
         queryKey: ['results', project.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ project_id: project.id })
     });
+
+    // Set the most recent report run as default
+    React.useEffect(() => {
+        if (reportRuns.length > 0 && !selectedReportRun) {
+            setSelectedReportRun(reportRuns[0].id);
+        }
+    }, [reportRuns]);
+
+    const results = selectedReportRun 
+        ? allResults.filter(r => r.report_run_id === selectedReportRun)
+        : [];
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees'],
@@ -160,6 +177,47 @@ export default function ReportTab({ project }) {
 
     return (
         <div className="space-y-6">
+            {/* Report Runs List */}
+            {reportRuns.length > 0 && (
+                <Card className="border-0 shadow-sm">
+                    <CardHeader>
+                        <CardTitle>Report History</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            {reportRuns.map((run) => (
+                                <button
+                                    key={run.id}
+                                    onClick={() => setSelectedReportRun(run.id)}
+                                    className={`w-full text-left p-4 rounded-lg border transition-all ${
+                                        selectedReportRun === run.id
+                                            ? 'bg-indigo-50 border-indigo-300'
+                                            : 'bg-white border-slate-200 hover:border-slate-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium text-slate-900">
+                                                Report Generated: {new Date(run.created_date).toLocaleString('en-US', {
+                                                    dateStyle: 'medium',
+                                                    timeStyle: 'short'
+                                                })}
+                                            </p>
+                                            <p className="text-sm text-slate-600 mt-1">
+                                                {run.employee_count} employee{run.employee_count !== 1 ? 's' : ''} analyzed
+                                            </p>
+                                        </div>
+                                        {selectedReportRun === run.id && (
+                                            <span className="text-indigo-600 font-medium text-sm">Viewing</span>
+                                        )}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Actions */}
             <Card className="border-0 shadow-sm">
                 <CardContent className="p-4">
@@ -186,39 +244,19 @@ export default function ReportTab({ project }) {
                 </CardContent>
             </Card>
 
-            {/* Report Generation Info */}
-            {results.length > 0 && (
-                <Card className="border-0 shadow-sm bg-indigo-50">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-indigo-900">Report Generated</p>
-                                <p className="text-xs text-indigo-700 mt-1">
-                                    {new Date(results[0].created_date).toLocaleString('en-US', {
-                                        dateStyle: 'medium',
-                                        timeStyle: 'short'
-                                    })}
-                                </p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-sm text-indigo-700">
-                                    {results.length} employee{results.length !== 1 ? 's' : ''} analyzed
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
             {/* Results Table */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <CardTitle>Attendance Report</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {results.length === 0 ? (
+                    {reportRuns.length === 0 ? (
                         <div className="text-center py-12 text-slate-500">
-                            No analysis results yet. Please run the analysis first.
+                            No reports generated yet. Please run the analysis first.
+                        </div>
+                    ) : results.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            No results found for this report.
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
