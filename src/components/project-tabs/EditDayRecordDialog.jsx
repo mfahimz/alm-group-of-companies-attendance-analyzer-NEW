@@ -39,10 +39,42 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
     };
 
     useEffect(() => {
-        if (dayRecord && open) {
+        if (dayRecord && open && punches.length > 0 && exceptions.length >= 0) {
             const dayPunches = getDayPunches();
+            const [day, month, year] = dayRecord.date.split('/');
+            const dateStr = `${year}-${month}-${day}`;
             
-            // Parse late minutes from lateInfo
+            // Check if there's an existing manual exception for this date
+            const existingException = exceptions.find(ex => 
+                ex.attendance_id === attendanceId &&
+                ex.date_from === dateStr &&
+                ex.date_to === dateStr &&
+                (ex.type === 'MANUAL_ADJUSTMENT' || 
+                 ex.type === 'MANUAL_PRESENT' || 
+                 ex.type === 'MANUAL_ABSENT' || 
+                 ex.type === 'MANUAL_HALF' ||
+                 ex.type === 'OFF')
+            );
+
+            if (existingException && existingException.details) {
+                // Load from existing exception
+                try {
+                    const details = JSON.parse(existingException.details);
+                    setFormData({
+                        type: existingException.type,
+                        details: details.notes || `Manual edit for ${dayRecord.date}`,
+                        selectedPunches: details.selectedPunches || dayPunches.map(p => p.id),
+                        lateMinutes: details.lateMinutes || 0,
+                        earlyCheckoutMinutes: details.earlyCheckoutMinutes || 0,
+                        isAbnormal: details.isAbnormal || false
+                    });
+                    return;
+                } catch (e) {
+                    // Fall through to default initialization
+                }
+            }
+
+            // Default initialization from calculated values
             let lateMinutes = 0;
             if (dayRecord.lateInfo && dayRecord.lateInfo !== '-') {
                 const matches = dayRecord.lateInfo.match(/(\d+)\s*min/g);
@@ -54,7 +86,6 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 }
             }
 
-            // Parse early checkout minutes from earlyCheckoutInfo
             let earlyCheckoutMinutes = 0;
             if (dayRecord.earlyCheckoutInfo && dayRecord.earlyCheckoutInfo !== '-') {
                 const matches = dayRecord.earlyCheckoutInfo.match(/(\d+)\s*min/g);
@@ -66,7 +97,6 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 }
             }
 
-            // Map current status to type
             let statusType = 'MANUAL_PRESENT';
             if (dayRecord.status.includes('Absent')) {
                 statusType = 'MANUAL_ABSENT';
@@ -87,7 +117,7 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 isAbnormal: dayRecord.abnormal || false
             });
         }
-    }, [dayRecord, punches, open]);
+    }, [dayRecord, punches, exceptions, open]);
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
