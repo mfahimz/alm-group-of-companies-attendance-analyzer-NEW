@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseTimeUAE, getUAEDate } from '../../utils/timezone';
+import { parseTimeUAE, getUAEDate } from '../utils/timezone';
 
 export default function RunAnalysisTab({ project }) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
