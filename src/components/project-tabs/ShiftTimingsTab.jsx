@@ -5,13 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 export default function ShiftTimingsTab({ project }) {
     const [file, setFile] = useState(null);
     const [parsedData, setParsedData] = useState([]);
     const [warnings, setWarnings] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedShifts, setSelectedShifts] = useState([]);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -164,6 +167,57 @@ export default function ShiftTimingsTab({ project }) {
         }
     });
 
+    const deleteMutation = useMutation({
+        mutationFn: (id) => base44.entities.ShiftTiming.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['shifts', project.id]);
+            toast.success('Shift deleted');
+        },
+        onError: () => {
+            toast.error('Failed to delete shift');
+        }
+    });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (ids) => {
+            await Promise.all(ids.map(id => base44.entities.ShiftTiming.delete(id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['shifts', project.id]);
+            setSelectedShifts([]);
+            toast.success('Shifts deleted successfully');
+        },
+        onError: () => {
+            toast.error('Failed to delete shifts');
+        }
+    });
+
+    const filteredShifts = shifts.filter(shift => 
+        !searchTerm || 
+        shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        employees.find(e => e.attendance_id === shift.attendance_id)?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const toggleSelectAll = () => {
+        if (selectedShifts.length === filteredShifts.length) {
+            setSelectedShifts([]);
+        } else {
+            setSelectedShifts(filteredShifts.map(s => s.id));
+        }
+    };
+
+    const toggleSelectShift = (id) => {
+        setSelectedShifts(prev => 
+            prev.includes(id) ? prev.filter(sId => sId !== id) : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = () => {
+        if (window.confirm(`Delete ${selectedShifts.length} selected shift records?`)) {
+            bulkDeleteMutation.mutate(selectedShifts);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Upload Section */}
@@ -230,25 +284,63 @@ export default function ShiftTimingsTab({ project }) {
                         <p className="text-slate-500 text-center py-8">No shifts uploaded yet</p>
                     ) : (
                         <div className="space-y-4">
-                            <p className="text-sm text-slate-600">
-                                Total: {shifts.length} shift records
-                            </p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-slate-600">
+                                    Total: {shifts.length} shift records
+                                    {filteredShifts.length !== shifts.length && ` (${filteredShifts.length} shown)`}
+                                </p>
+                                <div className="flex gap-3">
+                                    {selectedShifts.length > 0 && (
+                                        <Button 
+                                            onClick={handleBulkDelete}
+                                            variant="destructive"
+                                            size="sm"
+                                            disabled={bulkDeleteMutation.isPending}
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Delete {selectedShifts.length} Selected
+                                        </Button>
+                                    )}
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <Input
+                                            placeholder="Search by ID or name..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-9"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                             <div className="max-h-96 overflow-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            <TableHead className="w-12">
+                                                <Checkbox
+                                                    checked={selectedShifts.length === filteredShifts.length && filteredShifts.length > 0}
+                                                    onCheckedChange={toggleSelectAll}
+                                                />
+                                            </TableHead>
                                             <TableHead>Attendance ID</TableHead>
                                             <TableHead>Employee Name</TableHead>
                                             <TableHead>AM Shift</TableHead>
                                             <TableHead>PM Shift</TableHead>
                                             <TableHead>Applicable Days</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {shifts.map((shift) => {
+                                        {filteredShifts.map((shift) => {
                                             const employee = employees.find(e => e.attendance_id === shift.attendance_id);
                                             return (
                                                 <TableRow key={shift.id}>
+                                                    <TableCell>
+                                                        <Checkbox
+                                                            checked={selectedShifts.includes(shift.id)}
+                                                            onCheckedChange={() => toggleSelectShift(shift.id)}
+                                                        />
+                                                    </TableCell>
                                                     <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                     <TableCell>{employee?.name || '-'}</TableCell>
                                                     <TableCell>{formatTime(shift.am_start)} - {formatTime(shift.am_end)}</TableCell>
@@ -260,6 +352,19 @@ export default function ShiftTimingsTab({ project }) {
                                                                 Friday
                                                             </span>
                                                         )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                if (window.confirm('Delete this shift record?')) {
+                                                                    deleteMutation.mutate(shift.id);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </Button>
                                                     </TableCell>
                                                 </TableRow>
                                             );
