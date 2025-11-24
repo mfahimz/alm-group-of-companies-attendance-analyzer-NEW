@@ -58,6 +58,7 @@ export default function Layout({ children, currentPageName }) {
             items: [
                 { name: 'Users & Permissions', path: 'Users', icon: Shield },
                 { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
+                { name: 'Diagnostics', path: 'Diagnostics', icon: BarChart3 },
                 { name: 'Documentation', path: 'Documentation', icon: Book }
             ]
         },

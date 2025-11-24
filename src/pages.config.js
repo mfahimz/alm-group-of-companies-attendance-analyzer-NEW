@@ -6,6 +6,7 @@ import RulesSettings from './pages/RulesSettings';
 import Users from './pages/Users';
 import UserProfile from './pages/UserProfile';
 import Documentation from './pages/Documentation';
+import Diagnostics from './pages/Diagnostics';
 import __Layout from './Layout.jsx';
 
 
@@ -18,6 +19,7 @@ export const PAGES = {
     "Users": Users,
     "UserProfile": UserProfile,
     "Documentation": Documentation,
+    "Diagnostics": Diagnostics,
 }
 
 export const pagesConfig = {
