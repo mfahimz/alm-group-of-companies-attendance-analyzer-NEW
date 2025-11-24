@@ -212,29 +212,45 @@ export default function RunAnalysisTab({ project }) {
 
                 // Calculate late minutes for both AM and PM shifts
                 if (shift) {
-                    // AM shift late check
+                    // AM shift late check (first punch of the day)
                     if (shift.am_start && dayPunches.length > 0) {
                         const firstPunch = dayPunches[0];
                         const punchTime = parseTime(firstPunch.timestamp_raw);
                         const shiftStart = parseTime(shift.am_start);
 
+                        console.log(`[${dateStr}] ${attendance_id} AM Check:`, {
+                            punch: firstPunch.timestamp_raw,
+                            punchTime: punchTime?.toLocaleTimeString(),
+                            shiftStart: shift.am_start,
+                            shiftStartParsed: shiftStart?.toLocaleTimeString(),
+                            isLate: punchTime && shiftStart && punchTime > shiftStart
+                        });
+
                         if (punchTime && shiftStart && punchTime > shiftStart) {
-                            late_minutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                            const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
+                            late_minutes += minutes;
+                            console.log(`  -> Late by ${minutes} minutes`);
                         }
                     }
 
-                    // PM shift late check (second punch in)
+                    // PM shift late check (third punch - PM check-in)
                     if (shift.pm_start && dayPunches.length >= 3) {
-                        // Find the first punch after lunch (around PM shift start)
-                        const pmPunches = dayPunches.filter((p, idx) => idx >= 2); // After first 2 punches
-                        if (pmPunches.length > 0) {
-                            const pmFirstPunch = pmPunches[0];
-                            const punchTime = parseTime(pmFirstPunch.timestamp_raw);
-                            const shiftStart = parseTime(shift.pm_start);
+                        const pmCheckIn = dayPunches[2]; // 3rd punch is PM check-in
+                        const punchTime = parseTime(pmCheckIn.timestamp_raw);
+                        const shiftStart = parseTime(shift.pm_start);
 
-                            if (punchTime && shiftStart && punchTime > shiftStart) {
-                                late_minutes += Math.round((punchTime - shiftStart) / (1000 * 60));
-                            }
+                        console.log(`[${dateStr}] ${attendance_id} PM Check:`, {
+                            punch: pmCheckIn.timestamp_raw,
+                            punchTime: punchTime?.toLocaleTimeString(),
+                            shiftStart: shift.pm_start,
+                            shiftStartParsed: shiftStart?.toLocaleTimeString(),
+                            isLate: punchTime && shiftStart && punchTime > shiftStart
+                        });
+
+                        if (punchTime && shiftStart && punchTime > shiftStart) {
+                            const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
+                            late_minutes += minutes;
+                            console.log(`  -> Late by ${minutes} minutes`);
                         }
                     }
 
