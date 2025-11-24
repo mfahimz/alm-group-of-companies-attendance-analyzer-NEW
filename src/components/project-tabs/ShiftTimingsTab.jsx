@@ -325,11 +325,17 @@ export default function ShiftTimingsTab({ project }) {
                             </div>
 
                             <div>
-                                <Label>Applicable Days (optional)</Label>
-                                <Input
-                                    name="applicable_days"
-                                    placeholder="e.g., Saturday-Wednesday"
-                                />
+                                <Label>Applicable Days *</Label>
+                                <Select name="applicable_days" defaultValue="Monday to Thursday and Saturday" required>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Monday to Thursday and Saturday">Monday to Thursday and Saturday</SelectItem>
+                                        <SelectItem value="Friday">Friday</SelectItem>
+                                        <SelectItem value="Monday to Saturday">Monday to Saturday</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             <div>
