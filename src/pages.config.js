@@ -5,7 +5,6 @@ import Employees from './pages/Employees';
 import RulesSettings from './pages/RulesSettings';
 import Users from './pages/Users';
 import UserProfile from './pages/UserProfile';
-import Diagnostics from './pages/Diagnostics';
 import __Layout from './Layout.jsx';
 
 
@@ -17,7 +16,6 @@ export const PAGES = {
     "RulesSettings": RulesSettings,
     "Users": Users,
     "UserProfile": UserProfile,
-    "Diagnostics": Diagnostics,
 }
 
 export const pagesConfig = {
