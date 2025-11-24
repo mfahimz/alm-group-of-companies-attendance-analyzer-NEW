@@ -26,6 +26,12 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
         enabled: !!dayRecord
     });
 
+    const { data: exceptions = [] } = useQuery({
+        queryKey: ['exceptions', project.id],
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        enabled: !!dayRecord
+    });
+
     const getDayPunches = () => {
         if (!dayRecord) return [];
         const [day, month, year] = dayRecord.date.split('/');
@@ -118,12 +124,6 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
             });
         }
     }, [dayRecord, punches, exceptions, open]);
-
-    const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions', project.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        enabled: !!dayRecord
-    });
 
     const updateDayMutation = useMutation({
         mutationFn: async (data) => {
