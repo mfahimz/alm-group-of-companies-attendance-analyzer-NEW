@@ -186,6 +186,30 @@ export default function ReportTab({ project }) {
                 </CardContent>
             </Card>
 
+            {/* Report Generation Info */}
+            {results.length > 0 && (
+                <Card className="border-0 shadow-sm bg-indigo-50">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-indigo-900">Report Generated</p>
+                                <p className="text-xs text-indigo-700 mt-1">
+                                    {new Date(results[0].created_date).toLocaleString('en-US', {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'short'
+                                    })}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-sm text-indigo-700">
+                                    {results.length} employee{results.length !== 1 ? 's' : ''} analyzed
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Results Table */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
