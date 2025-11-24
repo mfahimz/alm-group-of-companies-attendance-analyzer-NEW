@@ -331,8 +331,7 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                     {/* Info Notice */}
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <p className="text-sm text-blue-800">
-                            <strong>Note:</strong> Changes will only affect this specific day for this employee in this project. 
-                            You must re-run the analysis for changes to take effect in the final report.
+                            <strong>Note:</strong> Changes will be saved to this specific day and will immediately update the current report.
                         </p>
                     </div>
 
