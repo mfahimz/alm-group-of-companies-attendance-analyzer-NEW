@@ -414,7 +414,7 @@ export default function ReportTab({ project }) {
                                     <TableRow key={idx} className={day.abnormal ? 'bg-amber-50' : ''}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
-                                        <TableCell className="text-xs max-w-xs truncate">{day.punchTimes || '-'}</TableCell>
+                                        <TableCell className="text-xs">{day.punchTimes || '-'}</TableCell>
                                         <TableCell className="text-xs">{day.shift}</TableCell>
                                         <TableCell className="text-xs">{day.exception}</TableCell>
                                         <TableCell>
