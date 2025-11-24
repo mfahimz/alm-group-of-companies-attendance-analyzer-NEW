@@ -175,14 +175,14 @@ export default function RunAnalysisTab({ project }) {
             let shift = null;
             // First check for date-specific shift
             shift = employeeShifts.find(s => s.date === dateStr);
-            
+
             // If no date-specific shift, check for day-based shift
             if (!shift) {
                 if (dayOfWeek === 5) { // Friday
-                    // Look for Friday shift
-                    shift = employeeShifts.find(s => s.is_friday_shift);
+                    // Look for general Friday shift (not date-specific)
+                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
                 } else {
-                    // Look for regular working day shift (not Friday)
+                    // Look for regular working day shift (not Friday, not date-specific)
                     shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
                 }
             }
