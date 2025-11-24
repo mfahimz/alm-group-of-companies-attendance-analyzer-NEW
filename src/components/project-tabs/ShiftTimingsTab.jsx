@@ -190,36 +190,33 @@ export default function ShiftTimingsTab({ project }) {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Employee</TableHead>
-                                            <TableHead>Applicable Days</TableHead>
+                                            <TableHead>Attendance ID</TableHead>
+                                            <TableHead>Employee Name</TableHead>
                                             <TableHead>AM Shift</TableHead>
                                             <TableHead>PM Shift</TableHead>
+                                            <TableHead>Applicable Days</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {shifts.map((shift) => (
-                                            <TableRow key={shift.id}>
-                                                <TableCell className="font-medium">{shift.attendance_id}</TableCell>
-                                                <TableCell>
-                                                    {shift.applicable_days ? (
-                                                        <span className="flex items-center gap-2">
-                                                            {shift.applicable_days}
-                                                            {shift.is_friday_shift && (
-                                                                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
-                                                                    Friday
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    ) : shift.date ? (
-                                                        <span>{new Date(shift.date).toLocaleDateString()}</span>
-                                                    ) : (
-                                                        <span className="text-slate-500">All days</span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>{shift.am_start} - {shift.am_end}</TableCell>
-                                                <TableCell>{shift.pm_start} - {shift.pm_end}</TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {shifts.map((shift) => {
+                                            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                                            return (
+                                                <TableRow key={shift.id}>
+                                                    <TableCell className="font-medium">{shift.attendance_id}</TableCell>
+                                                    <TableCell>{employee?.name || '-'}</TableCell>
+                                                    <TableCell>{shift.am_start} - {shift.am_end}</TableCell>
+                                                    <TableCell>{shift.pm_start} - {shift.pm_end}</TableCell>
+                                                    <TableCell>
+                                                        {shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString() : 'All days')}
+                                                        {shift.is_friday_shift && (
+                                                            <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
+                                                                Friday
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>
