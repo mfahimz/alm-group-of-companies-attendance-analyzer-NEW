@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard } from 'lucide-react';
+import { Toaster } from 'sonner';
 
 export default function Layout({ children, currentPageName }) {
     const navigation = [
@@ -52,6 +53,9 @@ export default function Layout({ children, currentPageName }) {
             <main className="max-w-7xl mx-auto px-6 py-8">
                 {children}
             </main>
+            
+            {/* Toast Notifications */}
+            <Toaster position="bottom-left" richColors />
         </div>
     );
 }
