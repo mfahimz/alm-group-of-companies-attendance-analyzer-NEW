@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard, Shield, User as UserIcon, LogOut, Menu, X, ChevronDown } from 'lucide-react';
+import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard, Shield, User as UserIcon, LogOut, Menu, X, ChevronDown, Book } from 'lucide-react';
 import { Toaster } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -57,7 +57,8 @@ export default function Layout({ children, currentPageName }) {
             icon: Settings,
             items: [
                 { name: 'Users & Permissions', path: 'Users', icon: Shield },
-                { name: 'Rules Settings', path: 'RulesSettings', icon: Settings }
+                { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
+                { name: 'Documentation', path: 'Documentation', icon: Book }
             ]
         },
         {
