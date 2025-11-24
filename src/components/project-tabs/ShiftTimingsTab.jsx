@@ -52,6 +52,33 @@ export default function ShiftTimingsTab({ project }) {
         }
     };
 
+    const normalizeTime = (timeStr) => {
+        if (!timeStr || timeStr === '—') return '—';
+        
+        // If already in AM/PM format, return as is
+        if (/AM|PM/i.test(timeStr)) {
+            // Ensure format is "H:MM AM/PM" or "HH:MM AM/PM"
+            const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (match) {
+                return `${match[1]}:${match[2]} ${match[3].toUpperCase()}`;
+            }
+            return timeStr;
+        }
+        
+        // Parse 24-hour format (HH:MM or HH:MM:SS)
+        const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (!match) return timeStr;
+        
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        const period = hours >= 12 ? 'PM' : 'AM';
+        
+        if (hours > 12) hours -= 12;
+        if (hours === 0) hours = 12;
+        
+        return `${hours}:${minutes} ${period}`;
+    };
+
     const parseCSV = (file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -68,10 +95,10 @@ export default function ShiftTimingsTab({ project }) {
                     const attendance_id = values[0];
                     // values[1] = name (not needed for shift timing)
                     // values[2] = department (not needed)
-                    const am_start = values[3]; // morning start
-                    const am_end = values[4];   // morning end
-                    const pm_start = values[5]; // evening start
-                    const pm_end = values[6];   // evening end
+                    const am_start = normalizeTime(values[3]); // morning start
+                    const am_end = normalizeTime(values[4]);   // morning end
+                    const pm_start = normalizeTime(values[5]); // evening start
+                    const pm_end = normalizeTime(values[6]);   // evening end
                     // values[7] = total hours (optional)
                     const applicableDays = values[8] || ''; // applicable days
 
@@ -155,7 +182,7 @@ export default function ShiftTimingsTab({ project }) {
                             CSV format: attendance_id, name, department, morning_start, morning_end, evening_start, evening_end, total_hours, applicable_days
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                            System auto-detects Friday shifts from applicable_days column.
+                            Time format: HH:MM AM/PM or 24-hour (will be converted). System auto-detects Friday shifts from applicable_days column.
                         </p>
                     </div>
 

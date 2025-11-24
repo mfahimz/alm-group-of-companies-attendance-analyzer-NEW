@@ -354,8 +354,8 @@ export default function RunAnalysisTab({ project }) {
         try {
             if (!timeStr || timeStr === '—') return null;
             
-            // Try AM/PM format first: "8:00 AM" or "08:00 AM" or "DD/MM/YYYY 8:00 AM"
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            // Parse AM/PM format: "8:00 AM" or "08:00 AM" or "DD/MM/YYYY 8:00 AM"
+            const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
@@ -363,17 +363,6 @@ export default function RunAnalysisTab({ project }) {
                 
                 if (period === 'PM' && hours !== 12) hours += 12;
                 if (period === 'AM' && hours === 12) hours = 0;
-                
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-            
-            // Try 24-hour format: "08:00:00", "08:00", "8:00"
-            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-            if (timeMatch) {
-                const hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
                 
                 const date = new Date();
                 date.setHours(hours, minutes, 0, 0);

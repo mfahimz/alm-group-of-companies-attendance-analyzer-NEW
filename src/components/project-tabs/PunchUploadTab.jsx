@@ -204,7 +204,10 @@ export default function PunchUploadTab({ project }) {
                             onChange={handleFileChange}
                         />
                         <p className="text-sm text-slate-500 mt-2">
-                            CSV format: attendance_id, name (optional), timestamp (DD/MM/YYYY HH:MM AM/PM)
+                            CSV format: attendance_id, name (optional), timestamp
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Timestamp format: DD/MM/YYYY HH:MM AM/PM (e.g., 02/10/2025 8:54 AM)
                         </p>
                     </div>
 

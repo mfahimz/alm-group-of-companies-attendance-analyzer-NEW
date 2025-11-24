@@ -152,6 +152,14 @@ export default function ReportTab({ project }) {
         setShowBreakdown(true);
     };
 
+    const formatDate = (dateStr) => {
+        const date = new Date(dateStr);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+
     const getDailyBreakdown = () => {
         if (!selectedEmployee) return [];
 
@@ -213,7 +221,7 @@ export default function ReportTab({ project }) {
             const isAbnormal = selectedEmployee.abnormal_dates?.includes(dateStr);
 
             breakdown.push({
-                date: currentDate.toLocaleDateString(),
+                date: formatDate(dateStr),
                 punches: dayPunches.length,
                 punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
                 shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
@@ -392,10 +400,10 @@ export default function ReportTab({ project }) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Date</TableHead>
+                                    <TableHead>Date (DD/MM/YYYY)</TableHead>
                                     <TableHead>Punches</TableHead>
                                     <TableHead>Punch Times</TableHead>
-                                    <TableHead>Shift</TableHead>
+                                    <TableHead>Shift (HH:MM AM/PM)</TableHead>
                                     <TableHead>Exception</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Abnormal</TableHead>
