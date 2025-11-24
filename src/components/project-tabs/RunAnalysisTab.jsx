@@ -237,13 +237,9 @@ export default function RunAnalysisTab({ project }) {
                     full_absence_count++;
                 }
 
-                // Use custom late/early minutes if provided
-                if (dayEdit.custom_late_minutes !== null && dayEdit.custom_late_minutes !== undefined) {
-                    late_minutes += dayEdit.custom_late_minutes;
-                }
-                if (dayEdit.custom_early_minutes !== null && dayEdit.custom_early_minutes !== undefined) {
-                    early_checkout_minutes += dayEdit.custom_early_minutes;
-                }
+                // For custom status, always use custom minutes (default to 0 if not provided)
+                late_minutes += dayEdit.custom_late_minutes || 0;
+                early_checkout_minutes += dayEdit.custom_early_minutes || 0;
             } else {
                 // Normal calculation
                 // Presence rule
