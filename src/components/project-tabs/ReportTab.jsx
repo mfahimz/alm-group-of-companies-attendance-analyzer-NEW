@@ -230,11 +230,18 @@ export default function ReportTab({ project }) {
             });
 
             let shift = null;
-            if (dayOfWeek === 5) {
-                shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
-            }
+            // First check for date-specific shift
+            shift = employeeShifts.find(s => s.date === dateStr);
+            
+            // If no date-specific shift, check for day-based shift
             if (!shift) {
-                shift = employeeShifts.find(s => s.date === dateStr) || employeeShifts.find(s => !s.date && !s.is_friday_shift);
+                if (dayOfWeek === 5) { // Friday
+                    // Look for general Friday shift (not date-specific)
+                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
+                } else {
+                    // Look for regular working day shift (not Friday, not date-specific)
+                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                }
             }
 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
