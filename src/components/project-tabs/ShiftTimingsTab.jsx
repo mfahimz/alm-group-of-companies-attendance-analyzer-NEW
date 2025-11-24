@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Search, Trash2 } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Edit } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import EditShiftDialog from './EditShiftDialog';
 
 export default function ShiftTimingsTab({ project }) {
     const [file, setFile] = useState(null);
@@ -15,6 +16,7 @@ export default function ShiftTimingsTab({ project }) {
     const [warnings, setWarnings] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedShifts, setSelectedShifts] = useState([]);
+    const [editingShift, setEditingShift] = useState(null);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -354,17 +356,26 @@ export default function ShiftTimingsTab({ project }) {
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => {
-                                                                if (window.confirm('Delete this shift record?')) {
-                                                                    deleteMutation.mutate(shift.id);
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-red-600" />
-                                                        </Button>
+                                                        <div className="flex gap-1 justify-end">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => setEditingShift(shift)}
+                                                            >
+                                                                <Edit className="w-4 h-4 text-indigo-600" />
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => {
+                                                                    if (window.confirm('Delete this shift record?')) {
+                                                                        deleteMutation.mutate(shift.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-red-600" />
+                                                            </Button>
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -376,6 +387,14 @@ export default function ShiftTimingsTab({ project }) {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Edit Shift Dialog */}
+            <EditShiftDialog
+                open={!!editingShift}
+                onClose={() => setEditingShift(null)}
+                shift={editingShift}
+                projectId={project.id}
+            />
         </div>
     );
 }
