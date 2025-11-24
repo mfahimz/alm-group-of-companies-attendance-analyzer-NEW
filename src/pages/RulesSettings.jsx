@@ -9,6 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Save, Settings } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '../utils';
 
 const DEFAULT_RULES = {
     date_rules: {
@@ -44,6 +46,20 @@ export default function RulesSettings() {
     const [rules, setRules] = useState(DEFAULT_RULES);
     const [abnormalDatesInput, setAbnormalDatesInput] = useState('');
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
+
+    // Check if current user is admin
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    React.useEffect(() => {
+        if (currentUser && currentUser.role !== 'admin') {
+            toast.error('Access denied. Admin only.');
+            navigate(createPageUrl('Dashboard'));
+        }
+    }, [currentUser, navigate]);
 
     const { data: rulesData, isLoading } = useQuery({
         queryKey: ['rules'],
@@ -120,6 +136,10 @@ export default function RulesSettings() {
                 <div className="text-slate-500">Loading rules...</div>
             </div>
         );
+    }
+
+    if (!currentUser || currentUser.role !== 'admin') {
+        return null;
     }
 
     return (
