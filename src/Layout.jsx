@@ -21,7 +21,7 @@ export default function Layout({ children, currentPageName }) {
                         <div className="flex items-center space-x-8">
                             <div className="flex items-center space-x-3">
                                 <BarChart3 className="w-7 h-7 text-indigo-600" />
-                                <span className="text-xl font-semibold text-slate-900">Attendance Analysis</span>
+                                <span className="text-xl font-semibold text-slate-900">Attendance</span>
                             </div>
                             <div className="flex space-x-1">
                                 {navigation.map((item) => {
