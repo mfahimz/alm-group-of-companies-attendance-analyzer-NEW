@@ -16,6 +16,26 @@ export default function ReportTab({ project }) {
     const [selectedReportRun, setSelectedReportRun] = useState(null);
     const queryClient = useQueryClient();
 
+    const formatTime = (timeStr) => {
+        if (!timeStr || timeStr === '—') return '—';
+        
+        // If already in AM/PM format, return as is
+        if (/AM|PM/i.test(timeStr)) return timeStr;
+        
+        // Parse 24-hour format (HH:MM or HH:MM:SS)
+        const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (!match) return timeStr;
+        
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        const period = hours >= 12 ? 'PM' : 'AM';
+        
+        if (hours > 12) hours -= 12;
+        if (hours === 0) hours = 12;
+        
+        return `${hours}:${minutes} ${period}`;
+    };
+
     const { data: reportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
         queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date')
@@ -196,7 +216,7 @@ export default function ReportTab({ project }) {
                 date: currentDate.toLocaleDateString(),
                 punches: dayPunches.length,
                 punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
-                shift: shift ? `${shift.am_start}-${shift.am_end} / ${shift.pm_start}-${shift.pm_end}` : 'No shift',
+                shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
                 exception: dateException ? dateException.type : '-',
                 status,
                 abnormal: isAbnormal

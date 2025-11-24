@@ -14,6 +14,26 @@ export default function ShiftTimingsTab({ project }) {
     const [warnings, setWarnings] = useState([]);
     const queryClient = useQueryClient();
 
+    const formatTime = (timeStr) => {
+        if (!timeStr || timeStr === '—') return '—';
+        
+        // If already in AM/PM format, return as is
+        if (/AM|PM/i.test(timeStr)) return timeStr;
+        
+        // Parse 24-hour format (HH:MM or HH:MM:SS)
+        const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (!match) return timeStr;
+        
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        const period = hours >= 12 ? 'PM' : 'AM';
+        
+        if (hours > 12) hours -= 12;
+        if (hours === 0) hours = 12;
+        
+        return `${hours}:${minutes} ${period}`;
+    };
+
     const { data: employees = [] } = useQuery({
         queryKey: ['employees'],
         queryFn: () => base44.entities.Employee.list()
@@ -204,8 +224,8 @@ export default function ShiftTimingsTab({ project }) {
                                                 <TableRow key={shift.id}>
                                                     <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                     <TableCell>{employee?.name || '-'}</TableCell>
-                                                    <TableCell>{shift.am_start} - {shift.am_end}</TableCell>
-                                                    <TableCell>{shift.pm_start} - {shift.pm_end}</TableCell>
+                                                    <TableCell>{formatTime(shift.am_start)} - {formatTime(shift.am_end)}</TableCell>
+                                                    <TableCell>{formatTime(shift.pm_start)} - {formatTime(shift.pm_end)}</TableCell>
                                                     <TableCell>
                                                         {shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString() : 'All days')}
                                                         {shift.is_friday_shift && (
