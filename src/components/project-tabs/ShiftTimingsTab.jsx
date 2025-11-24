@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, AlertTriangle, Search, Trash2, Edit } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditShiftDialog from './EditShiftDialog';
 
@@ -17,6 +18,7 @@ export default function ShiftTimingsTab({ project }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedShifts, setSelectedShifts] = useState([]);
     const [editingShift, setEditingShift] = useState(null);
+    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -194,11 +196,29 @@ export default function ShiftTimingsTab({ project }) {
         }
     });
 
-    const filteredShifts = shifts.filter(shift => 
-        !searchTerm || 
-        shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employees.find(e => e.attendance_id === shift.attendance_id)?.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredShifts = shifts
+        .filter(shift => 
+            !searchTerm || 
+            shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            employees.find(e => e.attendance_id === shift.attendance_id)?.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => {
+            let aVal, bVal;
+            if (sort.key === 'name') {
+                aVal = employees.find(e => e.attendance_id === a.attendance_id)?.name || '';
+                bVal = employees.find(e => e.attendance_id === b.attendance_id)?.name || '';
+            } else {
+                aVal = a[sort.key];
+                bVal = b[sort.key];
+            }
+            
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
     const toggleSelectAll = () => {
         if (selectedShifts.length === filteredShifts.length) {
@@ -324,8 +344,12 @@ export default function ShiftTimingsTab({ project }) {
                                                     onCheckedChange={toggleSelectAll}
                                                 />
                                             </TableHead>
-                                            <TableHead>Attendance ID</TableHead>
-                                            <TableHead>Employee Name</TableHead>
+                                            <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                                Attendance ID
+                                            </SortableTableHead>
+                                            <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
+                                                Employee Name
+                                            </SortableTableHead>
                                             <TableHead>AM Shift</TableHead>
                                             <TableHead>PM Shift</TableHead>
                                             <TableHead>Applicable Days</TableHead>

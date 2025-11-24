@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Download, Search, Eye, Trash2, Edit } from 'lucide-react';
+import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditDayRecordDialog from './EditDayRecordDialog';
 
@@ -16,6 +17,7 @@ export default function ReportTab({ project }) {
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [selectedReportRun, setSelectedReportRun] = useState(null);
     const [editingDay, setEditingDay] = useState(null);
+    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -113,10 +115,22 @@ export default function ReportTab({ project }) {
         };
     });
 
-    const filteredResults = enrichedResults.filter(result =>
-        result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        result.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredResults = enrichedResults
+        .filter(result =>
+            result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            result.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => {
+            let aVal = a[sort.key];
+            let bVal = b[sort.key];
+            
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
     const exportToExcel = () => {
         if (filteredResults.length === 0) {
@@ -432,13 +446,27 @@ export default function ReportTab({ project }) {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Attendance ID</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Working Days</TableHead>
-                                        <TableHead>Present Days</TableHead>
-                                        <TableHead>Full Absences</TableHead>
-                                        <TableHead>Late Minutes</TableHead>
-                                        <TableHead>Early Checkout Minutes</TableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                            Attendance ID
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
+                                            Name
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="working_days" currentSort={sort} onSort={setSort}>
+                                            Working Days
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="present_days" currentSort={sort} onSort={setSort}>
+                                            Present Days
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort}>
+                                            Full Absences
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort}>
+                                            Late Minutes
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
+                                            Early Checkout Minutes
+                                        </SortableTableHead>
                                         <TableHead>Notes</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>

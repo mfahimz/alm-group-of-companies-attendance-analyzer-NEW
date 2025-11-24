@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import SortableTableHead from '../components/ui/SortableTableHead';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +20,7 @@ export default function Employees() {
     const [importFile, setImportFile] = useState(null);
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -119,6 +121,17 @@ export default function Employees() {
                                 emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesDuplicateFilter = !showOnlyDuplicates || isDuplicate(emp);
             return matchesSearch && matchesDuplicateFilter;
+        })
+        .sort((a, b) => {
+            let aVal = a[sort.key];
+            let bVal = b[sort.key];
+            
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
         });
 
     const totalDuplicates = employees.filter(isDuplicate).length;
@@ -370,10 +383,18 @@ export default function Employees() {
                                             onCheckedChange={toggleSelectAll}
                                         />
                                     </TableHead>
-                                    <TableHead>Attendance ID</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Company</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                        Attendance ID
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
+                                        Name
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="company" currentSort={sort} onSort={setSort}>
+                                        Company
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="active" currentSort={sort} onSort={setSort}>
+                                        Status
+                                    </SortableTableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>

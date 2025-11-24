@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Pencil, Shield, User as UserIcon, Lock, RefreshCw } from 'lucide-react';
+import SortableTableHead from '../components/ui/SortableTableHead';
 import { toast } from 'sonner';
 import UserDialog from '../components/users/UserDialog';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +26,7 @@ export default function Users() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUser, setSelectedUser] = useState(null);
     const [showDialog, setShowDialog] = useState(false);
+    const [sort, setSort] = useState({ key: 'full_name', direction: 'asc' });
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -150,10 +152,22 @@ export default function Users() {
         return permission.allowed_roles.split(',').map(r => r.trim()).includes(role);
     };
 
-    const filteredUsers = users.filter(user =>
-        user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredUsers = users
+        .filter(user =>
+            user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => {
+            let aVal = a[sort.key];
+            let bVal = b[sort.key];
+            
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
     if (!currentUser) {
         return <div className="text-center py-12 text-slate-500">Loading...</div>;
@@ -208,10 +222,18 @@ export default function Users() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Created</TableHead>
+                                    <SortableTableHead sortKey="full_name" currentSort={sort} onSort={setSort}>
+                                        Name
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="email" currentSort={sort} onSort={setSort}>
+                                        Email
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="role" currentSort={sort} onSort={setSort}>
+                                        Role
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="created_date" currentSort={sort} onSort={setSort}>
+                                        Created
+                                    </SortableTableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>

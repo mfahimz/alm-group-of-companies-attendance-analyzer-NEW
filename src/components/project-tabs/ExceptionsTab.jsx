@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2, Search } from 'lucide-react';
+import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 
 export default function ExceptionsTab({ project }) {
@@ -24,6 +25,7 @@ export default function ExceptionsTab({ project }) {
         details: ''
     });
     const [filter, setFilter] = useState({ search: '', type: '' });
+    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const queryClient = useQueryClient();
 
     const { data: exceptions = [] } = useQuery({
@@ -93,17 +95,29 @@ export default function ExceptionsTab({ project }) {
         createMutation.mutate(submitData);
     };
 
-    const filteredExceptions = exceptions.filter(ex => {
-        if (filter.search) {
-            const searchLower = filter.search.toLowerCase();
-            const matchesId = ex.attendance_id.toLowerCase().includes(searchLower);
-            const employee = employees.find(e => e.attendance_id === ex.attendance_id);
-            const matchesName = employee?.name.toLowerCase().includes(searchLower);
-            if (!matchesId && !matchesName) return false;
-        }
-        if (filter.type && ex.type !== filter.type) return false;
-        return true;
-    });
+    const filteredExceptions = exceptions
+        .filter(ex => {
+            if (filter.search) {
+                const searchLower = filter.search.toLowerCase();
+                const matchesId = ex.attendance_id.toLowerCase().includes(searchLower);
+                const employee = employees.find(e => e.attendance_id === ex.attendance_id);
+                const matchesName = employee?.name.toLowerCase().includes(searchLower);
+                if (!matchesId && !matchesName) return false;
+            }
+            if (filter.type && ex.type !== filter.type) return false;
+            return true;
+        })
+        .sort((a, b) => {
+            let aVal = a[sort.key];
+            let bVal = b[sort.key];
+            
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
 
@@ -301,10 +315,18 @@ export default function ExceptionsTab({ project }) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Employee</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>From</TableHead>
-                                    <TableHead>To</TableHead>
+                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                        Employee
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
+                                        Type
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="date_from" currentSort={sort} onSort={setSort}>
+                                        From
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="date_to" currentSort={sort} onSort={setSort}>
+                                        To
+                                    </SortableTableHead>
                                     <TableHead>Details</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>

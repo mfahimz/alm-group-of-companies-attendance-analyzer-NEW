@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, AlertTriangle, Check, Search, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 
 export default function PunchUploadTab({ project }) {
@@ -17,6 +18,7 @@ export default function PunchUploadTab({ project }) {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [selectedPunches, setSelectedPunches] = useState([]);
+    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -164,10 +166,22 @@ export default function PunchUploadTab({ project }) {
     });
 
     // Enrich punches with employee names
-    const enrichedPunches = filteredPunches.map(punch => ({
-        ...punch,
-        employee_name: employees.find(e => e.attendance_id === punch.attendance_id)?.name || '-'
-    }));
+    const enrichedPunches = filteredPunches
+        .map(punch => ({
+            ...punch,
+            employee_name: employees.find(e => e.attendance_id === punch.attendance_id)?.name || '-'
+        }))
+        .sort((a, b) => {
+            let aVal = a[sort.key];
+            let bVal = b[sort.key];
+            
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
     const toggleSelectAll = () => {
         if (selectedPunches.length === enrichedPunches.length) {
@@ -307,9 +321,15 @@ export default function PunchUploadTab({ project }) {
                                                     onCheckedChange={toggleSelectAll}
                                                 />
                                             </TableHead>
-                                            <TableHead>Employee ID</TableHead>
-                                            <TableHead>Employee Name</TableHead>
-                                            <TableHead>Time</TableHead>
+                                            <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                                Employee ID
+                                            </SortableTableHead>
+                                            <SortableTableHead sortKey="employee_name" currentSort={sort} onSort={setSort}>
+                                                Employee Name
+                                            </SortableTableHead>
+                                            <SortableTableHead sortKey="timestamp_raw" currentSort={sort} onSort={setSort}>
+                                                Time
+                                            </SortableTableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
