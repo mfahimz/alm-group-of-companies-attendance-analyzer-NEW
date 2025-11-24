@@ -33,7 +33,6 @@ export default function Layout({ children, currentPageName }) {
         { name: 'Projects', path: 'Projects', icon: FolderKanban },
         { name: 'Employees', path: 'Employees', icon: Users },
         { name: 'Users', path: 'Users', icon: Shield },
-        { name: 'Page Permissions', path: 'PagePermissions', icon: Settings },
         { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
         { name: 'My Profile', path: 'UserProfile', icon: UserIcon }
     ];
