@@ -352,20 +352,35 @@ export default function RunAnalysisTab({ project }) {
 
     const parseTime = (timeStr) => {
         try {
-            // Handle both "HH:MM AM/PM" format and full timestamp "DD/MM/YYYY HH:MM AM/PM"
+            if (!timeStr || timeStr === '—') return null;
+            
+            // Try AM/PM format first: "8:00 AM" or "08:00 AM" or "DD/MM/YYYY 8:00 AM"
             let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-            if (!timeMatch) return null;
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = timeMatch[3].toUpperCase();
+                
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
             
-            let hours = parseInt(timeMatch[1]);
-            const minutes = parseInt(timeMatch[2]);
-            const period = timeMatch[3].toUpperCase();
+            // Try 24-hour format: "08:00:00", "08:00", "8:00"
+            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (timeMatch) {
+                const hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
             
-            if (period === 'PM' && hours !== 12) hours += 12;
-            if (period === 'AM' && hours === 12) hours = 0;
-            
-            const date = new Date();
-            date.setHours(hours, minutes, 0, 0);
-            return date;
+            return null;
         } catch {
             return null;
         }
