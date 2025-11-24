@@ -68,6 +68,7 @@ export default function ShiftTimingsTab({ project }) {
                         attendance_id,
                         date: null, // General shift, no specific date
                         is_friday_shift,
+                        applicable_days: applicableDays,
                         am_start,
                         am_end,
                         pm_start,
@@ -96,6 +97,7 @@ export default function ShiftTimingsTab({ project }) {
                 attendance_id: s.attendance_id,
                 date: s.date,
                 is_friday_shift: s.is_friday_shift,
+                applicable_days: s.applicable_days,
                 am_start: s.am_start,
                 am_end: s.am_end,
                 pm_start: s.pm_start,
@@ -189,7 +191,7 @@ export default function ShiftTimingsTab({ project }) {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Employee</TableHead>
-                                            <TableHead>Date/Type</TableHead>
+                                            <TableHead>Applicable Days</TableHead>
                                             <TableHead>AM Shift</TableHead>
                                             <TableHead>PM Shift</TableHead>
                                         </TableRow>
@@ -199,17 +201,19 @@ export default function ShiftTimingsTab({ project }) {
                                             <TableRow key={shift.id}>
                                                 <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                 <TableCell>
-                                                    {shift.date ? (
-                                                        <span>
-                                                            {new Date(shift.date).toLocaleDateString()}
+                                                    {shift.applicable_days ? (
+                                                        <span className="flex items-center gap-2">
+                                                            {shift.applicable_days}
                                                             {shift.is_friday_shift && (
-                                                                <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
+                                                                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
                                                                     Friday
                                                                 </span>
                                                             )}
                                                         </span>
+                                                    ) : shift.date ? (
+                                                        <span>{new Date(shift.date).toLocaleDateString()}</span>
                                                     ) : (
-                                                        <span className="text-slate-500">General</span>
+                                                        <span className="text-slate-500">All days</span>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>{shift.am_start} - {shift.am_end}</TableCell>
