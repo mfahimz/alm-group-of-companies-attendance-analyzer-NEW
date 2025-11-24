@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Search, Trash2, Edit } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, AlertTriangle, Search, Trash2, Edit, Plus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -18,6 +20,7 @@ export default function ShiftTimingsTab({ project }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedShifts, setSelectedShifts] = useState([]);
     const [editingShift, setEditingShift] = useState(null);
+    const [showAddForm, setShowAddForm] = useState(false);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const queryClient = useQueryClient();
 
@@ -196,6 +199,21 @@ export default function ShiftTimingsTab({ project }) {
         }
     });
 
+    const createShiftMutation = useMutation({
+        mutationFn: (data) => base44.entities.ShiftTiming.create({
+            ...data,
+            project_id: project.id
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['shifts', project.id]);
+            toast.success('Shift timing added successfully');
+            setShowAddForm(false);
+        },
+        onError: () => {
+            toast.error('Failed to add shift timing');
+        }
+    });
+
     const filteredShifts = shifts
         .filter(shift => 
             !searchTerm || 
@@ -242,6 +260,129 @@ export default function ShiftTimingsTab({ project }) {
 
     return (
         <div className="space-y-6">
+            {/* Add Shift Form */}
+            {showAddForm && (
+                <Card className="border-0 shadow-sm">
+                    <CardHeader>
+                        <CardTitle>Add Shift Timing</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.target);
+                            const attendance_id = formData.get('attendance_id');
+                            const is_friday_shift = formData.get('is_friday_shift') === 'true';
+                            const applicable_days = formData.get('applicable_days');
+                            const am_start = normalizeTime(formData.get('am_start'));
+                            const am_end = normalizeTime(formData.get('am_end'));
+                            const pm_start = normalizeTime(formData.get('pm_start'));
+                            const pm_end = normalizeTime(formData.get('pm_end'));
+
+                            if (!attendance_id || !am_start || !am_end || !pm_start || !pm_end) {
+                                toast.error('Please fill in all required fields');
+                                return;
+                            }
+
+                            createShiftMutation.mutate({
+                                attendance_id,
+                                date: null,
+                                is_friday_shift,
+                                applicable_days,
+                                am_start,
+                                am_end,
+                                pm_start,
+                                pm_end
+                            });
+                        }} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Employee *</Label>
+                                    <Select name="attendance_id" required>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select employee" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {employees.map(emp => (
+                                                <SelectItem key={emp.id} value={emp.attendance_id}>
+                                                    {emp.attendance_id} - {emp.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Shift Type</Label>
+                                    <Select name="is_friday_shift" defaultValue="false">
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="false">Regular (Sat-Wed)</SelectItem>
+                                            <SelectItem value="true">Friday Shift</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Applicable Days (optional)</Label>
+                                <Input
+                                    name="applicable_days"
+                                    placeholder="e.g., Saturday-Wednesday"
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2 block">Shift Times *</Label>
+                                <div className="grid grid-cols-4 gap-4">
+                                    <div>
+                                        <Label className="text-xs">AM Start</Label>
+                                        <Input
+                                            name="am_start"
+                                            placeholder="08:00 AM"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">AM End</Label>
+                                        <Input
+                                            name="am_end"
+                                            placeholder="12:00 PM"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">PM Start</Label>
+                                        <Input
+                                            name="pm_start"
+                                            placeholder="01:00 PM"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">PM End</Label>
+                                        <Input
+                                            name="pm_end"
+                                            placeholder="05:00 PM"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createShiftMutation.isPending}>
+                                    {createShiftMutation.isPending ? 'Adding...' : 'Add Shift'}
+                                </Button>
+                                <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Upload Section */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
@@ -299,7 +440,19 @@ export default function ShiftTimingsTab({ project }) {
             {/* Current Shifts */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
-                    <CardTitle>Current Shift Timings</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Current Shift Timings</CardTitle>
+                        {!showAddForm && (
+                            <Button 
+                                onClick={() => setShowAddForm(true)}
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Shift Timing
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {shifts.length === 0 ? (
