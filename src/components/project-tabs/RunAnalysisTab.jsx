@@ -188,8 +188,14 @@ export default function RunAnalysisTab({ project }) {
                 };
             }
 
-            // Get punches for this day
-            const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+            // Get punches for this day and sort by time
+            const dayPunches = employeePunches
+                .filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
 
             // Presence rule
             if (dayPunches.length > 0) {
@@ -200,7 +206,7 @@ export default function RunAnalysisTab({ project }) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
                     const shiftStart = parseTime(shift.am_start);
-                    
+
                     if (punchTime && shiftStart && punchTime > shiftStart) {
                         late_minutes += Math.round((punchTime - shiftStart) / (1000 * 60));
                     }
