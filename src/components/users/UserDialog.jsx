@@ -36,6 +36,7 @@ export default function UserDialog({ open, onClose, user }) {
         mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['users']);
+            queryClient.invalidateQueries(['currentUser']);
             toast.success('User updated successfully');
             onClose();
         },
