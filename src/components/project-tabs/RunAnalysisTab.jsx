@@ -114,7 +114,11 @@ export default function RunAnalysisTab({ project }) {
     };
 
     const analyzeEmployee = async (attendance_id) => {
-        const employeePunches = punches.filter(p => p.attendance_id === attendance_id);
+        const employeePunches = punches.filter(p => 
+            p.attendance_id === attendance_id && 
+            p.punch_date >= project.date_from && 
+            p.punch_date <= project.date_to
+        );
         const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
         const employeeExceptions = exceptions.filter(e => e.attendance_id === attendance_id);
 

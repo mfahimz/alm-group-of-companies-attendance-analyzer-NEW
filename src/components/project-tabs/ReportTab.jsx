@@ -112,7 +112,11 @@ export default function ReportTab({ project }) {
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
         
-        const employeePunches = punches.filter(p => p.attendance_id === selectedEmployee.attendance_id);
+        const employeePunches = punches.filter(p => 
+            p.attendance_id === selectedEmployee.attendance_id &&
+            p.punch_date >= project.date_from && 
+            p.punch_date <= project.date_to
+        );
         const employeeShifts = shifts.filter(s => s.attendance_id === selectedEmployee.attendance_id);
         const employeeExceptions = exceptions.filter(e => e.attendance_id === selectedEmployee.attendance_id);
 
