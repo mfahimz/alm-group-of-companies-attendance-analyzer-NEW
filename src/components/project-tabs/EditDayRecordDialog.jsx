@@ -66,8 +66,20 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 }
             }
 
+            // Map current status to type
+            let statusType = 'MANUAL_PRESENT';
+            if (dayRecord.status.includes('Absent')) {
+                statusType = 'MANUAL_ABSENT';
+            } else if (dayRecord.status.includes('Half')) {
+                statusType = 'MANUAL_HALF';
+            } else if (dayRecord.status.includes('Off')) {
+                statusType = 'OFF';
+            } else if (dayRecord.status.includes('Present')) {
+                statusType = 'MANUAL_PRESENT';
+            }
+
             setFormData({
-                type: 'MANUAL_PRESENT',
+                type: statusType,
                 details: `Manual edit for ${dayRecord.date}`,
                 selectedPunches: dayPunches.map(p => p.id),
                 lateMinutes: lateMinutes,
