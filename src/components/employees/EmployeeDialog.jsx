@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 export default function EmployeeDialog({ open, onClose, employee }) {
     const [formData, setFormData] = useState({
         attendance_id: '',
-        name: ''
+        name: '',
+        active: true
     });
     const queryClient = useQueryClient();
 
@@ -19,12 +21,14 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         if (employee) {
             setFormData({
                 attendance_id: employee.attendance_id || '',
-                name: employee.name || ''
+                name: employee.name || '',
+                active: employee.active ?? true
             });
         } else {
             setFormData({
                 attendance_id: '',
-                name: ''
+                name: '',
+                active: true
             });
         }
     }, [employee]);
@@ -110,6 +114,18 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="Full name"
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Label htmlFor="active">Active Status</Label>
+                            <p className="text-xs text-slate-500">Active employees will be included in projects</p>
+                        </div>
+                        <Switch
+                            id="active"
+                            checked={formData.active}
+                            onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
                         />
                     </div>
 

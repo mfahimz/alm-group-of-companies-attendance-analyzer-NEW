@@ -340,6 +340,7 @@ export default function Employees() {
                                     </TableHead>
                                     <TableHead>Attendance ID</TableHead>
                                     <TableHead>Name</TableHead>
+                                    <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -369,6 +370,14 @@ export default function Employees() {
                                                         <AlertCircle className="w-4 h-4 text-amber-600" title="Duplicate name" />
                                                     )}
                                                 </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`
+                                                    px-2 py-1 rounded-full text-xs font-medium
+                                                    ${employee.active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}
+                                                `}>
+                                                    {employee.active ? 'Active' : 'Inactive'}
+                                                </span>
                                             </TableCell>
                                             <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
