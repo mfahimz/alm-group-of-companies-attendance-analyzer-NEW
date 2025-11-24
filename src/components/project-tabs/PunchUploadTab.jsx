@@ -47,10 +47,19 @@ export default function PunchUploadTab({ project }) {
                 const values = lines[i].split(',').map(v => v.trim());
                 if (values.length >= 2) {
                     const attendance_id = values[0];
-                    // Handle both formats: (ID, timestamp) and (ID, name, timestamp)
-                    const timestamp_raw = values.length >= 3 && values[2].match(/\d{2}\/\d{2}\/\d{4}/) 
-                        ? values[2] 
-                        : values[1];
+                    
+                    // Detect which column is the timestamp by checking for date pattern
+                    let timestamp_raw = '';
+                    if (values[1].match(/\d{2}\/\d{2}\/\d{4}/)) {
+                        // Format: ID, timestamp
+                        timestamp_raw = values[1];
+                    } else if (values.length >= 3 && values[2].match(/\d{2}\/\d{2}\/\d{4}/)) {
+                        // Format: ID, name, timestamp
+                        timestamp_raw = values[2];
+                    } else {
+                        // Fallback to second column
+                        timestamp_raw = values[1];
+                    }
 
                     // Extract date from timestamp (DD/MM/YYYY HH:MM AM/PM)
                     const dateMatch = timestamp_raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
