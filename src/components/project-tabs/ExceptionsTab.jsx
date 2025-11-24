@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ExceptionsTab({ project }) {
@@ -23,7 +23,7 @@ export default function ExceptionsTab({ project }) {
         new_pm_end: '',
         details: ''
     });
-    const [filter, setFilter] = useState({ attendance_id: '', type: '' });
+    const [filter, setFilter] = useState({ search: '', type: '' });
     const queryClient = useQueryClient();
 
     const { data: exceptions = [] } = useQuery({
@@ -94,7 +94,13 @@ export default function ExceptionsTab({ project }) {
     };
 
     const filteredExceptions = exceptions.filter(ex => {
-        if (filter.attendance_id && !ex.attendance_id.includes(filter.attendance_id)) return false;
+        if (filter.search) {
+            const searchLower = filter.search.toLowerCase();
+            const matchesId = ex.attendance_id.toLowerCase().includes(searchLower);
+            const employee = employees.find(e => e.attendance_id === ex.attendance_id);
+            const matchesName = employee?.name.toLowerCase().includes(searchLower);
+            if (!matchesId && !matchesName) return false;
+        }
         if (filter.type && ex.type !== filter.type) return false;
         return true;
     });
@@ -260,12 +266,15 @@ export default function ExceptionsTab({ project }) {
                 <CardContent className="space-y-4">
                     {/* Filters */}
                     <div className="flex gap-4">
-                        <Input
-                            placeholder="Filter by employee ID..."
-                            value={filter.attendance_id}
-                            onChange={(e) => setFilter({ ...filter, attendance_id: e.target.value })}
-                            className="max-w-xs"
-                        />
+                        <div className="relative flex-1 max-w-xs">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Search by ID or name..."
+                                value={filter.search}
+                                onChange={(e) => setFilter({ ...filter, search: e.target.value })}
+                                className="pl-9"
+                            />
+                        </div>
                         <Select
                             value={filter.type}
                             onValueChange={(value) => setFilter({ ...filter, type: value })}
