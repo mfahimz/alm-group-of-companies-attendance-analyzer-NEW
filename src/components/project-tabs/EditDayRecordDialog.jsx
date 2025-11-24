@@ -77,22 +77,82 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
         }
     }, [existingEdit, dayRecord]);
 
+    // Get current report run ID
+    const { data: reportRuns = [] } = useQuery({
+        queryKey: ['reportRuns', project.id],
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date'),
+        enabled: open
+    });
+
+    const currentReportRunId = reportRuns.length > 0 ? reportRuns[0].id : null;
+
+    // Fetch the current analysis result for this employee
+    const { data: analysisResult } = useQuery({
+        queryKey: ['analysisResult', project.id, attendanceId, currentReportRunId],
+        queryFn: async () => {
+            if (!currentReportRunId) return null;
+            const results = await base44.entities.AnalysisResult.filter({
+                project_id: project.id,
+                attendance_id: attendanceId,
+                report_run_id: currentReportRunId
+            });
+            return results.length > 0 ? results[0] : null;
+        },
+        enabled: open && !!currentReportRunId && !!attendanceId
+    });
+
     const saveEditMutation = useMutation({
         mutationFn: async (data) => {
+            // Save the day-level edit
+            let dayEdit;
             if (existingEdit) {
-                return await base44.entities.DayLevelEdit.update(existingEdit.id, data);
+                dayEdit = await base44.entities.DayLevelEdit.update(existingEdit.id, data);
             } else {
-                return await base44.entities.DayLevelEdit.create(data);
+                dayEdit = await base44.entities.DayLevelEdit.create(data);
             }
+
+            // Recalculate and update the AnalysisResult
+            if (analysisResult && currentReportRunId) {
+                // Fetch all day edits for this employee
+                const allEdits = await base44.entities.DayLevelEdit.filter({
+                    project_id: project.id,
+                    attendance_id: attendanceId
+                });
+
+                // Recalculate totals based on all edits
+                let totalLate = 0;
+                let totalEarly = 0;
+                let presentCount = analysisResult.present_days;
+                let halfCount = analysisResult.half_absence_count;
+                let fullAbsenceCount = analysisResult.full_absence_count;
+
+                // Apply edits to totals
+                allEdits.forEach(edit => {
+                    if (edit.custom_late_minutes !== null && edit.custom_late_minutes !== undefined) {
+                        totalLate += edit.custom_late_minutes;
+                    }
+                    if (edit.custom_early_minutes !== null && edit.custom_early_minutes !== undefined) {
+                        totalEarly += edit.custom_early_minutes;
+                    }
+                });
+
+                await base44.entities.AnalysisResult.update(analysisResult.id, {
+                    late_minutes: totalLate,
+                    early_checkout_minutes: totalEarly
+                });
+            }
+
+            return dayEdit;
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['dayEdit']);
             queryClient.invalidateQueries(['results', project.id]);
-            toast.success('Day record updated - please re-run analysis to see changes');
+            queryClient.invalidateQueries(['analysisResult']);
+            toast.success('Day record updated and report refreshed');
             onClose();
         },
-        onError: () => {
-            toast.error('Failed to update day record');
+        onError: (error) => {
+            toast.error('Failed to update day record: ' + error.message);
         }
     });
 
