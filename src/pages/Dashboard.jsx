@@ -41,7 +41,7 @@ export default function Dashboard() {
         },
         {
             label: 'Active Employees',
-            value: employees.filter(e => e.status === 'active').length,
+            value: employees.filter(e => e.active === true).length,
             icon: Users,
             color: 'bg-blue-500',
             bgColor: 'bg-blue-50'
