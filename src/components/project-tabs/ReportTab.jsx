@@ -253,8 +253,9 @@ export default function ReportTab({ project }) {
                 };
             }
 
-            // Calculate late minutes
+            // Calculate late minutes and early checkout
             let lateInfo = '';
+            let earlyCheckoutInfo = '';
             if (shift && dayPunches.length > 0) {
                 // AM shift late check
                 if (shift.am_start) {
@@ -275,6 +276,27 @@ export default function ReportTab({ project }) {
                         const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
                         if (lateInfo) lateInfo += ' | ';
                         lateInfo += `PM: ${minutes} min late`;
+                    }
+                }
+
+                // Early checkout checks
+                if (shift.am_end && dayPunches.length >= 2) {
+                    const secondPunch = dayPunches[1];
+                    const punchTime = parseTime(secondPunch.timestamp_raw);
+                    const shiftEnd = parseTime(shift.am_end);
+                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                        const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
+                        earlyCheckoutInfo += `AM: ${minutes} min early`;
+                    }
+                }
+                if (shift.pm_end && dayPunches.length >= 4) {
+                    const lastPunch = dayPunches[dayPunches.length - 1];
+                    const punchTime = parseTime(lastPunch.timestamp_raw);
+                    const shiftEnd = parseTime(shift.pm_end);
+                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                        const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
+                        if (earlyCheckoutInfo) earlyCheckoutInfo += ' | ';
+                        earlyCheckoutInfo += `PM: ${minutes} min early`;
                     }
                 }
             }
@@ -300,7 +322,8 @@ export default function ReportTab({ project }) {
                 exception: dateException ? dateException.type : '-',
                 status,
                 abnormal: isAbnormal,
-                lateInfo: lateInfo || '-'
+                lateInfo: lateInfo || '-',
+                earlyCheckoutInfo: earlyCheckoutInfo || '-'
             });
         }
 
@@ -480,6 +503,7 @@ export default function ReportTab({ project }) {
                                     <TableHead>Exception</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Late Minutes</TableHead>
+                                    <TableHead>Early Checkout Minutes</TableHead>
                                     <TableHead>Abnormal</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -505,6 +529,13 @@ export default function ReportTab({ project }) {
                                         <TableCell className="text-xs">
                                             {day.lateInfo !== '-' ? (
                                                 <span className="text-orange-600 font-medium">{day.lateInfo}</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.earlyCheckoutInfo !== '-' ? (
+                                                <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
                                             ) : (
                                                 <span className="text-slate-400">-</span>
                                             )}
