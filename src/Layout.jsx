@@ -55,7 +55,7 @@ export default function Layout({ children, currentPageName }) {
             </main>
             
             {/* Toast Notifications */}
-            <Toaster position="bottom-left" richColors />
+            <Toaster position="top-left" richColors />
         </div>
     );
 }
