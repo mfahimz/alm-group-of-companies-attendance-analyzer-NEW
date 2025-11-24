@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Check, Search } from 'lucide-react';
+import { Upload, AlertTriangle, Check, Search, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 export default function PunchUploadTab({ project }) {
@@ -13,6 +14,8 @@ export default function PunchUploadTab({ project }) {
     const [parsedData, setParsedData] = useState([]);
     const [warnings, setWarnings] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
+    const [selectedPunches, setSelectedPunches] = useState([]);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -118,16 +121,63 @@ export default function PunchUploadTab({ project }) {
         }
     });
 
-    // Filter punches based on search
-    const filteredPunches = punches.filter(punch => 
-        !searchTerm || punch.attendance_id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const deleteMutation = useMutation({
+        mutationFn: (id) => base44.entities.Punch.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['punches', project.id]);
+            toast.success('Punch deleted');
+        },
+        onError: () => {
+            toast.error('Failed to delete punch');
+        }
+    });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (ids) => {
+            await Promise.all(ids.map(id => base44.entities.Punch.delete(id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['punches', project.id]);
+            setSelectedPunches([]);
+            toast.success('Punches deleted successfully');
+        },
+        onError: () => {
+            toast.error('Failed to delete punches');
+        }
+    });
+
+    // Filter punches based on search and date
+    const filteredPunches = punches.filter(punch => {
+        const matchesSearch = !searchTerm || punch.attendance_id.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesDate = !dateFilter || punch.punch_date === dateFilter;
+        return matchesSearch && matchesDate;
+    });
 
     // Enrich punches with employee names
     const enrichedPunches = filteredPunches.map(punch => ({
         ...punch,
         employee_name: employees.find(e => e.attendance_id === punch.attendance_id)?.name || '-'
     }));
+
+    const toggleSelectAll = () => {
+        if (selectedPunches.length === enrichedPunches.length) {
+            setSelectedPunches([]);
+        } else {
+            setSelectedPunches(enrichedPunches.map(p => p.id));
+        }
+    };
+
+    const toggleSelectPunch = (id) => {
+        setSelectedPunches(prev => 
+            prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = () => {
+        if (window.confirm(`Delete ${selectedPunches.length} selected punch records?`)) {
+            bulkDeleteMutation.mutate(selectedPunches);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -195,32 +245,79 @@ export default function PunchUploadTab({ project }) {
                             <div className="flex items-center justify-between">
                                 <p className="text-sm text-slate-600">
                                     Total: {punches.length} punch records from {new Set(punches.map(p => p.attendance_id)).size} employees
+                                    {enrichedPunches.length !== punches.length && ` (${enrichedPunches.length} shown)`}
                                 </p>
-                                <div className="relative w-64">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <div className="flex gap-3">
+                                    {selectedPunches.length > 0 && (
+                                        <Button 
+                                            onClick={handleBulkDelete}
+                                            variant="destructive"
+                                            size="sm"
+                                            disabled={bulkDeleteMutation.isPending}
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Delete {selectedPunches.length} Selected
+                                        </Button>
+                                    )}
                                     <Input
-                                        placeholder="Filter by attendance ID..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pl-9"
+                                        type="date"
+                                        value={dateFilter}
+                                        onChange={(e) => setDateFilter(e.target.value)}
+                                        className="w-48"
+                                        placeholder="Filter by date"
                                     />
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <Input
+                                            placeholder="Filter by attendance ID..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-9"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <div className="max-h-96 overflow-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            <TableHead className="w-12">
+                                                <Checkbox
+                                                    checked={selectedPunches.length === enrichedPunches.length && enrichedPunches.length > 0}
+                                                    onCheckedChange={toggleSelectAll}
+                                                />
+                                            </TableHead>
                                             <TableHead>Employee ID</TableHead>
                                             <TableHead>Employee Name</TableHead>
                                             <TableHead>Time</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {enrichedPunches.map((punch) => (
                                             <TableRow key={punch.id}>
+                                                <TableCell>
+                                                    <Checkbox
+                                                        checked={selectedPunches.includes(punch.id)}
+                                                        onCheckedChange={() => toggleSelectPunch(punch.id)}
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="font-medium">{punch.attendance_id}</TableCell>
                                                 <TableCell>{punch.employee_name}</TableCell>
                                                 <TableCell>{punch.timestamp_raw}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            if (window.confirm('Delete this punch record?')) {
+                                                                deleteMutation.mutate(punch.id);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                                    </Button>
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
