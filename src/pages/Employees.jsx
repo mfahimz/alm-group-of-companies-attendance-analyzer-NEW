@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, Upload, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
 
@@ -14,6 +14,7 @@ export default function Employees() {
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showDialog, setShowDialog] = useState(false);
     const [importFile, setImportFile] = useState(null);
+    const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: employees = [], isLoading } = useQuery({
@@ -32,10 +33,42 @@ export default function Employees() {
         }
     });
 
-    const filteredEmployees = employees.filter(emp =>
-        emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Detect duplicates
+    const duplicateAttendanceIds = new Set();
+    const duplicateNames = new Set();
+    const attendanceIdCounts = {};
+    const nameCounts = {};
+    
+    employees.forEach(emp => {
+        const aid = emp.attendance_id?.toLowerCase();
+        const name = emp.name?.toLowerCase();
+        
+        attendanceIdCounts[aid] = (attendanceIdCounts[aid] || 0) + 1;
+        nameCounts[name] = (nameCounts[name] || 0) + 1;
+    });
+    
+    Object.keys(attendanceIdCounts).forEach(aid => {
+        if (attendanceIdCounts[aid] > 1) duplicateAttendanceIds.add(aid);
+    });
+    
+    Object.keys(nameCounts).forEach(name => {
+        if (nameCounts[name] > 1) duplicateNames.add(name);
+    });
+
+    const isDuplicate = (emp) => {
+        return duplicateAttendanceIds.has(emp.attendance_id?.toLowerCase()) || 
+               duplicateNames.has(emp.name?.toLowerCase());
+    };
+
+    const filteredEmployees = employees
+        .filter(emp => {
+            const matchesSearch = emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesDuplicateFilter = !showOnlyDuplicates || isDuplicate(emp);
+            return matchesSearch && matchesDuplicateFilter;
+        });
+
+    const totalDuplicates = employees.filter(isDuplicate).length;
 
     const handleEdit = (employee) => {
         setSelectedEmployee(employee);
@@ -191,16 +224,45 @@ export default function Employees() {
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <Input
-                    placeholder="Search by name or attendance ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                />
+            {/* Search and Filters */}
+            <div className="flex gap-4 items-center">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Input
+                        placeholder="Search by name or attendance ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+                <Button
+                    variant={showOnlyDuplicates ? "default" : "outline"}
+                    onClick={() => setShowOnlyDuplicates(!showOnlyDuplicates)}
+                    className={showOnlyDuplicates ? "bg-amber-600 hover:bg-amber-700" : ""}
+                >
+                    <Filter className="w-4 h-4 mr-2" />
+                    Duplicates Only {totalDuplicates > 0 && `(${totalDuplicates})`}
+                </Button>
             </div>
+
+            {/* Duplicate Warning */}
+            {totalDuplicates > 0 && !showOnlyDuplicates && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div>
+                        <p className="font-medium text-amber-900">Duplicate Entries Detected</p>
+                        <p className="text-sm text-amber-700 mt-1">
+                            Found {totalDuplicates} employee{totalDuplicates > 1 ? 's' : ''} with duplicate attendance IDs or names.{' '}
+                            <button 
+                                onClick={() => setShowOnlyDuplicates(true)}
+                                className="underline font-medium hover:text-amber-900"
+                            >
+                                View duplicates
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Employees Table */}
             <Card className="border-0 shadow-sm">
@@ -221,11 +283,27 @@ export default function Employees() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredEmployees.map((employee) => (
-                                    <TableRow key={employee.id}>
-                                        <TableCell className="font-medium">{employee.attendance_id}</TableCell>
-                                        <TableCell>{employee.name}</TableCell>
-                                        <TableCell className="text-right">
+                                {filteredEmployees.map((employee) => {
+                                    const hasDuplicate = isDuplicate(employee);
+                                    return (
+                                        <TableRow key={employee.id} className={hasDuplicate ? "bg-amber-50" : ""}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {employee.attendance_id}
+                                                    {duplicateAttendanceIds.has(employee.attendance_id?.toLowerCase()) && (
+                                                        <AlertCircle className="w-4 h-4 text-amber-600" title="Duplicate attendance ID" />
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    {employee.name}
+                                                    {duplicateNames.has(employee.name?.toLowerCase()) && (
+                                                        <AlertCircle className="w-4 h-4 text-amber-600" title="Duplicate name" />
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <Button
                                                     size="sm"
@@ -245,7 +323,8 @@ export default function Employees() {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     )}
