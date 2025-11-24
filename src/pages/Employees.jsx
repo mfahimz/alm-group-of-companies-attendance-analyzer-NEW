@@ -123,16 +123,8 @@ export default function Employees() {
 
     const totalDuplicates = employees.filter(isDuplicate).length;
 
-    const hasAccess = () => {
-        if (!currentUser || permissions.length === 0) return false;
-        const permission = permissions.find(p => p.page_name === 'Employees');
-        if (!permission) return true;
-        const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-        return allowedRoles.includes(currentUser.role);
-    };
-
-    if (!hasAccess()) {
-        return null;
+    if (!currentUser) {
+        return <div className="text-center py-12 text-slate-500">Loading...</div>;
     }
 
     const handleEdit = (employee) => {

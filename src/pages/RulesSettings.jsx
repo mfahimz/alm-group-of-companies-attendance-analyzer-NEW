@@ -142,24 +142,12 @@ export default function RulesSettings() {
         }));
     };
 
-    if (isLoading) {
+    if (!currentUser || isLoading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <div className="text-slate-500">Loading rules...</div>
+                <div className="text-slate-500">Loading...</div>
             </div>
         );
-    }
-
-    const hasAccess = () => {
-        if (!currentUser || permissions.length === 0) return false;
-        const permission = permissions.find(p => p.page_name === 'RulesSettings');
-        if (!permission) return true;
-        const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-        return allowedRoles.includes(currentUser.role);
-    };
-
-    if (!hasAccess()) {
-        return null;
     }
 
     return (

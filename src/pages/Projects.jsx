@@ -153,16 +153,8 @@ export default function Projects() {
         project.department?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const hasAccess = () => {
-        if (!currentUser || permissions.length === 0) return false;
-        const permission = permissions.find(p => p.page_name === 'Projects');
-        if (!permission) return true;
-        const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-        return allowedRoles.includes(currentUser.role);
-    };
-
-    if (!hasAccess()) {
-        return null;
+    if (!currentUser) {
+        return <div className="text-center py-12 text-slate-500">Loading...</div>;
     }
 
     return (
