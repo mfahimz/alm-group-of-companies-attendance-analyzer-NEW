@@ -1,16 +1,28 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard } from 'lucide-react';
+import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard, Shield, User as UserIcon, LogOut } from 'lucide-react';
 import { Toaster } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { Button } from '@/components/ui/button';
 
 export default function Layout({ children, currentPageName }) {
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const isAdmin = currentUser?.role === 'admin';
+
     const navigation = [
-        { name: 'Dashboard', path: 'Dashboard', icon: LayoutDashboard },
-        { name: 'Projects', path: 'Projects', icon: FolderKanban },
-        { name: 'Employees', path: 'Employees', icon: Users },
-        { name: 'Rules Settings', path: 'RulesSettings', icon: Settings }
-    ];
+        { name: 'Dashboard', path: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'user'] },
+        { name: 'Projects', path: 'Projects', icon: FolderKanban, roles: ['admin'] },
+        { name: 'Employees', path: 'Employees', icon: Users, roles: ['admin'] },
+        { name: 'Users', path: 'Users', icon: Shield, roles: ['admin'] },
+        { name: 'Rules Settings', path: 'RulesSettings', icon: Settings, roles: ['admin'] },
+        { name: 'My Profile', path: 'UserProfile', icon: UserIcon, roles: ['user'] }
+    ].filter(item => item.roles.includes(currentUser?.role));
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -44,6 +56,28 @@ export default function Layout({ children, currentPageName }) {
                                     );
                                 })}
                             </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {currentUser && (
+                                <div className="flex items-center gap-3 text-sm">
+                                    <span className="text-slate-600">{currentUser.full_name}</span>
+                                    <span className={`
+                                        px-2 py-1 rounded-full text-xs font-medium
+                                        ${isAdmin ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}
+                                    `}>
+                                        {isAdmin ? 'Admin' : 'User'}
+                                    </span>
+                                </div>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => base44.auth.logout()}
+                                className="text-slate-600 hover:text-slate-900"
+                            >
+                                <LogOut className="w-4 h-4 mr-2" />
+                                Logout
+                            </Button>
                         </div>
                     </div>
                 </div>

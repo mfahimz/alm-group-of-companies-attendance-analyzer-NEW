@@ -9,6 +9,8 @@ import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle } from 'lucid
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '../utils';
 
 export default function Employees() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -18,6 +20,20 @@ export default function Employees() {
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
+
+    // Check if current user is admin
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    React.useEffect(() => {
+        if (currentUser && currentUser.role !== 'admin') {
+            toast.error('Access denied. Admin only.');
+            navigate(createPageUrl('Dashboard'));
+        }
+    }, [currentUser, navigate]);
 
     const { data: employees = [], isLoading } = useQuery({
         queryKey: ['employees'],
@@ -94,6 +110,10 @@ export default function Employees() {
         });
 
     const totalDuplicates = employees.filter(isDuplicate).length;
+
+    if (!currentUser || currentUser.role !== 'admin') {
+        return null;
+    }
 
     const handleEdit = (employee) => {
         setSelectedEmployee(employee);

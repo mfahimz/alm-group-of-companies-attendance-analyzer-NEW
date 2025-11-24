@@ -16,6 +16,19 @@ export default function Projects() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
+    // Check if current user is admin
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    React.useEffect(() => {
+        if (currentUser && currentUser.role !== 'admin') {
+            toast.error('Access denied. Admin only.');
+            navigate(createPageUrl('Dashboard'));
+        }
+    }, [currentUser, navigate]);
+
     const { data: projects = [], isLoading } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list('-created_date')
@@ -127,6 +140,10 @@ export default function Projects() {
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.department?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    if (!currentUser || currentUser.role !== 'admin') {
+        return null;
+    }
 
     return (
         <div className="space-y-6">
