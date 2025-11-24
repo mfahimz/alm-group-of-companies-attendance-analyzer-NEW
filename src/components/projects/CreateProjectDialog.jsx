@@ -48,11 +48,7 @@ export default function CreateProjectDialog({ open, onClose }) {
             return;
         }
 
-        const daysDiff = Math.ceil((dateTo - dateFrom) / (1000 * 60 * 60 * 24));
-        if (daysDiff > 10) {
-            toast.error('Project duration should not exceed 10 days');
-            return;
-        }
+
 
         createMutation.mutate({
             ...formData,
