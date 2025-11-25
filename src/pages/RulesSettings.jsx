@@ -171,8 +171,8 @@ export default function RulesSettings() {
                         <Label htmlFor="holidays">Holidays</Label>
                         <Input
                             id="holidays"
-                            value={rules.date_rules?.holidays?.join(', ')}
-                            onChange={(e) => updateRule('date_rules', 'holidays', e.target.value.split(',').map(h => h.trim()))}
+                            value={rules.date_rules?.holidays?.join(', ') || ''}
+                            onChange={(e) => updateRule('date_rules', 'holidays', e.target.value.split(',').map(h => h.trim()).filter(h => h))}
                             placeholder="e.g. Sunday, Saturday"
                             className="mt-2"
                         />
