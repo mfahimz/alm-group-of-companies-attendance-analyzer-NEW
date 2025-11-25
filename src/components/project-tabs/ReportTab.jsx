@@ -199,9 +199,7 @@ export default function ReportTab({ project }) {
     };
 
     const showDailyBreakdown = (result) => {
-        // Get the latest result data from enrichedResults to ensure we have current day_overrides
-        const latestResult = enrichedResults.find(r => r.id === result.id) || result;
-        setSelectedEmployee(latestResult);
+        setSelectedEmployee(result);
         setShowBreakdown(true);
     };
 
