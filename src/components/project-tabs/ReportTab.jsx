@@ -435,24 +435,14 @@ export default function ReportTab({ project }) {
                     }
                 }
 
-                // Early checkout checks
-                if (shift.am_end && dayPunches.length >= 2) {
-                    const secondPunch = dayPunches[1];
-                    const punchTime = parseTime(secondPunch.timestamp_raw);
-                    const shiftEnd = parseTime(shift.am_end);
-                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                        const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
-                        earlyCheckoutInfo += `AM: ${minutes} min early`;
-                    }
-                }
-                if (shift.pm_end && dayPunches.length >= 4) {
+                // Early checkout check - PM only (last punch before PM shift end)
+                if (shift.pm_end && dayPunches.length >= 1) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
                     if (punchTime && shiftEnd && punchTime < shiftEnd) {
                         const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
-                        if (earlyCheckoutInfo) earlyCheckoutInfo += ' | ';
-                        earlyCheckoutInfo += `PM: ${minutes} min early`;
+                        earlyCheckoutInfo = `PM: ${minutes} min early`;
                     }
                 }
             }
