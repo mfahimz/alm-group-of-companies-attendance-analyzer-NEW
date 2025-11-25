@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 export default function Layout({ children, currentPageName }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [expandedGroup, setExpandedGroup] = useState('dashboard');
 
     const { data: currentUser } = useQuery({
@@ -107,15 +108,16 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Sidebar */}
             <aside className={cn(
-                "fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-auto",
-                sidebarOpen ? "translate-x-0" : "-translate-x-full"
+                "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transform transition-all duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-auto",
+                sidebarOpen ? "translate-x-0" : "-translate-x-full",
+                sidebarCollapsed ? "w-16" : "w-72"
             )}>
                 <div className="flex flex-col h-full">
                     {/* Logo */}
-                    <div className="flex items-center justify-between px-6 h-16 border-b border-slate-200">
+                    <div className={cn("flex items-center justify-between h-16 border-b border-slate-200", sidebarCollapsed ? "px-3" : "px-6")}>
                         <div className="flex items-center space-x-3">
-                            <BarChart3 className="w-7 h-7 text-indigo-600" />
-                            <span className="text-xl font-semibold text-slate-900">Attendance</span>
+                            <BarChart3 className="w-7 h-7 text-indigo-600 flex-shrink-0" />
+                            {!sidebarCollapsed && <span className="text-xl font-semibold text-slate-900">Attendance</span>}
                         </div>
                         <Button
                             variant="ghost"
@@ -128,7 +130,7 @@ export default function Layout({ children, currentPageName }) {
                     </div>
 
                     {/* Navigation */}
-                    <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2">
+                    <nav className={cn("flex-1 overflow-y-auto py-6 space-y-2", sidebarCollapsed ? "px-2" : "px-4")}>
                         {filteredMenuGroups.map((group) => {
                             const GroupIcon = group.icon;
                             const isExpanded = expandedGroup === group.id;
@@ -140,33 +142,41 @@ export default function Layout({ children, currentPageName }) {
                                         <Link
                                             to={createPageUrl(group.items[0].path)}
                                             className={cn(
-                                                "flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
+                                                "flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all",
+                                                sidebarCollapsed ? "justify-center" : "space-x-3",
                                                 currentPageName === group.items[0].path
                                                     ? "bg-indigo-50 text-indigo-700"
                                                     : "text-slate-700 hover:bg-slate-50"
                                             )}
                                             onClick={() => setSidebarOpen(false)}
+                                            title={sidebarCollapsed ? group.items[0].name : undefined}
                                         >
-                                            <GroupIcon className="w-5 h-5" />
-                                            <span>{group.items[0].name}</span>
+                                            <GroupIcon className="w-5 h-5 flex-shrink-0" />
+                                            {!sidebarCollapsed && <span>{group.items[0].name}</span>}
                                         </Link>
                                     ) : (
                                         // Multiple items - render as group
                                         <div>
                                             <button
                                                 onClick={() => toggleGroup(group.id)}
-                                                className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"
+                                                className={cn(
+                                                    "w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all",
+                                                    sidebarCollapsed ? "justify-center" : "justify-between"
+                                                )}
+                                                title={sidebarCollapsed ? group.name : undefined}
                                             >
-                                                <div className="flex items-center space-x-3">
-                                                    <GroupIcon className="w-5 h-5" />
-                                                    <span>{group.name}</span>
+                                                <div className={cn("flex items-center", sidebarCollapsed ? "" : "space-x-3")}>
+                                                    <GroupIcon className="w-5 h-5 flex-shrink-0" />
+                                                    {!sidebarCollapsed && <span>{group.name}</span>}
                                                 </div>
-                                                <ChevronDown className={cn(
-                                                    "w-4 h-4 transition-transform",
-                                                    isExpanded && "rotate-180"
-                                                )} />
+                                                {!sidebarCollapsed && (
+                                                    <ChevronDown className={cn(
+                                                        "w-4 h-4 transition-transform",
+                                                        isExpanded && "rotate-180"
+                                                    )} />
+                                                )}
                                             </button>
-                                            {isExpanded && (
+                                            {isExpanded && !sidebarCollapsed && (
                                                 <div className="mt-1 ml-4 space-y-1">
                                                     {group.items.map((item) => {
                                                         const Icon = item.icon;
@@ -196,9 +206,24 @@ export default function Layout({ children, currentPageName }) {
                         })}
                     </nav>
 
+                    {/* Collapse Toggle (Desktop only) */}
+                    <div className="hidden lg:block border-t border-slate-200 p-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                            className="w-full justify-center"
+                        >
+                            <ChevronDown className={cn(
+                                "w-4 h-4 transition-transform",
+                                sidebarCollapsed ? "-rotate-90" : "rotate-90"
+                            )} />
+                        </Button>
+                    </div>
+
                     {/* User Info & Logout */}
-                    <div className="border-t border-slate-200 p-4">
-                        {currentUser && (
+                    <div className={cn("border-t border-slate-200", sidebarCollapsed ? "p-2" : "p-4")}>
+                        {currentUser && !sidebarCollapsed && (
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
@@ -222,10 +247,11 @@ export default function Layout({ children, currentPageName }) {
                             variant="outline"
                             size="sm"
                             onClick={() => base44.auth.logout()}
-                            className="w-full justify-center"
+                            className={cn("w-full", sidebarCollapsed ? "p-2" : "justify-center")}
+                            title={sidebarCollapsed ? "Logout" : undefined}
                         >
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Logout
+                            <LogOut className={cn("w-4 h-4", !sidebarCollapsed && "mr-2")} />
+                            {!sidebarCollapsed && "Logout"}
                         </Button>
                     </div>
                 </div>
