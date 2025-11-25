@@ -157,23 +157,67 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
         }
     });
 
-    const recalculateTotals = (result, overrides) => {
-        // Only update abnormal_dates based on overrides
-        // late_minutes and early_checkout_minutes are kept as-is since they represent
-        // the original calculated totals. The per-day overrides are stored separately
-        // and applied when viewing the daily breakdown.
+    const recalculateTotals = (result, overrides, originalTotals) => {
+        // Recalculate all totals based on overrides
         const abnormalDates = new Set((result.abnormal_dates || '').split(',').filter(Boolean));
         
+        // Start with original calculated values
+        let totalLateMinutes = originalTotals.late_minutes || 0;
+        let totalEarlyCheckout = originalTotals.early_checkout_minutes || 0;
+        let fullAbsenceCount = originalTotals.full_absence_count || 0;
+        let halfAbsenceCount = originalTotals.half_absence_count || 0;
+        let presentDays = originalTotals.present_days || 0;
+        
+        // Apply each override's delta from original day values
         Object.entries(overrides).forEach(([dateStr, override]) => {
+            // Handle abnormal dates
             if (override.isAbnormal) {
                 abnormalDates.add(dateStr);
             } else {
                 abnormalDates.delete(dateStr);
             }
+            
+            // Apply the override values - these replace the original values for that day
+            // The override stores the NEW values for that day
+            if (override.originalLateMinutes !== undefined) {
+                totalLateMinutes = totalLateMinutes - override.originalLateMinutes + override.lateMinutes;
+            }
+            if (override.originalEarlyCheckout !== undefined) {
+                totalEarlyCheckout = totalEarlyCheckout - override.originalEarlyCheckout + override.earlyCheckoutMinutes;
+            }
+            
+            // Handle status changes
+            if (override.originalStatus && override.type !== override.originalStatus) {
+                // Remove old status contribution
+                if (override.originalStatus === 'MANUAL_ABSENT' || override.originalStatus === 'Absent') {
+                    fullAbsenceCount--;
+                } else if (override.originalStatus === 'MANUAL_HALF' || override.originalStatus === 'Half Day') {
+                    halfAbsenceCount--;
+                } else if (override.originalStatus === 'MANUAL_PRESENT' || override.originalStatus === 'Present') {
+                    presentDays--;
+                }
+                
+                // Add new status contribution
+                if (override.type === 'MANUAL_ABSENT') {
+                    fullAbsenceCount++;
+                } else if (override.type === 'MANUAL_HALF') {
+                    halfAbsenceCount++;
+                    presentDays++;
+                } else if (override.type === 'MANUAL_PRESENT') {
+                    presentDays++;
+                } else if (override.type === 'OFF') {
+                    // OFF days don't count as absence or present
+                }
+            }
         });
 
         return {
-            abnormal_dates: Array.from(abnormalDates).join(',')
+            abnormal_dates: Array.from(abnormalDates).join(','),
+            late_minutes: Math.max(0, totalLateMinutes),
+            early_checkout_minutes: Math.max(0, totalEarlyCheckout),
+            full_absence_count: Math.max(0, fullAbsenceCount),
+            half_absence_count: Math.max(0, halfAbsenceCount),
+            present_days: Math.max(0, presentDays)
         };
     };
 
