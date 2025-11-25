@@ -279,7 +279,7 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                 const matchesName = employee?.name.toLowerCase().includes(searchLower);
                 if (!matchesId && !matchesName) return false;
             }
-            if (filter.type && ex.type !== filter.type) return false;
+            if (filter.type && filter.type !== 'all' && ex.type !== filter.type) return false;
             return true;
         })
         .sort((a, b) => {
@@ -515,7 +515,7 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                 <SelectValue placeholder="All types" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value={null}>All types</SelectItem>
+                                <SelectItem value="all">All types</SelectItem>
                                 <SelectItem value="OFF">Off / Leave</SelectItem>
                                 <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
                                 <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
