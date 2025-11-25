@@ -20,9 +20,9 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
     const queryClient = useQueryClient();
 
     const { data: punches = [] } = useQuery({
-        queryKey: ['punches', project.id],
+        queryKey: ['punches', project?.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
-        enabled: !!dayRecord
+        enabled: !!dayRecord && !!project?.id
     });
 
     const getDayPunches = () => {
@@ -131,8 +131,8 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 isAbnormal: data.isAbnormal
             };
 
-            // Recalculate totals based on all overrides
-            const updatedResult = recalculateTotals(analysisResult, overrides, project);
+            // Recalculate abnormal dates based on all overrides
+            const updatedResult = recalculateTotals(analysisResult, overrides);
 
             // Update the analysis result with new overrides and recalculated totals
             return await base44.entities.AnalysisResult.update(analysisResult.id, {
@@ -150,24 +150,14 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
         }
     });
 
-    const recalculateTotals = (result, overrides, project) => {
-        // Start with original calculated values
-        let late_minutes = result.late_minutes || 0;
-        let early_checkout_minutes = result.early_checkout_minutes || 0;
-        let full_absence_count = result.full_absence_count || 0;
-        let present_days = result.present_days || 0;
-        let half_absence_count = result.half_absence_count || 0;
+    const recalculateTotals = (result, overrides) => {
+        // Only update abnormal_dates based on overrides
+        // late_minutes and early_checkout_minutes are kept as-is since they represent
+        // the original calculated totals. The per-day overrides are stored separately
+        // and applied when viewing the daily breakdown.
         const abnormalDates = new Set((result.abnormal_dates || '').split(',').filter(Boolean));
-
-        // Apply overrides - this recalculates based on overrides
-        // For simplicity, we sum up override values
-        let overrideLateMinutes = 0;
-        let overrideEarlyMinutes = 0;
         
         Object.entries(overrides).forEach(([dateStr, override]) => {
-            overrideLateMinutes += override.lateMinutes || 0;
-            overrideEarlyMinutes += override.earlyCheckoutMinutes || 0;
-            
             if (override.isAbnormal) {
                 abnormalDates.add(dateStr);
             } else {
@@ -176,8 +166,6 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
         });
 
         return {
-            late_minutes: overrideLateMinutes || late_minutes,
-            early_checkout_minutes: overrideEarlyMinutes || early_checkout_minutes,
             abnormal_dates: Array.from(abnormalDates).join(',')
         };
     };

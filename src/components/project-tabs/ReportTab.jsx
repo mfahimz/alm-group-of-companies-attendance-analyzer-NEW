@@ -164,7 +164,9 @@ export default function ReportTab({ project }) {
     };
 
     const showDailyBreakdown = (result) => {
-        setSelectedEmployee(result);
+        // Get the latest result data from enrichedResults to ensure we have current day_overrides
+        const latestResult = enrichedResults.find(r => r.id === result.id) || result;
+        setSelectedEmployee(latestResult);
         setShowBreakdown(true);
     };
 
@@ -749,7 +751,14 @@ export default function ReportTab({ project }) {
             {/* Edit Day Record Dialog */}
             <EditDayRecordDialog
                 open={!!editingDay}
-                onClose={() => setEditingDay(null)}
+                onClose={() => {
+                    setEditingDay(null);
+                    // Refresh selectedEmployee with latest data after edit
+                    if (selectedEmployee) {
+                        const updated = enrichedResults.find(r => r.id === selectedEmployee.id);
+                        if (updated) setSelectedEmployee(updated);
+                    }
+                }}
                 dayRecord={editingDay}
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}
