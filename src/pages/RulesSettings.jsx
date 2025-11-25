@@ -297,6 +297,45 @@ export default function RulesSettings() {
                 </CardContent>
             </Card>
 
+            {/* Punch Filtering */}
+            <Card className="border-0 shadow-sm">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Settings className="w-5 h-5" />
+                        Multi-Punch Detection
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Label>Enable Multi-Punch Detection</Label>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Filter multiple punches within time windows to get 4 key punches (AM-in, AM-out, PM-in, PM-out)
+                            </p>
+                        </div>
+                        <Switch
+                            checked={rules.punch_filtering?.enable_multi_punch_detection ?? true}
+                            onCheckedChange={(checked) => updateRule('punch_filtering', 'enable_multi_punch_detection', checked)}
+                        />
+                    </div>
+
+                    <div>
+                        <Label>Cluster Window (Minutes)</Label>
+                        <Input
+                            type="number"
+                            value={rules.punch_filtering?.cluster_window_minutes ?? 10}
+                            onChange={(e) => updateRule('punch_filtering', 'cluster_window_minutes', parseInt(e.target.value) || 10)}
+                            className="mt-2 w-32"
+                            min={1}
+                            max={60}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                            Punches within this window are considered part of the same check-in/out event. Default: 10 minutes.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Attendance Calculation */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
