@@ -99,8 +99,15 @@ export default function PunchUploadTab({ project }) {
 
     const uploadMutation = useMutation({
         mutationFn: async () => {
-            // Delete existing punches for this project using deleteMany
-            await base44.entities.Punch.deleteMany({ project_id: project.id });
+            // Delete existing punches for this project
+            const existingPunches = await base44.entities.Punch.filter({ project_id: project.id });
+            
+            // Delete in batches to avoid timeout
+            const deleteBatchSize = 50;
+            for (let i = 0; i < existingPunches.length; i += deleteBatchSize) {
+                const batch = existingPunches.slice(i, i + deleteBatchSize);
+                await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
+            }
 
             // Insert new punches in batches to avoid timeout
             const punchRecords = parsedData.map(p => ({
