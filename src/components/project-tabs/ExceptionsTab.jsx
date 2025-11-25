@@ -31,6 +31,8 @@ const TYPE_MAP = {
     'early checkout': 'MANUAL_EARLY_CHECKOUT',
     'sick leave': 'SICK_LEAVE',
     'sick': 'SICK_LEAVE',
+    'single shift': 'SINGLE_SHIFT',
+    'single': 'SINGLE_SHIFT',
     // Also accept the exact system codes
     'off': 'OFF',
     'public_holiday': 'PUBLIC_HOLIDAY',
@@ -39,7 +41,8 @@ const TYPE_MAP = {
     'manual_absent': 'MANUAL_ABSENT',
     'manual_half': 'MANUAL_HALF',
     'manual_early_checkout': 'MANUAL_EARLY_CHECKOUT',
-    'sick_leave': 'SICK_LEAVE'
+    'sick_leave': 'SICK_LEAVE',
+    'single_shift': 'SINGLE_SHIFT'
 };
 
 export default function ExceptionsTab({ project }) {
@@ -576,7 +579,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                 <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                 <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                 <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                            </SelectContent>
+                                <SelectItem value="SINGLE_SHIFT">Single Shift</SelectItem>
+                                </SelectContent>
                         </Select>
                     </div>
 
@@ -635,6 +639,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                                         <SelectItem value="MANUAL_HALF">Half Day</SelectItem>
                                                         <SelectItem value="MANUAL_EARLY_CHECKOUT">Early Checkout</SelectItem>
                                                         <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                                        <SelectItem value="SINGLE_SHIFT">Single Shift</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </TableCell>
