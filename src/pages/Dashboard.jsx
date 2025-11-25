@@ -53,8 +53,8 @@ export default function Dashboard() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-                <p className="text-slate-600 mt-2">Overview of attendance analysis system</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Dashboard</h1>
+                <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Overview of attendance analysis system</p>
             </div>
 
             {/* Stats Grid */}
@@ -95,17 +95,17 @@ export default function Dashboard() {
                                 <Link
                                     key={project.id}
                                     to={createPageUrl(`ProjectDetail?id=${project.id}`)}
-                                    className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 hover:bg-slate-50 transition-colors gap-2"
                                 >
-                                    <div>
-                                        <p className="font-semibold text-slate-900">{project.name}</p>
-                                        <p className="text-sm text-slate-600 mt-1">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-semibold text-slate-900 truncate">{project.name}</p>
+                                        <p className="text-xs sm:text-sm text-slate-600 mt-1">
                                             {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                                         </p>
                                     </div>
-                                    <div>
+                                    <div className="flex-shrink-0">
                                         <span className={`
-                                            px-3 py-1 rounded-full text-xs font-medium
+                                            px-2.5 py-1 rounded-full text-xs font-medium
                                             ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
                                             ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
                                             ${project.status === 'locked' ? 'bg-slate-100 text-slate-700' : ''}

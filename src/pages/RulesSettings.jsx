@@ -147,15 +147,15 @@ export default function RulesSettings() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Rules Settings</h1>
-                    <p className="text-slate-600 mt-2">Configure global attendance analysis rules</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Rules Settings</h1>
+                    <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Configure global attendance analysis rules</p>
                 </div>
                 <Button 
                     onClick={handleSave}
                     disabled={saveMutation.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-700"
+                    className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto"
                 >
                     <Save className="w-4 h-4 mr-2" />
                     {saveMutation.isPending ? 'Saving...' : 'Save Rules'}

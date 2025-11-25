@@ -53,15 +53,15 @@ export default function ProjectDetail() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back to Projects
                 </Link>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
-                        <p className="text-slate-600 mt-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{project.name}</h1>
+                        <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">
                             {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                         </p>
                     </div>
                     <span className={`
-                        px-4 py-2 rounded-full text-sm font-medium
+                        px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium w-fit
                         ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
                         ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
                         ${project.status === 'locked' ? 'bg-slate-100 text-slate-700' : ''}
@@ -73,13 +73,13 @@ export default function ProjectDetail() {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="bg-white border border-slate-200 p-1">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="punches">Punch Upload</TabsTrigger>
-                    <TabsTrigger value="shifts">Shift Timings</TabsTrigger>
-                    <TabsTrigger value="exceptions">Exceptions</TabsTrigger>
-                    <TabsTrigger value="analysis">Run Analysis</TabsTrigger>
-                    <TabsTrigger value="report">Report</TabsTrigger>
+                <TabsList className="bg-white border border-slate-200 p-1 flex flex-wrap h-auto gap-1">
+                    <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+                    <TabsTrigger value="punches" className="text-xs sm:text-sm">Punches</TabsTrigger>
+                    <TabsTrigger value="shifts" className="text-xs sm:text-sm">Shifts</TabsTrigger>
+                    <TabsTrigger value="exceptions" className="text-xs sm:text-sm">Exceptions</TabsTrigger>
+                    <TabsTrigger value="analysis" className="text-xs sm:text-sm">Analysis</TabsTrigger>
+                    <TabsTrigger value="report" className="text-xs sm:text-sm">Report</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview">

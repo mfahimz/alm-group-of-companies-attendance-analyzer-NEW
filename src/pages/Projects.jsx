@@ -149,14 +149,14 @@ export default function Projects() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Projects</h1>
-                    <p className="text-slate-600 mt-2">Manage attendance analysis projects</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Projects</h1>
+                    <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
                 </div>
                 <Button 
                     onClick={() => setShowCreateDialog(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700"
+                    className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     New Project
