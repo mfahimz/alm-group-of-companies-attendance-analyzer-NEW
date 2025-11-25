@@ -295,7 +295,8 @@ export default function RunAnalysisTab({ project }) {
             }
 
             // Abnormality detection (use filtered punches)
-            const expectedPunches = 4; // 2 AM + 2 PM typically
+            // For single shift employees, expected punches is 2, otherwise 4
+            const expectedPunches = hasSingleShiftException ? 2 : 4;
             if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
                 abnormal_dates_list.push(dateStr);
             }
