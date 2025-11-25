@@ -128,17 +128,29 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 }
             }
 
-            // Add/update the override for this date
+            // Store original values for delta calculation (only if not already overridden)
+            const existingOverride = overrides[dateStr];
             overrides[dateStr] = {
                 type: data.type,
                 details: data.details,
                 lateMinutes: data.lateMinutes,
                 earlyCheckoutMinutes: data.earlyCheckoutMinutes,
-                isAbnormal: data.isAbnormal
+                isAbnormal: data.isAbnormal,
+                // Preserve original values from first edit
+                originalLateMinutes: existingOverride?.originalLateMinutes ?? data.originalLateMinutes,
+                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? data.originalEarlyCheckout,
+                originalStatus: existingOverride?.originalStatus ?? data.originalStatus
             };
 
-            // Recalculate abnormal dates based on all overrides
-            const updatedTotals = recalculateTotals(latestResult, overrides);
+            // Recalculate totals based on all overrides
+            const originalTotals = {
+                late_minutes: latestResult.late_minutes,
+                early_checkout_minutes: latestResult.early_checkout_minutes,
+                full_absence_count: latestResult.full_absence_count,
+                half_absence_count: latestResult.half_absence_count,
+                present_days: latestResult.present_days
+            };
+            const updatedTotals = recalculateTotals(latestResult, overrides, originalTotals);
 
             // Update the analysis result with new overrides and recalculated totals
             return await base44.entities.AnalysisResult.update(analysisResult.id, {
