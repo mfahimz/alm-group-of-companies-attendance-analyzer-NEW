@@ -322,6 +322,16 @@ export default function ReportTab({ project }) {
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
         
+        // Parse day_overrides for this specific report
+        let dayOverrides = {};
+        if (selectedEmployee.day_overrides) {
+            try {
+                dayOverrides = JSON.parse(selectedEmployee.day_overrides);
+            } catch (e) {
+                dayOverrides = {};
+            }
+        }
+        
         const employeePunches = punches.filter(p => 
             p.attendance_id === selectedEmployee.attendance_id &&
             p.punch_date >= project.date_from && 
@@ -436,7 +446,27 @@ export default function ReportTab({ project }) {
                 status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
             }
 
-            const isAbnormal = selectedEmployee.abnormal_dates?.includes(dateStr);
+            let isAbnormal = selectedEmployee.abnormal_dates?.includes(dateStr);
+            
+            // Check for day-specific overrides in this report
+            const dayOverride = dayOverrides[dateStr];
+            if (dayOverride) {
+                // Apply override values
+                if (dayOverride.type === 'MANUAL_PRESENT') status = 'Present (Edited)';
+                else if (dayOverride.type === 'MANUAL_ABSENT') status = 'Absent (Edited)';
+                else if (dayOverride.type === 'MANUAL_HALF') status = 'Half Day (Edited)';
+                else if (dayOverride.type === 'OFF') status = 'Off (Edited)';
+                
+                if (dayOverride.lateMinutes !== undefined) {
+                    lateInfo = dayOverride.lateMinutes > 0 ? `${dayOverride.lateMinutes} min (edited)` : '-';
+                }
+                if (dayOverride.earlyCheckoutMinutes !== undefined) {
+                    earlyCheckoutInfo = dayOverride.earlyCheckoutMinutes > 0 ? `${dayOverride.earlyCheckoutMinutes} min (edited)` : '-';
+                }
+                if (dayOverride.isAbnormal !== undefined) {
+                    isAbnormal = dayOverride.isAbnormal;
+                }
+            }
 
             breakdown.push({
                 date: formatDate(dateStr),
@@ -448,7 +478,8 @@ export default function ReportTab({ project }) {
                 status,
                 abnormal: isAbnormal,
                 lateInfo: lateInfo || '-',
-                earlyCheckoutInfo: earlyCheckoutInfo || '-'
+                earlyCheckoutInfo: earlyCheckoutInfo || '-',
+                hasOverride: !!dayOverride
             });
         }
 
@@ -653,7 +684,7 @@ export default function ReportTab({ project }) {
                             </TableHeader>
                             <TableBody>
                                 {getDailyBreakdown().map((day, idx) => (
-                                    <TableRow key={idx} className={day.abnormal ? 'bg-amber-50' : ''}>
+                                    <TableRow key={idx} className={`${day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
                                         <TableCell className="text-xs max-w-xs">
@@ -722,6 +753,7 @@ export default function ReportTab({ project }) {
                 dayRecord={editingDay}
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}
+                analysisResult={selectedEmployee}
             />
         </div>
     );

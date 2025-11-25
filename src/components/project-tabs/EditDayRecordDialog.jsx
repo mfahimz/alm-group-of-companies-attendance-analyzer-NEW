@@ -9,11 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
-export default function EditDayRecordDialog({ open, onClose, dayRecord, project, attendanceId }) {
+export default function EditDayRecordDialog({ open, onClose, dayRecord, project, attendanceId, analysisResult }) {
     const [formData, setFormData] = useState({
         type: 'MANUAL_PRESENT',
-        details: `Manual edit for ${dayRecord?.date || ''}`,
-        selectedPunches: [],
+        details: '',
         lateMinutes: 0,
         earlyCheckoutMinutes: 0,
         isAbnormal: false
@@ -23,12 +22,6 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
-        enabled: !!dayRecord
-    });
-
-    const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions', project.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
         enabled: !!dayRecord
     });
 
@@ -45,124 +38,111 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
     };
 
     useEffect(() => {
-        if (dayRecord && open && punches.length > 0 && exceptions.length >= 0) {
-            const dayPunches = getDayPunches();
+        if (dayRecord && open && analysisResult) {
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${month}-${day}`;
             
-            // Check if there's an existing manual exception for this date
-            const existingException = exceptions.find(ex => 
-                ex.attendance_id === attendanceId &&
-                ex.date_from === dateStr &&
-                ex.date_to === dateStr &&
-                (ex.type === 'MANUAL_ADJUSTMENT' || 
-                 ex.type === 'MANUAL_PRESENT' || 
-                 ex.type === 'MANUAL_ABSENT' || 
-                 ex.type === 'MANUAL_HALF' ||
-                 ex.type === 'OFF')
-            );
-
-            if (existingException && existingException.details) {
-                // Load from existing exception
+            // Check if there's an existing override for this date in the analysis result
+            let existingOverride = null;
+            if (analysisResult.day_overrides) {
                 try {
-                    const details = JSON.parse(existingException.details);
-                    setFormData({
-                        type: existingException.type,
-                        details: details.notes || `Manual edit for ${dayRecord.date}`,
-                        selectedPunches: details.selectedPunches || dayPunches.map(p => p.id),
-                        lateMinutes: details.lateMinutes || 0,
-                        earlyCheckoutMinutes: details.earlyCheckoutMinutes || 0,
-                        isAbnormal: details.isAbnormal || false
-                    });
-                    return;
+                    const overrides = JSON.parse(analysisResult.day_overrides);
+                    existingOverride = overrides[dateStr];
                 } catch (e) {
-                    // Fall through to default initialization
+                    // Invalid JSON, ignore
                 }
             }
 
-            // Default initialization from calculated values
-            let lateMinutes = 0;
-            if (dayRecord.lateInfo && dayRecord.lateInfo !== '-') {
-                const matches = dayRecord.lateInfo.match(/(\d+)\s*min/g);
-                if (matches) {
-                    lateMinutes = matches.reduce((sum, match) => {
-                        const num = parseInt(match.match(/\d+/)[0]);
-                        return sum + num;
-                    }, 0);
+            if (existingOverride) {
+                setFormData({
+                    type: existingOverride.type || 'MANUAL_PRESENT',
+                    details: existingOverride.details || '',
+                    lateMinutes: existingOverride.lateMinutes || 0,
+                    earlyCheckoutMinutes: existingOverride.earlyCheckoutMinutes || 0,
+                    isAbnormal: existingOverride.isAbnormal || false
+                });
+            } else {
+                // Default initialization from calculated values
+                let lateMinutes = 0;
+                if (dayRecord.lateInfo && dayRecord.lateInfo !== '-') {
+                    const matches = dayRecord.lateInfo.match(/(\d+)\s*min/g);
+                    if (matches) {
+                        lateMinutes = matches.reduce((sum, match) => {
+                            const num = parseInt(match.match(/\d+/)[0]);
+                            return sum + num;
+                        }, 0);
+                    }
                 }
-            }
 
-            let earlyCheckoutMinutes = 0;
-            if (dayRecord.earlyCheckoutInfo && dayRecord.earlyCheckoutInfo !== '-') {
-                const matches = dayRecord.earlyCheckoutInfo.match(/(\d+)\s*min/g);
-                if (matches) {
-                    earlyCheckoutMinutes = matches.reduce((sum, match) => {
-                        const num = parseInt(match.match(/\d+/)[0]);
-                        return sum + num;
-                    }, 0);
+                let earlyCheckoutMinutes = 0;
+                if (dayRecord.earlyCheckoutInfo && dayRecord.earlyCheckoutInfo !== '-') {
+                    const matches = dayRecord.earlyCheckoutInfo.match(/(\d+)\s*min/g);
+                    if (matches) {
+                        earlyCheckoutMinutes = matches.reduce((sum, match) => {
+                            const num = parseInt(match.match(/\d+/)[0]);
+                            return sum + num;
+                        }, 0);
+                    }
                 }
-            }
 
-            let statusType = 'MANUAL_PRESENT';
-            if (dayRecord.status.includes('Absent')) {
-                statusType = 'MANUAL_ABSENT';
-            } else if (dayRecord.status.includes('Half')) {
-                statusType = 'MANUAL_HALF';
-            } else if (dayRecord.status.includes('Off')) {
-                statusType = 'OFF';
-            } else if (dayRecord.status.includes('Present')) {
-                statusType = 'MANUAL_PRESENT';
-            }
+                let statusType = 'MANUAL_PRESENT';
+                if (dayRecord.status.includes('Absent')) {
+                    statusType = 'MANUAL_ABSENT';
+                } else if (dayRecord.status.includes('Half')) {
+                    statusType = 'MANUAL_HALF';
+                } else if (dayRecord.status.includes('Off')) {
+                    statusType = 'OFF';
+                } else if (dayRecord.status.includes('Present')) {
+                    statusType = 'MANUAL_PRESENT';
+                }
 
-            setFormData({
-                type: statusType,
-                details: `Manual edit for ${dayRecord.date}`,
-                selectedPunches: dayPunches.map(p => p.id),
-                lateMinutes: lateMinutes,
-                earlyCheckoutMinutes: earlyCheckoutMinutes,
-                isAbnormal: dayRecord.abnormal || false
-            });
+                setFormData({
+                    type: statusType,
+                    details: '',
+                    lateMinutes: lateMinutes,
+                    earlyCheckoutMinutes: earlyCheckoutMinutes,
+                    isAbnormal: dayRecord.abnormal || false
+                });
+            }
         }
-    }, [dayRecord, punches, exceptions, open]);
+    }, [dayRecord, open, analysisResult]);
 
     const updateDayMutation = useMutation({
         mutationFn: async (data) => {
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${month}-${day}`;
 
-            // Check if exception already exists for this date and employee
-            const existingException = exceptions.find(ex => 
-                ex.attendance_id === attendanceId &&
-                ex.date_from === dateStr &&
-                ex.date_to === dateStr &&
-                (ex.type === 'MANUAL_ADJUSTMENT' || ex.type === data.type)
-            );
+            // Get existing overrides or create new object
+            let overrides = {};
+            if (analysisResult.day_overrides) {
+                try {
+                    overrides = JSON.parse(analysisResult.day_overrides);
+                } catch (e) {
+                    overrides = {};
+                }
+            }
 
-            const exceptionData = {
-                project_id: project.id,
-                attendance_id: attendanceId,
-                date_from: dateStr,
-                date_to: dateStr,
+            // Add/update the override for this date
+            overrides[dateStr] = {
                 type: data.type,
-                details: JSON.stringify({
-                    selectedPunches: data.selectedPunches,
-                    lateMinutes: data.lateMinutes,
-                    earlyCheckoutMinutes: data.earlyCheckoutMinutes,
-                    isAbnormal: data.isAbnormal,
-                    notes: data.details
-                })
+                details: data.details,
+                lateMinutes: data.lateMinutes,
+                earlyCheckoutMinutes: data.earlyCheckoutMinutes,
+                isAbnormal: data.isAbnormal
             };
 
-            if (existingException) {
-                return await base44.entities.Exception.update(existingException.id, exceptionData);
-            } else {
-                return await base44.entities.Exception.create(exceptionData);
-            }
+            // Recalculate totals based on all overrides
+            const updatedResult = recalculateTotals(analysisResult, overrides, project);
+
+            // Update the analysis result with new overrides and recalculated totals
+            return await base44.entities.AnalysisResult.update(analysisResult.id, {
+                day_overrides: JSON.stringify(overrides),
+                ...updatedResult
+            });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['results', project.id]);
-            toast.success('Day record updated. Re-run analysis to apply changes.');
+            toast.success('Day record updated for this report');
             onClose();
         },
         onError: () => {
@@ -170,19 +150,42 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
         }
     });
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!dayRecord) return;
-        updateDayMutation.mutate(formData);
+    const recalculateTotals = (result, overrides, project) => {
+        // Start with original calculated values
+        let late_minutes = result.late_minutes || 0;
+        let early_checkout_minutes = result.early_checkout_minutes || 0;
+        let full_absence_count = result.full_absence_count || 0;
+        let present_days = result.present_days || 0;
+        let half_absence_count = result.half_absence_count || 0;
+        const abnormalDates = new Set((result.abnormal_dates || '').split(',').filter(Boolean));
+
+        // Apply overrides - this recalculates based on overrides
+        // For simplicity, we sum up override values
+        let overrideLateMinutes = 0;
+        let overrideEarlyMinutes = 0;
+        
+        Object.entries(overrides).forEach(([dateStr, override]) => {
+            overrideLateMinutes += override.lateMinutes || 0;
+            overrideEarlyMinutes += override.earlyCheckoutMinutes || 0;
+            
+            if (override.isAbnormal) {
+                abnormalDates.add(dateStr);
+            } else {
+                abnormalDates.delete(dateStr);
+            }
+        });
+
+        return {
+            late_minutes: overrideLateMinutes || late_minutes,
+            early_checkout_minutes: overrideEarlyMinutes || early_checkout_minutes,
+            abnormal_dates: Array.from(abnormalDates).join(',')
+        };
     };
 
-    const togglePunch = (punchId) => {
-        setFormData(prev => ({
-            ...prev,
-            selectedPunches: prev.selectedPunches.includes(punchId)
-                ? prev.selectedPunches.filter(id => id !== punchId)
-                : [...prev.selectedPunches, punchId]
-        }));
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!dayRecord || !analysisResult) return;
+        updateDayMutation.mutate(formData);
     };
 
     if (!dayRecord) return null;
@@ -194,6 +197,7 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Day Record: {dayRecord.date}</DialogTitle>
+                    <p className="text-sm text-slate-500 mt-1">Changes apply only to this specific report</p>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                     <div>
@@ -214,27 +218,16 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                         </Select>
                     </div>
 
-                    {/* Punch Selection */}
-                    <div className="border rounded-lg p-4 space-y-3">
-                        <Label className="text-base font-semibold">Select Punches to Include</Label>
-                        <p className="text-sm text-slate-600">Choose which punches should be used for calculations</p>
+                    {/* Punch Times (Read-only display) */}
+                    <div className="border rounded-lg p-4 space-y-3 bg-slate-50">
+                        <Label className="text-base font-semibold">Punch Times (Read-only)</Label>
                         {dayPunches.length === 0 ? (
                             <p className="text-sm text-slate-500 italic">No punches recorded for this day</p>
                         ) : (
-                            <div className="space-y-2">
-                                {dayPunches.map((punch) => (
-                                    <div key={punch.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded">
-                                        <Checkbox
-                                            id={`punch-${punch.id}`}
-                                            checked={formData.selectedPunches.includes(punch.id)}
-                                            onCheckedChange={() => togglePunch(punch.id)}
-                                        />
-                                        <label
-                                            htmlFor={`punch-${punch.id}`}
-                                            className="text-sm flex-1 cursor-pointer"
-                                        >
-                                            {punch.timestamp_raw}
-                                        </label>
+                            <div className="space-y-1">
+                                {dayPunches.map((punch, idx) => (
+                                    <div key={punch.id} className="text-sm text-slate-700">
+                                        {idx + 1}. {punch.timestamp_raw}
                                     </div>
                                 ))}
                             </div>
