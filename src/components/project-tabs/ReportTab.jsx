@@ -484,7 +484,7 @@ export default function ReportTab({ project }) {
                 status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
             }
 
-            let isAbnormal = selectedEmployee.abnormal_dates?.includes(dateStr);
+            let isAbnormal = currentResult.abnormal_dates?.includes(dateStr);
             
             // Check for day-specific overrides in this report
             const dayOverride = dayOverrides[dateStr];
