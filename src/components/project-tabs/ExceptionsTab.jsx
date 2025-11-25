@@ -292,7 +292,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             return;
         }
         
-        if (!formData.date_from || !formData.date_to) {
+        if (formData.type !== 'SINGLE_SHIFT' && (!formData.date_from || !formData.date_to)) {
             toast.error('Please fill in date range');
             return;
         }
@@ -303,10 +303,11 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             : formData;
         
         // Clean up empty string values and convert early_checkout_minutes to number
+        // For SINGLE_SHIFT, use project date range as placeholder
         const cleanedData = {
             attendance_id: submitData.attendance_id,
-            date_from: submitData.date_from,
-            date_to: submitData.date_to,
+            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : submitData.date_from,
+            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : submitData.date_to,
             type: submitData.type,
             details: submitData.details || null
         };
@@ -411,22 +412,26 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div>
-                                    <Label>From Date *</Label>
-                                    <Input
-                                        type="date"
-                                        value={formData.date_from}
-                                        onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <Label>To Date *</Label>
-                                    <Input
-                                        type="date"
-                                        value={formData.date_to}
-                                        onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
-                                    />
-                                </div>
+                                {formData.type !== 'SINGLE_SHIFT' && (
+                                    <>
+                                        <div>
+                                            <Label>From Date *</Label>
+                                            <Input
+                                                type="date"
+                                                value={formData.date_from}
+                                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>To Date *</Label>
+                                            <Input
+                                                type="date"
+                                                value={formData.date_to}
+                                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                                            />
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             {needsShiftOverride && (
