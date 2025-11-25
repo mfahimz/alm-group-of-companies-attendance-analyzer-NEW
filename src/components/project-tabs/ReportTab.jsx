@@ -223,9 +223,12 @@ export default function ReportTab({ project }) {
         }
     };
 
-    // Filter multiple punches within 10-minute windows to get the 4 key punches
+    // Filter multiple punches within configured time windows to get the 4 key punches
     const filterMultiplePunches = (punchList, shift) => {
         if (punchList.length <= 4) return punchList;
+        
+        // Get cluster window from rules, default to 10 minutes
+        const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
         
         const punchesWithTime = punchList.map(p => ({
             ...p,
@@ -234,16 +237,17 @@ export default function ReportTab({ project }) {
         
         if (punchesWithTime.length === 0) return punchList;
 
-        // 1. Morning Punch-In: Keep first punch in a rolling 10-minute window
+        // 1. Morning Punch-In: Keep first punch in the cluster window
         let morningPunchIn = null;
         const morningCandidates = [];
         for (let i = 0; i < punchesWithTime.length; i++) {
             if (morningCandidates.length === 0) {
                 morningCandidates.push(punchesWithTime[i]);
             } else {
-                const lastInCluster = morningCandidates[morningCandidates.length - 1];
-                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
-                if (timeDiff <= 10) {
+                // Compare against the FIRST punch in cluster, not the last
+                const firstInCluster = morningCandidates[0];
+                const timeDiff = Math.abs(punchesWithTime[i].time - firstInCluster.time) / (1000 * 60);
+                if (timeDiff <= clusterWindow) {
                     morningCandidates.push(punchesWithTime[i]);
                 } else {
                     break;
