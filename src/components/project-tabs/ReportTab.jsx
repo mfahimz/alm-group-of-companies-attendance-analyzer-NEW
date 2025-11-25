@@ -486,7 +486,8 @@ export default function ReportTab({ project }) {
                                                         month: '2-digit',
                                                         year: 'numeric',
                                                         hour: '2-digit',
-                                                        minute: '2-digit'
+                                                        minute: '2-digit',
+                                                        timeZone: 'Asia/Dubai'
                                                     })}
                                                 </p>
                                                 <p className="text-sm text-slate-600 mt-1">
