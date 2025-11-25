@@ -531,7 +531,7 @@ export default function ShiftTimingsTab({ project }) {
                                                     <TableCell>{formatTime(shift.am_start)} - {formatTime(shift.am_end)}</TableCell>
                                                     <TableCell>{formatTime(shift.pm_start)} - {formatTime(shift.pm_end)}</TableCell>
                                                     <TableCell>
-                                                        {shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString() : 'All days')}
+                                                        {shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days')}
                                                         {shift.is_friday_shift && (
                                                             <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
                                                                 Friday
