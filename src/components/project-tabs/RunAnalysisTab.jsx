@@ -537,7 +537,7 @@ export default function RunAnalysisTab({ project }) {
                             <div className="w-full bg-indigo-200 rounded-full h-2">
                                 <div 
                                     className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                                    style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
                                 />
                             </div>
                             <p className="text-sm text-indigo-700 mt-2">
