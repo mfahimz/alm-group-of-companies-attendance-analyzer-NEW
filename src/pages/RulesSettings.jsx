@@ -87,9 +87,13 @@ export default function RulesSettings() {
     });
 
     useEffect(() => {
-        if (rulesData) {
-            const parsedRules = JSON.parse(rulesData.rules_json);
-            setRules(parsedRules);
+        if (rulesData && rulesData.rules_json) {
+            try {
+                const parsedRules = JSON.parse(rulesData.rules_json);
+                setRules(parsedRules);
+            } catch (e) {
+                console.error('Failed to parse rules JSON:', e);
+            }
         }
     }, [rulesData]);
 
