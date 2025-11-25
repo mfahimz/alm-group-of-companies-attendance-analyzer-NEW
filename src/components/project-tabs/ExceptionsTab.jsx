@@ -350,7 +350,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             return 0;
         });
 
-    const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
+    const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE' || formData.type === 'SINGLE_SHIFT';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
 
     return (
