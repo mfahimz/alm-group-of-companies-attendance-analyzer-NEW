@@ -100,21 +100,24 @@ export default function PunchUploadTab({ project }) {
 
     const uploadMutation = useMutation({
         mutationFn: async () => {
-            // Helper to add delay between API calls
             const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
             
             // Delete existing punches for this project
+            setUploadProgress({ phase: 'Deleting old records...', current: 0, total: 0 });
             const existingPunches = await base44.entities.Punch.filter({ project_id: project.id });
             
-            // Delete in small batches with delays to avoid rate limiting
-            const deleteBatchSize = 10;
-            for (let i = 0; i < existingPunches.length; i += deleteBatchSize) {
-                const batch = existingPunches.slice(i, i + deleteBatchSize);
-                await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
-                await delay(1000); // Wait 1s between delete batches
+            if (existingPunches.length > 0) {
+                setUploadProgress({ phase: 'Deleting old records...', current: 0, total: existingPunches.length });
+                const deleteBatchSize = 10;
+                for (let i = 0; i < existingPunches.length; i += deleteBatchSize) {
+                    const batch = existingPunches.slice(i, i + deleteBatchSize);
+                    await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
+                    setUploadProgress({ phase: 'Deleting old records...', current: Math.min(i + deleteBatchSize, existingPunches.length), total: existingPunches.length });
+                    await delay(800);
+                }
             }
 
-            // Insert new punches in batches with delays
+            // Insert new punches in batches
             const punchRecords = parsedData.map(p => ({
                 project_id: project.id,
                 attendance_id: p.attendance_id,
@@ -122,12 +125,15 @@ export default function PunchUploadTab({ project }) {
                 punch_date: p.punch_date
             }));
 
-            // Upload in batches of 25 with longer delays to avoid rate limiting
-            const batchSize = 25;
+            setUploadProgress({ phase: 'Uploading new records...', current: 0, total: punchRecords.length });
+            
+            // Upload in batches of 20 with delays
+            const batchSize = 20;
             for (let i = 0; i < punchRecords.length; i += batchSize) {
                 const batch = punchRecords.slice(i, i + batchSize);
                 await base44.entities.Punch.bulkCreate(batch);
-                await delay(1500); // Wait 1.5s between upload batches
+                setUploadProgress({ phase: 'Uploading new records...', current: Math.min(i + batchSize, punchRecords.length), total: punchRecords.length });
+                await delay(1000);
             }
         },
         onSuccess: () => {
@@ -135,9 +141,11 @@ export default function PunchUploadTab({ project }) {
             toast.success('Punches uploaded successfully');
             setParsedData([]);
             setFile(null);
+            setUploadProgress(null);
         },
         onError: (error) => {
             toast.error('Failed to upload punches: ' + (error.message || 'Unknown error'));
+            setUploadProgress(null);
         }
     });
 
