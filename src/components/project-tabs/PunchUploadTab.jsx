@@ -100,21 +100,7 @@ export default function PunchUploadTab({ project }) {
 
     const uploadMutation = useMutation({
         mutationFn: async () => {
-            // Delete existing punches for this project
-            setUploadProgress({ phase: 'Deleting old records...', current: 0, total: 0 });
-            const existingPunches = await base44.entities.Punch.filter({ project_id: project.id });
-            
-            if (existingPunches.length > 0) {
-                setUploadProgress({ phase: 'Deleting old records...', current: 0, total: existingPunches.length });
-                const deleteBatchSize = 50;
-                for (let i = 0; i < existingPunches.length; i += deleteBatchSize) {
-                    const batch = existingPunches.slice(i, i + deleteBatchSize);
-                    await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
-                    setUploadProgress({ phase: 'Deleting old records...', current: Math.min(i + deleteBatchSize, existingPunches.length), total: existingPunches.length });
-                }
-            }
-
-            // Insert new punches in batches
+            // Insert new punches in batches (append mode - no deletion)
             const punchRecords = parsedData.map(p => ({
                 project_id: project.id,
                 attendance_id: p.attendance_id,
@@ -122,13 +108,13 @@ export default function PunchUploadTab({ project }) {
                 punch_date: p.punch_date
             }));
 
-            setUploadProgress({ phase: 'Uploading new records...', current: 0, total: punchRecords.length });
+            setUploadProgress({ phase: 'Uploading records...', current: 0, total: punchRecords.length });
             
             const batchSize = 100;
             for (let i = 0; i < punchRecords.length; i += batchSize) {
                 const batch = punchRecords.slice(i, i + batchSize);
                 await base44.entities.Punch.bulkCreate(batch);
-                setUploadProgress({ phase: 'Uploading new records...', current: Math.min(i + batchSize, punchRecords.length), total: punchRecords.length });
+                setUploadProgress({ phase: 'Uploading records...', current: Math.min(i + batchSize, punchRecords.length), total: punchRecords.length });
             }
         },
         onSuccess: () => {
