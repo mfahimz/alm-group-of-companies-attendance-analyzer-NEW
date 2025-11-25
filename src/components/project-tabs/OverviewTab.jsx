@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Lock, Copy, Trash2, Calendar, Users, AlertCircle, FileText } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Lock, Copy, Trash2, Calendar, Users, AlertCircle, FileText, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
@@ -11,6 +14,19 @@ import { createPageUrl } from '../../utils';
 export default function OverviewTab({ project }) {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [editData, setEditData] = useState({
+        name: project.name,
+        date_from: project.date_from,
+        date_to: project.date_to
+    });
+
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const isAdmin = currentUser?.role === 'admin';
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
@@ -111,6 +127,36 @@ export default function OverviewTab({ project }) {
         }
     };
 
+    const updateProjectMutation = useMutation({
+        mutationFn: (data) => base44.entities.Project.update(project.id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['project', project.id]);
+            queryClient.invalidateQueries(['projects']);
+            toast.success('Project updated successfully');
+            setShowEditDialog(false);
+        },
+        onError: () => {
+            toast.error('Failed to update project');
+        }
+    });
+
+    const handleEditSubmit = (e) => {
+        e.preventDefault();
+        if (!editData.name.trim()) {
+            toast.error('Project name is required');
+            return;
+        }
+        if (!editData.date_from || !editData.date_to) {
+            toast.error('Date range is required');
+            return;
+        }
+        if (new Date(editData.date_from) > new Date(editData.date_to)) {
+            toast.error('Start date must be before end date');
+            return;
+        }
+        updateProjectMutation.mutate(editData);
+    };
+
     const stats = [
         { label: 'Working Days', value: workingDays, icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' },
         { label: 'Employees', value: uniqueEmployees, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -145,10 +191,33 @@ export default function OverviewTab({ project }) {
             {/* Details */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
-                    <CardTitle>Project Details</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Project Details</CardTitle>
+                        {isAdmin && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setEditData({
+                                        name: project.name,
+                                        date_from: project.date_from,
+                                        date_to: project.date_to
+                                    });
+                                    setShowEditDialog(true);
+                                }}
+                            >
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Edit
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-sm text-slate-600">Project Name</p>
+                            <p className="font-medium text-slate-900 mt-1">{project.name}</p>
+                        </div>
                         <div>
                             <p className="text-sm text-slate-600">Date Range</p>
                             <p className="font-medium text-slate-900 mt-1">
@@ -214,6 +283,59 @@ export default function OverviewTab({ project }) {
                     </Button>
                 </CardContent>
             </Card>
+
+            {/* Edit Project Dialog */}
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Project</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
+                        <div>
+                            <Label>Project Name *</Label>
+                            <Input
+                                value={editData.name}
+                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                                placeholder="Enter project name"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label>Start Date *</Label>
+                                <Input
+                                    type="date"
+                                    value={editData.date_from}
+                                    onChange={(e) => setEditData({ ...editData, date_from: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <Label>End Date *</Label>
+                                <Input
+                                    type="date"
+                                    value={editData.date_to}
+                                    onChange={(e) => setEditData({ ...editData, date_to: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-4">
+                            <Button
+                                type="submit"
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                disabled={updateProjectMutation.isPending}
+                            >
+                                {updateProjectMutation.isPending ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowEditDialog(false)}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
