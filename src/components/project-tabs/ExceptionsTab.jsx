@@ -586,13 +586,15 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                                         value={exception.attendance_id}
                                                         onValueChange={(value) => handleCellChange(exception.id, 'attendance_id', value)}
                                                     >
-                                                        <SelectTrigger className="h-8 w-28">
-                                                            <SelectValue />
+                                                        <SelectTrigger className="h-8 w-44">
+                                                            <SelectValue>
+                                                                {exception.attendance_id} - {employees.find(e => e.attendance_id === exception.attendance_id)?.name || ''}
+                                                            </SelectValue>
                                                         </SelectTrigger>
                                                         <SelectContent>
                                                             {employees.map(emp => (
                                                                 <SelectItem key={emp.id} value={emp.attendance_id}>
-                                                                    {emp.attendance_id}
+                                                                    {emp.attendance_id} - {emp.name}
                                                                 </SelectItem>
                                                             ))}
                                                         </SelectContent>
