@@ -407,6 +407,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                             <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                            <SelectItem value="SINGLE_SHIFT">Single Shift (2 punches)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
