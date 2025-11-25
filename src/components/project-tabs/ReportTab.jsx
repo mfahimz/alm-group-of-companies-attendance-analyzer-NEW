@@ -786,21 +786,10 @@ export default function ReportTab({ project }) {
             {/* Edit Day Record Dialog */}
             <EditDayRecordDialog
                 open={!!editingDay}
-                onClose={async () => {
+                onClose={() => {
                     setEditingDay(null);
-                    // Refresh selectedEmployee with latest data after edit
-                    if (selectedEmployee) {
-                        // Re-fetch the latest result from the database
-                        const latestResults = await base44.entities.AnalysisResult.filter({ id: selectedEmployee.id });
-                        if (latestResults.length > 0) {
-                            const latestResult = latestResults[0];
-                            const employee = employees.find(e => e.attendance_id === latestResult.attendance_id);
-                            setSelectedEmployee({
-                                ...latestResult,
-                                name: employee?.name || 'Unknown'
-                            });
-                        }
-                    }
+                    // Invalidate queries to refresh data
+                    queryClient.invalidateQueries(['results', project.id]);
                 }}
                 dayRecord={editingDay}
                 project={project}
