@@ -652,7 +652,16 @@ export default function ReportTab({ project }) {
                                     <TableRow key={idx} className={day.abnormal ? 'bg-amber-50' : ''}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
-                                        <TableCell className="text-xs">{day.punchTimes || '-'}</TableCell>
+                                        <TableCell className="text-xs max-w-xs">
+                                            <div title={day.allPunchTimes || day.punchTimes}>
+                                                {day.punchTimes || '-'}
+                                                {day.allPunchTimes && day.allPunchTimes !== day.punchTimes && (
+                                                    <span className="text-slate-400 block text-[10px]">
+                                                        (filtered from {day.punches} punches)
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-xs">{day.shift}</TableCell>
                                         <TableCell className="text-xs">{day.exception}</TableCell>
                                         <TableCell>
