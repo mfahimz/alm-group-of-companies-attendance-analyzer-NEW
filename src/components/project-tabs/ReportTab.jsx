@@ -374,6 +374,9 @@ export default function ReportTab({ project }) {
                 };
             }
 
+            // Filter multiple punches to get the 4 key punches
+            const dayPunches = filterMultiplePunches(rawDayPunches, shift);
+
             // Calculate late minutes and early checkout
             let lateInfo = '';
             let earlyCheckoutInfo = '';
