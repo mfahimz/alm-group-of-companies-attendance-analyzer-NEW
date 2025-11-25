@@ -267,18 +267,8 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
 
-                    // Early checkout check (AM and PM)
-                    if (shift.am_end && filteredPunches.length >= 2) {
-                        const secondPunch = filteredPunches[1];
-                        const punchTime = parseTime(secondPunch.timestamp_raw);
-                        const shiftEnd = parseTime(shift.am_end);
-
-                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                            early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
-                        }
-                    }
-
-                    if (shift.pm_end && filteredPunches.length >= 4) {
+                    // Early checkout check - PM only (last punch before PM shift end)
+                    if (shift.pm_end && filteredPunches.length >= 1) {
                         const lastPunch = filteredPunches[filteredPunches.length - 1];
                         const punchTime = parseTime(lastPunch.timestamp_raw);
                         const shiftEnd = parseTime(shift.pm_end);
