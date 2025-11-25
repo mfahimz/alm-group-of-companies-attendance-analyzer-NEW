@@ -98,90 +98,46 @@ export default function ShiftTimingsTab({ project }) {
             const data = [];
             const newWarnings = [];
 
-            if (lines.length < 2) {
-                toast.error('CSV file appears to be empty or has no data rows');
-                return;
-            }
-
-            // Detect CSV format from header
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-            const colCount = headers.length;
-
             // Skip header row
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
-                
-                if (values.length < 5) {
-                    newWarnings.push(`Row ${i}: Not enough columns (${values.length}), skipping`);
-                    continue;
-                }
+                if (values.length >= 7) {
+                    const attendance_id = values[0];
+                    // values[1] = name (not needed for shift timing)
+                    // values[2] = department (not needed)
+                    const am_start = normalizeTime(values[3]); // morning start
+                    const am_end = normalizeTime(values[4]);   // morning end
+                    const pm_start = normalizeTime(values[5]); // evening start
+                    const pm_end = normalizeTime(values[6]);   // evening end
+                    // values[7] = total hours (optional)
+                    const applicableDays = values[8] || ''; // applicable days
 
-                let attendance_id, am_start, am_end, pm_start, pm_end, applicableDays;
+                    // Check if employee exists
+                    const employeeExists = employees.some(e => e.attendance_id === attendance_id);
+                    if (!employeeExists) {
+                        newWarnings.push(`Unknown employee: ${attendance_id}`);
+                    }
 
-                // Format 1: Full format (9 cols): attendance_id, name, department, morning_start, morning_end, evening_start, evening_end, total_hours, applicable_days
-                if (colCount >= 7) {
-                    attendance_id = values[0];
-                    am_start = normalizeTime(values[3]);
-                    am_end = normalizeTime(values[4]);
-                    pm_start = normalizeTime(values[5]);
-                    pm_end = normalizeTime(values[6]);
-                    applicableDays = values[8] || '';
-                }
-                // Format 2: Simple format (5 cols): attendance_id, am_start, am_end, pm_start, pm_end
-                else if (colCount >= 5) {
-                    attendance_id = values[0];
-                    am_start = normalizeTime(values[1]);
-                    am_end = normalizeTime(values[2]);
-                    pm_start = normalizeTime(values[3]);
-                    pm_end = normalizeTime(values[4]);
-                    applicableDays = values[5] || '';
-                }
-                // Format 3: With name (6 cols): attendance_id, name, am_start, am_end, pm_start, pm_end
-                else {
-                    attendance_id = values[0];
-                    am_start = normalizeTime(values[2]);
-                    am_end = normalizeTime(values[3]);
-                    pm_start = normalizeTime(values[4]);
-                    pm_end = normalizeTime(values[5]);
-                    applicableDays = values[6] || '';
-                }
+                    // Parse applicable days to detect Friday shifts
+                    const is_friday_shift = applicableDays.toLowerCase().includes('friday');
 
-                // Validate times are not empty
-                if (!am_start || am_start === '—' || !pm_end || pm_end === '—') {
-                    newWarnings.push(`Row ${i}: Invalid time format for employee ${attendance_id}, skipping`);
-                    continue;
+                    data.push({
+                        attendance_id,
+                        date: null, // General shift, no specific date
+                        is_friday_shift,
+                        applicable_days: applicableDays,
+                        am_start,
+                        am_end,
+                        pm_start,
+                        pm_end,
+                        employeeExists
+                    });
                 }
-
-                // Check if employee exists
-                const employeeExists = employees.some(e => e.attendance_id === attendance_id);
-                if (!employeeExists) {
-                    newWarnings.push(`Unknown employee: ${attendance_id}`);
-                }
-
-                // Parse applicable days to detect Friday shifts
-                const is_friday_shift = applicableDays.toLowerCase().includes('friday');
-
-                data.push({
-                    attendance_id,
-                    date: null,
-                    is_friday_shift,
-                    applicable_days: applicableDays || 'Monday to Thursday and Saturday',
-                    am_start,
-                    am_end,
-                    pm_start,
-                    pm_end,
-                    employeeExists
-                });
             }
 
             setParsedData(data);
             setWarnings([...new Set(newWarnings)]);
-            
-            if (data.length > 0) {
-                toast.success(`Parsed ${data.length} shift records`);
-            } else {
-                toast.error('No valid shift records found. Check your CSV format.');
-            }
+            toast.success(`Parsed ${data.length} shift records`);
         };
         reader.readAsText(file);
     };
@@ -446,15 +402,10 @@ export default function ShiftTimingsTab({ project }) {
                             onChange={handleFileChange}
                         />
                         <p className="text-sm text-slate-500 mt-2">
-                            Supported CSV formats:
+                            CSV format: attendance_id, name, department, morning_start, morning_end, evening_start, evening_end, total_hours, applicable_days
                         </p>
-                        <ul className="text-xs text-slate-500 mt-1 list-disc ml-4 space-y-1">
-                            <li>Simple: attendance_id, am_start, am_end, pm_start, pm_end</li>
-                            <li>With name: attendance_id, name, am_start, am_end, pm_start, pm_end</li>
-                            <li>Full: attendance_id, name, department, am_start, am_end, pm_start, pm_end, total_hours, applicable_days</li>
-                        </ul>
                         <p className="text-xs text-slate-500 mt-1">
-                            Time format: HH:MM AM/PM (e.g., 8:00 AM) or 24-hour (e.g., 08:00)
+                            Time format: HH:MM AM/PM or 24-hour (will be converted). System auto-detects Friday shifts from applicable_days column.
                         </p>
                     </div>
 
