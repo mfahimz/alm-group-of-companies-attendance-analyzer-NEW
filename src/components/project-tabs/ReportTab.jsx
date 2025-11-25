@@ -381,12 +381,12 @@ export default function ReportTab({ project }) {
         }
         
         const employeePunches = punches.filter(p => 
-            p.attendance_id === selectedEmployee.attendance_id &&
+            p.attendance_id === currentResult.attendance_id &&
             p.punch_date >= project.date_from && 
             p.punch_date <= project.date_to
         );
-        const employeeShifts = shifts.filter(s => s.attendance_id === selectedEmployee.attendance_id);
-        const employeeExceptions = exceptions.filter(e => e.attendance_id === selectedEmployee.attendance_id);
+        const employeeShifts = shifts.filter(s => s.attendance_id === currentResult.attendance_id);
+        const employeeExceptions = exceptions.filter(e => e.attendance_id === currentResult.attendance_id);
 
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const currentDate = new Date(d);
