@@ -57,7 +57,7 @@ export default function ProjectDetail() {
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
                         <p className="text-slate-600 mt-2">
-                            {new Date(project.date_from).toLocaleDateString()} - {new Date(project.date_to).toLocaleDateString()}
+                            {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                         </p>
                     </div>
                     <span className={`

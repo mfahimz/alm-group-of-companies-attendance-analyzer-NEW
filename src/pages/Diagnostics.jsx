@@ -262,7 +262,7 @@ export default function Diagnostics() {
             count: reportRuns.length,
             icon: CheckCircle,
             color: 'emerald',
-            details: reportRuns.length > 0 ? `Latest: ${new Date(reportRuns[0].created_date).toLocaleDateString()}` : 'No runs yet'
+            details: reportRuns.length > 0 ? `Latest: ${new Date(reportRuns[0].created_date).toLocaleDateString('en-GB')}` : 'No runs yet'
         },
         {
             label: 'System Users',
@@ -432,7 +432,7 @@ export default function Diagnostics() {
                                         <p className="text-sm text-slate-600">{activity.details}</p>
                                     </div>
                                     <p className="text-xs text-slate-500">
-                                        {activity.date.toLocaleDateString()} {activity.date.toLocaleTimeString()}
+                                        {activity.date.toLocaleDateString('en-GB')} {activity.date.toLocaleTimeString()}
                                     </p>
                                 </div>
                             ))}

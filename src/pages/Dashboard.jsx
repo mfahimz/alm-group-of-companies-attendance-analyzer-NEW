@@ -100,7 +100,7 @@ export default function Dashboard() {
                                     <div>
                                         <p className="font-semibold text-slate-900">{project.name}</p>
                                         <p className="text-sm text-slate-600 mt-1">
-                                            {new Date(project.date_from).toLocaleDateString()} - {new Date(project.date_to).toLocaleDateString()}
+                                            {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                                         </p>
                                     </div>
                                     <div>

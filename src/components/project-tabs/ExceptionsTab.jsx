@@ -373,8 +373,8 @@ export default function ExceptionsTab({ project }) {
                                                     : exception.type.replace(/_/g, ' ')}
                                             </span>
                                         </TableCell>
-                                        <TableCell>{new Date(exception.date_from).toLocaleDateString()}</TableCell>
-                                        <TableCell>{new Date(exception.date_to).toLocaleDateString()}</TableCell>
+                                        <TableCell>{new Date(exception.date_from).toLocaleDateString('en-GB')}</TableCell>
+                                                                                    <TableCell>{new Date(exception.date_to).toLocaleDateString('en-GB')}</TableCell>
                                         <TableCell className="max-w-xs truncate">{exception.details || '-'}</TableCell>
                                         <TableCell className="text-right">
                                             <Button
