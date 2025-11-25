@@ -54,12 +54,12 @@ export default function PunchUploadTab({ project }) {
                 if (values.length >= 2) {
                     const attendance_id = values[0];
                     
-                    // Detect which column is the timestamp by checking for date pattern
+                    // Detect which column is the timestamp by checking for date pattern (supports D/M/YYYY or DD/MM/YYYY)
                     let timestamp_raw = '';
-                    if (values[1].match(/\d{2}\/\d{2}\/\d{4}/)) {
+                    if (values[1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
                         // Format: ID, timestamp
                         timestamp_raw = values[1];
-                    } else if (values.length >= 3 && values[2].match(/\d{2}\/\d{2}\/\d{4}/)) {
+                    } else if (values.length >= 3 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
                         // Format: ID, name, timestamp
                         timestamp_raw = values[2];
                     } else {
@@ -67,12 +67,12 @@ export default function PunchUploadTab({ project }) {
                         timestamp_raw = values[1];
                     }
 
-                    // Extract date from timestamp (DD/MM/YYYY HH:MM AM/PM)
-                    const dateMatch = timestamp_raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                    // Extract date from timestamp (D/M/YYYY or DD/MM/YYYY HH:MM AM/PM)
+                    const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
                     let punch_date = '';
                     if (dateMatch) {
                         const [, day, month, year] = dateMatch;
-                        punch_date = `${year}-${month}-${day}`;
+                        punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
                     }
 
                     // Check if employee exists
