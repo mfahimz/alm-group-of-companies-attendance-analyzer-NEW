@@ -481,7 +481,14 @@ export default function ReportTab({ project }) {
                 else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
                 else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
             } else if (dayPunches.length > 0) {
-                status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                // Check if employee has SINGLE_SHIFT exception (applies to entire project)
+                const hasSingleShiftException = employeeExceptions.some(ex => ex.type === 'SINGLE_SHIFT');
+                // For single shift employees, 2 punches = Present, otherwise need 2+ for present
+                if (hasSingleShiftException) {
+                    status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                } else {
+                    status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                }
             }
 
             let isAbnormal = currentResult.abnormal_dates?.includes(dateStr);
