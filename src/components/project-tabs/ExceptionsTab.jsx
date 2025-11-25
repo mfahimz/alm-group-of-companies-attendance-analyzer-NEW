@@ -249,12 +249,12 @@ export default function ExceptionsTab({ project }) {
     };
 
     const downloadTemplate = () => {
-        const template = `attendance_id,date_from,date_to,type,details
-544,2025-11-10,2025-11-10,Off,Annual leave
-ALL,2025-11-15,2025-11-15,Public Holiday,National Day
-322,2025-11-12,2025-11-14,Sick Leave,Medical certificate
-123,2025-11-20,2025-11-20,Present,Worked from home
-456,2025-11-21,2025-11-21,Half Day,Left early`;
+        const template = `attendance_id,name,date_from,date_to,type,details
+544,John Smith,2025-11-10,2025-11-10,Off,Annual leave
+ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
+322,Jane Doe,2025-11-12,2025-11-14,Sick Leave,Medical certificate
+123,Bob Johnson,2025-11-20,2025-11-20,Present,Worked from home
+456,Alice Brown,2025-11-21,2025-11-21,Half Day,Left early`;
         
         const blob = new Blob([template], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
