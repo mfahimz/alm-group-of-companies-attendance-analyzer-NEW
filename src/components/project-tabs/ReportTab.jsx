@@ -120,9 +120,33 @@ export default function ReportTab({ project }) {
 
     const enrichedResults = results.map(result => {
         const employee = employees.find(e => e.attendance_id === result.attendance_id);
+        
+        // Calculate adjusted totals based on day_overrides
+        let adjustedLateMinutes = result.late_minutes || 0;
+        let adjustedEarlyCheckout = result.early_checkout_minutes || 0;
+        
+        if (result.day_overrides) {
+            try {
+                const overrides = JSON.parse(result.day_overrides);
+                Object.values(overrides).forEach(override => {
+                    // Subtract original and add new values
+                    if (override.originalLateMinutes !== undefined) {
+                        adjustedLateMinutes = adjustedLateMinutes - override.originalLateMinutes + (override.lateMinutes || 0);
+                    }
+                    if (override.originalEarlyCheckout !== undefined) {
+                        adjustedEarlyCheckout = adjustedEarlyCheckout - override.originalEarlyCheckout + (override.earlyCheckoutMinutes || 0);
+                    }
+                });
+            } catch (e) {
+                // Invalid JSON, use original values
+            }
+        }
+        
         return {
             ...result,
-            name: employee?.name || 'Unknown'
+            name: employee?.name || 'Unknown',
+            late_minutes: Math.max(0, adjustedLateMinutes),
+            early_checkout_minutes: Math.max(0, adjustedEarlyCheckout)
         };
     });
 
