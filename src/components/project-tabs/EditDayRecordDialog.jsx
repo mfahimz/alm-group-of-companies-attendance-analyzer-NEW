@@ -146,8 +146,9 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 ...updatedTotals
             });
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['results', project.id]);
+        onSuccess: async () => {
+            await queryClient.invalidateQueries(['results', project.id]);
+            await queryClient.refetchQueries(['results', project.id]);
             toast.success('Day record updated for this report');
             onClose();
         },
