@@ -14,7 +14,6 @@ import { createPageUrl } from '../utils';
 
 const DEFAULT_RULES = {
     date_rules: {
-        special_abnormal_dates: ['30/09/2025'],
         holidays: ['Sunday'],
         always_mark_first_date_abnormal: false
     },
@@ -48,7 +47,6 @@ const DEFAULT_RULES = {
 
 export default function RulesSettings() {
     const [rules, setRules] = useState(DEFAULT_RULES);
-    const [abnormalDatesInput, setAbnormalDatesInput] = useState('');
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -92,7 +90,6 @@ export default function RulesSettings() {
         if (rulesData) {
             const parsedRules = JSON.parse(rulesData.rules_json);
             setRules(parsedRules);
-            setAbnormalDatesInput(parsedRules.date_rules?.special_abnormal_dates?.join(', ') || '');
         }
     }, [rulesData]);
 
@@ -123,17 +120,7 @@ export default function RulesSettings() {
     });
 
     const handleSave = () => {
-        const updatedRules = {
-            ...rules,
-            date_rules: {
-                ...rules.date_rules,
-                special_abnormal_dates: abnormalDatesInput
-                    .split(',')
-                    .map(d => d.trim())
-                    .filter(d => d)
-            }
-        };
-        saveMutation.mutate(updatedRules);
+        saveMutation.mutate(rules);
     };
 
     const updateRule = (category, key, value) => {
@@ -180,20 +167,6 @@ export default function RulesSettings() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div>
-                        <Label htmlFor="abnormal-dates">Special Abnormal Dates</Label>
-                        <Input
-                            id="abnormal-dates"
-                            value={abnormalDatesInput}
-                            onChange={(e) => setAbnormalDatesInput(e.target.value)}
-                            placeholder="e.g. 30/09/2025, 15/10/2025"
-                            className="mt-2"
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                            Comma-separated dates in DD/MM/YYYY format
-                        </p>
-                    </div>
-
                     <div>
                         <Label htmlFor="holidays">Holidays</Label>
                         <Input
