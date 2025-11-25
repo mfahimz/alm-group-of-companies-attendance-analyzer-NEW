@@ -251,7 +251,7 @@ export default function Users() {
                                                 {user.role === 'admin' ? 'Admin' : 'User'}
                                             </span>
                                         </TableCell>
-                                        <TableCell>{new Date(user.created_date).toLocaleDateString()}</TableCell>
+                                        <TableCell>{new Date(user.created_date).toLocaleDateString('en-GB')}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <Button
