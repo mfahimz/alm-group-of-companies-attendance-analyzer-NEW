@@ -279,9 +279,13 @@ export default function RunAnalysisTab({ project }) {
                     }
                 }
 
+                // Check if employee has SINGLE_SHIFT exception for this date
+                const hasSingleShiftException = dateException && dateException.type === 'SINGLE_SHIFT';
+                
                 // Half day detection (simple rule: less than 2 punches)
+                // Skip half day detection if employee has single shift exception (expects only 2 punches)
                 if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration') {
-                    if (filteredPunches.length < 2) {
+                    if (filteredPunches.length < 2 && !hasSingleShiftException) {
                         half_absence_count++;
                     }
                 }
