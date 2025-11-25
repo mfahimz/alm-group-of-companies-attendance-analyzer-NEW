@@ -608,26 +608,12 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                     {filteredExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
                                             <TableCell className="p-1">
-                                                {getFieldValue(exception, 'type') === 'PUBLIC_HOLIDAY' ? (
-                                                    <span className="px-2 py-1 text-sm text-slate-600">ALL</span>
+                                                {exception.type === 'PUBLIC_HOLIDAY' ? (
+                                                    <span className="text-sm text-slate-600">ALL</span>
                                                 ) : (
-                                                    <Select
-                                                        value={getFieldValue(exception, 'attendance_id')}
-                                                        onValueChange={(value) => handleCellChange(exception.id, 'attendance_id', value)}
-                                                    >
-                                                        <SelectTrigger className="h-8 w-44">
-                                                            <SelectValue>
-                                                                {getFieldValue(exception, 'attendance_id')} - {employees.find(e => e.attendance_id === getFieldValue(exception, 'attendance_id'))?.name || ''}
-                                                            </SelectValue>
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {employees.map(emp => (
-                                                                <SelectItem key={emp.id} value={emp.attendance_id}>
-                                                                    {emp.attendance_id} - {emp.name}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
+                                                    <span className="text-sm text-slate-900">
+                                                        {exception.attendance_id} - {employees.find(e => e.attendance_id === exception.attendance_id)?.name || ''}
+                                                    </span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="p-1">
