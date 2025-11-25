@@ -178,6 +178,7 @@ export default function ExceptionsTab({ project }) {
                                             <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                             <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
+                                            <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -323,6 +324,7 @@ export default function ExceptionsTab({ project }) {
                                 <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                 <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                 <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
+                                <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -364,6 +366,7 @@ export default function ExceptionsTab({ project }) {
                                                 ${exception.type === 'MANUAL_ABSENT' ? 'bg-red-100 text-red-700' : ''}
                                                 ${exception.type === 'MANUAL_HALF' ? 'bg-amber-100 text-amber-700' : ''}
                                                 ${exception.type === 'MANUAL_EARLY_CHECKOUT' ? 'bg-cyan-100 text-cyan-700' : ''}
+                                                ${exception.type === 'SICK_LEAVE' ? 'bg-orange-100 text-orange-700' : ''}
                                             `}>
                                                 {exception.type === 'MANUAL_EARLY_CHECKOUT' 
                                                     ? `Early Checkout (${exception.early_checkout_minutes || 0} min)`
