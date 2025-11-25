@@ -19,6 +19,7 @@ export default function PunchUploadTab({ project }) {
     const [dateTo, setDateTo] = useState('');
     const [selectedPunches, setSelectedPunches] = useState([]);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [uploadProgress, setUploadProgress] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
