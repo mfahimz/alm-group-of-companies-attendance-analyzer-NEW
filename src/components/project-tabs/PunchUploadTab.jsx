@@ -275,10 +275,26 @@ export default function PunchUploadTab({ project }) {
                     )}
 
                     {parsedData.length > 0 && (
-                        <div>
-                            <p className="text-sm text-slate-600 mb-2">
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-600">
                                 Preview: {parsedData.length} records ready to upload
                             </p>
+                            
+                            {uploadProgress && (
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                    <p className="text-sm font-medium text-indigo-900 mb-2">{uploadProgress.phase}</p>
+                                    <div className="w-full bg-indigo-200 rounded-full h-2">
+                                        <div 
+                                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: uploadProgress.total > 0 ? `${(uploadProgress.current / uploadProgress.total) * 100}%` : '0%' }}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-indigo-700 mt-1">
+                                        {uploadProgress.current} / {uploadProgress.total}
+                                    </p>
+                                </div>
+                            )}
+                            
                             <Button 
                                 onClick={() => uploadMutation.mutate()}
                                 disabled={uploadMutation.isPending}
