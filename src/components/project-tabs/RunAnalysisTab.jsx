@@ -121,7 +121,7 @@ export default function RunAnalysisTab({ project }) {
             p.punch_date <= project.date_to
         );
         const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
-        const employeeExceptions = exceptions.filter(e => e.attendance_id === attendance_id);
+        const employeeExceptions = exceptions.filter(e => e.attendance_id === attendance_id || e.attendance_id === 'ALL');
 
         let working_days = 0;
         let present_days = 0;
@@ -134,7 +134,7 @@ export default function RunAnalysisTab({ project }) {
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
         
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
@@ -168,6 +168,13 @@ export default function RunAnalysisTab({ project }) {
                     present_days++;
                     half_absence_count++;
                     continue;
+                } else if (dateException.type === 'SICK_LEAVE') {
+                    // Sick leave counts as present but tracked separately
+                    present_days++;
+                    continue;
+                } else if (dateException.type === 'MANUAL_EARLY_CHECKOUT') {
+                    // Add manual early checkout minutes
+                    early_checkout_minutes += dateException.early_checkout_minutes || 0;
                 }
             }
 
@@ -221,18 +228,9 @@ export default function RunAnalysisTab({ project }) {
                         const punchTime = parseTime(firstPunch.timestamp_raw);
                         const shiftStart = parseTime(shift.am_start);
 
-                        console.log(`[${dateStr}] ${attendance_id} AM Check:`, {
-                            punch: firstPunch.timestamp_raw,
-                            punchTime: punchTime?.toLocaleTimeString(),
-                            shiftStart: shift.am_start,
-                            shiftStartParsed: shiftStart?.toLocaleTimeString(),
-                            isLate: punchTime && shiftStart && punchTime > shiftStart
-                        });
-
                         if (punchTime && shiftStart && punchTime > shiftStart) {
                             const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
                             late_minutes += minutes;
-                            console.log(`  -> Late by ${minutes} minutes`);
                         }
                     }
 
@@ -242,18 +240,9 @@ export default function RunAnalysisTab({ project }) {
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
 
-                        console.log(`[${dateStr}] ${attendance_id} PM Check:`, {
-                            punch: pmCheckIn.timestamp_raw,
-                            punchTime: punchTime?.toLocaleTimeString(),
-                            shiftStart: shift.pm_start,
-                            shiftStartParsed: shiftStart?.toLocaleTimeString(),
-                            isLate: punchTime && shiftStart && punchTime > shiftStart
-                        });
-
                         if (punchTime && shiftStart && punchTime > shiftStart) {
                             const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
                             late_minutes += minutes;
-                            console.log(`  -> Late by ${minutes} minutes`);
                         }
                     }
 
