@@ -107,6 +107,17 @@ export default function ReportTab({ project }) {
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
     });
 
+    const { data: rules } = useQuery({
+        queryKey: ['rules'],
+        queryFn: async () => {
+            const rulesList = await base44.entities.AttendanceRules.list();
+            if (rulesList.length > 0) {
+                return JSON.parse(rulesList[0].rules_json);
+            }
+            return null;
+        }
+    });
+
     const enrichedResults = results.map(result => {
         const employee = employees.find(e => e.attendance_id === result.attendance_id);
         return {
