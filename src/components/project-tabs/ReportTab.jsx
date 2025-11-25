@@ -210,6 +210,111 @@ export default function ReportTab({ project }) {
         }
     };
 
+    // Filter multiple punches within 10-minute windows to get the 4 key punches
+    const filterMultiplePunches = (punchList, shift) => {
+        if (punchList.length <= 4) return punchList;
+        
+        const punchesWithTime = punchList.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time);
+        
+        if (punchesWithTime.length === 0) return punchList;
+
+        // 1. Morning Punch-In: Keep first punch in a rolling 10-minute window
+        let morningPunchIn = null;
+        const morningCandidates = [];
+        for (let i = 0; i < punchesWithTime.length; i++) {
+            if (morningCandidates.length === 0) {
+                morningCandidates.push(punchesWithTime[i]);
+            } else {
+                const lastInCluster = morningCandidates[morningCandidates.length - 1];
+                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
+                if (timeDiff <= 10) {
+                    morningCandidates.push(punchesWithTime[i]);
+                } else {
+                    break;
+                }
+            }
+        }
+        morningPunchIn = morningCandidates[0];
+
+        // 2. Morning Punch-Out: Keep last punch before PM start
+        let morningPunchOut = null;
+        if (shift && shift.am_end && punchesWithTime.length > 1) {
+            const pmStartTime = shift.pm_start ? parseTime(shift.pm_start) : null;
+            
+            const amEndCandidates = [];
+            for (let i = 1; i < punchesWithTime.length; i++) {
+                const punch = punchesWithTime[i];
+                if (pmStartTime && punch.time >= pmStartTime) continue;
+                
+                if (amEndCandidates.length === 0) {
+                    amEndCandidates.push(punch);
+                } else {
+                    const lastInCluster = amEndCandidates[amEndCandidates.length - 1];
+                    const timeDiff = Math.abs(punch.time - lastInCluster.time) / (1000 * 60);
+                    if (timeDiff <= 10) {
+                        amEndCandidates.push(punch);
+                    }
+                }
+            }
+            if (amEndCandidates.length > 0) {
+                morningPunchOut = amEndCandidates[amEndCandidates.length - 1];
+            }
+        }
+
+        // 3. PM Punch-In: First punch after AM punch-out
+        let pmPunchIn = null;
+        const morningOutIndex = morningPunchOut ? punchesWithTime.indexOf(morningPunchOut) : 0;
+        const pmInCandidates = [];
+        for (let i = morningOutIndex + 1; i < punchesWithTime.length; i++) {
+            if (pmInCandidates.length === 0) {
+                pmInCandidates.push(punchesWithTime[i]);
+            } else {
+                const lastInCluster = pmInCandidates[pmInCandidates.length - 1];
+                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
+                if (timeDiff <= 10) {
+                    pmInCandidates.push(punchesWithTime[i]);
+                } else {
+                    break;
+                }
+            }
+        }
+        if (pmInCandidates.length > 0) {
+            pmPunchIn = pmInCandidates[0];
+        }
+
+        // 4. Evening Punch-Out: Keep last punch
+        let eveningPunchOut = null;
+        if (shift && shift.pm_end) {
+            const pmEndTime = parseTime(shift.pm_end);
+            const afterShiftPunches = punchesWithTime.filter(p => p.time >= pmEndTime);
+            
+            if (afterShiftPunches.length > 0) {
+                eveningPunchOut = afterShiftPunches[afterShiftPunches.length - 1];
+            } else if (punchesWithTime.length > 0) {
+                eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+            }
+        } else if (punchesWithTime.length > 0) {
+            eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+        }
+
+        // Build filtered result
+        const filtered = [];
+        if (morningPunchIn) filtered.push(morningPunchIn);
+        if (morningPunchOut && morningPunchOut !== morningPunchIn) filtered.push(morningPunchOut);
+        if (pmPunchIn && pmPunchIn !== morningPunchOut && pmPunchIn !== morningPunchIn) filtered.push(pmPunchIn);
+        if (eveningPunchOut && 
+            eveningPunchOut !== pmPunchIn && 
+            eveningPunchOut !== morningPunchOut && 
+            eveningPunchOut !== morningPunchIn) {
+            filtered.push(eveningPunchOut);
+        }
+
+        return filtered.map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
+    };
+
     const getDailyBreakdown = () => {
         if (!selectedEmployee) return [];
 
