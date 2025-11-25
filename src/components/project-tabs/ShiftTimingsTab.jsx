@@ -446,10 +446,15 @@ export default function ShiftTimingsTab({ project }) {
                             onChange={handleFileChange}
                         />
                         <p className="text-sm text-slate-500 mt-2">
-                            CSV format: attendance_id, name, department, morning_start, morning_end, evening_start, evening_end, total_hours, applicable_days
+                            Supported CSV formats:
                         </p>
+                        <ul className="text-xs text-slate-500 mt-1 list-disc ml-4 space-y-1">
+                            <li>Simple: attendance_id, am_start, am_end, pm_start, pm_end</li>
+                            <li>With name: attendance_id, name, am_start, am_end, pm_start, pm_end</li>
+                            <li>Full: attendance_id, name, department, am_start, am_end, pm_start, pm_end, total_hours, applicable_days</li>
+                        </ul>
                         <p className="text-xs text-slate-500 mt-1">
-                            Time format: HH:MM AM/PM or 24-hour (will be converted). System auto-detects Friday shifts from applicable_days column.
+                            Time format: HH:MM AM/PM (e.g., 8:00 AM) or 24-hour (e.g., 08:00)
                         </p>
                     </div>
 
