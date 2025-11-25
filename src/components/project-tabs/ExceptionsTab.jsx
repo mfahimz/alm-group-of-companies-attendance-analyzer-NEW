@@ -7,9 +7,39 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
+
+// Map user-friendly names to system type codes
+const TYPE_MAP = {
+    'off': 'OFF',
+    'leave': 'OFF',
+    'off / leave': 'OFF',
+    'public holiday': 'PUBLIC_HOLIDAY',
+    'holiday': 'PUBLIC_HOLIDAY',
+    'shift override': 'SHIFT_OVERRIDE',
+    'manual present': 'MANUAL_PRESENT',
+    'present': 'MANUAL_PRESENT',
+    'manual absent': 'MANUAL_ABSENT',
+    'absent': 'MANUAL_ABSENT',
+    'manual half': 'MANUAL_HALF',
+    'half day': 'MANUAL_HALF',
+    'half': 'MANUAL_HALF',
+    'manual early checkout': 'MANUAL_EARLY_CHECKOUT',
+    'early checkout': 'MANUAL_EARLY_CHECKOUT',
+    'sick leave': 'SICK_LEAVE',
+    'sick': 'SICK_LEAVE',
+    // Also accept the exact system codes
+    'off': 'OFF',
+    'public_holiday': 'PUBLIC_HOLIDAY',
+    'shift_override': 'SHIFT_OVERRIDE',
+    'manual_present': 'MANUAL_PRESENT',
+    'manual_absent': 'MANUAL_ABSENT',
+    'manual_half': 'MANUAL_HALF',
+    'manual_early_checkout': 'MANUAL_EARLY_CHECKOUT',
+    'sick_leave': 'SICK_LEAVE'
+};
 
 export default function ExceptionsTab({ project }) {
     const [showForm, setShowForm] = useState(false);
@@ -27,6 +57,7 @@ export default function ExceptionsTab({ project }) {
     });
     const [filter, setFilter] = useState({ search: '', type: '' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [importProgress, setImportProgress] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: exceptions = [] } = useQuery({
@@ -59,6 +90,136 @@ export default function ExceptionsTab({ project }) {
             toast.success('Exception deleted');
         }
     });
+
+    const parseDate = (value) => {
+        if (!value) return '';
+        // If it's already YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+        // DD/MM/YYYY format
+        const match = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (match) {
+            const [, day, month, year] = match;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        // Try Excel serial date number
+        if (!isNaN(value)) {
+            const date = new Date((value - 25569) * 86400 * 1000);
+            return date.toISOString().split('T')[0];
+        }
+        return '';
+    };
+
+    const handleFileImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+                const exceptions = [];
+                const errors = [];
+
+                jsonData.forEach((row, index) => {
+                    const rowNum = index + 2; // Excel row (header is row 1)
+                    
+                    // Get attendance_id (support multiple column names)
+                    const attendance_id = row.attendance_id || row.employee_id || row.id || row.AttendanceID || row.EmployeeID || '';
+                    
+                    // Get dates
+                    const date_from = parseDate(row.date_from || row.from || row.start_date || row.DateFrom || '');
+                    const date_to = parseDate(row.date_to || row.to || row.end_date || row.DateTo || date_from);
+                    
+                    // Get type and map it
+                    const typeRaw = (row.type || row.Type || row.exception_type || '').toString().toLowerCase().trim();
+                    const type = TYPE_MAP[typeRaw];
+                    
+                    if (!type) {
+                        errors.push(`Row ${rowNum}: Invalid type "${row.type || ''}". Use: Off, Public Holiday, Sick Leave, Present, Absent, Half Day, Shift Override, Early Checkout`);
+                        return;
+                    }
+                    
+                    if (!date_from) {
+                        errors.push(`Row ${rowNum}: Missing or invalid date_from`);
+                        return;
+                    }
+                    
+                    // For PUBLIC_HOLIDAY, set attendance_id to ALL
+                    const finalAttendanceId = type === 'PUBLIC_HOLIDAY' ? 'ALL' : attendance_id;
+                    
+                    if (type !== 'PUBLIC_HOLIDAY' && !finalAttendanceId) {
+                        errors.push(`Row ${rowNum}: Missing attendance_id`);
+                        return;
+                    }
+
+                    exceptions.push({
+                        project_id: project.id,
+                        attendance_id: finalAttendanceId,
+                        date_from,
+                        date_to: date_to || date_from,
+                        type,
+                        details: row.details || row.reason || row.notes || '',
+                        new_am_start: row.new_am_start || row.am_start || '',
+                        new_am_end: row.new_am_end || row.am_end || '',
+                        new_pm_start: row.new_pm_start || row.pm_start || '',
+                        new_pm_end: row.new_pm_end || row.pm_end || '',
+                        early_checkout_minutes: row.early_checkout_minutes ? parseInt(row.early_checkout_minutes) : null
+                    });
+                });
+
+                if (errors.length > 0) {
+                    toast.error(`${errors.length} errors found:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...and ${errors.length - 3} more` : ''}`);
+                    return;
+                }
+
+                if (exceptions.length === 0) {
+                    toast.error('No valid exceptions found in file');
+                    return;
+                }
+
+                setImportProgress({ current: 0, total: exceptions.length });
+                
+                const batchSize = 20;
+                for (let i = 0; i < exceptions.length; i += batchSize) {
+                    const batch = exceptions.slice(i, i + batchSize);
+                    await base44.entities.Exception.bulkCreate(batch);
+                    setImportProgress({ current: Math.min(i + batchSize, exceptions.length), total: exceptions.length });
+                }
+
+                queryClient.invalidateQueries(['exceptions', project.id]);
+                toast.success(`Imported ${exceptions.length} exceptions successfully`);
+                setImportProgress(null);
+            } catch (error) {
+                toast.error('Failed to import file: ' + error.message);
+                setImportProgress(null);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        e.target.value = '';
+    };
+
+    const downloadTemplate = () => {
+        const template = `attendance_id,date_from,date_to,type,details
+544,2025-11-10,2025-11-10,Off,Annual leave
+ALL,2025-11-15,2025-11-15,Public Holiday,National Day
+322,2025-11-12,2025-11-14,Sick Leave,Medical certificate
+123,2025-11-20,2025-11-20,Present,Worked from home
+456,2025-11-21,2025-11-21,Half Day,Left early`;
+        
+        const blob = new Blob([template], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'exceptions_template.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     const resetForm = () => {
         setFormData({
@@ -284,6 +445,31 @@ export default function ExceptionsTab({ project }) {
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <CardTitle>Exceptions</CardTitle>
+                        <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={downloadTemplate}
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Template
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById('exception-import').click()}
+                            disabled={importProgress !== null}
+                        >
+                            <Upload className="w-4 h-4 mr-2" />
+                            {importProgress ? `${importProgress.current}/${importProgress.total}` : 'Import Excel'}
+                        </Button>
+                        <input
+                            id="exception-import"
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleFileImport}
+                            className="hidden"
+                        />
                         {!showForm && (
                             <Button 
                                 onClick={() => setShowForm(true)}
@@ -294,6 +480,7 @@ export default function ExceptionsTab({ project }) {
                                 Add Exception
                             </Button>
                         )}
+                    </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
