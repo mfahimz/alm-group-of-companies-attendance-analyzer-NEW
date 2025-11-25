@@ -22,6 +22,7 @@ export default function ExceptionsTab({ project }) {
         new_am_end: '',
         new_pm_start: '',
         new_pm_end: '',
+        early_checkout_minutes: '',
         details: ''
     });
     const [filter, setFilter] = useState({ search: '', type: '' });
@@ -69,6 +70,7 @@ export default function ExceptionsTab({ project }) {
             new_am_end: '',
             new_pm_start: '',
             new_pm_end: '',
+            early_checkout_minutes: '',
             details: ''
         });
     };
@@ -120,6 +122,7 @@ export default function ExceptionsTab({ project }) {
         });
 
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
+    const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
 
     return (
         <div className="space-y-6">
@@ -174,6 +177,7 @@ export default function ExceptionsTab({ project }) {
                                             <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                             <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+                                            <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -232,6 +236,20 @@ export default function ExceptionsTab({ project }) {
                                             />
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {needsEarlyCheckoutMinutes && (
+                                <div className="max-w-xs">
+                                    <Label>Early Checkout Minutes *</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="e.g. 30"
+                                        value={formData.early_checkout_minutes}
+                                        onChange={(e) => setFormData({ ...formData, early_checkout_minutes: e.target.value })}
+                                        min="1"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">Minutes to add to early checkout total</p>
                                 </div>
                             )}
 
@@ -304,6 +322,7 @@ export default function ExceptionsTab({ project }) {
                                 <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                 <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                 <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+                                <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -344,8 +363,11 @@ export default function ExceptionsTab({ project }) {
                                                 ${exception.type === 'MANUAL_PRESENT' ? 'bg-green-100 text-green-700' : ''}
                                                 ${exception.type === 'MANUAL_ABSENT' ? 'bg-red-100 text-red-700' : ''}
                                                 ${exception.type === 'MANUAL_HALF' ? 'bg-amber-100 text-amber-700' : ''}
+                                                ${exception.type === 'MANUAL_EARLY_CHECKOUT' ? 'bg-cyan-100 text-cyan-700' : ''}
                                             `}>
-                                                {exception.type.replace(/_/g, ' ')}
+                                                {exception.type === 'MANUAL_EARLY_CHECKOUT' 
+                                                    ? `Early Checkout (${exception.early_checkout_minutes || 0} min)`
+                                                    : exception.type.replace(/_/g, ' ')}
                                             </span>
                                         </TableCell>
                                         <TableCell>{new Date(exception.date_from).toLocaleDateString()}</TableCell>
