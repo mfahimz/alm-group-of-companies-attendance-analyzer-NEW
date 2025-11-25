@@ -99,17 +99,23 @@ export default function PunchUploadTab({ project }) {
 
     const uploadMutation = useMutation({
         mutationFn: async () => {
+            // Helper to add delay between API calls
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            
             // Delete existing punches for this project
             const existingPunches = await base44.entities.Punch.filter({ project_id: project.id });
             
-            // Delete in batches to avoid timeout
-            const deleteBatchSize = 50;
+            // Delete in small batches with delays to avoid rate limiting
+            const deleteBatchSize = 20;
             for (let i = 0; i < existingPunches.length; i += deleteBatchSize) {
                 const batch = existingPunches.slice(i, i + deleteBatchSize);
                 await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
+                if (i + deleteBatchSize < existingPunches.length) {
+                    await delay(500); // Wait 500ms between delete batches
+                }
             }
 
-            // Insert new punches in batches to avoid timeout
+            // Insert new punches in batches with delays
             const punchRecords = parsedData.map(p => ({
                 project_id: project.id,
                 attendance_id: p.attendance_id,
@@ -117,11 +123,14 @@ export default function PunchUploadTab({ project }) {
                 punch_date: p.punch_date
             }));
 
-            // Upload in batches of 100 to avoid timeout
-            const batchSize = 100;
+            // Upload in batches of 50 with delays to avoid rate limiting
+            const batchSize = 50;
             for (let i = 0; i < punchRecords.length; i += batchSize) {
                 const batch = punchRecords.slice(i, i + batchSize);
                 await base44.entities.Punch.bulkCreate(batch);
+                if (i + batchSize < punchRecords.length) {
+                    await delay(500); // Wait 500ms between upload batches
+                }
             }
         },
         onSuccess: () => {
