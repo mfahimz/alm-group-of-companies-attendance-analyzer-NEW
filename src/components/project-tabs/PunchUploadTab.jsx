@@ -1,16 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Search, Trash2, Users, Clock, CalendarDays, TrendingUp, BarChart3, TableIcon } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function PunchUploadTab({ project }) {
     const [file, setFile] = useState(null);
@@ -219,85 +217,6 @@ export default function PunchUploadTab({ project }) {
         }
     };
 
-    // Dashboard metrics
-    const dashboardMetrics = useMemo(() => {
-        if (punches.length === 0) return null;
-
-        const uniqueEmployees = new Set(punches.map(p => p.attendance_id)).size;
-        const uniqueDates = new Set(punches.map(p => p.punch_date)).size;
-        const avgPunchesPerDay = uniqueDates > 0 ? (punches.length / uniqueDates).toFixed(1) : 0;
-        const avgPunchesPerEmployee = uniqueEmployees > 0 ? (punches.length / uniqueEmployees).toFixed(1) : 0;
-
-        return {
-            totalPunches: punches.length,
-            uniqueEmployees,
-            uniqueDates,
-            avgPunchesPerDay,
-            avgPunchesPerEmployee
-        };
-    }, [punches]);
-
-    // Chart data - daily punch counts
-    const dailyChartData = useMemo(() => {
-        if (punches.length === 0) return [];
-
-        const dailyCounts = {};
-        punches.forEach(p => {
-            if (p.punch_date) {
-                dailyCounts[p.punch_date] = (dailyCounts[p.punch_date] || 0) + 1;
-            }
-        });
-
-        return Object.entries(dailyCounts)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([date, count]) => ({
-                date: new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-                fullDate: date,
-                count
-            }));
-    }, [punches]);
-
-    // Chart data - weekly punch counts
-    const weeklyChartData = useMemo(() => {
-        if (punches.length === 0) return [];
-
-        const weeklyCounts = {};
-        punches.forEach(p => {
-            if (p.punch_date) {
-                const date = new Date(p.punch_date);
-                const weekStart = new Date(date);
-                weekStart.setDate(date.getDate() - date.getDay());
-                const weekKey = weekStart.toISOString().split('T')[0];
-                weeklyCounts[weekKey] = (weeklyCounts[weekKey] || 0) + 1;
-            }
-        });
-
-        return Object.entries(weeklyCounts)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([weekStart, count]) => ({
-                week: `Week of ${new Date(weekStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`,
-                count
-            }));
-    }, [punches]);
-
-    // Employee punch distribution
-    const employeeChartData = useMemo(() => {
-        if (punches.length === 0) return [];
-
-        const employeeCounts = {};
-        punches.forEach(p => {
-            employeeCounts[p.attendance_id] = (employeeCounts[p.attendance_id] || 0) + 1;
-        });
-
-        return Object.entries(employeeCounts)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 15) // Top 15 employees
-            .map(([id, count]) => ({
-                employee: employees.find(e => e.attendance_id === id)?.name || id,
-                count
-            }));
-    }, [punches, employees]);
-
     return (
         <div className="space-y-6">
             {/* Upload Section */}
@@ -369,126 +288,6 @@ export default function PunchUploadTab({ project }) {
                     )}
                 </CardContent>
             </Card>
-
-            {/* Dashboard Metrics */}
-            {dashboardMetrics && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <Card className="border-0 shadow-sm">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-indigo-100 rounded-lg">
-                                    <Clock className="w-5 h-5 text-indigo-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-slate-900">{dashboardMetrics.totalPunches}</p>
-                                    <p className="text-xs text-slate-500">Total Punches</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-0 shadow-sm">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-green-100 rounded-lg">
-                                    <Users className="w-5 h-5 text-green-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-slate-900">{dashboardMetrics.uniqueEmployees}</p>
-                                    <p className="text-xs text-slate-500">Employees</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-0 shadow-sm">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                    <CalendarDays className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-slate-900">{dashboardMetrics.uniqueDates}</p>
-                                    <p className="text-xs text-slate-500">Days with Data</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-0 shadow-sm">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-amber-100 rounded-lg">
-                                    <TrendingUp className="w-5 h-5 text-amber-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-slate-900">{dashboardMetrics.avgPunchesPerDay}</p>
-                                    <p className="text-xs text-slate-500">Avg/Day</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-0 shadow-sm">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-100 rounded-lg">
-                                    <BarChart3 className="w-5 h-5 text-purple-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-slate-900">{dashboardMetrics.avgPunchesPerEmployee}</p>
-                                    <p className="text-xs text-slate-500">Avg/Employee</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* Charts */}
-            {punches.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="border-0 shadow-sm">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">Daily Punch Trend</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={dailyChartData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                        <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-45} textAnchor="end" height={60} />
-                                        <YAxis tick={{ fontSize: 11 }} />
-                                        <Tooltip 
-                                            contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-                                            formatter={(value) => [value, 'Punches']}
-                                        />
-                                        <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 3 }} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-0 shadow-sm">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">Top Employees by Punch Count</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={employeeChartData} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                        <XAxis type="number" tick={{ fontSize: 11 }} />
-                                        <YAxis dataKey="employee" type="category" tick={{ fontSize: 10 }} width={80} />
-                                        <Tooltip 
-                                            contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-                                            formatter={(value) => [value, 'Punches']}
-                                        />
-                                        <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
 
             {/* Current Punches */}
             <Card className="border-0 shadow-sm">
