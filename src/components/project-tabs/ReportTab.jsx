@@ -440,8 +440,9 @@ export default function ReportTab({ project }) {
 
             breakdown.push({
                 date: formatDate(dateStr),
-                punches: dayPunches.length,
+                punches: rawDayPunches.length,
                 punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
+                allPunchTimes: rawDayPunches.map(p => p.timestamp_raw).join(', '),
                 shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
                 exception: dateException ? dateException.type : '-',
                 status,
