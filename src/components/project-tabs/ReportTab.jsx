@@ -337,7 +337,7 @@ export default function ReportTab({ project }) {
 
             if (dayOfWeek === 0) continue; // Skip Sundays
 
-            const dayPunches = employeePunches.filter(p => p.punch_date === dateStr)
+            const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
                     const timeA = parseTime(a.timestamp_raw);
                     const timeB = parseTime(b.timestamp_raw);
