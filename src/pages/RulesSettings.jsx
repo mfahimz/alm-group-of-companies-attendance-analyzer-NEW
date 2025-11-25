@@ -26,6 +26,10 @@ const DEFAULT_RULES = {
         friday_uses_friday_shift: true,
         fallback_to_general_shift_if_missing: true
     },
+    punch_filtering: {
+        enable_multi_punch_detection: true,
+        cluster_window_minutes: 10
+    },
     attendance_calculation: {
         presence_rule: 'at_least_one_punch',
         late_minutes_rule: 'first_punch_minus_shift_start',
