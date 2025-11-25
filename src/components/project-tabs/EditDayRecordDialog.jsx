@@ -142,15 +142,8 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 originalStatus: existingOverride?.originalStatus ?? data.originalStatus
             };
 
-            // Recalculate totals based on all overrides
-            const originalTotals = {
-                late_minutes: latestResult.late_minutes,
-                early_checkout_minutes: latestResult.early_checkout_minutes,
-                full_absence_count: latestResult.full_absence_count,
-                half_absence_count: latestResult.half_absence_count,
-                present_days: latestResult.present_days
-            };
-            const updatedTotals = recalculateTotals(latestResult, overrides, originalTotals);
+            // Recalculate only abnormal dates
+            const updatedTotals = recalculateTotals(latestResult, overrides);
 
             // Update the analysis result with new overrides and recalculated totals
             return await base44.entities.AnalysisResult.update(analysisResult.id, {
