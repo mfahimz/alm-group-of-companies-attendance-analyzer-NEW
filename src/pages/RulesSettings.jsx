@@ -17,10 +17,7 @@ const DEFAULT_RULES = {
         holidays: ['Sunday'],
         always_mark_first_date_abnormal: false
     },
-    timestamp_rules: {
-        timestamp_format: 'DD/MM/YYYY HH:MM AM/PM',
-        treat_duplicate_timestamps_as_valid: true
-    },
+
     shift_rules: {
         friday_uses_friday_shift: true,
         fallback_to_general_shift_if_missing: true
@@ -196,42 +193,7 @@ export default function RulesSettings() {
                 </CardContent>
             </Card>
 
-            {/* Timestamp Rules */}
-            <Card className="border-0 shadow-sm">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Settings className="w-5 h-5" />
-                        Timestamp Handling
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label>Timestamp Format</Label>
-                        <Input
-                            value={rules.timestamp_rules?.timestamp_format}
-                            onChange={(e) => updateRule('timestamp_rules', 'timestamp_format', e.target.value)}
-                            className="mt-2"
-                            disabled
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                            Fixed format - do not change
-                        </p>
-                    </div>
 
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Label>Treat Duplicate Timestamps as Valid</Label>
-                            <p className="text-xs text-slate-500 mt-1">
-                                Keep duplicate punches without removal
-                            </p>
-                        </div>
-                        <Switch
-                            checked={rules.timestamp_rules?.treat_duplicate_timestamps_as_valid}
-                            onCheckedChange={(checked) => updateRule('timestamp_rules', 'treat_duplicate_timestamps_as_valid', checked)}
-                        />
-                    </div>
-                </CardContent>
-            </Card>
 
             {/* Shift Rules */}
             <Card className="border-0 shadow-sm">
