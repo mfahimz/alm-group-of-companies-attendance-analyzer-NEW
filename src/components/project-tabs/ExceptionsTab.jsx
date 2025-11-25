@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
+
 import { Plus, Trash2, Search, Upload, Download } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -56,7 +56,7 @@ export default function ExceptionsTab({ project }) {
         early_checkout_minutes: '',
         details: ''
     });
-    const [filter, setFilter] = useState({ search: '', type: '' });
+    const [filter, setFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [importProgress, setImportProgress] = useState(null);
     const queryClient = useQueryClient();
@@ -81,6 +81,9 @@ export default function ExceptionsTab({ project }) {
             toast.success('Exception added successfully');
             setShowForm(false);
             resetForm();
+        },
+        onError: (error) => {
+            toast.error('Failed to add exception: ' + (error.message || 'Unknown error'));
         }
     });
 
@@ -457,8 +460,8 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                             </div>
 
                             <div className="flex gap-3">
-                                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700">
-                                    Add Exception
+                                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createMutation.isPending}>
+                                    {createMutation.isPending ? 'Adding...' : 'Add Exception'}
                                 </Button>
                                 <Button type="button" variant="outline" onClick={() => {
                                     setShowForm(false);
