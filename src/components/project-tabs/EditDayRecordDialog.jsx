@@ -236,7 +236,42 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!dayRecord || !analysisResult) return;
-        updateDayMutation.mutate(formData);
+        
+        // Parse original values from dayRecord
+        let originalLateMinutes = 0;
+        if (dayRecord.lateInfo && dayRecord.lateInfo !== '-' && !dayRecord.lateInfo.includes('edited')) {
+            const matches = dayRecord.lateInfo.match(/(\d+)\s*min/g);
+            if (matches) {
+                originalLateMinutes = matches.reduce((sum, match) => {
+                    const num = parseInt(match.match(/\d+/)[0]);
+                    return sum + num;
+                }, 0);
+            }
+        }
+        
+        let originalEarlyCheckout = 0;
+        if (dayRecord.earlyCheckoutInfo && dayRecord.earlyCheckoutInfo !== '-' && !dayRecord.earlyCheckoutInfo.includes('edited')) {
+            const matches = dayRecord.earlyCheckoutInfo.match(/(\d+)\s*min/g);
+            if (matches) {
+                originalEarlyCheckout = matches.reduce((sum, match) => {
+                    const num = parseInt(match.match(/\d+/)[0]);
+                    return sum + num;
+                }, 0);
+            }
+        }
+        
+        let originalStatus = dayRecord.status;
+        if (originalStatus.includes('Edited')) {
+            // Already edited, get original from override
+            originalStatus = null; // Will use existing override's originalStatus
+        }
+        
+        updateDayMutation.mutate({
+            ...formData,
+            originalLateMinutes,
+            originalEarlyCheckout,
+            originalStatus
+        });
     };
 
     if (!dayRecord) return null;
