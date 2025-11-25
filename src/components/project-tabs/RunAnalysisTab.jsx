@@ -113,13 +113,11 @@ export default function RunAnalysisTab({ project }) {
 
             // Bulk create results in batches
             setProgress({ current: uniqueEmployeeIds.length, total: uniqueEmployeeIds.length, status: 'Saving results...' });
-            const createBatchSize = 25;
+            const createBatchSize = 15;
             for (let i = 0; i < allResults.length; i += createBatchSize) {
                 const batch = allResults.slice(i, i + createBatchSize);
                 await base44.entities.AnalysisResult.bulkCreate(batch);
-                if (i + createBatchSize < allResults.length) {
-                    await delay(300);
-                }
+                await delay(800);
             }
 
             await updateProjectMutation.mutateAsync('analyzed');
