@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-import { Plus, Trash2, Search, Upload, Download } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 
@@ -59,6 +59,7 @@ export default function ExceptionsTab({ project }) {
     const [filter, setFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [importProgress, setImportProgress] = useState(null);
+    const [editedRows, setEditedRows] = useState({});
     const queryClient = useQueryClient();
 
     const { data: exceptions = [] } = useQuery({
@@ -103,7 +104,35 @@ export default function ExceptionsTab({ project }) {
     });
 
     const handleCellChange = (exceptionId, field, value) => {
-        updateMutation.mutate({ id: exceptionId, data: { [field]: value } });
+        setEditedRows(prev => ({
+            ...prev,
+            [exceptionId]: {
+                ...(prev[exceptionId] || {}),
+                [field]: value
+            }
+        }));
+    };
+
+    const handleSaveRow = (exceptionId) => {
+        if (editedRows[exceptionId]) {
+            updateMutation.mutate({ id: exceptionId, data: editedRows[exceptionId] }, {
+                onSuccess: () => {
+                    setEditedRows(prev => {
+                        const newState = { ...prev };
+                        delete newState[exceptionId];
+                        return newState;
+                    });
+                    toast.success('Exception updated');
+                }
+            });
+        }
+    };
+
+    const getFieldValue = (exception, field) => {
+        if (editedRows[exception.id] && editedRows[exception.id][field] !== undefined) {
+            return editedRows[exception.id][field];
+        }
+        return exception[field];
     };
 
     const parseDate = (value) => {
@@ -579,16 +608,16 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                     {filteredExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
                                             <TableCell className="p-1">
-                                                {exception.type === 'PUBLIC_HOLIDAY' ? (
+                                                {getFieldValue(exception, 'type') === 'PUBLIC_HOLIDAY' ? (
                                                     <span className="px-2 py-1 text-sm text-slate-600">ALL</span>
                                                 ) : (
                                                     <Select
-                                                        value={exception.attendance_id}
+                                                        value={getFieldValue(exception, 'attendance_id')}
                                                         onValueChange={(value) => handleCellChange(exception.id, 'attendance_id', value)}
                                                     >
                                                         <SelectTrigger className="h-8 w-44">
                                                             <SelectValue>
-                                                                {exception.attendance_id} - {employees.find(e => e.attendance_id === exception.attendance_id)?.name || ''}
+                                                                {getFieldValue(exception, 'attendance_id')} - {employees.find(e => e.attendance_id === getFieldValue(exception, 'attendance_id'))?.name || ''}
                                                             </SelectValue>
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -603,7 +632,7 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                             </TableCell>
                                             <TableCell className="p-1">
                                                 <Select
-                                                    value={exception.type}
+                                                    value={getFieldValue(exception, 'type')}
                                                     onValueChange={(value) => handleCellChange(exception.id, 'type', value)}
                                                 >
                                                     <SelectTrigger className="h-8 w-36">
@@ -624,7 +653,7 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                             <TableCell className="p-1">
                                                 <Input
                                                     type="date"
-                                                    value={exception.date_from}
+                                                    value={getFieldValue(exception, 'date_from')}
                                                     onChange={(e) => handleCellChange(exception.id, 'date_from', e.target.value)}
                                                     className="h-8 w-36"
                                                 />
@@ -632,27 +661,39 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                             <TableCell className="p-1">
                                                 <Input
                                                     type="date"
-                                                    value={exception.date_to}
+                                                    value={getFieldValue(exception, 'date_to')}
                                                     onChange={(e) => handleCellChange(exception.id, 'date_to', e.target.value)}
                                                     className="h-8 w-36"
                                                 />
                                             </TableCell>
                                             <TableCell className="p-1">
                                                 <Input
-                                                    value={exception.details || ''}
+                                                    value={getFieldValue(exception, 'details') || ''}
                                                     onChange={(e) => handleCellChange(exception.id, 'details', e.target.value)}
                                                     placeholder="Notes..."
                                                     className="h-8 w-40"
                                                 />
                                             </TableCell>
                                             <TableCell className="text-right p-1">
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => deleteMutation.mutate(exception.id)}
-                                                >
-                                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                                </Button>
+                                                <div className="flex gap-1 justify-end">
+                                                    {editedRows[exception.id] && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => handleSaveRow(exception.id)}
+                                                            disabled={updateMutation.isPending}
+                                                        >
+                                                            <Save className="w-4 h-4 text-green-600" />
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => deleteMutation.mutate(exception.id)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
