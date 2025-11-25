@@ -589,8 +589,9 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                 <TableHeader>
                                     <TableRow>
                                         <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                            Employee
-                                        </SortableTableHead>
+                                                                                          ID
+                                                                                      </SortableTableHead>
+                                                                                      <TableHead>Name</TableHead>
                                         <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
                                             Type
                                         </SortableTableHead>
@@ -608,13 +609,14 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                                     {filteredExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
                                             <TableCell className="p-1">
-                                                {exception.type === 'PUBLIC_HOLIDAY' ? (
-                                                    <span className="text-sm text-slate-600">ALL</span>
-                                                ) : (
-                                                    <span className="text-sm text-slate-900">
-                                                        {exception.attendance_id} - {employees.find(e => e.attendance_id === exception.attendance_id)?.name || ''}
-                                                    </span>
-                                                )}
+                                                <span className="text-sm text-slate-900">
+                                                    {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="p-1">
+                                                <span className="text-sm text-slate-900">
+                                                    {exception.type === 'PUBLIC_HOLIDAY' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id)?.name || '—')}
+                                                </span>
                                             </TableCell>
                                             <TableCell className="p-1">
                                                 <Select
