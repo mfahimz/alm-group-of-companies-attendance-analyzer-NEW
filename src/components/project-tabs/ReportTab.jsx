@@ -225,7 +225,8 @@ export default function ReportTab({ project }) {
 
     // Filter multiple punches within configured time windows to get the 4 key punches
     const filterMultiplePunches = (punchList, shift) => {
-        if (punchList.length <= 4) return punchList;
+        // Always process to identify the 4 key punches, even with 4 or fewer
+        if (punchList.length <= 1) return punchList;
         
         // Get cluster window from rules, default to 10 minutes
         const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
