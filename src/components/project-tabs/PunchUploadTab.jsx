@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Check, Search, Trash2 } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -157,7 +157,15 @@ export default function PunchUploadTab({ project }) {
 
     const bulkDeleteMutation = useMutation({
         mutationFn: async (ids) => {
-            await Promise.all(ids.map(id => base44.entities.Punch.delete(id)));
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const batchSize = 20;
+            for (let i = 0; i < ids.length; i += batchSize) {
+                const batch = ids.slice(i, i + batchSize);
+                await Promise.all(batch.map(id => base44.entities.Punch.delete(id)));
+                if (i + batchSize < ids.length) {
+                    await delay(500);
+                }
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['punches', project.id]);

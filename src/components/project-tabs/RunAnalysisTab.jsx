@@ -67,13 +67,28 @@ export default function RunAnalysisTab({ project }) {
         setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Processing...' });
 
         try {
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            
+            // Delete previous results for this project
+            setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Cleaning up old results...' });
+            const oldResults = await base44.entities.AnalysisResult.filter({ project_id: project.id });
+            const deleteBatchSize = 20;
+            for (let i = 0; i < oldResults.length; i += deleteBatchSize) {
+                const batch = oldResults.slice(i, i + deleteBatchSize);
+                await Promise.all(batch.map(r => base44.entities.AnalysisResult.delete(r.id)));
+                if (i + deleteBatchSize < oldResults.length) {
+                    await delay(300);
+                }
+            }
+
             // Create a new report run
             const reportRun = await base44.entities.ReportRun.create({
                 project_id: project.id,
                 employee_count: uniqueEmployeeIds.length
             });
 
-            // Process each employee
+            // Process all employees and collect results
+            const allResults = [];
             for (let i = 0; i < uniqueEmployeeIds.length; i++) {
                 const attendance_id = uniqueEmployeeIds[i];
                 setProgress({ 
@@ -83,8 +98,7 @@ export default function RunAnalysisTab({ project }) {
                 });
 
                 const result = await analyzeEmployee(attendance_id);
-                
-                await base44.entities.AnalysisResult.create({
+                allResults.push({
                     project_id: project.id,
                     report_run_id: reportRun.id,
                     attendance_id: result.attendance_id,
@@ -97,6 +111,17 @@ export default function RunAnalysisTab({ project }) {
                     abnormal_dates: result.abnormal_dates,
                     notes: result.notes
                 });
+            }
+
+            // Bulk create results in batches
+            setProgress({ current: uniqueEmployeeIds.length, total: uniqueEmployeeIds.length, status: 'Saving results...' });
+            const createBatchSize = 25;
+            for (let i = 0; i < allResults.length; i += createBatchSize) {
+                const batch = allResults.slice(i, i + createBatchSize);
+                await base44.entities.AnalysisResult.bulkCreate(batch);
+                if (i + createBatchSize < allResults.length) {
+                    await delay(300);
+                }
             }
 
             await updateProjectMutation.mutateAsync('analyzed');
