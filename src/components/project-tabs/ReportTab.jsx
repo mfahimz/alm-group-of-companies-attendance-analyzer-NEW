@@ -363,15 +363,18 @@ export default function ReportTab({ project }) {
     const getDailyBreakdown = () => {
         if (!selectedEmployee) return [];
 
+        // Get the latest version of this employee's result from enrichedResults
+        const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
+
         const breakdown = [];
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
         
         // Parse day_overrides for this specific report
         let dayOverrides = {};
-        if (selectedEmployee.day_overrides) {
+        if (currentResult.day_overrides) {
             try {
-                dayOverrides = JSON.parse(selectedEmployee.day_overrides);
+                dayOverrides = JSON.parse(currentResult.day_overrides);
             } catch (e) {
                 dayOverrides = {};
             }
