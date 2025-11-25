@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, Search, Upload, Download } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -90,6 +91,17 @@ export default function ExceptionsTab({ project }) {
             toast.success('Exception deleted');
         }
     });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }) => base44.entities.Exception.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['exceptions', project.id]);
+        }
+    });
+
+    const handleCellChange = (exceptionId, field, value) => {
+        updateMutation.mutate({ id: exceptionId, data: { [field]: value } });
+    };
 
     const parseDate = (value) => {
         if (!value) return '';
@@ -520,62 +532,108 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
                     {filteredExceptions.length === 0 ? (
                         <p className="text-slate-500 text-center py-8">No exceptions found</p>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                        Employee
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
-                                        Type
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="date_from" currentSort={sort} onSort={setSort}>
-                                        From
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="date_to" currentSort={sort} onSort={setSort}>
-                                        To
-                                    </SortableTableHead>
-                                    <TableHead>Details</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredExceptions.map((exception) => (
-                                    <TableRow key={exception.id}>
-                                        <TableCell className="font-medium">{exception.attendance_id}</TableCell>
-                                        <TableCell>
-                                            <span className={`
-                                                px-2 py-1 rounded text-xs font-medium
-                                                ${exception.type === 'OFF' ? 'bg-slate-100 text-slate-700' : ''}
-                                                ${exception.type === 'PUBLIC_HOLIDAY' ? 'bg-purple-100 text-purple-700' : ''}
-                                                ${exception.type === 'SHIFT_OVERRIDE' ? 'bg-blue-100 text-blue-700' : ''}
-                                                ${exception.type === 'MANUAL_PRESENT' ? 'bg-green-100 text-green-700' : ''}
-                                                ${exception.type === 'MANUAL_ABSENT' ? 'bg-red-100 text-red-700' : ''}
-                                                ${exception.type === 'MANUAL_HALF' ? 'bg-amber-100 text-amber-700' : ''}
-                                                ${exception.type === 'MANUAL_EARLY_CHECKOUT' ? 'bg-cyan-100 text-cyan-700' : ''}
-                                                ${exception.type === 'SICK_LEAVE' ? 'bg-orange-100 text-orange-700' : ''}
-                                            `}>
-                                                {exception.type === 'MANUAL_EARLY_CHECKOUT' 
-                                                    ? `Early Checkout (${exception.early_checkout_minutes || 0} min)`
-                                                    : exception.type.replace(/_/g, ' ')}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>{new Date(exception.date_from).toLocaleDateString('en-GB')}</TableCell>
-                                                                                    <TableCell>{new Date(exception.date_to).toLocaleDateString('en-GB')}</TableCell>
-                                        <TableCell className="max-w-xs truncate">{exception.details || '-'}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => deleteMutation.mutate(exception.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4 text-red-600" />
-                                            </Button>
-                                        </TableCell>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                            Employee
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
+                                            Type
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="date_from" currentSort={sort} onSort={setSort}>
+                                            From
+                                        </SortableTableHead>
+                                        <SortableTableHead sortKey="date_to" currentSort={sort} onSort={setSort}>
+                                            To
+                                        </SortableTableHead>
+                                        <TableHead>Details</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredExceptions.map((exception) => (
+                                        <TableRow key={exception.id}>
+                                            <TableCell className="p-1">
+                                                {exception.type === 'PUBLIC_HOLIDAY' ? (
+                                                    <span className="px-2 py-1 text-sm text-slate-600">ALL</span>
+                                                ) : (
+                                                    <Select
+                                                        value={exception.attendance_id}
+                                                        onValueChange={(value) => handleCellChange(exception.id, 'attendance_id', value)}
+                                                    >
+                                                        <SelectTrigger className="h-8 w-28">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {employees.map(emp => (
+                                                                <SelectItem key={emp.id} value={emp.attendance_id}>
+                                                                    {emp.attendance_id}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="p-1">
+                                                <Select
+                                                    value={exception.type}
+                                                    onValueChange={(value) => handleCellChange(exception.id, 'type', value)}
+                                                >
+                                                    <SelectTrigger className="h-8 w-36">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="OFF">Off / Leave</SelectItem>
+                                                        <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
+                                                        <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
+                                                        <SelectItem value="MANUAL_PRESENT">Present</SelectItem>
+                                                        <SelectItem value="MANUAL_ABSENT">Absent</SelectItem>
+                                                        <SelectItem value="MANUAL_HALF">Half Day</SelectItem>
+                                                        <SelectItem value="MANUAL_EARLY_CHECKOUT">Early Checkout</SelectItem>
+                                                        <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </TableCell>
+                                            <TableCell className="p-1">
+                                                <Input
+                                                    type="date"
+                                                    value={exception.date_from}
+                                                    onChange={(e) => handleCellChange(exception.id, 'date_from', e.target.value)}
+                                                    className="h-8 w-36"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="p-1">
+                                                <Input
+                                                    type="date"
+                                                    value={exception.date_to}
+                                                    onChange={(e) => handleCellChange(exception.id, 'date_to', e.target.value)}
+                                                    className="h-8 w-36"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="p-1">
+                                                <Input
+                                                    value={exception.details || ''}
+                                                    onChange={(e) => handleCellChange(exception.id, 'details', e.target.value)}
+                                                    placeholder="Notes..."
+                                                    className="h-8 w-40"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-right p-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => deleteMutation.mutate(exception.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>
