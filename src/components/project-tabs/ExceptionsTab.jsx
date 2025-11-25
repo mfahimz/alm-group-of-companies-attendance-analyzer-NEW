@@ -267,7 +267,27 @@ ALL,2025-11-15,2025-11-15,Public Holiday,National Day
             ? { ...formData, attendance_id: 'ALL' }
             : formData;
         
-        createMutation.mutate(submitData);
+        // Clean up empty string values and convert early_checkout_minutes to number
+        const cleanedData = {
+            attendance_id: submitData.attendance_id,
+            date_from: submitData.date_from,
+            date_to: submitData.date_to,
+            type: submitData.type,
+            details: submitData.details || null
+        };
+        
+        if (submitData.type === 'SHIFT_OVERRIDE') {
+            cleanedData.new_am_start = submitData.new_am_start || null;
+            cleanedData.new_am_end = submitData.new_am_end || null;
+            cleanedData.new_pm_start = submitData.new_pm_start || null;
+            cleanedData.new_pm_end = submitData.new_pm_end || null;
+        }
+        
+        if (submitData.type === 'MANUAL_EARLY_CHECKOUT' && submitData.early_checkout_minutes) {
+            cleanedData.early_checkout_minutes = parseInt(submitData.early_checkout_minutes);
+        }
+        
+        createMutation.mutate(cleanedData);
     };
 
     const filteredExceptions = exceptions
