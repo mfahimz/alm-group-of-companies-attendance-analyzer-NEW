@@ -321,6 +321,34 @@ export default function PunchUploadTab({ project }) {
                                 </div>
                             )}
                             
+                            {uploadLogs.length > 0 && (
+                                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <button
+                                        onClick={() => setShowLogs(!showLogs)}
+                                        className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
+                                    >
+                                        <span className="text-sm font-medium text-slate-700">Upload Log ({uploadLogs.length} entries)</span>
+                                        {showLogs ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                    </button>
+                                    {showLogs && (
+                                        <div className="max-h-48 overflow-y-auto bg-slate-900 p-3 text-xs font-mono">
+                                            {uploadLogs.map((log, idx) => (
+                                                <div key={idx} className="flex items-start gap-2 py-0.5">
+                                                    <span className="text-slate-500">{log.time}</span>
+                                                    {log.status === 'success' && <CheckCircle className="w-3 h-3 text-green-400 mt-0.5" />}
+                                                    {log.status === 'error' && <XCircle className="w-3 h-3 text-red-400 mt-0.5" />}
+                                                    {log.status === 'info' && <span className="w-3 h-3 text-blue-400 mt-0.5">•</span>}
+                                                    <span className={
+                                                        log.status === 'success' ? 'text-green-400' :
+                                                        log.status === 'error' ? 'text-red-400' : 'text-slate-300'
+                                                    }>{log.message}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
                             <Button 
                                 onClick={() => uploadMutation.mutate()}
                                 disabled={uploadMutation.isPending}
