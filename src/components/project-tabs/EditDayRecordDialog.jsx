@@ -128,7 +128,7 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 }
             }
 
-            // Store original values for delta calculation (only if not already overridden)
+            // Store original values for delta calculation (preserve from first edit)
             const existingOverride = overrides[dateStr];
             overrides[dateStr] = {
                 type: data.type,
@@ -136,10 +136,8 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
                 lateMinutes: data.lateMinutes,
                 earlyCheckoutMinutes: data.earlyCheckoutMinutes,
                 isAbnormal: data.isAbnormal,
-                // Preserve original values from first edit
                 originalLateMinutes: existingOverride?.originalLateMinutes ?? data.originalLateMinutes,
-                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? data.originalEarlyCheckout,
-                originalStatus: existingOverride?.originalStatus ?? data.originalStatus
+                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? data.originalEarlyCheckout
             };
 
             // Recalculate only abnormal dates
