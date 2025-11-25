@@ -112,11 +112,17 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${month}-${day}`;
 
+            // Fetch the latest analysis result to avoid stale data
+            const latestResults = await base44.entities.AnalysisResult.filter({ 
+                id: analysisResult.id 
+            });
+            const latestResult = latestResults[0] || analysisResult;
+
             // Get existing overrides or create new object
             let overrides = {};
-            if (analysisResult.day_overrides) {
+            if (latestResult.day_overrides) {
                 try {
-                    overrides = JSON.parse(analysisResult.day_overrides);
+                    overrides = JSON.parse(latestResult.day_overrides);
                 } catch (e) {
                     overrides = {};
                 }
@@ -132,12 +138,12 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
             };
 
             // Recalculate abnormal dates based on all overrides
-            const updatedResult = recalculateTotals(analysisResult, overrides);
+            const updatedTotals = recalculateTotals(latestResult, overrides);
 
             // Update the analysis result with new overrides and recalculated totals
             return await base44.entities.AnalysisResult.update(analysisResult.id, {
                 day_overrides: JSON.stringify(overrides),
-                ...updatedResult
+                ...updatedTotals
             });
         },
         onSuccess: () => {
