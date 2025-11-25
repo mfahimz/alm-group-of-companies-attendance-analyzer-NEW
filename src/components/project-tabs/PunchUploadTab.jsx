@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Search, Trash2 } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -20,6 +20,8 @@ export default function PunchUploadTab({ project }) {
     const [selectedPunches, setSelectedPunches] = useState([]);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
+    const [uploadLogs, setUploadLogs] = useState([]);
+    const [showLogs, setShowLogs] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -98,20 +100,34 @@ export default function PunchUploadTab({ project }) {
         reader.readAsText(file);
     };
 
+    const addLog = (message, status = 'info') => {
+        setUploadLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message, status }]);
+    };
+
     const uploadMutation = useMutation({
         mutationFn: async () => {
             const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            setUploadLogs([]);
+            setShowLogs(true);
+            
+            addLog('Starting upload process...', 'info');
             
             // Delete existing punches for this project
             setUploadProgress({ phase: 'Deleting old records...', current: 0, total: 0 });
             const existingPunches = await base44.entities.Punch.filter({ project_id: project.id });
+            addLog(`Found ${existingPunches.length} existing records to delete`, 'info');
             
             if (existingPunches.length > 0) {
                 setUploadProgress({ phase: 'Deleting old records...', current: 0, total: existingPunches.length });
                 const deleteBatchSize = 10;
                 for (let i = 0; i < existingPunches.length; i += deleteBatchSize) {
                     const batch = existingPunches.slice(i, i + deleteBatchSize);
-                    await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
+                    try {
+                        await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
+                        addLog(`Deleted batch ${Math.floor(i/deleteBatchSize) + 1}: ${batch.length} records`, 'success');
+                    } catch (err) {
+                        addLog(`Delete batch ${Math.floor(i/deleteBatchSize) + 1} failed: ${err.message}`, 'error');
+                    }
                     setUploadProgress({ phase: 'Deleting old records...', current: Math.min(i + deleteBatchSize, existingPunches.length), total: existingPunches.length });
                     await delay(800);
                 }
@@ -125,16 +141,26 @@ export default function PunchUploadTab({ project }) {
                 punch_date: p.punch_date
             }));
 
+            addLog(`Starting upload of ${punchRecords.length} new records...`, 'info');
             setUploadProgress({ phase: 'Uploading new records...', current: 0, total: punchRecords.length });
             
             // Upload in batches of 20 with delays
             const batchSize = 20;
+            let successCount = 0;
             for (let i = 0; i < punchRecords.length; i += batchSize) {
                 const batch = punchRecords.slice(i, i + batchSize);
-                await base44.entities.Punch.bulkCreate(batch);
+                try {
+                    await base44.entities.Punch.bulkCreate(batch);
+                    successCount += batch.length;
+                    addLog(`Uploaded batch ${Math.floor(i/batchSize) + 1}: ${batch.length} records (${successCount}/${punchRecords.length})`, 'success');
+                } catch (err) {
+                    addLog(`Upload batch ${Math.floor(i/batchSize) + 1} failed: ${err.message}`, 'error');
+                }
                 setUploadProgress({ phase: 'Uploading new records...', current: Math.min(i + batchSize, punchRecords.length), total: punchRecords.length });
                 await delay(1000);
             }
+            
+            addLog(`Upload complete! ${successCount} records uploaded.`, 'success');
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['punches', project.id]);
