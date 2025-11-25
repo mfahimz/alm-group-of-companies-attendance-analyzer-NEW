@@ -482,8 +482,11 @@ export default function ReportTab({ project }) {
                                             <div>
                                                 <p className="font-medium text-slate-900">
                                                     Report Generated: {new Date(run.created_date).toLocaleString('en-US', {
-                                                        dateStyle: 'medium',
-                                                        timeStyle: 'short'
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
                                                     })}
                                                 </p>
                                                 <p className="text-sm text-slate-600 mt-1">

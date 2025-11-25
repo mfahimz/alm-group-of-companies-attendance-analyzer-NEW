@@ -242,7 +242,7 @@ export default function OverviewTab({ project }) {
                             <div>
                                 <p className="text-sm text-slate-600">Last Analysis</p>
                                 <p className="font-medium text-slate-900 mt-1">
-                                    {new Date(project.updated_date).toLocaleString()}
+                                    {new Date(project.updated_date).toLocaleString('en-GB')}
                                 </p>
                             </div>
                         )}

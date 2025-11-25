@@ -70,7 +70,7 @@ export default function UserProfile() {
                             <div>
                                 <p className="text-sm text-slate-600">Member Since</p>
                                 <p className="font-medium text-slate-900">
-                                    {user?.created_date ? new Date(user.created_date).toLocaleDateString() : '-'}
+                                    {user?.created_date ? new Date(user.created_date).toLocaleDateString('en-GB') : '-'}
                                 </p>
                             </div>
                         </div>

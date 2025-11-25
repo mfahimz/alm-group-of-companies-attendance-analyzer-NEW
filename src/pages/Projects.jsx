@@ -205,7 +205,7 @@ export default function Projects() {
                                         <div className="flex justify-between">
                                             <span className="text-slate-600">Date Range:</span>
                                             <span className="font-medium text-slate-900">
-                                                {new Date(project.date_from).toLocaleDateString()} - {new Date(project.date_to).toLocaleDateString()}
+                                                {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                                             </span>
                                         </div>
                                         {project.department && (
@@ -217,7 +217,7 @@ export default function Projects() {
                                         <div className="flex justify-between">
                                             <span className="text-slate-600">Created:</span>
                                             <span className="font-medium text-slate-900">
-                                                {new Date(project.created_date).toLocaleDateString()}
+                                                {new Date(project.created_date).toLocaleDateString('en-GB')}
                                             </span>
                                         </div>
                                     </div>
