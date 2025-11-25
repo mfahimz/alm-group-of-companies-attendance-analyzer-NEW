@@ -106,13 +106,11 @@ export default function PunchUploadTab({ project }) {
             const existingPunches = await base44.entities.Punch.filter({ project_id: project.id });
             
             // Delete in small batches with delays to avoid rate limiting
-            const deleteBatchSize = 20;
+            const deleteBatchSize = 10;
             for (let i = 0; i < existingPunches.length; i += deleteBatchSize) {
                 const batch = existingPunches.slice(i, i + deleteBatchSize);
                 await Promise.all(batch.map(p => base44.entities.Punch.delete(p.id)));
-                if (i + deleteBatchSize < existingPunches.length) {
-                    await delay(500); // Wait 500ms between delete batches
-                }
+                await delay(1000); // Wait 1s between delete batches
             }
 
             // Insert new punches in batches with delays
@@ -123,14 +121,12 @@ export default function PunchUploadTab({ project }) {
                 punch_date: p.punch_date
             }));
 
-            // Upload in batches of 50 with delays to avoid rate limiting
-            const batchSize = 50;
+            // Upload in batches of 25 with longer delays to avoid rate limiting
+            const batchSize = 25;
             for (let i = 0; i < punchRecords.length; i += batchSize) {
                 const batch = punchRecords.slice(i, i + batchSize);
                 await base44.entities.Punch.bulkCreate(batch);
-                if (i + batchSize < punchRecords.length) {
-                    await delay(500); // Wait 500ms between upload batches
-                }
+                await delay(1500); // Wait 1.5s between upload batches
             }
         },
         onSuccess: () => {
