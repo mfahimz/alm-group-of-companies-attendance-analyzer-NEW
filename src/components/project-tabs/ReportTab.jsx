@@ -261,17 +261,21 @@ export default function ReportTab({ project }) {
         if (shift && shift.am_end && punchesWithTime.length > 1) {
             const pmStartTime = shift.pm_start ? parseTime(shift.pm_start) : null;
             
+            // Find punches around AM end time (not in morning cluster)
+            const morningClusterEndIndex = morningCandidates.length;
             const amEndCandidates = [];
-            for (let i = 1; i < punchesWithTime.length; i++) {
+            
+            for (let i = morningClusterEndIndex; i < punchesWithTime.length; i++) {
                 const punch = punchesWithTime[i];
                 if (pmStartTime && punch.time >= pmStartTime) continue;
                 
                 if (amEndCandidates.length === 0) {
                     amEndCandidates.push(punch);
                 } else {
-                    const lastInCluster = amEndCandidates[amEndCandidates.length - 1];
-                    const timeDiff = Math.abs(punch.time - lastInCluster.time) / (1000 * 60);
-                    if (timeDiff <= 10) {
+                    // Compare against the FIRST punch in this cluster
+                    const firstInCluster = amEndCandidates[0];
+                    const timeDiff = Math.abs(punch.time - firstInCluster.time) / (1000 * 60);
+                    if (timeDiff <= clusterWindow) {
                         amEndCandidates.push(punch);
                     }
                 }
@@ -281,17 +285,18 @@ export default function ReportTab({ project }) {
             }
         }
 
-        // 3. PM Punch-In: First punch after AM punch-out
+        // 3. PM Punch-In: First punch after AM punch-out cluster
         let pmPunchIn = null;
-        const morningOutIndex = morningPunchOut ? punchesWithTime.indexOf(morningPunchOut) : 0;
+        const morningOutIndex = morningPunchOut ? punchesWithTime.indexOf(morningPunchOut) : (morningCandidates.length - 1);
         const pmInCandidates = [];
         for (let i = morningOutIndex + 1; i < punchesWithTime.length; i++) {
             if (pmInCandidates.length === 0) {
                 pmInCandidates.push(punchesWithTime[i]);
             } else {
-                const lastInCluster = pmInCandidates[pmInCandidates.length - 1];
-                const timeDiff = Math.abs(punchesWithTime[i].time - lastInCluster.time) / (1000 * 60);
-                if (timeDiff <= 10) {
+                // Compare against the FIRST punch in this cluster
+                const firstInCluster = pmInCandidates[0];
+                const timeDiff = Math.abs(punchesWithTime[i].time - firstInCluster.time) / (1000 * 60);
+                if (timeDiff <= clusterWindow) {
                     pmInCandidates.push(punchesWithTime[i]);
                 } else {
                     break;
