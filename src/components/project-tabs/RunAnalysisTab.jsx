@@ -279,13 +279,13 @@ export default function RunAnalysisTab({ project }) {
                     }
                 }
 
-                // Check if employee has SINGLE_SHIFT exception (applies to entire project, not date-specific)
-                const hasSingleShiftException = employeeExceptions.some(ex => ex.type === 'SINGLE_SHIFT');
+                // Check if employee has single shift (from shift timing)
+                const isSingleShift = shift?.is_single_shift || false;
                 
                 // Half day detection (simple rule: less than 2 punches)
-                // Skip half day detection if employee has single shift exception (expects only 2 punches)
+                // Skip half day detection if employee has single shift (expects only 2 punches)
                 if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration') {
-                    if (filteredPunches.length < 2 && !hasSingleShiftException) {
+                    if (filteredPunches.length < 2 && !isSingleShift) {
                         half_absence_count++;
                     }
                 }
@@ -295,14 +295,14 @@ export default function RunAnalysisTab({ project }) {
             }
 
             // Abnormality detection (use filtered punches)
-            // For single shift employees, expected punches is 2, otherwise 4
-            const expectedPunches = hasSingleShiftException ? 2 : 4;
-            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
-                abnormal_dates_list.push(dateStr);
-            }
-            if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
-                abnormal_dates_list.push(dateStr);
-            }
+                            // For single shift employees, expected punches is 2, otherwise 4
+                            const expectedPunches = isSingleShift ? 2 : 4;
+                            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
+                                abnormal_dates_list.push(dateStr);
+                            }
+                            if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
+                                abnormal_dates_list.push(dateStr);
+                            }
 
             // Special abnormal dates
             const dateFormatted = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
@@ -330,8 +330,23 @@ export default function RunAnalysisTab({ project }) {
     };
 
     const filterMultiplePunches = (punchList, shift) => {
-        // Always process to identify the 4 key punches, even with 4 or fewer
+        // Always process to identify the key punches
         if (punchList.length <= 1) return punchList;
+        
+        // For single shift employees, only keep first and last punch
+        if (shift?.is_single_shift) {
+            const punchesWithTime = punchList.map(p => ({
+                ...p,
+                time: parseTime(p.timestamp_raw)
+            })).filter(p => p.time).sort((a, b) => a.time - b.time);
+            
+            if (punchesWithTime.length <= 2) return punchList;
+            
+            // Return first and last punch only
+            const firstPunch = punchesWithTime[0];
+            const lastPunch = punchesWithTime[punchesWithTime.length - 1];
+            return [firstPunch, lastPunch].map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
+        }
         
         // Get cluster window from rules, default to 10 minutes
         const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
