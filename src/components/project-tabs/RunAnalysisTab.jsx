@@ -414,12 +414,14 @@ export default function RunAnalysisTab({ project }) {
             // Abnormality detection (use filtered punches)
             // For single shift employees, expected punches is 2, otherwise 4
             const expectedPunches = isSingleShift ? 2 : 4;
-                            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
-                                abnormal_dates_list.push(dateStr);
-                            }
-                            if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
-                                abnormal_dates_list.push(dateStr);
-                            }
+            // Don't mark as abnormal if we auto-filled the missing punch
+            const effectivePunchCount = autoFilledPunch ? filteredPunches.length + 1 : filteredPunches.length;
+            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && effectivePunchCount < expectedPunches) {
+                abnormal_dates_list.push(dateStr);
+            }
+            if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
+                abnormal_dates_list.push(dateStr);
+            }
 
             // Special abnormal dates
             const dateFormatted = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
