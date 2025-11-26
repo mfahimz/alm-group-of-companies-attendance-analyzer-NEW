@@ -1075,15 +1075,22 @@ export default function ReportTab({ project }) {
                                         <TableCell className="text-xs">{day.shift}</TableCell>
                                         <TableCell className="text-xs">{day.exception}</TableCell>
                                         <TableCell>
-                                            <span className={`
-                                                px-2 py-1 rounded text-xs font-medium
-                                                ${day.status.includes('Present') ? 'bg-green-100 text-green-700' : ''}
-                                                ${day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
-                                                ${day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
-                                                ${day.status.includes('Off') ? 'bg-slate-100 text-slate-700' : ''}
-                                            `}>
-                                                {day.status}
-                                            </span>
+                                            <div>
+                                                <span className={`
+                                                    px-2 py-1 rounded text-xs font-medium
+                                                    ${day.status.includes('Present') && !day.status.includes('Half') ? 'bg-green-100 text-green-700' : ''}
+                                                    ${day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
+                                                    ${day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
+                                                    ${day.status.includes('Off') ? 'bg-slate-100 text-slate-700' : ''}
+                                                `}>
+                                                    {day.status}
+                                                </span>
+                                                {day.partialDayReason && (
+                                                    <span className="text-amber-600 block text-[10px] mt-1">
+                                                        {day.partialDayReason}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-xs">
                                             {day.lateInfo !== '-' ? (
