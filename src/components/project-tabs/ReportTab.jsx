@@ -651,6 +651,7 @@ export default function ReportTab({ project }) {
 
             breakdown.push({
                 date: formatDate(dateStr),
+                dateStr,
                 punches: rawDayPunches.length,
                 punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
                 allPunchTimes: rawDayPunches.map(p => p.timestamp_raw).join(', '),
@@ -660,7 +661,9 @@ export default function ReportTab({ project }) {
                 abnormal: isAbnormal,
                 lateInfo: lateInfo || '-',
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
-                hasOverride: !!dayOverride
+                hasOverride: !!dayOverride,
+                autoFillSuggestion,
+                partialDayReason: partialDayResult.reason
             });
         }
 
