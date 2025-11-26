@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
-export default function EditDayRecordDialog({ open, onClose, dayRecord, project, attendanceId, analysisResult }) {
+export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult }) {
     const [formData, setFormData] = useState({
         type: 'MANUAL_PRESENT',
         details: '',
@@ -153,6 +153,7 @@ export default function EditDayRecordDialog({ open, onClose, dayRecord, project,
             await queryClient.invalidateQueries(['results', project.id]);
             await queryClient.refetchQueries(['results', project.id]);
             toast.success('Day record updated for this report');
+            if (onSave) onSave();
             onClose();
         },
         onError: () => {
