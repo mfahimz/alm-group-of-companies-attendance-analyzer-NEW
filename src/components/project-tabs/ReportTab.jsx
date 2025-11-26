@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Trash2, Edit } from 'lucide-react';
+import { Download, Search, Eye, Trash2, Edit, Filter, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditDayRecordDialog from './EditDayRecordDialog';
@@ -18,6 +20,13 @@ export default function ReportTab({ project }) {
     const [selectedReportRun, setSelectedReportRun] = useState(null);
     const [editingDay, setEditingDay] = useState(null);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [filters, setFilters] = useState({
+        dateFrom: '',
+        dateTo: '',
+        status: 'all',
+        abnormality: 'all'
+    });
+    const [showFilters, setShowFilters] = useState(false);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -150,10 +159,101 @@ export default function ReportTab({ project }) {
         };
     });
 
+    // Helper function to check if employee matches filter criteria based on daily breakdown
+    const matchesAdvancedFilters = (result) => {
+        // If no advanced filters are set, return true
+        if (!filters.dateFrom && !filters.dateTo && filters.status === 'all' && filters.abnormality === 'all') {
+            return true;
+        }
+
+        const employeePunches = punches.filter(p => 
+            p.attendance_id === result.attendance_id &&
+            p.punch_date >= project.date_from && 
+            p.punch_date <= project.date_to
+        );
+        const employeeShifts = shifts.filter(s => s.attendance_id === result.attendance_id);
+        const employeeExceptions = exceptions.filter(e => e.attendance_id === result.attendance_id || e.attendance_id === 'ALL');
+
+        let dayOverrides = {};
+        if (result.day_overrides) {
+            try {
+                dayOverrides = JSON.parse(result.day_overrides);
+            } catch (e) {}
+        }
+
+        const startDate = new Date(filters.dateFrom || project.date_from);
+        const endDate = new Date(filters.dateTo || project.date_to);
+
+        let hasMatchingDay = false;
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const currentDate = new Date(d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay();
+
+            if (dayOfWeek === 0) continue; // Skip Sundays
+
+            const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+            const dateException = employeeExceptions.find(ex => {
+                const exFrom = new Date(ex.date_from);
+                const exTo = new Date(ex.date_to);
+                return currentDate >= exFrom && currentDate <= exTo;
+            });
+
+            // Determine status
+            let status = 'Absent';
+            if (dateException) {
+                if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') status = 'Off';
+                else if (dateException.type === 'MANUAL_PRESENT') status = 'Present';
+                else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent';
+                else if (dateException.type === 'MANUAL_HALF') status = 'Half Day';
+                else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
+                else if (dateException.type === 'SICK_LEAVE') status = 'Present';
+            } else if (dayPunches.length > 0) {
+                status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+            }
+
+            // Check for day overrides
+            const dayOverride = dayOverrides[dateStr];
+            if (dayOverride) {
+                if (dayOverride.type === 'MANUAL_PRESENT') status = 'Present';
+                else if (dayOverride.type === 'MANUAL_ABSENT') status = 'Absent';
+                else if (dayOverride.type === 'MANUAL_HALF') status = 'Half Day';
+                else if (dayOverride.type === 'OFF') status = 'Off';
+            }
+
+            // Check abnormality
+            let isAbnormal = result.abnormal_dates?.includes(dateStr);
+            if (dayOverride?.isAbnormal !== undefined) {
+                isAbnormal = dayOverride.isAbnormal;
+            }
+
+            // Apply status filter
+            if (filters.status !== 'all') {
+                if (filters.status === 'present' && status !== 'Present') continue;
+                if (filters.status === 'absent' && status !== 'Absent') continue;
+                if (filters.status === 'half' && status !== 'Half Day') continue;
+                if (filters.status === 'off' && status !== 'Off') continue;
+            }
+
+            // Apply abnormality filter
+            if (filters.abnormality !== 'all') {
+                if (filters.abnormality === 'yes' && !isAbnormal) continue;
+                if (filters.abnormality === 'no' && isAbnormal) continue;
+            }
+
+            hasMatchingDay = true;
+            break;
+        }
+
+        return hasMatchingDay;
+    };
+
     const filteredResults = enrichedResults
         .filter(result =>
-            result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            result.name.toLowerCase().includes(searchTerm.toLowerCase())
+            (result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            result.name.toLowerCase().includes(searchTerm.toLowerCase())) &&
+            matchesAdvancedFilters(result)
         )
         .sort((a, b) => {
             let aVal = a[sort.key];
@@ -610,8 +710,8 @@ export default function ReportTab({ project }) {
 
             {/* Actions */}
             <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                <CardContent className="p-4 space-y-4">
+                    <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 max-w-md">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -623,14 +723,106 @@ export default function ReportTab({ project }) {
                                 />
                             </div>
                         </div>
-                        <Button
-                            onClick={exportToExcel}
-                            variant="outline"
-                        >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export to Excel
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={() => setShowFilters(!showFilters)}
+                                variant={showFilters ? "secondary" : "outline"}
+                                className="gap-2"
+                            >
+                                <Filter className="w-4 h-4" />
+                                Filters
+                                {(filters.dateFrom || filters.dateTo || filters.status !== 'all' || filters.abnormality !== 'all') && (
+                                    <span className="bg-indigo-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                        {[filters.dateFrom || filters.dateTo ? 1 : 0, filters.status !== 'all' ? 1 : 0, filters.abnormality !== 'all' ? 1 : 0].reduce((a, b) => a + b, 0)}
+                                    </span>
+                                )}
+                            </Button>
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Export to Excel
+                            </Button>
+                        </div>
                     </div>
+
+                    {/* Advanced Filters */}
+                    {showFilters && (
+                        <div className="border rounded-lg p-4 bg-slate-50 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="font-medium text-slate-900">Advanced Filters</h4>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setFilters({ dateFrom: '', dateTo: '', status: 'all', abnormality: 'all' })}
+                                    className="text-slate-500 hover:text-slate-700"
+                                >
+                                    <X className="w-4 h-4 mr-1" />
+                                    Clear All
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div>
+                                    <Label className="text-sm text-slate-600">Date From</Label>
+                                    <Input
+                                        type="date"
+                                        value={filters.dateFrom}
+                                        min={project.date_from}
+                                        max={project.date_to}
+                                        onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-sm text-slate-600">Date To</Label>
+                                    <Input
+                                        type="date"
+                                        value={filters.dateTo}
+                                        min={filters.dateFrom || project.date_from}
+                                        max={project.date_to}
+                                        onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-sm text-slate-600">Status</Label>
+                                    <Select
+                                        value={filters.status}
+                                        onValueChange={(value) => setFilters({ ...filters, status: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Statuses</SelectItem>
+                                            <SelectItem value="present">Present</SelectItem>
+                                            <SelectItem value="absent">Absent</SelectItem>
+                                            <SelectItem value="half">Half Day</SelectItem>
+                                            <SelectItem value="off">Off</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-sm text-slate-600">Abnormality</Label>
+                                    <Select
+                                        value={filters.abnormality}
+                                        onValueChange={(value) => setFilters({ ...filters, abnormality: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="yes">Abnormal Days</SelectItem>
+                                            <SelectItem value="no">Normal Days</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                Showing employees who have at least one day matching the selected criteria within the date range.
+                            </p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
