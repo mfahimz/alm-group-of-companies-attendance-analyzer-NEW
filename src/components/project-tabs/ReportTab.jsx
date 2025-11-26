@@ -1113,7 +1113,7 @@ export default function ReportTab({ project }) {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-xs">
-                                            {day.earlyCheckoutInfo !== '-' ? (
+                                            {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
                                                 <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
                                             ) : (
                                                 <span className="text-slate-400">-</span>
