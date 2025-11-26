@@ -245,10 +245,25 @@ export default function ReportTab({ project }) {
         }
     };
 
-    // Filter multiple punches within configured time windows to get the 4 key punches
-    const filterMultiplePunches = (punchList, shift) => {
-        // Always process to identify the 4 key punches, even with 4 or fewer
-        if (punchList.length <= 1) return punchList;
+    // Filter multiple punches within configured time windows to get the key punches
+            const filterMultiplePunches = (punchList, shift) => {
+                // Always process to identify the key punches
+                if (punchList.length <= 1) return punchList;
+
+                // For single shift employees, only keep first and last punch
+                if (shift?.is_single_shift) {
+                    const punchesWithTime = punchList.map(p => ({
+                        ...p,
+                        time: parseTime(p.timestamp_raw)
+                    })).filter(p => p.time).sort((a, b) => a.time - b.time);
+
+                    if (punchesWithTime.length <= 2) return punchList;
+
+                    // Return first and last punch only
+                    const firstPunch = punchesWithTime[0];
+                    const lastPunch = punchesWithTime[punchesWithTime.length - 1];
+                    return [firstPunch, lastPunch].map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
+                }
         
         // Get cluster window from rules, default to 10 minutes
         const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
@@ -481,14 +496,14 @@ export default function ReportTab({ project }) {
                 else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
                 else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
             } else if (dayPunches.length > 0) {
-                // Check if employee has SINGLE_SHIFT exception (applies to entire project)
-                const hasSingleShiftException = employeeExceptions.some(ex => ex.type === 'SINGLE_SHIFT');
-                // For single shift employees, 2 punches = Present, otherwise need 2+ for present
-                if (hasSingleShiftException) {
-                    status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
-                } else {
-                    status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
-                }
+                // Check if employee has single shift (from shift timing)
+                                    const isSingleShift = shift?.is_single_shift || false;
+                                    // For single shift employees, 2 punches = Present, otherwise need 2+ for present
+                                    if (isSingleShift) {
+                                        status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                                    } else {
+                                        status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                                    }
             }
 
             let isAbnormal = currentResult.abnormal_dates?.includes(dateStr);
