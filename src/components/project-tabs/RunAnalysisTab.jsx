@@ -112,6 +112,7 @@ export default function RunAnalysisTab({ project }) {
 
             await updateProjectMutation.mutateAsync('analyzed');
             queryClient.invalidateQueries(['results', project.id]);
+            queryClient.invalidateQueries(['reportRuns', project.id]);
             toast.success('Analysis completed successfully');
             setProgress({ current: uniqueEmployeeIds.length, total: uniqueEmployeeIds.length, status: 'Complete!' });
         } catch (error) {
