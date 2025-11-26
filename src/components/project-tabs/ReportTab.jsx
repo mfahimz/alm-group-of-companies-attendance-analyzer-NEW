@@ -1103,8 +1103,8 @@ export default function ReportTab({ project }) {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-xs">
-                                            {day.lateInfo !== '-' ? (
-                                                <span className="text-orange-600 font-medium">{day.lateInfo}</span>
+                                            {day.lateMinutesTotal > 0 ? (
+                                                <span className="text-orange-600 font-medium">{day.lateMinutesTotal} min</span>
                                             ) : (
                                                 <span className="text-slate-400">-</span>
                                             )}
