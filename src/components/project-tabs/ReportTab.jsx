@@ -407,8 +407,9 @@ export default function ReportTab({ project }) {
                         totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
                     }
                 }
-                // PM late
-                if (shift.pm_start && dayPunches.length >= 3) {
+                // PM late - ONLY if we have actual 4 punches (not when missing PM start)
+                const expectedPunches = isSingleShift ? 2 : 4;
+                if (shift.pm_start && dayPunches.length >= 4 && !isSingleShift) {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
                     const shiftStart = parseTime(shift.pm_start);
@@ -416,8 +417,7 @@ export default function ReportTab({ project }) {
                         totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
                     }
                 }
-                // Early checkout
-                const expectedPunches = isSingleShift ? 2 : 4;
+                // Early checkout - only for complete punch sets
                 if (shift.pm_end && dayPunches.length >= expectedPunches) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
