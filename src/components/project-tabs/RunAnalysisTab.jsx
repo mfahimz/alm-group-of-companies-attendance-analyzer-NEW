@@ -97,7 +97,8 @@ export default function RunAnalysisTab({ project }) {
                     late_minutes: result.late_minutes,
                     early_checkout_minutes: result.early_checkout_minutes,
                     abnormal_dates: result.abnormal_dates,
-                    notes: result.notes
+                    notes: result.notes,
+                    auto_resolutions: result.auto_resolutions
                 });
             }
 
