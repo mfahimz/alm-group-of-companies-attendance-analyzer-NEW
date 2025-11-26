@@ -251,6 +251,9 @@ export default function OverviewTab({ project }) {
                 </CardContent>
             </Card>
 
+            {/* AI Anomaly Detection */}
+            <AnomalyDetectionCard project={project} />
+
             {/* Actions */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
