@@ -222,8 +222,9 @@ export default function ReportTab({ project }) {
                 else if (dayOverride.type === 'OFF') status = 'Off';
             }
 
-            // Check abnormality
-            let isAbnormal = result.abnormal_dates?.includes(dateStr);
+            // Check abnormality - abnormal_dates is comma-separated string of YYYY-MM-DD dates
+            const abnormalDatesArray = (result.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
+            let isAbnormal = abnormalDatesArray.includes(dateStr);
             if (dayOverride?.isAbnormal !== undefined) {
                 isAbnormal = dayOverride.isAbnormal;
             }
