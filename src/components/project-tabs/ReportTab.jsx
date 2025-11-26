@@ -753,15 +753,20 @@ export default function ReportTab({ project }) {
                     }
                 }
                 // PM shift late check - ONLY if we have actual 4 punches (not when PM_START is auto-filled)
+                // Validate that the 3rd punch is actually around PM start time (within 2 hours)
                 if (shift.pm_start && dayPunches.length >= 4 && !pmStartAutoFilled && !isSingleShift) {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
                     const shiftStart = parseTime(shift.pm_start);
-                    if (punchTime && shiftStart && punchTime > shiftStart) {
-                        const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
-                        lateMinutesTotal += minutes;
-                        if (lateInfo) lateInfo += ' | ';
-                        lateInfo += `PM: ${minutes} min late`;
+                    if (punchTime && shiftStart) {
+                        const diffMinutes = Math.round((punchTime - shiftStart) / (1000 * 60));
+                        // Only count as PM late if punch is within reasonable range (not more than 120 min late)
+                        // This prevents false positives when punch filtering incorrectly identifies punches
+                        if (diffMinutes > 0 && diffMinutes <= 120) {
+                            lateMinutesTotal += diffMinutes;
+                            if (lateInfo) lateInfo += ' | ';
+                            lateInfo += `PM: ${diffMinutes} min late`;
+                        }
                     }
                 }
 
