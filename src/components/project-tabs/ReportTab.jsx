@@ -454,12 +454,15 @@ export default function ReportTab({ project }) {
             // Filter multiple punches to get the 4 key punches
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
 
-            // Calculate late minutes and early checkout
-            let lateInfo = '';
-            let earlyCheckoutInfo = '';
-            if (shift && dayPunches.length > 0) {
-                // AM shift late check
-                if (shift.am_start) {
+            // Check if employee has single shift
+                            const isSingleShift = shift?.is_single_shift || false;
+
+                            // Calculate late minutes and early checkout
+                            let lateInfo = '';
+                            let earlyCheckoutInfo = '';
+                            if (shift && dayPunches.length > 0) {
+                                // AM shift late check
+                                if (shift.am_start) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
                     const shiftStart = parseTime(shift.am_start);
@@ -495,22 +498,16 @@ export default function ReportTab({ project }) {
             }
 
             let status = 'Absent';
-            if (dateException) {
-                if (dateException.type === 'OFF') status = 'Off';
-                else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
-                else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
-                else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
-                else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
-            } else if (dayPunches.length > 0) {
-                // Check if employee has single shift (from shift timing)
-                                    const isSingleShift = shift?.is_single_shift || false;
-                                    // For single shift employees, 2 punches = Present, otherwise need 2+ for present
-                                    if (isSingleShift) {
-                                        status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
-                                    } else {
-                                        status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
-                                    }
-            }
+                            if (dateException) {
+                                if (dateException.type === 'OFF') status = 'Off';
+                                else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
+                                else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
+                                else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
+                                else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
+                            } else if (dayPunches.length > 0) {
+                                // For single shift employees, 2 punches = Present, otherwise need 2+ for present
+                                status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                            }
 
             let isAbnormal = currentResult.abnormal_dates?.includes(dateStr);
             
