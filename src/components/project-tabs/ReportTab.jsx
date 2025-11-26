@@ -779,6 +779,7 @@ export default function ReportTab({ project }) {
 
                 // Early checkout check - only for complete punch sets
                 const expectedPunches = isSingleShift ? 2 : 4;
+                // For single shift with 1 punch, don't calculate early checkout (incomplete data)
                 if (shift.pm_end && dayPunches.length >= expectedPunches) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
@@ -811,7 +812,7 @@ export default function ReportTab({ project }) {
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
-            // Also mark as abnormal if only 3 punches (missing punch scenario)
+            // Also mark as abnormal if punches don't match expected count
             const expectedPunchCount = isSingleShift ? 2 : 4;
             if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
                 isAbnormal = true;
