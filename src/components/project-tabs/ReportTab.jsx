@@ -815,7 +815,9 @@ export default function ReportTab({ project }) {
                 open={!!editingDay}
                 onClose={() => {
                     setEditingDay(null);
-                    // Invalidate queries to refresh data
+                }}
+                onSave={() => {
+                    // Invalidate queries to refresh data immediately
                     queryClient.invalidateQueries(['results', project.id]);
                 }}
                 dayRecord={editingDay}
