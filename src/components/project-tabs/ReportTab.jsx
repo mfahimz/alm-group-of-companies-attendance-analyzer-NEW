@@ -59,10 +59,18 @@ export default function ReportTab({ project }) {
         queryFn: () => base44.entities.AnalysisResult.filter({ project_id: project.id })
     });
 
-    // Set the most recent report run as default
+    // Set the most recent report run as default, and update when new reports are added
     React.useEffect(() => {
-        if (reportRuns.length > 0 && !selectedReportRun) {
-            setSelectedReportRun(reportRuns[0].id);
+        if (reportRuns.length > 0) {
+            // Always select the most recent report (first in list since sorted by -created_date)
+            const mostRecentId = reportRuns[0].id;
+            // If current selection doesn't exist in the list (deleted) or no selection yet, update
+            const currentExists = reportRuns.some(r => r.id === selectedReportRun);
+            if (!selectedReportRun || !currentExists) {
+                setSelectedReportRun(mostRecentId);
+            }
+        } else {
+            setSelectedReportRun(null);
         }
     }, [reportRuns]);
 
