@@ -236,6 +236,9 @@ export default function RunAnalysisTab({ project }) {
 
             // Filter multiple punches before analysis
             const filteredPunches = filterMultiplePunches(dayPunches, shift);
+            
+            // Check if employee has single shift (from shift timing)
+            const isSingleShift = shift?.is_single_shift || false;
 
             // Presence rule
             if (filteredPunches.length > 0) {
@@ -255,8 +258,8 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
 
-                    // PM shift late check (third punch - PM check-in)
-                    if (shift.pm_start && filteredPunches.length >= 3) {
+                    // PM shift late check (third punch - PM check-in) - skip for single shift
+                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 3) {
                         const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
@@ -278,9 +281,6 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
                 }
-
-                // Check if employee has single shift (from shift timing)
-                const isSingleShift = shift?.is_single_shift || false;
                 
                 // Half day detection (simple rule: less than 2 punches)
                 // Skip half day detection if employee has single shift (expects only 2 punches)
@@ -295,8 +295,8 @@ export default function RunAnalysisTab({ project }) {
             }
 
             // Abnormality detection (use filtered punches)
-                            // For single shift employees, expected punches is 2, otherwise 4
-                            const expectedPunches = isSingleShift ? 2 : 4;
+            // For single shift employees, expected punches is 2, otherwise 4
+            const expectedPunches = isSingleShift ? 2 : 4;
                             if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
                                 abnormal_dates_list.push(dateStr);
                             }
