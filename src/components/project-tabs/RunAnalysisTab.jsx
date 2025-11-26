@@ -126,6 +126,94 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
+    // Detect which punch is missing and auto-fill it (Conservative mode)
+    const detectAndAutoFillMissingPunch = (dayPunches, shift) => {
+        if (!shift || dayPunches.length !== 3) return { punches: dayPunches, autoFilled: null };
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length !== 3) return { punches: dayPunches, autoFilled: null };
+        
+        const amStart = parseTime(shift.am_start);
+        const amEnd = parseTime(shift.am_end);
+        const pmStart = parseTime(shift.pm_start);
+        const pmEnd = parseTime(shift.pm_end);
+        
+        if (!amStart || !amEnd || !pmStart || !pmEnd) return { punches: dayPunches, autoFilled: null };
+        
+        const [p1, p2, p3] = punchesWithTime;
+        
+        // Calculate time differences to each expected punch time
+        const p1ToAmStart = Math.abs(p1.time - amStart) / (1000 * 60);
+        const p1ToAmEnd = Math.abs(p1.time - amEnd) / (1000 * 60);
+        const p2ToAmEnd = Math.abs(p2.time - amEnd) / (1000 * 60);
+        const p2ToPmStart = Math.abs(p2.time - pmStart) / (1000 * 60);
+        const p3ToPmStart = Math.abs(p3.time - pmStart) / (1000 * 60);
+        const p3ToPmEnd = Math.abs(p3.time - pmEnd) / (1000 * 60);
+        
+        // Threshold for "close enough" to a shift time (30 minutes)
+        const threshold = 30;
+        
+        let autoFilled = null;
+        let autoFilledPunches = [...dayPunches];
+        
+        // Case 1: Missing AM Start (p1 is close to AM End)
+        if (p1ToAmEnd < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
+            autoFilled = { type: 'AM_START', time: shift.am_start };
+        }
+        // Case 2: Missing AM End (p1 close to AM Start, p2 close to PM Start)
+        else if (p1ToAmStart < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
+            autoFilled = { type: 'AM_END', time: shift.am_end };
+        }
+        // Case 3: Missing PM Start (p1 AM Start, p2 AM End, p3 PM End)
+        else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmEnd < threshold) {
+            autoFilled = { type: 'PM_START', time: shift.pm_start };
+        }
+        // Case 4: Missing PM End (most common - p1 AM Start, p2 AM End, p3 PM Start)
+        else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmStart < threshold) {
+            autoFilled = { type: 'PM_END', time: shift.pm_end };
+        }
+        
+        return { punches: autoFilledPunches, autoFilled };
+    };
+
+    // Detect partial day (employee came but left early - worked less than half the expected hours)
+    const detectPartialDay = (dayPunches, shift) => {
+        if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
+        
+        const firstPunch = punchesWithTime[0].time;
+        const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
+        
+        const amStart = parseTime(shift.am_start);
+        const pmEnd = parseTime(shift.pm_end);
+        
+        if (!amStart || !pmEnd) return { isPartial: false, reason: null };
+        
+        // Calculate expected work hours and actual work hours
+        const expectedMinutes = (pmEnd - amStart) / (1000 * 60);
+        const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
+        
+        // If worked less than 50% of expected time, it's a partial/half day
+        if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
+            return { 
+                isPartial: true, 
+                reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)` 
+            };
+        }
+        
+        return { isPartial: false, reason: null };
+    };
+
     const analyzeEmployee = async (attendance_id) => {
         const employeePunches = punches.filter(p => 
             p.attendance_id === attendance_id && 
@@ -142,6 +230,7 @@ export default function RunAnalysisTab({ project }) {
         let late_minutes = 0;
         let early_checkout_minutes = 0;
         const abnormal_dates_list = [];
+        const auto_resolutions = [];
 
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
