@@ -556,12 +556,22 @@ export default function ReportTab({ project }) {
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
 
             // Check if employee has single shift
-                            const isSingleShift = shift?.is_single_shift || false;
+            const isSingleShift = shift?.is_single_shift || false;
+            
+            // Detect partial day
+            const partialDayResult = detectPartialDay(dayPunches, shift);
+            
+            // Detect and show auto-fill suggestion for 3 punches
+            let autoFillSuggestion = null;
+            if (!isSingleShift && dayPunches.length === 3 && shift) {
+                const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
+                autoFillSuggestion = autoFillResult.autoFilled;
+            }
 
-                            // Calculate late minutes and early checkout
-                            let lateInfo = '';
-                            let earlyCheckoutInfo = '';
-                            if (shift && dayPunches.length > 0) {
+            // Calculate late minutes and early checkout
+            let lateInfo = '';
+            let earlyCheckoutInfo = '';
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
                                 // AM shift late check
                                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
