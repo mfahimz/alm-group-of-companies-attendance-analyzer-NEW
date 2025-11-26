@@ -11,6 +11,7 @@ import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
 import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import RunAnalysisTab from '../components/project-tabs/RunAnalysisTab';
 import ReportTab from '../components/project-tabs/ReportTab';
+import AIAnalysisTab from '../components/project-tabs/AIAnalysisTab';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function ProjectDetail() {
@@ -76,6 +77,9 @@ export default function ProjectDetail() {
                     <TabsTrigger value="exceptions" className="text-xs sm:text-sm">Exceptions</TabsTrigger>
                     <TabsTrigger value="analysis" className="text-xs sm:text-sm">Analysis</TabsTrigger>
                     <TabsTrigger value="report" className="text-xs sm:text-sm">Report</TabsTrigger>
+                    <TabsTrigger value="ai" className="text-xs sm:text-sm flex items-center gap-1">
+                        <span className="hidden sm:inline">✨</span> AI Insights
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview">
@@ -100,6 +104,10 @@ export default function ProjectDetail() {
 
                 <TabsContent value="report">
                     <ReportTab project={project} />
+                </TabsContent>
+
+                <TabsContent value="ai">
+                    <AIAnalysisTab project={project} />
                 </TabsContent>
             </Tabs>
         </div>
