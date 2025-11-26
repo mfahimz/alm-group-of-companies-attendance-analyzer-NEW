@@ -68,18 +68,8 @@ export default function RunAnalysisTab({ project }) {
 
         try {
             const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-            
-            // Delete previous results for this project
-            setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Cleaning up old results...' });
-            const oldResults = await base44.entities.AnalysisResult.filter({ project_id: project.id });
-            const deleteBatchSize = 10;
-            for (let i = 0; i < oldResults.length; i += deleteBatchSize) {
-                const batch = oldResults.slice(i, i + deleteBatchSize);
-                await Promise.all(batch.map(r => base44.entities.AnalysisResult.delete(r.id)));
-                await delay(500);
-            }
 
-            // Create a new report run
+            // Create a new report run (keeping old reports intact)
             const reportRun = await base44.entities.ReportRun.create({
                 project_id: project.id,
                 employee_count: uniqueEmployeeIds.length
