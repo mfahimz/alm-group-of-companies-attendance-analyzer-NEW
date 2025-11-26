@@ -665,15 +665,17 @@ export default function ReportTab({ project }) {
 
             // Calculate late minutes and early checkout
             let lateInfo = '';
+            let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
             if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
-                                // AM shift late check
-                                if (shift.am_start) {
+                // AM shift late check
+                if (shift.am_start) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
                     const shiftStart = parseTime(shift.am_start);
                     if (punchTime && shiftStart && punchTime > shiftStart) {
                         const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
+                        lateMinutesTotal += minutes;
                         lateInfo += `AM: ${minutes} min late`;
                     }
                 }
@@ -684,23 +686,23 @@ export default function ReportTab({ project }) {
                     const shiftStart = parseTime(shift.pm_start);
                     if (punchTime && shiftStart && punchTime > shiftStart) {
                         const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
+                        lateMinutesTotal += minutes;
                         if (lateInfo) lateInfo += ' | ';
                         lateInfo += `PM: ${minutes} min late`;
                     }
                 }
 
-                // Early checkout check - PM only (last punch before PM shift end)
-                                    // Only calculate early checkout if employee has all expected punches
-                                    const expectedPunches = isSingleShift ? 2 : 4;
-                                    if (shift.pm_end && dayPunches.length >= expectedPunches) {
-                                        const lastPunch = dayPunches[dayPunches.length - 1];
-                                        const punchTime = parseTime(lastPunch.timestamp_raw);
-                                        const shiftEnd = parseTime(shift.pm_end);
-                                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                                            const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
-                                            earlyCheckoutInfo = `PM: ${minutes} min early`;
-                                        }
-                                    }
+                // Early checkout check
+                const expectedPunches = isSingleShift ? 2 : 4;
+                if (shift.pm_end && dayPunches.length >= expectedPunches) {
+                    const lastPunch = dayPunches[dayPunches.length - 1];
+                    const punchTime = parseTime(lastPunch.timestamp_raw);
+                    const shiftEnd = parseTime(shift.pm_end);
+                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                        const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
+                        earlyCheckoutInfo = `${minutes} min`;
+                    }
+                }
             }
 
             let status = 'Absent';
