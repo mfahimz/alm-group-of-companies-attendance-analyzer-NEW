@@ -209,6 +209,10 @@ export default function RunAnalysisTab({ project }) {
                 if (dayOfWeek === 5) { // Friday
                     // Look for general Friday shift (not date-specific)
                     shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
+                    // Fallback to regular shift if no Friday-specific shift exists
+                    if (!shift) {
+                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                    }
                 } else {
                     // Look for regular working day shift (not Friday, not date-specific)
                     shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
