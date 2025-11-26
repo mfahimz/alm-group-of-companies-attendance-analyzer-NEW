@@ -275,6 +275,7 @@ export default function RunAnalysisTab({ project }) {
                 } else if (dateException.type === 'SICK_LEAVE') {
                     // Sick leave counts as present but tracked separately
                     present_days++;
+                    sick_leave_count++;
                     continue;
                 } else if (dateException.type === 'MANUAL_EARLY_CHECKOUT') {
                     // Add manual early checkout minutes
