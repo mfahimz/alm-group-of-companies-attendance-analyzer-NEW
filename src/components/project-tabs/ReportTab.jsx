@@ -610,7 +610,9 @@ export default function ReportTab({ project }) {
                                 status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
                             }
 
-            let isAbnormal = currentResult.abnormal_dates?.includes(dateStr);
+            // Check abnormality - abnormal_dates is comma-separated string of YYYY-MM-DD dates
+            const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
+            let isAbnormal = abnormalDatesArray.includes(dateStr);
             
             // Check for day-specific overrides in this report
             const dayOverride = dayOverrides[dateStr];
