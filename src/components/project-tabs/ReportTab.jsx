@@ -481,15 +481,17 @@ export default function ReportTab({ project }) {
                 }
 
                 // Early checkout check - PM only (last punch before PM shift end)
-                if (shift.pm_end && dayPunches.length >= 1) {
-                    const lastPunch = dayPunches[dayPunches.length - 1];
-                    const punchTime = parseTime(lastPunch.timestamp_raw);
-                    const shiftEnd = parseTime(shift.pm_end);
-                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                        const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
-                        earlyCheckoutInfo = `PM: ${minutes} min early`;
-                    }
-                }
+                                    // Only calculate early checkout if employee has all expected punches
+                                    const expectedPunches = isSingleShift ? 2 : 4;
+                                    if (shift.pm_end && dayPunches.length >= expectedPunches) {
+                                        const lastPunch = dayPunches[dayPunches.length - 1];
+                                        const punchTime = parseTime(lastPunch.timestamp_raw);
+                                        const shiftEnd = parseTime(shift.pm_end);
+                                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                                            const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
+                                            earlyCheckoutInfo = `PM: ${minutes} min early`;
+                                        }
+                                    }
             }
 
             let status = 'Absent';

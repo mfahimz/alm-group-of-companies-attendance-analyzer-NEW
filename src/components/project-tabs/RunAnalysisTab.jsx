@@ -275,15 +275,17 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // Early checkout check - PM only (last punch before PM shift end)
-                    if (shift.pm_end && filteredPunches.length >= 1) {
-                        const lastPunch = filteredPunches[filteredPunches.length - 1];
-                        const punchTime = parseTime(lastPunch.timestamp_raw);
-                        const shiftEnd = parseTime(shift.pm_end);
+                                            // Only calculate early checkout if employee has all expected punches
+                                            const expectedPunches = isSingleShift ? 2 : 4;
+                                            if (shift.pm_end && filteredPunches.length >= expectedPunches) {
+                                                const lastPunch = filteredPunches[filteredPunches.length - 1];
+                                                const punchTime = parseTime(lastPunch.timestamp_raw);
+                                                const shiftEnd = parseTime(shift.pm_end);
 
-                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                            early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
-                        }
-                    }
+                                                if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                                                    early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                                                }
+                                            }
                 }
                 
                 // Half day detection (simple rule: less than 2 punches)
