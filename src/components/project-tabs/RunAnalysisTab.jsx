@@ -319,14 +319,40 @@ export default function RunAnalysisTab({ project }) {
                 });
 
             // Filter multiple punches before analysis
-            const filteredPunches = filterMultiplePunches(dayPunches, shift);
+            let filteredPunches = filterMultiplePunches(dayPunches, shift);
             
             // Check if employee has single shift (from shift timing)
             const isSingleShift = shift?.is_single_shift || false;
+            
+            // Auto-fill missing punch (Conservative mode - only for regular shifts with exactly 3 punches)
+            let autoFilledPunch = null;
+            if (!isSingleShift && filteredPunches.length === 3 && shift) {
+                const autoFillResult = detectAndAutoFillMissingPunch(filteredPunches, shift);
+                autoFilledPunch = autoFillResult.autoFilled;
+                if (autoFilledPunch) {
+                    auto_resolutions.push({
+                        date: dateStr,
+                        type: 'MISSING_PUNCH_AUTO_FILL',
+                        details: `Auto-filled ${autoFilledPunch.type.replace('_', ' ')} with ${autoFilledPunch.time}`
+                    });
+                }
+            }
 
             // Presence rule
             if (filteredPunches.length > 0) {
-                present_days++;
+                // Detect partial day (worked but left early)
+                const partialDayResult = detectPartialDay(filteredPunches, shift);
+                if (partialDayResult.isPartial) {
+                    present_days++;
+                    half_absence_count++;
+                    auto_resolutions.push({
+                        date: dateStr,
+                        type: 'PARTIAL_DAY_DETECTED',
+                        details: partialDayResult.reason
+                    });
+                } else {
+                    present_days++;
+                }
 
                 // Calculate late minutes for both AM and PM shifts
                 if (shift) {
