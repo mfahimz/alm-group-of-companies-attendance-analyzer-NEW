@@ -811,6 +811,12 @@ export default function ReportTab({ project }) {
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
+            // Also mark as abnormal if only 3 punches (missing punch scenario)
+            const expectedPunchCount = isSingleShift ? 2 : 4;
+            if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
+                isAbnormal = true;
+            }
+            
             // Check for day-specific overrides in this report
             const dayOverride = dayOverrides[dateStr];
             if (dayOverride) {
