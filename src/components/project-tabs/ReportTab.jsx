@@ -397,8 +397,12 @@ export default function ReportTab({ project }) {
             }
 
             // Calculate late and early checkout for non-overridden days
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
-                // AM late
+            // Only calculate if we have complete punch data
+            const expectedPunches = isSingleShift ? 2 : 4;
+            const hasCompletePunches = dayPunches.length >= expectedPunches;
+            
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && hasCompletePunches) {
+                // AM late - only for complete punch sets
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
@@ -407,8 +411,7 @@ export default function ReportTab({ project }) {
                         totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
                     }
                 }
-                // PM late - ONLY if we have actual 4 punches (not when missing PM start)
-                const expectedPunches = isSingleShift ? 2 : 4;
+                // PM late - ONLY if we have actual 4 punches (not single shift)
                 if (shift.pm_start && dayPunches.length >= 4 && !isSingleShift) {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
@@ -418,7 +421,7 @@ export default function ReportTab({ project }) {
                     }
                 }
                 // Early checkout - only for complete punch sets
-                if (shift.pm_end && dayPunches.length >= expectedPunches) {
+                if (shift.pm_end) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
@@ -752,8 +755,12 @@ export default function ReportTab({ project }) {
             // Determine if PM_START was auto-filled (meaning 3rd punch is actually PM checkout, not PM check-in)
             const pmStartAutoFilled = autoFillSuggestion?.type === 'PM_START';
             
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
-                // AM shift late check
+            // Only calculate late/early checkout if we have complete punch data
+            const expectedPunches = isSingleShift ? 2 : 4;
+            const hasCompletePunches = dayPunches.length >= expectedPunches;
+            
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && hasCompletePunches) {
+                // AM shift late check - only for complete punch sets
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
@@ -765,7 +772,7 @@ export default function ReportTab({ project }) {
                     }
                 }
                 // PM shift late check - ONLY if we have actual 4 punches (not when PM_START is auto-filled)
-                if (shift.pm_start && dayPunches.length >= 4 && !pmStartAutoFilled) {
+                if (shift.pm_start && dayPunches.length >= 4 && !pmStartAutoFilled && !isSingleShift) {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
                     const shiftStart = parseTime(shift.pm_start);
@@ -778,9 +785,7 @@ export default function ReportTab({ project }) {
                 }
 
                 // Early checkout check - only for complete punch sets
-                const expectedPunches = isSingleShift ? 2 : 4;
-                // For single shift with 1 punch, don't calculate early checkout (incomplete data)
-                if (shift.pm_end && dayPunches.length >= expectedPunches) {
+                if (shift.pm_end) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
