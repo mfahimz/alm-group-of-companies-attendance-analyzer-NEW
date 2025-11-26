@@ -94,6 +94,7 @@ export default function RunAnalysisTab({ project }) {
                     present_days: result.present_days,
                     full_absence_count: result.full_absence_count,
                     half_absence_count: result.half_absence_count,
+                    sick_leave_count: result.sick_leave_count,
                     late_minutes: result.late_minutes,
                     early_checkout_minutes: result.early_checkout_minutes,
                     abnormal_dates: result.abnormal_dates,
@@ -228,6 +229,7 @@ export default function RunAnalysisTab({ project }) {
         let present_days = 0;
         let full_absence_count = 0;
         let half_absence_count = 0;
+        let sick_leave_count = 0;
         let late_minutes = 0;
         let early_checkout_minutes = 0;
         const abnormal_dates_list = [];
@@ -450,6 +452,7 @@ export default function RunAnalysisTab({ project }) {
             present_days,
             full_absence_count,
             half_absence_count,
+            sick_leave_count,
             late_minutes,
             early_checkout_minutes,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),

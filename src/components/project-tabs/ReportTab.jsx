@@ -564,13 +564,14 @@ export default function ReportTab({ project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'Full Absences', 'Late Minutes', 'Early Checkout Minutes', 'Notes'];
+        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'Full Absences', 'Sick Leave', 'Late Minutes', 'Early Checkout Minutes', 'Notes'];
         const rows = filteredResults.map(r => [
             r.attendance_id,
             r.name,
             r.working_days,
             r.present_days,
             r.full_absence_count,
+            r.sick_leave_count || 0,
             r.late_minutes,
             r.early_checkout_minutes || 0,
             r.notes || ''
@@ -1082,11 +1083,14 @@ export default function ReportTab({ project }) {
                                             Present Days
                                         </SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort}>
-                                            Full Absences
-                                        </SortableTableHead>
-                                        <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort}>
-                                            Late Minutes
-                                        </SortableTableHead>
+                                                Full Absences
+                                            </SortableTableHead>
+                                            <SortableTableHead sortKey="sick_leave_count" currentSort={sort} onSort={setSort}>
+                                                Sick Leave
+                                            </SortableTableHead>
+                                            <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort}>
+                                                Late Minutes
+                                            </SortableTableHead>
                                         <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
                                             Early Checkout Minutes
                                         </SortableTableHead>
@@ -1104,6 +1108,11 @@ export default function ReportTab({ project }) {
                                             <TableCell>
                                                 <span className={`${result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}`}>
                                                     {result.full_absence_count}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`${result.sick_leave_count > 0 ? 'text-purple-600 font-medium' : ''}`}>
+                                                    {result.sick_leave_count || 0}
                                                 </span>
                                             </TableCell>
                                             <TableCell>
