@@ -1067,15 +1067,10 @@ export default function ReportTab({ project }) {
                                         <TableCell>{day.punches}</TableCell>
                                         <TableCell className="text-xs max-w-xs">
                                             <div title={day.allPunchTimes || day.punchTimes}>
-                                                {day.punchTimes || '-'}
-                                                {day.allPunchTimes && day.allPunchTimes !== day.punchTimes && (
-                                                    <span className="text-slate-400 block text-[10px]">
-                                                        (filtered from {day.punches} punches)
-                                                    </span>
-                                                )}
+                                                {day.punchTimesShort || '-'}
                                                 {day.autoFillSuggestion && (
                                                     <span className="text-indigo-600 block text-[10px]">
-                                                        🔧 Auto-filled: {day.autoFillSuggestion.type.replace(/_/g, ' ')} → {day.autoFillSuggestion.time}
+                                                        🔧 +{day.autoFillSuggestion.time}
                                                     </span>
                                                 )}
                                             </div>
