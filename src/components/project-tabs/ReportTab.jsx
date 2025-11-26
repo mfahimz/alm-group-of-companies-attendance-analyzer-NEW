@@ -895,8 +895,15 @@ export default function ReportTab({ project }) {
                                                     {result.early_checkout_minutes || 0}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="text-xs text-slate-600 max-w-xs truncate">
-                                                {result.notes || '-'}
+                                            <TableCell className="text-xs text-slate-600 max-w-xs">
+                                                <div className="truncate" title={result.notes || '-'}>
+                                                    {result.notes || '-'}
+                                                </div>
+                                                {result.auto_resolutions && (
+                                                    <div className="text-indigo-600 text-[10px] mt-1 truncate" title={result.auto_resolutions}>
+                                                        🔧 Auto-resolved
+                                                    </div>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <Button
