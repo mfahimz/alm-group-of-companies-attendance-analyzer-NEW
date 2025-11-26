@@ -736,6 +736,7 @@ export default function ReportTab({ project }) {
                 else if (dayOverride.type === 'OFF') status = 'Off (Edited)';
                 
                 if (dayOverride.lateMinutes !== undefined) {
+                    lateMinutesTotal = dayOverride.lateMinutes;
                     lateInfo = dayOverride.lateMinutes > 0 ? `${dayOverride.lateMinutes} min (edited)` : '-';
                 }
                 if (dayOverride.earlyCheckoutMinutes !== undefined) {
