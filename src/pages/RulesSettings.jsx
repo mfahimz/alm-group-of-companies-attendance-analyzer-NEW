@@ -11,6 +11,7 @@ import { Save, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 const DEFAULT_RULES = {
     date_rules: {
@@ -147,6 +148,10 @@ export default function RulesSettings() {
 
     return (
         <div className="space-y-6">
+            <Breadcrumb items={[
+                { label: 'Settings' },
+                { label: 'Rules Settings' }
+            ]} />
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Rules Settings</h1>

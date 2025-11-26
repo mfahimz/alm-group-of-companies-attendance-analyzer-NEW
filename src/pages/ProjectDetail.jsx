@@ -11,6 +11,7 @@ import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
 import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import RunAnalysisTab from '../components/project-tabs/RunAnalysisTab';
 import ReportTab from '../components/project-tabs/ReportTab';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function ProjectDetail() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -44,31 +45,26 @@ export default function ProjectDetail() {
 
     return (
         <div className="space-y-6">
+            <Breadcrumb items={[
+                { label: 'Projects', href: 'Projects' },
+                { label: project.name }
+            ]} />
             {/* Header */}
-            <div>
-                <Link 
-                    to={createPageUrl('Projects')}
-                    className="inline-flex items-center text-slate-600 hover:text-slate-900 mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Projects
-                </Link>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{project.name}</h1>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{project.name}</h1>
                         <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">
-                            {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
-                        </p>
-                    </div>
-                    <span className={`
-                        px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium w-fit
-                        ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
-                        ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
-                        ${project.status === 'locked' ? 'bg-slate-100 text-slate-700' : ''}
-                    `}>
-                        {project.status}
-                    </span>
+                        {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
+                    </p>
                 </div>
+                <span className={`
+                    px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium w-fit
+                    ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
+                    ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
+                    ${project.status === 'locked' ? 'bg-slate-100 text-slate-700' : ''}
+                `}>
+                    {project.status}
+                </span>
             </div>
 
             {/* Tabs */}

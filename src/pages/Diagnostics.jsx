@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function Diagnostics() {
     const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -309,6 +310,10 @@ export default function Diagnostics() {
 
     return (
         <div className="space-y-8">
+            <Breadcrumb items={[
+                { label: 'Settings', href: 'RulesSettings' },
+                { label: 'Diagnostics' }
+            ]} />
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">System Diagnostics</h1>
                 <p className="text-slate-600 mt-2">Overview of system health and data statistics</p>

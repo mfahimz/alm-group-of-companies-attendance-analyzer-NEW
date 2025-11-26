@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function Employees() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -279,6 +280,7 @@ export default function Employees() {
 
     return (
         <div className="space-y-6">
+            <Breadcrumb items={[{ label: 'Employees' }]} />
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">Employees</h1>

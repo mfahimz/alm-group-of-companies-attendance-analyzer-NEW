@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FolderKanban, Users, AlertCircle, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function Dashboard() {
     const { data: projects = [] } = useQuery({
@@ -52,6 +53,7 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8">
+            <Breadcrumb items={[{ label: 'Dashboard' }]} />
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Dashboard</h1>
                 <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Overview of attendance analysis system</p>

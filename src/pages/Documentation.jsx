@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Book, Users, FolderKanban, Settings, BarChart3, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function Documentation() {
     const [expandedSection, setExpandedSection] = useState('overview');
@@ -43,6 +44,10 @@ export default function Documentation() {
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
+            <Breadcrumb items={[
+                { label: 'Settings', href: 'RulesSettings' },
+                { label: 'Documentation' }
+            ]} />
             <div className="text-center mb-8">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl mb-4">
                     <Book className="w-8 h-8 text-indigo-600" />

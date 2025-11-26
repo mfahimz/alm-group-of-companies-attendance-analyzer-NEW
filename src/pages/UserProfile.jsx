@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User as UserIcon, Mail, Shield, Calendar } from 'lucide-react';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function UserProfile() {
     const { data: user, isLoading } = useQuery({
@@ -20,6 +21,7 @@ export default function UserProfile() {
 
     return (
         <div className="space-y-6">
+            <Breadcrumb items={[{ label: 'My Profile' }]} />
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
                 <p className="text-slate-600 mt-2">View your account information</p>

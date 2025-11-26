@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
 import { toast } from 'sonner';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function Projects() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -149,6 +150,7 @@ export default function Projects() {
 
     return (
         <div className="space-y-6">
+            <Breadcrumb items={[{ label: 'Projects' }]} />
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Projects</h1>

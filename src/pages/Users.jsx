@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import UserDialog from '../components/users/UserDialog';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 const DEFAULT_PAGES = [
     { page_name: 'Dashboard', description: 'Main dashboard and overview', allowed_roles: 'admin,user' },
@@ -175,6 +176,10 @@ export default function Users() {
 
     return (
         <div className="space-y-6">
+            <Breadcrumb items={[
+                { label: 'Settings', href: 'RulesSettings' },
+                { label: 'Users & Permissions' }
+            ]} />
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">User Management</h1>
                 <p className="text-slate-600 mt-2">Manage system users, roles, and page permissions</p>
