@@ -10,6 +10,7 @@ import { Lock, Copy, Trash2, Calendar, Users, AlertCircle, FileText, Pencil } fr
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
+import AnomalyDetectionCard from './AnomalyDetectionCard';
 
 export default function OverviewTab({ project }) {
     const queryClient = useQueryClient();
