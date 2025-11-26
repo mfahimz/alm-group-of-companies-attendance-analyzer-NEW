@@ -369,8 +369,9 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
 
-                    // PM shift late check (third punch - PM check-in) - skip for single shift
-                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 3) {
+                    // PM shift late check (third punch - PM check-in) - ONLY if we have actual 4 punches
+                    // When there are only 3 punches, the 3rd punch could be PM checkout (not PM check-in)
+                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 4) {
                         const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
