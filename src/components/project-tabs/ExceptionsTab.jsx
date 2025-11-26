@@ -346,7 +346,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             return 0;
         });
 
-    const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE' || formData.type === 'SINGLE_SHIFT';
+    const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
 
     return (
@@ -431,64 +431,41 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
 
                             {needsShiftOverride && (
                                 <div>
-                                    <Label className="mb-2 block">
-                                        {formData.type === 'SINGLE_SHIFT' ? 'Single Shift Times (Punch In / Punch Out)' : 'Override Shift Times'}
-                                    </Label>
-                                    {formData.type === 'SINGLE_SHIFT' ? (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <Label className="text-xs">Punch In (Start)</Label>
-                                                <Input
-                                                    placeholder="08:00 AM"
-                                                    value={formData.new_am_start}
-                                                    onChange={(e) => setFormData({ ...formData, new_am_start: e.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs">Punch Out (End)</Label>
-                                                <Input
-                                                    placeholder="05:00 PM"
-                                                    value={formData.new_pm_end}
-                                                    onChange={(e) => setFormData({ ...formData, new_pm_end: e.target.value })}
-                                                />
-                                            </div>
+                                    <Label className="mb-2 block">Override Shift Times</Label>
+                                    <div className="grid grid-cols-4 gap-4">
+                                        <div>
+                                            <Label className="text-xs">AM Start</Label>
+                                            <Input
+                                                placeholder="08:00 AM"
+                                                value={formData.new_am_start}
+                                                onChange={(e) => setFormData({ ...formData, new_am_start: e.target.value })}
+                                            />
                                         </div>
-                                    ) : (
-                                        <div className="grid grid-cols-4 gap-4">
-                                            <div>
-                                                <Label className="text-xs">AM Start</Label>
-                                                <Input
-                                                    placeholder="08:00 AM"
-                                                    value={formData.new_am_start}
-                                                    onChange={(e) => setFormData({ ...formData, new_am_start: e.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs">AM End</Label>
-                                                <Input
-                                                    placeholder="12:00 PM"
-                                                    value={formData.new_am_end}
-                                                    onChange={(e) => setFormData({ ...formData, new_am_end: e.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs">PM Start</Label>
-                                                <Input
-                                                    placeholder="01:00 PM"
-                                                    value={formData.new_pm_start}
-                                                    onChange={(e) => setFormData({ ...formData, new_pm_start: e.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs">PM End</Label>
-                                                <Input
-                                                    placeholder="05:00 PM"
-                                                    value={formData.new_pm_end}
-                                                    onChange={(e) => setFormData({ ...formData, new_pm_end: e.target.value })}
-                                                />
-                                            </div>
+                                        <div>
+                                            <Label className="text-xs">AM End</Label>
+                                            <Input
+                                                placeholder="12:00 PM"
+                                                value={formData.new_am_end}
+                                                onChange={(e) => setFormData({ ...formData, new_am_end: e.target.value })}
+                                            />
                                         </div>
-                                    )}
+                                        <div>
+                                            <Label className="text-xs">PM Start</Label>
+                                            <Input
+                                                placeholder="01:00 PM"
+                                                value={formData.new_pm_start}
+                                                onChange={(e) => setFormData({ ...formData, new_pm_start: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">PM End</Label>
+                                            <Input
+                                                placeholder="05:00 PM"
+                                                value={formData.new_pm_end}
+                                                onChange={(e) => setFormData({ ...formData, new_pm_end: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
