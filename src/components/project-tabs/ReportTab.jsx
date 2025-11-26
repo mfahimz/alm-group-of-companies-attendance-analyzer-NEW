@@ -609,16 +609,21 @@ export default function ReportTab({ project }) {
             }
 
             let status = 'Absent';
-                            if (dateException) {
-                                if (dateException.type === 'OFF') status = 'Off';
-                                else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
-                                else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
-                                else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
-                                else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
-                            } else if (dayPunches.length > 0) {
-                                // For single shift employees, 2 punches = Present, otherwise need 2+ for present
-                                status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
-                            }
+            if (dateException) {
+                if (dateException.type === 'OFF') status = 'Off';
+                else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
+                else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
+                else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
+                else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
+            } else if (dayPunches.length > 0) {
+                // Check for partial day first
+                if (partialDayResult.isPartial) {
+                    status = 'Half Day (Partial)';
+                } else {
+                    // For single shift employees, 2 punches = Present, otherwise need 2+ for present
+                    status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                }
+            }
 
             // Check abnormality - abnormal_dates is comma-separated string of YYYY-MM-DD dates
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
