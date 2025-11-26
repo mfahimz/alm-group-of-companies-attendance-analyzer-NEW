@@ -762,6 +762,7 @@ export default function ReportTab({ project }) {
                 status,
                 abnormal: isAbnormal,
                 lateInfo: lateInfo || '-',
+                lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 hasOverride: !!dayOverride,
                 autoFillSuggestion,
