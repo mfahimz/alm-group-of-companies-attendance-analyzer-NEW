@@ -435,6 +435,12 @@ export default function RunAnalysisTab({ project }) {
             }
         }
 
+        // Build notes with auto-resolutions for transparency
+        const abnormalDatesFormatted = [...new Set(abnormal_dates_list)].map(d => new Date(d).toLocaleDateString()).join(', ');
+        const autoResolutionNotes = auto_resolutions.length > 0 
+            ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
+            : '';
+        
         return {
             attendance_id,
             working_days,
@@ -444,7 +450,8 @@ export default function RunAnalysisTab({ project }) {
             late_minutes,
             early_checkout_minutes,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
-            notes: [...new Set(abnormal_dates_list)].map(d => new Date(d).toLocaleDateString()).join(', ')
+            notes: abnormalDatesFormatted,
+            auto_resolutions: autoResolutionNotes
         };
     };
 
