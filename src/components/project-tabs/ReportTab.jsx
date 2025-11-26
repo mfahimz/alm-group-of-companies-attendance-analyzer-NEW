@@ -744,11 +744,18 @@ export default function ReportTab({ project }) {
                 }
             }
 
+            // Extract just the time part from timestamps for cleaner display
+            const extractTime = (ts) => {
+                const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+                return match ? match[1] : ts;
+            };
+
             breakdown.push({
                 date: formatDate(dateStr),
                 dateStr,
                 punches: rawDayPunches.length,
                 punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
+                punchTimesShort: dayPunches.map(p => extractTime(p.timestamp_raw)).join(', '),
                 allPunchTimes: rawDayPunches.map(p => p.timestamp_raw).join(', '),
                 shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
                 exception: dateException ? dateException.type : '-',
