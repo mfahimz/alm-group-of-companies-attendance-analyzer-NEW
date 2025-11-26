@@ -599,40 +599,6 @@ export default function ReportTab({ project }) {
         return `${day}/${month}/${year}`;
     };
 
-    const parseTime = (timeStr) => {
-        try {
-            if (!timeStr || timeStr === '—') return null;
-
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-            if (timeMatch) {
-                let hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const period = timeMatch[3].toUpperCase();
-
-                if (period === 'PM' && hours !== 12) hours += 12;
-                if (period === 'AM' && hours === 12) hours = 0;
-
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-
-            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-            if (timeMatch) {
-                const hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-
-            return null;
-        } catch {
-            return null;
-        }
-    };
-
     // Detect which punch is missing and auto-fill it (Conservative mode)
     const detectAndAutoFillMissingPunch = (dayPunches, shift) => {
         if (!shift || dayPunches.length !== 3) return { punches: dayPunches, autoFilled: null };
