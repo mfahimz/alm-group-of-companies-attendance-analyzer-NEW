@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, AlertTriangle, Search, Trash2, Edit, Plus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditShiftDialog from './EditShiftDialog';
@@ -22,6 +23,7 @@ export default function ShiftTimingsTab({ project }) {
     const [editingShift, setEditingShift] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [isSingleShift, setIsSingleShift] = useState(false);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -274,12 +276,16 @@ export default function ShiftTimingsTab({ project }) {
                             const is_friday_shift = formData.get('is_friday_shift') === 'true';
                             const applicable_days = formData.get('applicable_days');
                             const am_start = normalizeTime(formData.get('am_start'));
-                            const am_end = normalizeTime(formData.get('am_end'));
-                            const pm_start = normalizeTime(formData.get('pm_start'));
+                            const am_end = isSingleShift ? null : normalizeTime(formData.get('am_end'));
+                            const pm_start = isSingleShift ? null : normalizeTime(formData.get('pm_start'));
                             const pm_end = normalizeTime(formData.get('pm_end'));
 
-                            if (!attendance_id || !am_start || !am_end || !pm_start || !pm_end) {
+                            if (!attendance_id || !am_start || !pm_end) {
                                 toast.error('Please fill in all required fields');
+                                return;
+                            }
+                            if (!isSingleShift && (!am_end || !pm_start)) {
+                                toast.error('Please fill in all shift times');
                                 return;
                             }
 
@@ -287,12 +293,14 @@ export default function ShiftTimingsTab({ project }) {
                                 attendance_id,
                                 date: null,
                                 is_friday_shift,
+                                is_single_shift: isSingleShift,
                                 applicable_days,
                                 am_start,
                                 am_end,
                                 pm_start,
                                 pm_end
                             });
+                            setIsSingleShift(false);
                         }} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -338,42 +346,76 @@ export default function ShiftTimingsTab({ project }) {
                                 </Select>
                             </div>
 
+                            <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
+                                <Switch
+                                    id="single-shift"
+                                    checked={isSingleShift}
+                                    onCheckedChange={setIsSingleShift}
+                                />
+                                <Label htmlFor="single-shift" className="cursor-pointer">
+                                    Single Shift (No break - only Punch In and Punch Out)
+                                </Label>
+                            </div>
+
                             <div>
-                                <Label className="mb-2 block">Shift Times *</Label>
-                                <div className="grid grid-cols-4 gap-4">
-                                    <div>
-                                        <Label className="text-xs">AM Start</Label>
-                                        <Input
-                                            name="am_start"
-                                            placeholder="08:00 AM"
-                                            required
-                                        />
+                                <Label className="mb-2 block">
+                                    {isSingleShift ? 'Shift Times (Punch In / Punch Out) *' : 'Shift Times *'}
+                                </Label>
+                                {isSingleShift ? (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label className="text-xs">Punch In</Label>
+                                            <Input
+                                                name="am_start"
+                                                placeholder="08:00 AM"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Punch Out</Label>
+                                            <Input
+                                                name="pm_end"
+                                                placeholder="05:00 PM"
+                                                required
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <Label className="text-xs">AM End</Label>
-                                        <Input
-                                            name="am_end"
-                                            placeholder="12:00 PM"
-                                            required
-                                        />
+                                ) : (
+                                    <div className="grid grid-cols-4 gap-4">
+                                        <div>
+                                            <Label className="text-xs">AM Start</Label>
+                                            <Input
+                                                name="am_start"
+                                                placeholder="08:00 AM"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">AM End</Label>
+                                            <Input
+                                                name="am_end"
+                                                placeholder="12:00 PM"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">PM Start</Label>
+                                            <Input
+                                                name="pm_start"
+                                                placeholder="01:00 PM"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">PM End</Label>
+                                            <Input
+                                                name="pm_end"
+                                                placeholder="05:00 PM"
+                                                required
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <Label className="text-xs">PM Start</Label>
-                                        <Input
-                                            name="pm_start"
-                                            placeholder="01:00 PM"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs">PM End</Label>
-                                        <Input
-                                            name="pm_end"
-                                            placeholder="05:00 PM"
-                                            required
-                                        />
-                                    </div>
-                                </div>
+                                )}
                             </div>
 
                             <div className="flex gap-3">
@@ -509,8 +551,8 @@ export default function ShiftTimingsTab({ project }) {
                                             <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
                                                 Employee Name
                                             </SortableTableHead>
-                                            <TableHead>AM Shift</TableHead>
-                                            <TableHead>PM Shift</TableHead>
+                                            <TableHead>Shift Type</TableHead>
+                                            <TableHead>Shift Times</TableHead>
                                             <TableHead>Applicable Days</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
@@ -528,8 +570,20 @@ export default function ShiftTimingsTab({ project }) {
                                                     </TableCell>
                                                     <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                     <TableCell>{employee?.name || '-'}</TableCell>
-                                                    <TableCell>{formatTime(shift.am_start)} - {formatTime(shift.am_end)}</TableCell>
-                                                    <TableCell>{formatTime(shift.pm_start)} - {formatTime(shift.pm_end)}</TableCell>
+                                                    <TableCell>
+                                                        {shift.is_single_shift ? (
+                                                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Single Shift</span>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Regular</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {shift.is_single_shift ? (
+                                                            <span>{formatTime(shift.am_start)} → {formatTime(shift.pm_end)}</span>
+                                                        ) : (
+                                                            <span>{formatTime(shift.am_start)}-{formatTime(shift.am_end)} / {formatTime(shift.pm_start)}-{formatTime(shift.pm_end)}</span>
+                                                        )}
+                                                    </TableCell>
                                                     <TableCell>
                                                         {shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days')}
                                                         {shift.is_friday_shift && (
