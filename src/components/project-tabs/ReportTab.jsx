@@ -135,35 +135,132 @@ export default function ReportTab({ project }) {
         }
     });
 
+    // Helper function to calculate daily breakdown for an employee (used for main table totals)
+    const calculateEmployeeTotals = (result) => {
+        const employeePunches = punches.filter(p => 
+            p.attendance_id === result.attendance_id &&
+            p.punch_date >= project.date_from && 
+            p.punch_date <= project.date_to
+        );
+        const employeeShifts = shifts.filter(s => s.attendance_id === result.attendance_id);
+        const employeeExceptions = exceptions.filter(e => e.attendance_id === result.attendance_id);
+
+        let dayOverrides = {};
+        if (result.day_overrides) {
+            try {
+                dayOverrides = JSON.parse(result.day_overrides);
+            } catch (e) {}
+        }
+
+        let totalLateMinutes = 0;
+        let totalEarlyCheckout = 0;
+
+        const startDate = new Date(project.date_from);
+        const endDate = new Date(project.date_to);
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const currentDate = new Date(d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay();
+
+            if (dayOfWeek === 0) continue; // Skip Sundays
+
+            const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+
+            const dateException = employeeExceptions.find(ex => {
+                const exFrom = new Date(ex.date_from);
+                const exTo = new Date(ex.date_to);
+                return currentDate >= exFrom && currentDate <= exTo;
+            });
+
+            let shift = null;
+            shift = employeeShifts.find(s => s.date === dateStr);
+            if (!shift) {
+                if (dayOfWeek === 5) {
+                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
+                    if (!shift) shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                } else {
+                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                }
+            }
+
+            if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                shift = {
+                    am_start: dateException.new_am_start,
+                    am_end: dateException.new_am_end,
+                    pm_start: dateException.new_pm_start,
+                    pm_end: dateException.new_pm_end
+                };
+            }
+
+            const dayPunches = filterMultiplePunches(rawDayPunches, shift);
+            const isSingleShift = shift?.is_single_shift || false;
+            const partialDayResult = detectPartialDay(dayPunches, shift);
+
+            // Check for day override first
+            const dayOverride = dayOverrides[dateStr];
+            if (dayOverride) {
+                if (dayOverride.lateMinutes !== undefined) {
+                    totalLateMinutes += dayOverride.lateMinutes;
+                }
+                if (dayOverride.earlyCheckoutMinutes !== undefined) {
+                    totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
+                }
+                continue; // Skip normal calculation for overridden days
+            }
+
+            // Calculate late and early checkout for non-overridden days
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
+                // AM late
+                if (shift.am_start) {
+                    const firstPunch = dayPunches[0];
+                    const punchTime = parseTime(firstPunch.timestamp_raw);
+                    const shiftStart = parseTime(shift.am_start);
+                    if (punchTime && shiftStart && punchTime > shiftStart) {
+                        totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                    }
+                }
+                // PM late
+                if (shift.pm_start && dayPunches.length >= 3) {
+                    const pmCheckIn = dayPunches[2];
+                    const punchTime = parseTime(pmCheckIn.timestamp_raw);
+                    const shiftStart = parseTime(shift.pm_start);
+                    if (punchTime && shiftStart && punchTime > shiftStart) {
+                        totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+                    }
+                }
+                // Early checkout
+                const expectedPunches = isSingleShift ? 2 : 4;
+                if (shift.pm_end && dayPunches.length >= expectedPunches) {
+                    const lastPunch = dayPunches[dayPunches.length - 1];
+                    const punchTime = parseTime(lastPunch.timestamp_raw);
+                    const shiftEnd = parseTime(shift.pm_end);
+                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                        totalEarlyCheckout += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                    }
+                }
+            }
+        }
+
+        return { totalLateMinutes, totalEarlyCheckout };
+    };
+
     const enrichedResults = results.map(result => {
         const employee = employees.find(e => e.attendance_id === result.attendance_id);
         
-        // Calculate adjusted totals based on day_overrides
-        let adjustedLateMinutes = result.late_minutes || 0;
-        let adjustedEarlyCheckout = result.early_checkout_minutes || 0;
-        
-        if (result.day_overrides) {
-            try {
-                const overrides = JSON.parse(result.day_overrides);
-                Object.values(overrides).forEach(override => {
-                    // Subtract original and add new values
-                    if (override.originalLateMinutes !== undefined) {
-                        adjustedLateMinutes = adjustedLateMinutes - override.originalLateMinutes + (override.lateMinutes || 0);
-                    }
-                    if (override.originalEarlyCheckout !== undefined) {
-                        adjustedEarlyCheckout = adjustedEarlyCheckout - override.originalEarlyCheckout + (override.earlyCheckoutMinutes || 0);
-                    }
-                });
-            } catch (e) {
-                // Invalid JSON, use original values
-            }
-        }
+        // Calculate totals from daily breakdown to match what's shown in the breakdown dialog
+        const { totalLateMinutes, totalEarlyCheckout } = calculateEmployeeTotals(result);
         
         return {
             ...result,
             name: employee?.name || 'Unknown',
-            late_minutes: Math.max(0, adjustedLateMinutes),
-            early_checkout_minutes: Math.max(0, adjustedEarlyCheckout)
+            late_minutes: Math.max(0, totalLateMinutes),
+            early_checkout_minutes: Math.max(0, totalEarlyCheckout)
         };
     });
 
