@@ -355,7 +355,7 @@ export default function RunAnalysisTab({ project }) {
                 }
 
                 // Calculate late minutes for both AM and PM shifts
-                if (shift) {
+                if (shift && !partialDayResult.isPartial) {
                     // AM shift late check (first punch of the day)
                     if (shift.am_start && filteredPunches.length > 0) {
                         const firstPunch = filteredPunches[0];
@@ -381,22 +381,27 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // Early checkout check - PM only (last punch before PM shift end)
-                                            // Only calculate early checkout if employee has all expected punches
-                                            const expectedPunches = isSingleShift ? 2 : 4;
-                                            if (shift.pm_end && filteredPunches.length >= expectedPunches) {
-                                                const lastPunch = filteredPunches[filteredPunches.length - 1];
-                                                const punchTime = parseTime(lastPunch.timestamp_raw);
-                                                const shiftEnd = parseTime(shift.pm_end);
+                    // Only calculate early checkout if employee has all expected punches OR auto-filled
+                    const expectedPunches = isSingleShift ? 2 : 4;
+                    const hasAllPunches = filteredPunches.length >= expectedPunches || autoFilledPunch;
+                    if (shift.pm_end && hasAllPunches) {
+                        // If PM_END was auto-filled, no early checkout (assume full day)
+                        if (autoFilledPunch?.type !== 'PM_END') {
+                            const lastPunch = filteredPunches[filteredPunches.length - 1];
+                            const punchTime = parseTime(lastPunch.timestamp_raw);
+                            const shiftEnd = parseTime(shift.pm_end);
 
-                                                if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                                                    early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
-                                                }
-                                            }
+                            if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                                early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                            }
+                        }
+                    }
                 }
                 
                 // Half day detection (simple rule: less than 2 punches)
                 // Skip half day detection if employee has single shift (expects only 2 punches)
-                if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration') {
+                // Also skip if partial day was already detected above
+                if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
                     if (filteredPunches.length < 2 && !isSingleShift) {
                         half_absence_count++;
                     }
