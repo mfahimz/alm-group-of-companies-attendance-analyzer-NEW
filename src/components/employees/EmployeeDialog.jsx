@@ -122,12 +122,18 @@ export default function EmployeeDialog({ open, onClose, employee }) {
 
                     <div>
                         <Label htmlFor="company">Company</Label>
-                        <Input
-                            id="company"
+                        <Select
                             value={formData.company}
-                            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                            placeholder="Company name"
-                        />
+                            onValueChange={(value) => setFormData({ ...formData, company: value })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select company" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                                <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <div className="flex items-center justify-between">
