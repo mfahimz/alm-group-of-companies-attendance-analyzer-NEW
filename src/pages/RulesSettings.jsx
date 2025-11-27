@@ -14,6 +14,9 @@ import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 const DEFAULT_RULES = {
+    company_settings: {
+        companies: ['Al Maraghi Auto Repairs', 'Al Maraghi Automotive']
+    },
     date_rules: {
         holidays: ['Sunday'],
         always_mark_first_date_abnormal: false
@@ -166,6 +169,31 @@ export default function RulesSettings() {
                     {saveMutation.isPending ? 'Saving...' : 'Save Rules'}
                 </Button>
             </div>
+
+            {/* Company Settings */}
+            <Card className="border-0 shadow-sm">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Settings className="w-5 h-5" />
+                        Company Settings
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="companies">Company Names</Label>
+                        <Input
+                            id="companies"
+                            value={rules.company_settings?.companies?.join(', ') || ''}
+                            onChange={(e) => updateRule('company_settings', 'companies', e.target.value.split(',').map(c => c.trim()).filter(c => c))}
+                            placeholder="e.g. Company A, Company B"
+                            className="mt-2"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                            Comma-separated list of company names for employee dropdown
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Date Rules */}
             <Card className="border-0 shadow-sm">
