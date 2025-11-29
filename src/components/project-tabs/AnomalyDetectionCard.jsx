@@ -176,7 +176,7 @@ Focus on HIGH and MEDIUM confidence anomalies. Ignore minor variations.`;
     }, {}) || {};
 
     return (
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-md bg-white ring-1 ring-slate-950/5">
             <CardHeader className="flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-100 rounded-lg">

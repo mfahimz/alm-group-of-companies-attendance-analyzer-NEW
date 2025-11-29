@@ -629,7 +629,7 @@ export default function RunAnalysisTab({ project }) {
 
     return (
         <div className="space-y-6">
-            <Card className="border-0 shadow-sm">
+            <Card className="border-0 shadow-md bg-white ring-1 ring-slate-950/5">
                 <CardHeader>
                     <CardTitle>Run Attendance Analysis</CardTitle>
                 </CardHeader>
