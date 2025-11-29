@@ -121,7 +121,7 @@ export default function Layout({ children, currentPageName }) {
                             </div>
                             {!sidebarCollapsed && (
                                 <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
-                                    Attendance
+                                    ALM Attendance
                                 </span>
                             )}
                         </div>
