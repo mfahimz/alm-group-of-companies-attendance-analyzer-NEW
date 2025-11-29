@@ -157,13 +157,13 @@ export default function RulesSettings() {
             ]} />
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-50">Rules Settings</h1>
-                    <p className="text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">Configure global attendance analysis rules</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Rules Settings</h1>
+                    <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Configure global attendance analysis rules</p>
                 </div>
                 <Button 
                     onClick={handleSave}
                     disabled={saveMutation.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white w-full sm:w-auto"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
                 >
                     <Save className="w-4 h-4 mr-2" />
                     {saveMutation.isPending ? 'Saving...' : 'Save Rules'}
@@ -171,22 +171,22 @@ export default function RulesSettings() {
             </div>
 
             {/* Company Settings */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Company Settings
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Label htmlFor="companies" className="text-slate-300">Company Names</Label>
+                        <Label htmlFor="companies" className="text-slate-900">Company Names</Label>
                         <Input
                             id="companies"
                             value={rules.company_settings?.companies?.join(', ') || ''}
                             onChange={(e) => updateRule('company_settings', 'companies', e.target.value.split(',').map(c => c.trim()).filter(c => c))}
                             placeholder="e.g. Company A, Company B"
-                            className="mt-2 bg-slate-950 border-slate-800 text-slate-50 placeholder:text-slate-500"
+                            className="mt-2 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
                         />
                         <p className="text-xs text-slate-500 mt-1">
                             Comma-separated list of company names for employee dropdown
@@ -196,22 +196,22 @@ export default function RulesSettings() {
             </Card>
 
             {/* Date Rules */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Date Rules
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Label htmlFor="holidays" className="text-slate-300">Holidays</Label>
+                        <Label htmlFor="holidays" className="text-slate-900">Holidays</Label>
                         <Input
                             id="holidays"
                             value={rules.date_rules?.holidays?.join(', ') || ''}
                             onChange={(e) => updateRule('date_rules', 'holidays', e.target.value.split(',').map(h => h.trim()).filter(h => h))}
                             placeholder="e.g. Sunday, Saturday"
-                            className="mt-2 bg-slate-950 border-slate-800 text-slate-50 placeholder:text-slate-500"
+                            className="mt-2 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
                         />
                         <p className="text-xs text-slate-500 mt-1">
                             Days to exclude from working days
@@ -220,7 +220,7 @@ export default function RulesSettings() {
 
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Always Mark First Date as Abnormal</Label>
+                            <Label className="text-slate-900">Always Mark First Date as Abnormal</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Automatically flag the first date of every project
                             </p>
@@ -234,20 +234,20 @@ export default function RulesSettings() {
             </Card>
 
             {/* Timestamp Rules */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Timestamp Handling
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Label className="text-slate-300">Timestamp Format</Label>
+                        <Label className="text-slate-900">Timestamp Format</Label>
                         <Input
                             value={rules.timestamp_rules?.timestamp_format}
                             onChange={(e) => updateRule('timestamp_rules', 'timestamp_format', e.target.value)}
-                            className="mt-2 bg-slate-950 border-slate-800 text-slate-50 placeholder:text-slate-500 disabled:opacity-50"
+                            className="mt-2 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 disabled:opacity-50"
                             disabled
                         />
                         <p className="text-xs text-slate-500 mt-1">
@@ -257,7 +257,7 @@ export default function RulesSettings() {
 
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Treat Duplicate Timestamps as Valid</Label>
+                            <Label className="text-slate-900">Treat Duplicate Timestamps as Valid</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Keep duplicate punches without removal
                             </p>
@@ -271,17 +271,17 @@ export default function RulesSettings() {
             </Card>
 
             {/* Shift Rules */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Shift Rules
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Friday Uses Friday Shift</Label>
+                            <Label className="text-slate-900">Friday Uses Friday Shift</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Apply Friday-specific shifts on Fridays
                             </p>
@@ -294,7 +294,7 @@ export default function RulesSettings() {
 
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Fallback to General Shift if Missing</Label>
+                            <Label className="text-slate-900">Fallback to General Shift if Missing</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Use general shift when specific date shift not found
                             </p>
@@ -308,17 +308,17 @@ export default function RulesSettings() {
             </Card>
 
             {/* Punch Filtering */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Multi-Punch Detection
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Enable Multi-Punch Detection</Label>
+                            <Label className="text-slate-900">Enable Multi-Punch Detection</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Filter multiple punches within time windows to get 4 key punches (AM-in, AM-out, PM-in, PM-out)
                             </p>
@@ -330,12 +330,12 @@ export default function RulesSettings() {
                     </div>
 
                     <div>
-                        <Label className="text-slate-300">Cluster Window (Minutes)</Label>
+                        <Label className="text-slate-900">Cluster Window (Minutes)</Label>
                         <Input
                             type="number"
                             value={rules.punch_filtering?.cluster_window_minutes ?? 10}
                             onChange={(e) => updateRule('punch_filtering', 'cluster_window_minutes', parseInt(e.target.value) || 10)}
-                            className="mt-2 w-32 bg-slate-950 border-slate-800 text-slate-50"
+                            className="mt-2 w-32 bg-white border-slate-200 text-slate-900"
                             min={1}
                             max={60}
                         />
@@ -347,19 +347,19 @@ export default function RulesSettings() {
             </Card>
 
             {/* Attendance Calculation */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Attendance Calculation
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Label className="text-slate-300">Presence Rule</Label>
+                        <Label className="text-slate-900">Presence Rule</Label>
                         <Input
                             value={rules.attendance_calculation?.presence_rule}
-                            className="mt-2 bg-slate-950 border-slate-800 text-slate-50 disabled:opacity-50"
+                            className="mt-2 bg-white border-slate-200 text-slate-900 disabled:opacity-50"
                             disabled
                         />
                         <p className="text-xs text-slate-500 mt-1">
@@ -368,10 +368,10 @@ export default function RulesSettings() {
                     </div>
 
                     <div>
-                        <Label className="text-slate-300">Late Minutes Calculation</Label>
+                        <Label className="text-slate-900">Late Minutes Calculation</Label>
                         <Input
                             value={rules.attendance_calculation?.late_minutes_rule}
-                            className="mt-2 bg-slate-950 border-slate-800 text-slate-50 disabled:opacity-50"
+                            className="mt-2 bg-white border-slate-200 text-slate-900 disabled:opacity-50"
                             disabled
                         />
                         <p className="text-xs text-slate-500 mt-1">
@@ -380,10 +380,10 @@ export default function RulesSettings() {
                     </div>
 
                     <div>
-                        <Label className="text-slate-300">Half Day Detection</Label>
+                        <Label className="text-slate-900">Half Day Detection</Label>
                         <Input
                             value={rules.attendance_calculation?.half_day_rule}
-                            className="mt-2 bg-slate-950 border-slate-800 text-slate-50 disabled:opacity-50"
+                            className="mt-2 bg-white border-slate-200 text-slate-900 disabled:opacity-50"
                             disabled
                         />
                         <p className="text-xs text-slate-500 mt-1">
@@ -392,10 +392,10 @@ export default function RulesSettings() {
                     </div>
 
                     <div>
-                        <Label className="text-slate-300">Full Absence Rule</Label>
+                        <Label className="text-slate-900">Full Absence Rule</Label>
                         <Input
                             value={rules.attendance_calculation?.full_absence_rule}
-                            className="mt-2 bg-slate-950 border-slate-800 text-slate-50 disabled:opacity-50"
+                            className="mt-2 bg-white border-slate-200 text-slate-900 disabled:opacity-50"
                             disabled
                         />
                         <p className="text-xs text-slate-500 mt-1">
@@ -406,17 +406,17 @@ export default function RulesSettings() {
             </Card>
 
             {/* Abnormality Rules */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Abnormality Detection
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Detect Missing Punches</Label>
+                            <Label className="text-slate-900">Detect Missing Punches</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Flag days with fewer punches than expected
                             </p>
@@ -429,7 +429,7 @@ export default function RulesSettings() {
 
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Detect Extra Punches</Label>
+                            <Label className="text-slate-900">Detect Extra Punches</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Flag days with more punches than expected
                             </p>
@@ -443,17 +443,17 @@ export default function RulesSettings() {
             </Card>
 
             {/* Report Rules */}
-            <Card className="border-slate-800 bg-slate-900 shadow-sm">
+            <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-50">
-                        <Settings className="w-5 h-5 text-indigo-400" />
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
                         Report Format
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Show Notes Column</Label>
+                            <Label className="text-slate-900">Show Notes Column</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Display notes in report
                             </p>
@@ -466,7 +466,7 @@ export default function RulesSettings() {
 
                     <div className="flex items-center justify-between">
                         <div>
-                            <Label className="text-slate-300">Notes Only Show Dates (No Reasons)</Label>
+                            <Label className="text-slate-900">Notes Only Show Dates (No Reasons)</Label>
                             <p className="text-xs text-slate-500 mt-1">
                                 Notes column contains only abnormal dates
                             </p>

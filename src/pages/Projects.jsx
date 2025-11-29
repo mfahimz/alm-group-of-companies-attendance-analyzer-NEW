@@ -153,12 +153,12 @@ export default function Projects() {
             <Breadcrumb items={[{ label: 'Projects' }]} />
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-50">Projects</h1>
-                    <p className="text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Projects</h1>
+                    <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
                 </div>
                 <Button 
                     onClick={() => setShowCreateDialog(true)}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white w-full sm:w-auto"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     New Project
@@ -167,12 +167,12 @@ export default function Projects() {
 
             {/* Search */}
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
                     placeholder="Search projects..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-slate-900 border-slate-800 text-slate-50 placeholder:text-slate-500"
+                    className="pl-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
                 />
             </div>
 
@@ -180,24 +180,24 @@ export default function Projects() {
             {isLoading ? (
                 <div className="text-center py-12 text-slate-500">Loading projects...</div>
             ) : filteredProjects.length === 0 ? (
-                <Card className="border-dashed border-slate-800 bg-slate-900/50">
+                <Card className="border-dashed border-slate-200 bg-slate-50">
                     <CardContent className="p-12 text-center">
-                        <p className="text-slate-400">No projects found. Create your first project to get started.</p>
+                        <p className="text-slate-500">No projects found. Create your first project to get started.</p>
                     </CardContent>
                 </Card>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProjects.map((project) => (
-                        <Card key={project.id} className="border-slate-800 bg-slate-900 shadow-sm hover:shadow-md hover:bg-slate-900/80 transition-all h-full group">
+                        <Card key={project.id} className="border-0 bg-white shadow-sm hover:shadow-md transition-all h-full group">
                             <CardContent className="p-6">
                                 <Link to={createPageUrl(`ProjectDetail?id=${project.id}`)}>
                                     <div className="flex items-start justify-between mb-4">
-                                        <h3 className="font-semibold text-slate-200 text-lg group-hover:text-indigo-400 transition-colors">{project.name}</h3>
+                                        <h3 className="font-semibold text-slate-900 text-lg group-hover:text-indigo-600 transition-colors">{project.name}</h3>
                                         <span className={`
-                                            px-2.5 py-1 rounded-full text-xs font-medium border
-                                            ${project.status === 'draft' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : ''}
-                                            ${project.status === 'analyzed' ? 'bg-green-500/10 text-green-400 border-green-500/20' : ''}
-                                            ${project.status === 'locked' ? 'bg-slate-800 text-slate-400 border-slate-700' : ''}
+                                            px-2.5 py-1 rounded-full text-xs font-medium
+                                            ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
+                                            ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
+                                            ${project.status === 'locked' ? 'bg-slate-100 text-slate-600' : ''}
                                         `}>
                                             {project.status}
                                         </span>
@@ -206,30 +206,30 @@ export default function Projects() {
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                             <span className="text-slate-500">Date Range:</span>
-                                            <span className="font-medium text-slate-300">
+                                            <span className="font-medium text-slate-900">
                                                 {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                                             </span>
                                         </div>
                                         {project.department && (
                                             <div className="flex justify-between">
                                                 <span className="text-slate-500">Department:</span>
-                                                <span className="font-medium text-slate-300">{project.department}</span>
+                                                <span className="font-medium text-slate-900">{project.department}</span>
                                             </div>
                                         )}
                                         <div className="flex justify-between">
                                             <span className="text-slate-500">Created:</span>
-                                            <span className="font-medium text-slate-300">
+                                            <span className="font-medium text-slate-900">
                                                 {new Date(project.created_date).toLocaleDateString('en-GB')}
                                             </span>
                                         </div>
                                     </div>
                                 </Link>
                                 
-                                <div className="mt-4 pt-4 border-t border-slate-800 flex gap-2">
+                                <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="flex-1 border-slate-700 bg-transparent text-slate-400 hover:text-white hover:bg-slate-800"
+                                        className="flex-1"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             duplicateMutation.mutate(project.id);
@@ -242,7 +242,7 @@ export default function Projects() {
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="border-slate-700 bg-transparent text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             if (window.confirm('Delete this project? This action cannot be undone.')) {
