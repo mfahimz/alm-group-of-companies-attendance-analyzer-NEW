@@ -63,18 +63,36 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat) => {
                     const Icon = stat.icon;
-                    const textColor = stat.color.replace('bg-', 'text-');
+                    
+                    // Enhanced styling for stats cards
+                    let gradientBg = 'bg-white';
+                    let iconBg = stat.bgColor;
+                    let iconColor = stat.color.replace('bg-', 'text-');
+                    
+                    if (stat.color.includes('indigo')) {
+                        gradientBg = 'bg-gradient-to-br from-indigo-50/50 to-white';
+                        iconBg = 'bg-indigo-100 text-indigo-600';
+                    } else if (stat.color.includes('amber')) {
+                        gradientBg = 'bg-gradient-to-br from-amber-50/50 to-white';
+                        iconBg = 'bg-amber-100 text-amber-600';
+                    } else if (stat.color.includes('green')) {
+                        gradientBg = 'bg-gradient-to-br from-green-50/50 to-white';
+                        iconBg = 'bg-green-100 text-green-600';
+                    } else if (stat.color.includes('blue')) {
+                        gradientBg = 'bg-gradient-to-br from-blue-50/50 to-white';
+                        iconBg = 'bg-blue-100 text-blue-600';
+                    }
 
                     return (
-                        <Card key={stat.label} className="border-0 bg-white shadow-sm hover:shadow-md transition-all duration-200">
+                        <Card key={stat.label} className={`border-0 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 ${gradientBg}`}>
                             <CardContent className="p-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-slate-500 font-medium">{stat.label}</p>
-                                        <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
+                                        <p className="text-sm text-slate-500 font-medium uppercase tracking-wider text-[11px]">{stat.label}</p>
+                                        <p className="text-3xl font-bold text-slate-900 mt-1 tracking-tight">{stat.value}</p>
                                     </div>
-                                    <div className={`${stat.bgColor} p-3 rounded-xl`}>
-                                        <Icon className={`w-6 h-6 ${textColor}`} />
+                                    <div className={`${iconBg} p-3.5 rounded-2xl shadow-sm`}>
+                                        <Icon className="w-6 h-6" />
                                     </div>
                                 </div>
                             </CardContent>
@@ -84,9 +102,12 @@ export default function Dashboard() {
             </div>
 
             {/* Recent Projects */}
-            <Card className="border-0 bg-white shadow-sm">
-                <CardHeader className="border-b border-slate-100">
-                    <CardTitle className="text-lg text-slate-900">Recent Projects</CardTitle>
+            <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 rounded-2xl">
+                <CardHeader className="border-b border-slate-100/80 px-8 py-6">
+                    <div className="flex items-center gap-2">
+                        <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
+                        <CardTitle className="text-lg text-slate-900 font-bold">Recent Projects</CardTitle>
+                    </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     {recentProjects.length === 0 ? (

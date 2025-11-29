@@ -97,34 +97,38 @@ export default function Layout({ children, currentPageName }) {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex text-slate-900">
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
             {/* Mobile Sidebar Backdrop */}
             {sidebarOpen && (
                 <div 
-                    className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden"
+                    className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
 
             {/* Sidebar */}
             <aside className={cn(
-                "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transform transition-all duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shadow-xl shadow-slate-200/50",
+                "fixed inset-y-0 left-0 z-50 bg-white/80 backdrop-blur-xl border-r border-white/20 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shadow-2xl shadow-indigo-100/50",
                 sidebarOpen ? "translate-x-0" : "-translate-x-full",
-                sidebarCollapsed ? "w-16" : "w-72"
+                sidebarCollapsed ? "w-20" : "w-72"
             )}>
                 <div className="flex flex-col h-full">
                     {/* Logo */}
-                    <div className={cn("flex items-center justify-between h-16 border-b border-slate-100", sidebarCollapsed ? "px-3" : "px-6")}>
-                        <div className="flex items-center space-x-3">
-                            <div className="bg-indigo-50 p-2 rounded-lg">
-                                <BarChart3 className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+                    <div className={cn("flex items-center justify-between h-20 mb-2", sidebarCollapsed ? "px-4 justify-center" : "px-8")}>
+                        <div className="flex items-center gap-3">
+                            <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200">
+                                <BarChart3 className="w-6 h-6 text-white flex-shrink-0" />
                             </div>
-                            {!sidebarCollapsed && <span className="text-xl font-bold text-slate-900">Attendance</span>}
+                            {!sidebarCollapsed && (
+                                <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
+                                    Attendance
+                                </span>
+                            )}
                         </div>
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="lg:hidden text-slate-400 hover:text-slate-600"
+                            className="lg:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
                             onClick={() => setSidebarOpen(false)}
                         >
                             <X className="w-5 h-5" />
@@ -144,43 +148,43 @@ export default function Layout({ children, currentPageName }) {
                                         <Link
                                             to={createPageUrl(group.items[0].path)}
                                             className={cn(
-                                                "flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
-                                                sidebarCollapsed ? "justify-center" : "space-x-3",
+                                                "flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 mx-2",
+                                                sidebarCollapsed ? "justify-center px-2" : "space-x-3",
                                                 currentPageName === group.items[0].path
-                                                    ? "bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100"
-                                                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                    ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 shadow-sm ring-1 ring-indigo-100"
+                                                    : "text-slate-600 hover:bg-slate-50/80 hover:text-slate-900"
                                             )}
                                             onClick={() => setSidebarOpen(false)}
                                             title={sidebarCollapsed ? group.items[0].name : undefined}
                                         >
-                                            <GroupIcon className="w-5 h-5 flex-shrink-0" />
+                                            <GroupIcon className={cn("w-5 h-5 flex-shrink-0 transition-colors", currentPageName === group.items[0].path ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600")} />
                                             {!sidebarCollapsed && <span>{group.items[0].name}</span>}
                                         </Link>
                                     ) : (
                                         // Multiple items - render as group
-                                        <div>
+                                        <div className="mx-2">
                                             <button
                                                 onClick={() => toggleGroup(group.id)}
                                                 className={cn(
-                                                    "w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
-                                                    sidebarCollapsed ? "justify-center" : "justify-between",
-                                                    "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                    "w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+                                                    sidebarCollapsed ? "justify-center px-2" : "justify-between",
+                                                    "text-slate-600 hover:bg-slate-50/80 hover:text-slate-900"
                                                 )}
                                                 title={sidebarCollapsed ? group.name : undefined}
                                             >
                                                 <div className={cn("flex items-center", sidebarCollapsed ? "" : "space-x-3")}>
-                                                    <GroupIcon className="w-5 h-5 flex-shrink-0" />
+                                                    <GroupIcon className="w-5 h-5 flex-shrink-0 text-slate-400" />
                                                     {!sidebarCollapsed && <span>{group.name}</span>}
                                                 </div>
                                                 {!sidebarCollapsed && (
                                                     <ChevronDown className={cn(
-                                                        "w-4 h-4 transition-transform",
+                                                        "w-4 h-4 transition-transform text-slate-400",
                                                         isExpanded && "rotate-180"
                                                     )} />
                                                 )}
                                             </button>
                                             {isExpanded && !sidebarCollapsed && (
-                                                <div className="mt-1 ml-4 space-y-1 border-l-2 border-slate-100 pl-2">
+                                                <div className="mt-1 ml-4 space-y-1 pl-2 border-l border-slate-100">
                                                     {group.items.map((item) => {
                                                         const Icon = item.icon;
                                                         return (
@@ -188,14 +192,14 @@ export default function Layout({ children, currentPageName }) {
                                                                 key={item.path}
                                                                 to={createPageUrl(item.path)}
                                                                 className={cn(
-                                                                    "flex items-center space-x-3 px-4 py-2 rounded-lg text-sm transition-all duration-200",
+                                                                    "flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-200",
                                                                     currentPageName === item.path
-                                                                        ? "bg-indigo-50 text-indigo-600 font-medium"
-                                                                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                                                        ? "bg-indigo-50/50 text-indigo-700 font-medium"
+                                                                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-50/50"
                                                                 )}
                                                                 onClick={() => setSidebarOpen(false)}
                                                             >
-                                                                <Icon className="w-4 h-4" />
+                                                                <Icon className={cn("w-4 h-4", currentPageName === item.path ? "text-indigo-500" : "text-slate-400")} />
                                                                 <span>{item.name}</span>
                                                             </Link>
                                                         );

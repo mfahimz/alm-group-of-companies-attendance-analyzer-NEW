@@ -180,56 +180,66 @@ export default function Projects() {
             {isLoading ? (
                 <div className="text-center py-12 text-slate-500">Loading projects...</div>
             ) : filteredProjects.length === 0 ? (
-                <Card className="border-dashed border-slate-200 bg-slate-50">
+                <Card className="border-2 border-dashed border-slate-200 bg-white/50 shadow-sm rounded-2xl">
                     <CardContent className="p-12 text-center">
-                        <p className="text-slate-500">No projects found. Create your first project to get started.</p>
+                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FolderKanban className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-1">No projects yet</h3>
+                        <p className="text-slate-500">Create your first project to get started.</p>
                     </CardContent>
                 </Card>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProjects.map((project) => (
-                        <Card key={project.id} className="border-0 bg-white shadow-sm hover:shadow-md transition-all h-full group">
+                        <Card key={project.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 h-full group rounded-2xl overflow-hidden ring-1 ring-slate-900/5">
+                            <div className={`h-2 w-full ${
+                                project.status === 'draft' ? 'bg-amber-400' :
+                                project.status === 'analyzed' ? 'bg-green-500' :
+                                'bg-slate-300'
+                            }`} />
                             <CardContent className="p-6">
                                 <Link to={createPageUrl(`ProjectDetail?id=${project.id}`)}>
                                     <div className="flex items-start justify-between mb-4">
-                                        <h3 className="font-semibold text-slate-900 text-lg group-hover:text-indigo-600 transition-colors">{project.name}</h3>
+                                        <h3 className="font-bold text-slate-900 text-lg group-hover:text-indigo-600 transition-colors leading-tight">{project.name}</h3>
                                         <span className={`
-                                            px-2.5 py-1 rounded-full text-xs font-medium
-                                            ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
-                                            ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
-                                            ${project.status === 'locked' ? 'bg-slate-100 text-slate-600' : ''}
+                                            px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
+                                            ${project.status === 'draft' ? 'bg-amber-50 text-amber-600 ring-1 ring-amber-100' : ''}
+                                            ${project.status === 'analyzed' ? 'bg-green-50 text-green-600 ring-1 ring-green-100' : ''}
+                                            ${project.status === 'locked' ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' : ''}
                                         `}>
                                             {project.status}
                                         </span>
                                     </div>
                                     
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-500">Date Range:</span>
-                                            <span className="font-medium text-slate-900">
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
+                                            <span className="text-slate-500 text-xs font-medium uppercase tracking-wide">Period</span>
+                                            <span className="font-semibold text-slate-700">
                                                 {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                                             </span>
                                         </div>
-                                        {project.department && (
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-500">Department:</span>
-                                                <span className="font-medium text-slate-900">{project.department}</span>
+                                        
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="p-2 rounded-lg bg-slate-50">
+                                                <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-1">Dept</p>
+                                                <p className="font-semibold text-slate-700 truncate">{project.department || 'All'}</p>
                                             </div>
-                                        )}
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-500">Created:</span>
-                                            <span className="font-medium text-slate-900">
-                                                {new Date(project.created_date).toLocaleDateString('en-GB')}
-                                            </span>
+                                            <div className="p-2 rounded-lg bg-slate-50">
+                                                <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-1">Created</p>
+                                                <p className="font-semibold text-slate-700 truncate">
+                                                    {new Date(project.created_date).toLocaleDateString('en-GB')}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </Link>
                                 
-                                <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
+                                <div className="mt-6 pt-4 border-t border-slate-100 flex gap-2">
                                     <Button
                                         size="sm"
-                                        variant="outline"
-                                        className="flex-1"
+                                        variant="ghost"
+                                        className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             duplicateMutation.mutate(project.id);
@@ -241,8 +251,8 @@ export default function Projects() {
                                     </Button>
                                     <Button
                                         size="sm"
-                                        variant="outline"
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        variant="ghost"
+                                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-2"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             if (window.confirm('Delete this project? This action cannot be undone.')) {
