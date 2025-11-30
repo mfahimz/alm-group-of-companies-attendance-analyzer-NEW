@@ -22,6 +22,7 @@ export default function Employees() {
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [bulkDepartmentDialog, setBulkDepartmentDialog] = useState(false);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -86,6 +87,30 @@ export default function Employees() {
         },
         onError: (error) => {
             toast.error('Failed to delete employees: ' + error.message);
+        }
+    });
+
+    const bulkUpdateDepartmentMutation = useMutation({
+        mutationFn: async ({ ids, department }) => {
+            const results = [];
+            for (const id of ids) {
+                try {
+                    await base44.entities.Employee.update(id, { department });
+                    results.push(id);
+                } catch (error) {
+                    console.error('Failed to update employee:', id, error);
+                }
+            }
+            return results;
+        },
+        onSuccess: (results) => {
+            queryClient.invalidateQueries(['employees']);
+            setSelectedEmployeeIds([]);
+            setBulkDepartmentDialog(false);
+            toast.success(`${results.length} employees updated successfully`);
+        },
+        onError: (error) => {
+            toast.error('Failed to update employees: ' + error.message);
         }
     });
 
@@ -297,6 +322,15 @@ export default function Employees() {
                             Delete {selectedEmployeeIds.length} Selected
                         </Button>
                     )}
+                    {selectedEmployeeIds.length > 0 && (
+                        <Button 
+                            onClick={() => setBulkDepartmentDialog(true)}
+                            variant="outline"
+                        >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Set Department ({selectedEmployeeIds.length})
+                        </Button>
+                    )}
                     <label>
                         <input
                             type="file"
@@ -394,6 +428,9 @@ export default function Employees() {
                                     <SortableTableHead sortKey="company" currentSort={sort} onSort={setSort}>
                                         Company
                                     </SortableTableHead>
+                                    <SortableTableHead sortKey="department" currentSort={sort} onSort={setSort}>
+                                        Department
+                                    </SortableTableHead>
                                     <SortableTableHead sortKey="active" currentSort={sort} onSort={setSort}>
                                         Status
                                     </SortableTableHead>
@@ -428,6 +465,7 @@ export default function Employees() {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-slate-600">{employee.company || '-'}</TableCell>
+                                            <TableCell className="text-slate-600">{employee.department || '-'}</TableCell>
                                             <TableCell>
                                                 <span className={`
                                                     px-2 py-1 rounded-full text-xs font-medium
@@ -472,6 +510,32 @@ export default function Employees() {
                 }}
                 employee={selectedEmployee}
             />
+
+            <Dialog open={bulkDepartmentDialog} onOpenChange={setBulkDepartmentDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Bulk Update Department</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label>Select Department for {selectedEmployeeIds.length} employees</Label>
+                        <Select onValueChange={(val) => {
+                            if (val) {
+                                bulkUpdateDepartmentMutation.mutate({ ids: selectedEmployeeIds, department: val });
+                            }
+                        }}>
+                            <SelectTrigger className="mt-2">
+                                <SelectValue placeholder="Select Department" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Admin">Admin</SelectItem>
+                                <SelectItem value="Operations">Operations</SelectItem>
+                                <SelectItem value="Front Office">Front Office</SelectItem>
+                                <SelectItem value="Housekeeping">Housekeeping</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

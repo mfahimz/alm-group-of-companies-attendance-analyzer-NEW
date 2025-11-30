@@ -14,6 +14,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         attendance_id: '',
         name: '',
         company: '',
+        department: '',
         active: true
     });
     const queryClient = useQueryClient();
@@ -24,6 +25,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 attendance_id: employee.attendance_id || '',
                 name: employee.name || '',
                 company: employee.company || '',
+                department: employee.department || '',
                 active: employee.active ?? true
             });
         } else {
@@ -31,6 +33,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 attendance_id: '',
                 name: '',
                 company: '',
+                department: '',
                 active: true
             });
         }
@@ -132,6 +135,24 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                             <SelectContent>
                                 <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
                                 <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="department">Department</Label>
+                        <Select
+                            value={formData.department}
+                            onValueChange={(value) => setFormData({ ...formData, department: value })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select department" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Admin">Admin</SelectItem>
+                                <SelectItem value="Operations">Operations</SelectItem>
+                                <SelectItem value="Front Office">Front Office</SelectItem>
+                                <SelectItem value="Housekeeping">Housekeeping</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

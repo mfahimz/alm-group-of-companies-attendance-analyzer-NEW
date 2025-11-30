@@ -24,6 +24,7 @@ export default function ShiftTimingsTab({ project }) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [isSingleShift, setIsSingleShift] = useState(false);
+    const [departmentFilter, setDepartmentFilter] = useState('all');
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -217,11 +218,16 @@ export default function ShiftTimingsTab({ project }) {
     });
 
     const filteredShifts = shifts
-        .filter(shift => 
-            !searchTerm || 
-            shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            employees.find(e => e.attendance_id === shift.attendance_id)?.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        .filter(shift => {
+            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+            const matchesSearch = !searchTerm || 
+                shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            const matchesDept = departmentFilter === 'all' || employee?.department === departmentFilter;
+
+            return matchesSearch && matchesDept;
+        })
         .sort((a, b) => {
             let aVal, bVal;
             if (sort.key === 'name') {
@@ -524,6 +530,18 @@ export default function ShiftTimingsTab({ project }) {
                                             Delete {selectedShifts.length} Selected
                                         </Button>
                                     )}
+                                    <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                                        <SelectTrigger className="w-40">
+                                            <SelectValue placeholder="Department" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Departments</SelectItem>
+                                            <SelectItem value="Admin">Admin</SelectItem>
+                                            <SelectItem value="Operations">Operations</SelectItem>
+                                            <SelectItem value="Front Office">Front Office</SelectItem>
+                                            <SelectItem value="Housekeeping">Housekeeping</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                     <div className="relative w-64">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                         <Input
@@ -551,6 +569,7 @@ export default function ShiftTimingsTab({ project }) {
                                             <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
                                                 Employee Name
                                             </SortableTableHead>
+                                            <TableHead>Department</TableHead>
                                             <TableHead>Shift Type</TableHead>
                                             <TableHead>Shift Times</TableHead>
                                             <TableHead>Applicable Days</TableHead>
@@ -570,6 +589,7 @@ export default function ShiftTimingsTab({ project }) {
                                                     </TableCell>
                                                     <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                     <TableCell>{employee?.name || '-'}</TableCell>
+                                                    <TableCell>{employee?.department || '-'}</TableCell>
                                                     <TableCell>
                                                         {shift.is_single_shift ? (
                                                             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Single Shift</span>
