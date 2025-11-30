@@ -97,6 +97,7 @@ export default function RunAnalysisTab({ project }) {
                     sick_leave_count: result.sick_leave_count,
                     late_minutes: result.late_minutes,
                     early_checkout_minutes: result.early_checkout_minutes,
+                    grace_minutes: 15,
                     abnormal_dates: result.abnormal_dates,
                     notes: result.notes,
                     auto_resolutions: result.auto_resolutions

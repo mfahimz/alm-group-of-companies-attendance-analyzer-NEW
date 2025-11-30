@@ -19,6 +19,7 @@ export default function ReportTab({ project }) {
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [selectedReportRun, setSelectedReportRun] = useState(null);
     const [editingDay, setEditingDay] = useState(null);
+    const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [filters, setFilters] = useState({
         dateFrom: '',
@@ -590,6 +591,20 @@ export default function ReportTab({ project }) {
         toast.success('Report exported');
     };
 
+    const updateGraceMinutesMutation = useMutation({
+        mutationFn: async ({ id, grace_minutes }) => {
+            await base44.entities.AnalysisResult.update(id, { grace_minutes });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['results', project.id]);
+            setEditingGraceMinutes(null);
+            toast.success('Grace minutes updated');
+        },
+        onError: () => {
+            toast.error('Failed to update grace minutes');
+        }
+    });
+
     const showDailyBreakdown = (result) => {
         setSelectedEmployee(result);
         setShowBreakdown(true);
@@ -1094,6 +1109,7 @@ export default function ReportTab({ project }) {
                                         <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
                                             Early Checkout Minutes
                                         </SortableTableHead>
+                                        <TableHead>Grace Minutes</TableHead>
                                         <TableHead>Notes</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -1124,6 +1140,19 @@ export default function ReportTab({ project }) {
                                                 <span className={`${result.early_checkout_minutes > 0 ? 'text-blue-600 font-medium' : ''}`}>
                                                     {result.early_checkout_minutes || 0}
                                                 </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2 group">
+                                                    <span>{result.grace_minutes ?? 15}</span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => setEditingGraceMinutes(result)}
+                                                    >
+                                                        <Edit className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                             <TableCell className="text-xs text-slate-600 max-w-xs">
                                                 <div className="truncate" title={result.notes || '-'}>
@@ -1263,6 +1292,33 @@ export default function ReportTab({ project }) {
                 attendanceId={selectedEmployee?.attendance_id}
                 analysisResult={selectedEmployee}
             />
+
+            <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && setEditingGraceMinutes(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Grace Minutes</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label>Grace Minutes</Label>
+                        <Input
+                            type="number"
+                            defaultValue={editingGraceMinutes?.grace_minutes ?? 15}
+                            id="grace-minutes-input"
+                            className="mt-2"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setEditingGraceMinutes(null)}>Cancel</Button>
+                        <Button onClick={() => {
+                            const val = document.getElementById('grace-minutes-input').value;
+                            updateGraceMinutesMutation.mutate({
+                                id: editingGraceMinutes.id,
+                                grace_minutes: parseInt(val)
+                            });
+                        }}>Save</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
