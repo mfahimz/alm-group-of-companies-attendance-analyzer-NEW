@@ -13,7 +13,6 @@ import { Switch } from '@/components/ui/switch';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditShiftDialog from './EditShiftDialog';
-import DepartmentGraceConfig from './DepartmentGraceConfig';
 
 export default function ShiftTimingsTab({ project }) {
     const [file, setFile] = useState(null);
@@ -269,8 +268,6 @@ export default function ShiftTimingsTab({ project }) {
 
     return (
         <div className="space-y-6">
-            <DepartmentGraceConfig project={project} />
-
             {/* Add Shift Form */}
             {showAddForm && (
                 <Card className="border-0 shadow-sm">

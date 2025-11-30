@@ -39,6 +39,12 @@ const DEFAULT_RULES = {
         half_day_rule: 'punch_count_or_duration',
         full_absence_rule: 'no_punch'
     },
+    grace_minutes: {
+        Admin: 15,
+        Operations: 15,
+        'Front Office': 15,
+        Housekeeping: 15
+    },
     abnormality_rules: {
         detect_missing_punches: true,
         detect_extra_punches: true
@@ -401,6 +407,37 @@ export default function RulesSettings() {
                         <p className="text-xs text-slate-500 mt-1">
                             no_punch: Zero punches = full absence
                         </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Grace Minutes Rules */}
+            <Card className="border-0 bg-white shadow-sm">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-indigo-600" />
+                        Department Grace Minutes
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        {['Admin', 'Operations', 'Front Office', 'Housekeeping'].map(dept => (
+                            <div key={dept} className="space-y-2">
+                                <Label className="text-slate-900">{dept}</Label>
+                                <div className="relative">
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        value={rules.grace_minutes?.[dept] ?? 15}
+                                        onChange={(e) => updateRule('grace_minutes', dept, parseInt(e.target.value) || 0)}
+                                        className="pr-12 bg-white border-slate-200 text-slate-900"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+                                        min
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </CardContent>
             </Card>
