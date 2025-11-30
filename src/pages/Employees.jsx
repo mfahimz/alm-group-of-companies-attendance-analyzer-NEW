@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
+import BulkEditDialog from '../components/employees/BulkEditDialog';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -25,7 +26,7 @@ export default function Employees() {
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
-    const [bulkDepartmentDialog, setBulkDepartmentDialog] = useState(false);
+    const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -93,12 +94,12 @@ export default function Employees() {
         }
     });
 
-    const bulkUpdateDepartmentMutation = useMutation({
-        mutationFn: async ({ ids, department }) => {
+    const bulkUpdateMutation = useMutation({
+        mutationFn: async ({ ids, updates }) => {
             const results = [];
             for (const id of ids) {
                 try {
-                    await base44.entities.Employee.update(id, { department });
+                    await base44.entities.Employee.update(id, updates);
                     results.push(id);
                 } catch (error) {
                     console.error('Failed to update employee:', id, error);
@@ -109,7 +110,7 @@ export default function Employees() {
         onSuccess: (results) => {
             queryClient.invalidateQueries(['employees']);
             setSelectedEmployeeIds([]);
-            setBulkDepartmentDialog(false);
+            setShowBulkEditDialog(false);
             toast.success(`${results.length} employees updated successfully`);
         },
         onError: (error) => {
@@ -327,11 +328,11 @@ export default function Employees() {
                     )}
                     {selectedEmployeeIds.length > 0 && (
                         <Button 
-                            onClick={() => setBulkDepartmentDialog(true)}
+                            onClick={() => setShowBulkEditDialog(true)}
                             variant="outline"
                         >
                             <Edit className="w-4 h-4 mr-2" />
-                            Set Department ({selectedEmployeeIds.length})
+                            Bulk Edit ({selectedEmployeeIds.length})
                         </Button>
                     )}
                     <label>
@@ -514,31 +515,13 @@ export default function Employees() {
                 employee={selectedEmployee}
             />
 
-            <Dialog open={bulkDepartmentDialog} onOpenChange={setBulkDepartmentDialog}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Bulk Update Department</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Label>Select Department for {selectedEmployeeIds.length} employees</Label>
-                        <Select onValueChange={(val) => {
-                            if (val) {
-                                bulkUpdateDepartmentMutation.mutate({ ids: selectedEmployeeIds, department: val });
-                            }
-                        }}>
-                            <SelectTrigger className="mt-2">
-                                <SelectValue placeholder="Select Department" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="Operations">Operations</SelectItem>
-                                <SelectItem value="Front Office">Front Office</SelectItem>
-                                <SelectItem value="Housekeeping">Housekeeping</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <BulkEditDialog
+                open={showBulkEditDialog}
+                onClose={() => setShowBulkEditDialog(false)}
+                selectedCount={selectedEmployeeIds.length}
+                onConfirm={(updates) => bulkUpdateMutation.mutate({ ids: selectedEmployeeIds, updates })}
+                isPending={bulkUpdateMutation.isPending}
+            />
         </div>
     );
 }
