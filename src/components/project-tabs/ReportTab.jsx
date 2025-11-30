@@ -1110,6 +1110,7 @@ export default function ReportTab({ project }) {
                                             Early Checkout Minutes
                                         </SortableTableHead>
                                         <TableHead>Grace Minutes</TableHead>
+                                        <TableHead>Deductible</TableHead>
                                         <TableHead>Notes</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -1153,6 +1154,23 @@ export default function ReportTab({ project }) {
                                                         <Edit className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
                                                     </Button>
                                                 </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {(() => {
+                                                    const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                                                    const grace = result.grace_minutes ?? 15;
+                                                    const deductible = Math.max(0, total - grace);
+                                                    return (
+                                                        <div className="flex flex-col">
+                                                            <span className={`font-bold ${deductible > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                                {deductible} min
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-500">
+                                                                {total} (Total) - {grace} (Grace)
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </TableCell>
                                             <TableCell className="text-xs text-slate-600 max-w-xs">
                                                 <div className="truncate" title={result.notes || '-'}>
