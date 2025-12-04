@@ -26,12 +26,6 @@ export default function ShiftTimingsTab({ project }) {
     const [isSingleShift, setIsSingleShift] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [uploadDateRange, setUploadDateRange] = useState({ from: project.date_from, to: project.date_to });
-    const [splitMonths, setSplitMonths] = useState({
-        month1_start: project.split_month_1_start || '',
-        month1_end: project.split_month_1_end || '',
-        month2_start: project.split_month_2_start || '',
-        month2_end: project.split_month_2_end || ''
-    });
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -225,31 +219,6 @@ export default function ShiftTimingsTab({ project }) {
             toast.error('Failed to add shift timing');
         }
     });
-
-    const saveSplitMonthsMutation = useMutation({
-        mutationFn: (data) => base44.entities.Project.update(project.id, {
-            split_month_1_start: data.month1_start,
-            split_month_1_end: data.month1_end,
-            split_month_2_start: data.month2_start,
-            split_month_2_end: data.month2_end
-        }),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['project', project.id]);
-            toast.success('Month splits saved successfully');
-        },
-        onError: () => {
-            toast.error('Failed to save month splits');
-        }
-    });
-
-    const applyDateRange = (start, end) => {
-        if (!start || !end) {
-            toast.error('Please configure month dates first');
-            return;
-        }
-        setUploadDateRange({ from: start, to: end });
-        toast.success(`Applied date range: ${new Date(start).toLocaleDateString()} - ${new Date(end).toLocaleDateString()}`);
-    };
 
     const filteredShifts = shifts
         .filter(shift => {
@@ -470,96 +439,6 @@ export default function ShiftTimingsTab({ project }) {
                     </CardContent>
                 </Card>
             )}
-
-            {/* Month Configuration Section */}
-            <Card className="border-0 shadow-sm bg-slate-50/50">
-                <CardHeader>
-                    <CardTitle className="text-base font-medium text-slate-800">Configure Split Months</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Month 1 */}
-                        <div className="space-y-3 p-4 bg-white rounded-lg border border-slate-200">
-                            <div className="flex items-center justify-between">
-                                <Label className="font-medium text-indigo-600">First Month Period</Label>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => applyDateRange(splitMonths.month1_start, splitMonths.month1_end)}
-                                    className="h-7 text-xs"
-                                >
-                                    Use for Upload
-                                </Button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <Label className="text-xs text-slate-500">Start Date</Label>
-                                    <Input 
-                                        type="date" 
-                                        value={splitMonths.month1_start}
-                                        onChange={(e) => setSplitMonths({...splitMonths, month1_start: e.target.value})}
-                                        className="h-8 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-slate-500">End Date</Label>
-                                    <Input 
-                                        type="date" 
-                                        value={splitMonths.month1_end}
-                                        onChange={(e) => setSplitMonths({...splitMonths, month1_end: e.target.value})}
-                                        className="h-8 text-sm"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Month 2 */}
-                        <div className="space-y-3 p-4 bg-white rounded-lg border border-slate-200">
-                            <div className="flex items-center justify-between">
-                                <Label className="font-medium text-purple-600">Second Month Period</Label>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => applyDateRange(splitMonths.month2_start, splitMonths.month2_end)}
-                                    className="h-7 text-xs"
-                                >
-                                    Use for Upload
-                                </Button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <Label className="text-xs text-slate-500">Start Date</Label>
-                                    <Input 
-                                        type="date" 
-                                        value={splitMonths.month2_start}
-                                        onChange={(e) => setSplitMonths({...splitMonths, month2_start: e.target.value})}
-                                        className="h-8 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-slate-500">End Date</Label>
-                                    <Input 
-                                        type="date" 
-                                        value={splitMonths.month2_end}
-                                        onChange={(e) => setSplitMonths({...splitMonths, month2_end: e.target.value})}
-                                        className="h-8 text-sm"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex justify-end">
-                        <Button 
-                            onClick={() => saveSplitMonthsMutation.mutate(splitMonths)}
-                            disabled={saveSplitMonthsMutation.isPending}
-                            size="sm"
-                            className="bg-slate-900 text-white hover:bg-slate-800"
-                        >
-                            {saveSplitMonthsMutation.isPending ? 'Saving...' : 'Save Configuration'}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
 
             {/* Upload Section */}
             <Card className="border-0 shadow-sm">
