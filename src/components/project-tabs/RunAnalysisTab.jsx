@@ -97,7 +97,7 @@ export default function RunAnalysisTab({ project }) {
                     sick_leave_count: result.sick_leave_count,
                     late_minutes: result.late_minutes,
                     early_checkout_minutes: result.early_checkout_minutes,
-                    grace_minutes: 15,
+                    grace_minutes: result.grace_minutes,
                     abnormal_dates: result.abnormal_dates,
                     notes: result.notes,
                     auto_resolutions: result.auto_resolutions
@@ -286,6 +286,15 @@ export default function RunAnalysisTab({ project }) {
 
             // Get shift for this day
             let shift = null;
+            
+            // Helper to check if shift is effective on current date
+            const isShiftEffective = (s) => {
+                if (!s.effective_from || !s.effective_to) return true;
+                const from = new Date(s.effective_from);
+                const to = new Date(s.effective_to);
+                return currentDate >= from && currentDate <= to;
+            };
+
             // First check for date-specific shift
             shift = employeeShifts.find(s => s.date === dateStr);
 
@@ -293,14 +302,14 @@ export default function RunAnalysisTab({ project }) {
             if (!shift) {
                 if (dayOfWeek === 5) { // Friday
                     // Look for general Friday shift (not date-specific)
-                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
+                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
                     // Fallback to regular shift if no Friday-specific shift exists
                     if (!shift) {
-                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                     }
                 } else {
                     // Look for regular working day shift (not Friday, not date-specific)
-                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                 }
             }
 
@@ -448,6 +457,11 @@ export default function RunAnalysisTab({ project }) {
             ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
             : '';
         
+        const employee = employees.find(e => e.attendance_id === attendance_id);
+        const dept = employee?.department || 'Operations';
+        const baseGrace = rules.grace_minutes?.[dept] ?? 15;
+        const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
+        
         return {
             attendance_id,
             working_days,
@@ -457,6 +471,7 @@ export default function RunAnalysisTab({ project }) {
             sick_leave_count,
             late_minutes,
             early_checkout_minutes,
+            grace_minutes: baseGrace + carriedGrace,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
             notes: abnormalDatesFormatted,
             auto_resolutions: autoResolutionNotes

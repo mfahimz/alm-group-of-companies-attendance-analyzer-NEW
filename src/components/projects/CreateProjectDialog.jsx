@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
@@ -14,10 +15,17 @@ export default function CreateProjectDialog({ open, onClose }) {
         name: '',
         date_from: '',
         date_to: '',
-        department: ''
+        department: '',
+        use_carried_grace_minutes: false
     });
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+
+    const { data: projects = [] } = useQuery({
+        queryKey: ['projects'],
+        queryFn: () => base44.entities.Project.list(),
+        enabled: open
+    });
 
     const createMutation = useMutation({
         mutationFn: (data) => base44.entities.Project.create(data),
@@ -31,6 +39,17 @@ export default function CreateProjectDialog({ open, onClose }) {
             toast.error('Failed to create project');
         }
     });
+
+    const checkOverlap = (start, end) => {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+
+        return projects.some(p => {
+            const pStart = new Date(p.date_from);
+            const pEnd = new Date(p.date_to);
+            return (startDate <= pEnd && endDate >= pStart);
+        });
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -48,7 +67,10 @@ export default function CreateProjectDialog({ open, onClose }) {
             return;
         }
 
-
+        if (checkOverlap(formData.date_from, formData.date_to)) {
+            toast.error('A project already exists within this date range');
+            return;
+        }
 
         createMutation.mutate({
             ...formData,
@@ -102,6 +124,17 @@ export default function CreateProjectDialog({ open, onClose }) {
                             onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                             placeholder="Optional"
                         />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Checkbox 
+                            id="use_grace" 
+                            checked={formData.use_carried_grace_minutes}
+                            onCheckedChange={(checked) => setFormData({ ...formData, use_carried_grace_minutes: checked })}
+                        />
+                        <Label htmlFor="use_grace" className="font-normal">
+                            Use carried forward grace minutes from employee master
+                        </Label>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4">

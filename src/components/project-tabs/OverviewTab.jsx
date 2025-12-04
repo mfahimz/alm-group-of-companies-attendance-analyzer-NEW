@@ -44,6 +44,11 @@ export default function OverviewTab({ project }) {
         queryFn: () => base44.entities.AnalysisResult.filter({ project_id: project.id })
     });
 
+    const { data: employees = [] } = useQuery({
+        queryKey: ['employees'],
+        queryFn: () => base44.entities.Employee.list()
+    });
+
     const uniqueEmployees = new Set(punches.map(p => p.attendance_id)).size;
 
     // Calculate working days (Monday to Saturday, excluding Sundays)
@@ -69,6 +74,59 @@ export default function OverviewTab({ project }) {
         onSuccess: () => {
             queryClient.invalidateQueries(['project', project.id]);
             toast.success('Project locked successfully');
+        }
+    });
+
+    const closeMutation = useMutation({
+        mutationFn: async () => {
+            // 1. Update employees with unused grace minutes
+            const updates = results.map(result => {
+                const employee = employees.find(e => e.attendance_id === result.attendance_id);
+                if (!employee) return null;
+
+                const totalAllowed = result.grace_minutes || 15;
+                const used = result.late_minutes || 0;
+                const unused = Math.max(0, totalAllowed - used);
+
+                // If project used carried grace, it means current allowance included previous balance.
+                // The new balance is simply what's left.
+                // If project didn't use carried grace, the new balance is just this month's unused.
+                // Wait, user said "add... total available".
+                // If I didn't use carried grace, does it mean I still have it?
+                // Assume yes: New Balance = (UseCarried ? 0 : OldBalance) + Unused
+                // BUT User said: "ask if this project can use... total available".
+                // Simplest logic: Whatever is calculated as "unused" from the report becomes the new "total available".
+                // Because report calculation already factored in (Base + Carried) if flag was checked.
+                // So Unused = (Base + Carried) - Used. This is the new Carried.
+                // If flag was NOT checked: Unused = Base - Used.
+                // What happens to old Carried? It should probably persist if not used?
+                // "carry forward the 10 minutes... total 25".
+                // If I assume "Bank" model:
+                // New Balance = (project.use_carried_grace_minutes ? 0 : employee.carried_grace_minutes) + Math.max(0, (result.grace_minutes - result.late_minutes));
+                // Note: result.grace_minutes already includes Carried if flag is true.
+                // So: Unused = result.grace_minutes - result.late_minutes.
+                // If flag True: result.grace = Base + Carried. Unused = Base + Carried - Used. -> New Balance.
+                // If flag False: result.grace = Base. Unused = Base - Used.
+                // Should we add Old Carried? "carry forward... total available".
+                // If I didn't use it, I keep it.
+                // So: New Balance = Unused + (project.use_carried_grace_minutes ? 0 : employee.carried_grace_minutes).
+                
+                const newBalance = Math.max(0, unused + (project.use_carried_grace_minutes ? 0 : (employee.carried_grace_minutes || 0)));
+
+                return base44.entities.Employee.update(employee.id, {
+                    carried_grace_minutes: newBalance
+                });
+            }).filter(Boolean);
+
+            await Promise.all(updates);
+
+            // 2. Close project
+            return base44.entities.Project.update(project.id, { status: 'closed' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['project', project.id]);
+            queryClient.invalidateQueries(['employees']);
+            toast.success('Project closed and grace minutes updated');
         }
     });
 
@@ -262,12 +320,28 @@ export default function OverviewTab({ project }) {
                 <CardContent className="flex flex-wrap gap-3">
                     <Button
                         onClick={() => lockMutation.mutate()}
-                        disabled={project.status === 'locked' || lockMutation.isPending}
+                        disabled={project.status === 'locked' || project.status === 'closed' || lockMutation.isPending}
                         variant="outline"
                     >
                         <Lock className="w-4 h-4 mr-2" />
                         {project.status === 'locked' ? 'Locked' : 'Lock Project'}
                     </Button>
+                    
+                    {isAdmin && project.status === 'analyzed' && (
+                        <Button
+                            onClick={() => {
+                                if (window.confirm('This will finalize the project and update employee grace minutes. Continue?')) {
+                                    closeMutation.mutate();
+                                }
+                            }}
+                            disabled={closeMutation.isPending}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Close & Finalize
+                        </Button>
+                    )}
+
                     {isAdmin && (
                         <>
                             <Button

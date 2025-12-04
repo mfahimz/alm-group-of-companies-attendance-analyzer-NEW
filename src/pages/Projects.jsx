@@ -8,12 +8,14 @@ import { Plus, Search, Copy, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
+import DuplicateProjectDialog from '../components/projects/DuplicateProjectDialog';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function Projects() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [duplicateProject, setDuplicateProject] = useState(null);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -49,76 +51,25 @@ export default function Projects() {
         queryFn: () => base44.entities.Project.list('-created_date')
     });
 
-    const duplicateMutation = useMutation({
-        mutationFn: async (projectId) => {
-            const project = projects.find(p => p.id === projectId);
-            const punches = await base44.entities.Punch.filter({ project_id: projectId });
-            const shifts = await base44.entities.ShiftTiming.filter({ project_id: projectId });
-            const exceptions = await base44.entities.Exception.filter({ project_id: projectId });
+    const checkOverlap = (start, end, excludeId = null) => {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        return projects.some(p => {
+            if (p.id === excludeId) return false;
+            const pStart = new Date(p.date_from);
+            const pEnd = new Date(p.date_to);
+            return (startDate <= pEnd && endDate >= pStart);
+        });
+    };
 
-            const newProject = await base44.entities.Project.create({
-                name: `${project.name} (Copy)`,
-                date_from: project.date_from,
-                date_to: project.date_to,
-                department: project.department,
-                status: 'draft'
-            });
-
-            if (punches.length > 0) {
-                await base44.entities.Punch.bulkCreate(
-                    punches.map(p => ({
-                        project_id: newProject.id,
-                        attendance_id: p.attendance_id,
-                        timestamp_raw: p.timestamp_raw,
-                        punch_date: p.punch_date
-                    }))
-                );
-            }
-
-            if (shifts.length > 0) {
-                await base44.entities.ShiftTiming.bulkCreate(
-                    shifts.map(s => ({
-                        project_id: newProject.id,
-                        attendance_id: s.attendance_id,
-                        date: s.date,
-                        is_friday_shift: s.is_friday_shift,
-                        applicable_days: s.applicable_days,
-                        am_start: s.am_start,
-                        am_end: s.am_end,
-                        pm_start: s.pm_start,
-                        pm_end: s.pm_end
-                    }))
-                );
-            }
-
-            if (exceptions.length > 0) {
-                await base44.entities.Exception.bulkCreate(
-                    exceptions.map(e => ({
-                        project_id: newProject.id,
-                        attendance_id: e.attendance_id,
-                        date_from: e.date_from,
-                        date_to: e.date_to,
-                        type: e.type,
-                        new_am_start: e.new_am_start,
-                        new_am_end: e.new_am_end,
-                        new_pm_start: e.new_pm_start,
-                        new_pm_end: e.new_pm_end,
-                        details: e.details
-                    }))
-                );
-            }
-
-            return newProject;
-        },
-        onSuccess: (newProject) => {
-            queryClient.invalidateQueries(['projects']);
-            toast.success('Project duplicated successfully');
-            navigate(createPageUrl(`ProjectDetail?id=${newProject.id}`));
-        },
-        onError: () => {
-            toast.error('Failed to duplicate project');
+    const handleDuplicateClick = (project) => {
+        if (checkOverlap(project.date_from, project.date_to, project.id)) {
+            setDuplicateProject(project);
+        } else {
+            // No overlap (should rarely happen if duplicating same dates, but logic is here)
+            setDuplicateProject(project); 
         }
-    });
+    };
 
     const deleteMutation = useMutation({
         mutationFn: async (projectId) => {
@@ -245,9 +196,8 @@ export default function Projects() {
                                             className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
                                             onClick={(e) => {
                                                 e.preventDefault();
-                                                duplicateMutation.mutate(project.id);
+                                                handleDuplicateClick(project);
                                             }}
-                                            disabled={duplicateMutation.isPending}
                                         >
                                             <Copy className="w-4 h-4 mr-2" />
                                             Duplicate
@@ -277,6 +227,13 @@ export default function Projects() {
             <CreateProjectDialog 
                 open={showCreateDialog}
                 onClose={() => setShowCreateDialog(false)}
+            />
+
+            <DuplicateProjectDialog 
+                open={!!duplicateProject}
+                onClose={() => setDuplicateProject(null)}
+                sourceProject={duplicateProject}
+                projects={projects}
             />
         </div>
     );

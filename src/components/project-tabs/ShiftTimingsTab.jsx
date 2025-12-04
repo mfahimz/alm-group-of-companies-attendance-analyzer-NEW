@@ -25,6 +25,7 @@ export default function ShiftTimingsTab({ project }) {
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [isSingleShift, setIsSingleShift] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
+    const [uploadDateRange, setUploadDateRange] = useState({ from: project.date_from, to: project.date_to });
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -161,7 +162,9 @@ export default function ShiftTimingsTab({ project }) {
                 am_start: s.am_start,
                 am_end: s.am_end,
                 pm_start: s.pm_start,
-                pm_end: s.pm_end
+                pm_end: s.pm_end,
+                effective_from: uploadDateRange.from,
+                effective_to: uploadDateRange.to
             }));
 
             await base44.entities.ShiftTiming.bulkCreate(shiftRecords);
@@ -457,6 +460,25 @@ export default function ShiftTimingsTab({ project }) {
                         </p>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Shift Effective From</Label>
+                            <Input 
+                                type="date" 
+                                value={uploadDateRange.from}
+                                onChange={(e) => setUploadDateRange({...uploadDateRange, from: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <Label>Shift Effective To</Label>
+                            <Input 
+                                type="date" 
+                                value={uploadDateRange.to}
+                                onChange={(e) => setUploadDateRange({...uploadDateRange, to: e.target.value})}
+                            />
+                        </div>
+                    </div>
+
                     {warnings.length > 0 && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                             <div className="flex items-start gap-2">
@@ -573,6 +595,7 @@ export default function ShiftTimingsTab({ project }) {
                                             <TableHead>Shift Type</TableHead>
                                             <TableHead>Shift Times</TableHead>
                                             <TableHead>Applicable Days</TableHead>
+                                            <TableHead>Effective Range</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -610,6 +633,15 @@ export default function ShiftTimingsTab({ project }) {
                                                             <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
                                                                 Friday
                                                             </span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {shift.effective_from && shift.effective_to ? (
+                                                            <span className="text-xs text-slate-500">
+                                                                {new Date(shift.effective_from).toLocaleDateString('en-GB')} - {new Date(shift.effective_to).toLocaleDateString('en-GB')}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400">All Project</span>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
