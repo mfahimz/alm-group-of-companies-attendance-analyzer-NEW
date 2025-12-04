@@ -268,23 +268,27 @@ export default function OverviewTab({ project }) {
                         <Lock className="w-4 h-4 mr-2" />
                         {project.status === 'locked' ? 'Locked' : 'Lock Project'}
                     </Button>
-                    <Button
-                        onClick={() => duplicateMutation.mutate()}
-                        disabled={duplicateMutation.isPending}
-                        variant="outline"
-                    >
-                        <Copy className="w-4 h-4 mr-2" />
-                        Duplicate Project
-                    </Button>
-                    <Button
-                        onClick={handleDelete}
-                        disabled={deleteMutation.isPending}
-                        variant="outline"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete Project
-                    </Button>
+                    {isAdmin && (
+                        <>
+                            <Button
+                                onClick={() => duplicateMutation.mutate()}
+                                disabled={duplicateMutation.isPending}
+                                variant="outline"
+                            >
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate Project
+                            </Button>
+                            <Button
+                                onClick={handleDelete}
+                                disabled={deleteMutation.isPending}
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Project
+                            </Button>
+                        </>
+                    )}
                 </CardContent>
             </Card>
 

@@ -23,6 +23,8 @@ export default function Projects() {
         queryFn: () => base44.auth.me()
     });
 
+    const isAdmin = currentUser?.role === 'admin';
+
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
         queryFn: () => base44.entities.PagePermission.list(),
@@ -235,35 +237,37 @@ export default function Projects() {
                                     </div>
                                 </Link>
                                 
-                                <div className="mt-6 pt-4 border-t border-slate-100 flex gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            duplicateMutation.mutate(project.id);
-                                        }}
-                                        disabled={duplicateMutation.isPending}
-                                    >
-                                        <Copy className="w-4 h-4 mr-2" />
-                                        Duplicate
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-2"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            if (window.confirm('Delete this project? This action cannot be undone.')) {
-                                                deleteMutation.mutate(project.id);
-                                            }
-                                        }}
-                                        disabled={deleteMutation.isPending}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
+                                {isAdmin && (
+                                    <div className="mt-6 pt-4 border-t border-slate-100 flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                duplicateMutation.mutate(project.id);
+                                            }}
+                                            disabled={duplicateMutation.isPending}
+                                        >
+                                            <Copy className="w-4 h-4 mr-2" />
+                                            Duplicate
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-2"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                if (window.confirm('Delete this project? This action cannot be undone.')) {
+                                                    deleteMutation.mutate(project.id);
+                                                }
+                                            }}
+                                            disabled={deleteMutation.isPending}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     ))}
