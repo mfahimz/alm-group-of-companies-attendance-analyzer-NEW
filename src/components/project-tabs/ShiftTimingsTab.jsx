@@ -57,22 +57,21 @@ export default function ShiftTimingsTab({ project }) {
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id })
     });
 
-    // Load date ranges from shifts when data is available
+    // Load date ranges from project configuration
     useEffect(() => {
-        if (shifts.length > 0) {
-            const block1Shift = shifts.find(s => s.shift_block === 'block1');
-            const block2Shift = shifts.find(s => s.shift_block === 'block2');
-            
-            setBlockDateRanges({
-                block1: block1Shift && block1Shift.effective_from && block1Shift.effective_to ? 
-                    { from: block1Shift.effective_from, to: block1Shift.effective_to } :
-                    { from: project.date_from, to: project.date_to },
-                block2: block2Shift && block2Shift.effective_from && block2Shift.effective_to ?
-                    { from: block2Shift.effective_from, to: block2Shift.effective_to } :
-                    { from: project.date_from, to: project.date_to }
-            });
+        if (project.shift_block_ranges) {
+            try {
+                const savedRanges = JSON.parse(project.shift_block_ranges);
+                setBlockDateRanges(savedRanges);
+            } catch (e) {
+                // Invalid JSON, use defaults
+                setBlockDateRanges({
+                    block1: { from: project.date_from, to: project.date_to },
+                    block2: { from: project.date_from, to: project.date_to }
+                });
+            }
         }
-    }, [shifts, project.date_from, project.date_to]);
+    }, [project.shift_block_ranges, project.date_from, project.date_to]);
 
     // Group shifts by blocks
     const block1Shifts = shifts.filter(s => s.shift_block === 'block1' || (!s.shift_block && s.effective_from <= blockDateRanges.block1.to));
@@ -184,28 +183,37 @@ export default function ShiftTimingsTab({ project }) {
 
     const updateBlockRangeMutation = useMutation({
         mutationFn: async ({ block, newRange }) => {
+            // Save date ranges to project configuration
+            const updatedRanges = {
+                ...blockDateRanges,
+                [block]: newRange
+            };
+            
+            await base44.entities.Project.update(project.id, {
+                shift_block_ranges: JSON.stringify(updatedRanges)
+            });
+            
+            // Also update existing shifts in this block if any
             const blockShifts = shifts.filter(s => s.shift_block === block);
-            
-            if (blockShifts.length === 0) {
-                throw new Error(`No shifts found in ${block}. Please upload shifts first.`);
+            if (blockShifts.length > 0) {
+                await Promise.all(
+                    blockShifts.map(shift => 
+                        base44.entities.ShiftTiming.update(shift.id, {
+                            effective_from: newRange.from,
+                            effective_to: newRange.to
+                        })
+                    )
+                );
             }
-            
-            await Promise.all(
-                blockShifts.map(shift => 
-                    base44.entities.ShiftTiming.update(shift.id, {
-                        effective_from: newRange.from,
-                        effective_to: newRange.to
-                    })
-                )
-            );
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', project.id]);
-            toast.success('Date range updated successfully');
+            queryClient.invalidateQueries(['project', project.id]);
+            toast.success('Date range saved successfully');
             setEditingBlockRange(null);
         },
         onError: (error) => {
-            toast.error(error.message || 'Failed to update date range');
+            toast.error(error.message || 'Failed to save date range');
         }
     });
 
