@@ -204,6 +204,8 @@ export default function ShiftTimingsTab({ project }) {
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', project.id]);
             toast.success('Date range updated successfully');
+            setShowEditDateRangeDialog(false);
+            setEditingDateRangeKey(null);
         },
         onError: () => {
             toast.error('Failed to update date range');
