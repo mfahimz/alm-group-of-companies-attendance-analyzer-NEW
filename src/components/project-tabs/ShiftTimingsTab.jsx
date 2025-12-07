@@ -28,7 +28,7 @@ export default function ShiftTimingsTab({ project }) {
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [uploadDateRange, setUploadDateRange] = useState({ from: project.date_from, to: project.date_to });
     const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {

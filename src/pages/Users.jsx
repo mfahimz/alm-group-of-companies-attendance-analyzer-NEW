@@ -30,7 +30,7 @@ export default function Users() {
     const [showDialog, setShowDialog] = useState(false);
     const [sort, setSort] = useState({ key: 'full_name', direction: 'asc' });
     const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 

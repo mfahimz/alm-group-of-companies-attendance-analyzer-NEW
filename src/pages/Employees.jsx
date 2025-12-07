@@ -29,7 +29,7 @@ export default function Employees() {
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
