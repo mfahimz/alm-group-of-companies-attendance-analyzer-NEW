@@ -223,25 +223,6 @@ export default function ShiftTimingsTab({ project }) {
         }
     });
 
-    const projectStartDate = new Date(project.date_from);
-    const projectEndDate = new Date(project.date_to);
-    const projectMidDate = new Date((projectStartDate.getTime() + projectEndDate.getTime()) / 2);
-
-    const filterShiftsByDateRange = (shift, isFirstHalf) => {
-        if (!shift.effective_from || !shift.effective_to) return true; // No date restriction
-        
-        const effectiveFrom = new Date(shift.effective_from);
-        const effectiveTo = new Date(shift.effective_to);
-        
-        if (isFirstHalf) {
-            // First half: shifts that overlap with project start to mid-date
-            return effectiveFrom <= projectMidDate && effectiveTo >= projectStartDate;
-        } else {
-            // Second half: shifts that overlap with mid-date to project end
-            return effectiveFrom <= projectEndDate && effectiveTo > projectMidDate;
-        }
-    };
-
     const filteredShifts = shifts
         .filter(shift => {
             const employee = employees.find(e => e.attendance_id === shift.attendance_id);
@@ -271,28 +252,16 @@ export default function ShiftTimingsTab({ project }) {
             return 0;
         });
 
-    const firstHalfShifts = filteredShifts.filter(shift => filterShiftsByDateRange(shift, true));
-    const secondHalfShifts = filteredShifts.filter(shift => filterShiftsByDateRange(shift, false));
-
-    const paginatedFirstHalfShifts = firstHalfShifts.slice(
+    const paginatedShifts = filteredShifts.slice(
         (currentPage - 1) * rowsPerPage,
         currentPage * rowsPerPage
     );
 
-    const paginatedSecondHalfShifts = secondHalfShifts.slice(
-        (currentPage - 1) * rowsPerPage,
-        currentPage * rowsPerPage
-    );
-
-    const toggleSelectAll = (isFirstHalf) => {
-        const targetShifts = isFirstHalf ? firstHalfShifts : secondHalfShifts;
-        const targetIds = targetShifts.map(s => s.id);
-        const allSelected = targetIds.every(id => selectedShifts.includes(id));
-        
-        if (allSelected) {
-            setSelectedShifts(prev => prev.filter(id => !targetIds.includes(id)));
+    const toggleSelectAll = () => {
+        if (selectedShifts.length === filteredShifts.length) {
+            setSelectedShifts([]);
         } else {
-            setSelectedShifts(prev => [...new Set([...prev, ...targetIds])]);
+            setSelectedShifts(filteredShifts.map(s => s.id));
         }
     };
 
@@ -552,16 +521,11 @@ export default function ShiftTimingsTab({ project }) {
                 </CardContent>
             </Card>
 
-            {/* Current Shifts - First Half */}
+            {/* Current Shifts */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>First Half Shift Timings</CardTitle>
-                            <p className="text-sm text-slate-500 mt-1">
-                                {new Date(project.date_from).toLocaleDateString('en-GB')} - {projectMidDate.toLocaleDateString('en-GB')}
-                            </p>
-                        </div>
+                        <CardTitle>Current Shift Timings</CardTitle>
                         {!showAddForm && (
                             <Button 
                                 onClick={() => setShowAddForm(true)}
@@ -575,13 +539,14 @@ export default function ShiftTimingsTab({ project }) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {firstHalfShifts.length === 0 ? (
-                        <p className="text-slate-500 text-center py-8">No shifts for this period</p>
+                    {shifts.length === 0 ? (
+                        <p className="text-slate-500 text-center py-8">No shifts uploaded yet</p>
                     ) : (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm text-slate-600">
-                                    {firstHalfShifts.length} shift records in this period
+                                    Total: {shifts.length} shift records
+                                    {filteredShifts.length !== shifts.length && ` (${filteredShifts.length} shown)`}
                                 </p>
                                 <div className="flex gap-3">
                                     {selectedShifts.length > 0 && (
@@ -624,8 +589,8 @@ export default function ShiftTimingsTab({ project }) {
                                         <TableRow>
                                             <TableHead className="w-12">
                                                 <Checkbox
-                                                    checked={firstHalfShifts.every(s => selectedShifts.includes(s.id)) && firstHalfShifts.length > 0}
-                                                    onCheckedChange={() => toggleSelectAll(true)}
+                                                    checked={selectedShifts.length === filteredShifts.length && filteredShifts.length > 0}
+                                                    onCheckedChange={toggleSelectAll}
                                                 />
                                             </TableHead>
                                             <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
@@ -643,7 +608,7 @@ export default function ShiftTimingsTab({ project }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {paginatedFirstHalfShifts.map((shift) => {
+                                        {paginatedShifts.map((shift) => {
                                             const employee = employees.find(e => e.attendance_id === shift.attendance_id);
                                             return (
                                                 <TableRow key={shift.id}>
@@ -715,143 +680,9 @@ export default function ShiftTimingsTab({ project }) {
                                     </TableBody>
                                 </Table>
                             </div>
-                            {firstHalfShifts.length > 0 && (
+                            {filteredShifts.length > 0 && (
                                 <TablePagination
-                                    totalItems={firstHalfShifts.length}
-                                    currentPage={currentPage}
-                                    rowsPerPage={rowsPerPage}
-                                    onPageChange={setCurrentPage}
-                                    onRowsPerPageChange={(value) => {
-                                        setRowsPerPage(value);
-                                        setCurrentPage(1);
-                                    }}
-                                />
-                            )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Current Shifts - Second Half */}
-            <Card className="border-0 shadow-sm">
-                <CardHeader>
-                    <div>
-                        <CardTitle>Second Half Shift Timings</CardTitle>
-                        <p className="text-sm text-slate-500 mt-1">
-                            {new Date(projectMidDate.getTime() + 86400000).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
-                        </p>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {secondHalfShifts.length === 0 ? (
-                        <p className="text-slate-500 text-center py-8">No shifts for this period</p>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-slate-600">
-                                    {secondHalfShifts.length} shift records in this period
-                                </p>
-                            </div>
-                            <div className="max-h-96 overflow-auto">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-12">
-                                                <Checkbox
-                                                    checked={secondHalfShifts.every(s => selectedShifts.includes(s.id)) && secondHalfShifts.length > 0}
-                                                    onCheckedChange={() => toggleSelectAll(false)}
-                                                />
-                                            </TableHead>
-                                            <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                                Attendance ID
-                                            </SortableTableHead>
-                                            <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
-                                                Employee Name
-                                            </SortableTableHead>
-                                            <TableHead>Department</TableHead>
-                                            <TableHead>Shift Type</TableHead>
-                                            <TableHead>Shift Times</TableHead>
-                                            <TableHead>Applicable Days</TableHead>
-                                            <TableHead>Effective Range</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {paginatedSecondHalfShifts.map((shift) => {
-                                            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
-                                            return (
-                                                <TableRow key={shift.id}>
-                                                    <TableCell>
-                                                        <Checkbox
-                                                            checked={selectedShifts.includes(shift.id)}
-                                                            onCheckedChange={() => toggleSelectShift(shift.id)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="font-medium">{shift.attendance_id}</TableCell>
-                                                    <TableCell>{employee?.name || '-'}</TableCell>
-                                                    <TableCell>{employee?.department || '-'}</TableCell>
-                                                    <TableCell>
-                                                        {shift.is_single_shift ? (
-                                                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Single Shift</span>
-                                                        ) : (
-                                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Regular</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {shift.is_single_shift ? (
-                                                            <span>{formatTime(shift.am_start)} → {formatTime(shift.pm_end)}</span>
-                                                        ) : (
-                                                            <span>{formatTime(shift.am_start)}-{formatTime(shift.am_end)} / {formatTime(shift.pm_start)}-{formatTime(shift.pm_end)}</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days')}
-                                                        {shift.is_friday_shift && (
-                                                            <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
-                                                                Friday
-                                                            </span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {shift.effective_from && shift.effective_to ? (
-                                                            <span className="text-xs text-slate-500">
-                                                                {new Date(shift.effective_from).toLocaleDateString('en-GB')} - {new Date(shift.effective_to).toLocaleDateString('en-GB')}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-xs text-slate-400">All Project</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <div className="flex gap-1 justify-end">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                onClick={() => setEditingShift(shift)}
-                                                            >
-                                                                <Edit className="w-4 h-4 text-indigo-600" />
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                onClick={() => {
-                                                                    if (window.confirm('Delete this shift record?')) {
-                                                                        deleteMutation.mutate(shift.id);
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Trash2 className="w-4 h-4 text-red-600" />
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                            {secondHalfShifts.length > 0 && (
-                                <TablePagination
-                                    totalItems={secondHalfShifts.length}
+                                    totalItems={filteredShifts.length}
                                     currentPage={currentPage}
                                     rowsPerPage={rowsPerPage}
                                     onPageChange={setCurrentPage}
