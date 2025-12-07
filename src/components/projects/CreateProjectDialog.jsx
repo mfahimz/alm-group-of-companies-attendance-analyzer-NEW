@@ -42,11 +42,12 @@ export default function CreateProjectDialog({ open, onClose }) {
         }
     });
 
-    const checkOverlap = (start, end) => {
+    const checkOverlap = (start, end, company) => {
         const startDate = new Date(start);
         const endDate = new Date(end);
 
         return projects.some(p => {
+            if (p.company !== company) return false; // Only check within same company
             const pStart = new Date(p.date_from);
             const pEnd = new Date(p.date_to);
             return (startDate <= pEnd && endDate >= pStart);
@@ -69,8 +70,8 @@ export default function CreateProjectDialog({ open, onClose }) {
             return;
         }
 
-        if (checkOverlap(formData.date_from, formData.date_to)) {
-            toast.error('A project already exists within this date range');
+        if (checkOverlap(formData.date_from, formData.date_to, formData.company)) {
+            toast.error(`A project for ${formData.company} already exists within this date range`);
             return;
         }
 

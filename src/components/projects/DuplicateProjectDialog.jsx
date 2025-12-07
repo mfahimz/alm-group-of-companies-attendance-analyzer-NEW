@@ -102,11 +102,12 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
         }
     });
 
-    const checkOverlap = (start, end) => {
+    const checkOverlap = (start, end, company) => {
         const startDate = new Date(start);
         const endDate = new Date(end);
 
         return projects.some(p => {
+            if (p.company !== company) return false; // Only check within same company
             const pStart = new Date(p.date_from);
             const pEnd = new Date(p.date_to);
             return (startDate <= pEnd && endDate >= pStart);
