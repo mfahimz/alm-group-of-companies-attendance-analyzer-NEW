@@ -185,6 +185,11 @@ export default function ShiftTimingsTab({ project }) {
     const updateBlockRangeMutation = useMutation({
         mutationFn: async ({ block, newRange }) => {
             const blockShifts = shifts.filter(s => s.shift_block === block);
+            
+            if (blockShifts.length === 0) {
+                throw new Error(`No shifts found in ${block}. Please upload shifts first.`);
+            }
+            
             await Promise.all(
                 blockShifts.map(shift => 
                     base44.entities.ShiftTiming.update(shift.id, {
@@ -193,15 +198,14 @@ export default function ShiftTimingsTab({ project }) {
                     })
                 )
             );
-            setBlockDateRanges(prev => ({ ...prev, [block]: newRange }));
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', project.id]);
             toast.success('Date range updated successfully');
             setEditingBlockRange(null);
         },
-        onError: () => {
-            toast.error('Failed to update date range');
+        onError: (error) => {
+            toast.error(error.message || 'Failed to update date range');
         }
     });
 
@@ -317,7 +321,7 @@ export default function ShiftTimingsTab({ project }) {
                                     <div className="flex gap-2 mt-2">
                                         <Input
                                             type="date"
-                                            defaultValue={blockRange.from}
+                                            value={blockDateRanges[blockId]?.from || ''}
                                             onChange={(e) => setBlockDateRanges(prev => ({
                                                 ...prev,
                                                 [blockId]: { ...prev[blockId], from: e.target.value }
@@ -326,7 +330,7 @@ export default function ShiftTimingsTab({ project }) {
                                         />
                                         <Input
                                             type="date"
-                                            defaultValue={blockRange.to}
+                                            value={blockDateRanges[blockId]?.to || ''}
                                             onChange={(e) => setBlockDateRanges(prev => ({
                                                 ...prev,
                                                 [blockId]: { ...prev[blockId], to: e.target.value }
@@ -343,7 +347,17 @@ export default function ShiftTimingsTab({ project }) {
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            onClick={() => setEditingBlockRange(null)}
+                                            onClick={() => {
+                                                setEditingBlockRange(null);
+                                                // Reset to saved values
+                                                const savedShift = shifts.find(s => s.shift_block === blockId);
+                                                if (savedShift) {
+                                                    setBlockDateRanges(prev => ({
+                                                        ...prev,
+                                                        [blockId]: { from: savedShift.effective_from, to: savedShift.effective_to }
+                                                    }));
+                                                }
+                                            }}
                                         >
                                             Cancel
                                         </Button>
