@@ -17,6 +17,7 @@ import BulkEditDialog from '../components/employees/BulkEditDialog';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
+import TablePagination from '../components/ui/TablePagination';
 
 export default function Employees() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -27,6 +28,8 @@ export default function Employees() {
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -165,6 +168,17 @@ export default function Employees() {
         });
 
     const totalDuplicates = employees.filter(isDuplicate).length;
+
+    // Pagination
+    const paginatedEmployees = filteredEmployees.slice(
+        (currentPage - 1) * rowsPerPage,
+        currentPage * rowsPerPage
+    );
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, showOnlyDuplicates]);
 
     if (!currentUser) {
         return <div className="text-center py-12 text-slate-500">Loading...</div>;
@@ -537,7 +551,7 @@ export default function Employees() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredEmployees.map((employee) => {
+                                {paginatedEmployees.map((employee) => {
                                     const hasDuplicate = isDuplicate(employee);
                                     return (
                                         <TableRow key={employee.id} className={hasDuplicate ? "bg-amber-50" : ""}>
@@ -600,6 +614,18 @@ export default function Employees() {
                                 })}
                             </TableBody>
                         </Table>
+                    )}
+                    {filteredEmployees.length > 0 && (
+                        <TablePagination
+                            totalItems={filteredEmployees.length}
+                            currentPage={currentPage}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setCurrentPage}
+                            onRowsPerPageChange={(value) => {
+                                setRowsPerPage(value);
+                                setCurrentPage(1);
+                            }}
+                        />
                     )}
                 </CardContent>
             </Card>
