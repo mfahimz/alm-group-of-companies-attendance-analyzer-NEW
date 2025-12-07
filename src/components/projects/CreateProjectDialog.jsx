@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
+import EmployeeSelectionDialog from './EmployeeSelectionDialog';
 
 export default function CreateProjectDialog({ open, onClose }) {
     const [formData, setFormData] = useState({
@@ -18,8 +20,10 @@ export default function CreateProjectDialog({ open, onClose }) {
         date_from: '',
         date_to: '',
         department: '',
+        custom_employee_ids: '',
         use_carried_grace_minutes: false
     });
+    const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -147,6 +151,27 @@ export default function CreateProjectDialog({ open, onClose }) {
                         />
                     </div>
 
+                    {formData.company && (
+                        <div>
+                            <Label>Custom Employee Selection</Label>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => setShowEmployeeDialog(true)}
+                            >
+                                <Users className="w-4 h-4 mr-2" />
+                                {formData.custom_employee_ids 
+                                    ? `${formData.custom_employee_ids.split(',').length} employees selected`
+                                    : 'Select employees for this project'
+                                }
+                            </Button>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Leave empty to include all employees
+                            </p>
+                        </div>
+                    )}
+
                     <div className="flex items-center space-x-2">
                         <Checkbox 
                             id="use_grace" 
@@ -172,6 +197,14 @@ export default function CreateProjectDialog({ open, onClose }) {
                     </div>
                 </form>
             </DialogContent>
+
+            <EmployeeSelectionDialog
+                open={showEmployeeDialog}
+                onOpenChange={setShowEmployeeDialog}
+                company={formData.company}
+                initialIds={formData.custom_employee_ids}
+                onConfirm={(ids) => setFormData({ ...formData, custom_employee_ids: ids })}
+            />
         </Dialog>
     );
 }
