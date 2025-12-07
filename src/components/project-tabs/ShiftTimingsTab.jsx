@@ -335,7 +335,7 @@ export default function ShiftTimingsTab({ project }) {
                                         />
                                         <Button
                                             size="sm"
-                                            onClick={() => updateBlockRangeMutation.mutate({ block: blockId, newRange: blockRange })}
+                                            onClick={() => updateBlockRangeMutation.mutate({ block: blockId, newRange: blockDateRanges[blockId] })}
                                             disabled={updateBlockRangeMutation.isPending}
                                         >
                                             Save
