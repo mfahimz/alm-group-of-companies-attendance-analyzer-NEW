@@ -21,7 +21,8 @@ export default function CreateProjectDialog({ open, onClose }) {
         date_to: '',
         department: '',
         custom_employee_ids: '',
-        use_carried_grace_minutes: false
+        use_carried_grace_minutes: false,
+        weekly_off_override: ''
     });
     const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
     const queryClient = useQueryClient();
@@ -182,6 +183,34 @@ export default function CreateProjectDialog({ open, onClose }) {
                             Use carried forward grace minutes from employee master
                         </Label>
                     </div>
+
+                    {formData.company === 'Naser Mohsin Auto Parts' && (
+                        <div>
+                            <Label htmlFor="weekly_off_override">Weekly Off Override</Label>
+                            <Select
+                                value={formData.weekly_off_override}
+                                onValueChange={(value) => setFormData({ ...formData, weekly_off_override: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Use employee settings" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={null}>Use employee settings</SelectItem>
+                                    <SelectItem value="Sunday">Sunday</SelectItem>
+                                    <SelectItem value="Monday">Monday</SelectItem>
+                                    <SelectItem value="Tuesday">Tuesday</SelectItem>
+                                    <SelectItem value="Wednesday">Wednesday</SelectItem>
+                                    <SelectItem value="Thursday">Thursday</SelectItem>
+                                    <SelectItem value="Friday">Friday</SelectItem>
+                                    <SelectItem value="Saturday">Saturday</SelectItem>
+                                    <SelectItem value="None">None (All 7 days working)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Override weekly off for all employees in this project
+                            </p>
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-3 pt-4">
                         <Button type="button" variant="outline" onClick={onClose}>
