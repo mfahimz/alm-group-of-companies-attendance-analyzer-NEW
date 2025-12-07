@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Lock, Copy, Trash2, Calendar, Users, AlertCircle, FileText, Pencil, CheckCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
@@ -18,8 +20,11 @@ export default function OverviewTab({ project }) {
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [editData, setEditData] = useState({
         name: project.name,
+        company: project.company,
         date_from: project.date_from,
-        date_to: project.date_to
+        date_to: project.date_to,
+        department: project.department || '',
+        use_carried_grace_minutes: project.use_carried_grace_minutes || false
     });
 
     const { data: currentUser } = useQuery({
@@ -259,11 +264,15 @@ export default function OverviewTab({ project }) {
                                 onClick={() => {
                                     setEditData({
                                         name: project.name,
+                                        company: project.company,
                                         date_from: project.date_from,
-                                        date_to: project.date_to
+                                        date_to: project.date_to,
+                                        department: project.department || '',
+                                        use_carried_grace_minutes: project.use_carried_grace_minutes || false
                                     });
                                     setShowEditDialog(true);
                                 }}
+                                disabled={project.status === 'locked' || project.status === 'closed'}
                             >
                                 <Pencil className="w-4 h-4 mr-2" />
                                 Edit
@@ -276,6 +285,10 @@ export default function OverviewTab({ project }) {
                         <div>
                             <p className="text-sm text-slate-600">Project Name</p>
                             <p className="font-medium text-slate-900 mt-1">{project.name}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-slate-600">Company</p>
+                            <p className="font-medium text-slate-900 mt-1">{project.company || '-'}</p>
                         </div>
                         <div>
                             <p className="text-sm text-slate-600">Date Range</p>
@@ -368,9 +381,9 @@ export default function OverviewTab({ project }) {
 
             {/* Edit Project Dialog */}
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Edit Project</DialogTitle>
+                        <DialogTitle>Edit Project Settings</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
                         <div>
@@ -380,6 +393,23 @@ export default function OverviewTab({ project }) {
                                 onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                                 placeholder="Enter project name"
                             />
+                        </div>
+                        <div>
+                            <Label>Company *</Label>
+                            <Select 
+                                value={editData.company} 
+                                onValueChange={(value) => setEditData({ ...editData, company: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                                    <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                                    <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                                    <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -399,7 +429,25 @@ export default function OverviewTab({ project }) {
                                 />
                             </div>
                         </div>
-                        <div className="flex gap-3 pt-4">
+                        <div>
+                            <Label>Department</Label>
+                            <Input
+                                value={editData.department}
+                                onChange={(e) => setEditData({ ...editData, department: e.target.value })}
+                                placeholder="Optional"
+                            />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox 
+                                id="use_grace" 
+                                checked={editData.use_carried_grace_minutes}
+                                onCheckedChange={(checked) => setEditData({ ...editData, use_carried_grace_minutes: checked })}
+                            />
+                            <Label htmlFor="use_grace" className="font-normal">
+                                Use carried forward grace minutes
+                            </Label>
+                        </div>
+                        <div className="flex gap-3 pt-2">
                             <Button
                                 type="submit"
                                 className="bg-indigo-600 hover:bg-indigo-700"
