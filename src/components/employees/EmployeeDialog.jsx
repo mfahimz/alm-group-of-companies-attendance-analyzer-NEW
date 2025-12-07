@@ -131,11 +131,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                             value={formData.hrms_id}
                             onChange={(e) => setFormData({ ...formData, hrms_id: e.target.value })}
                             placeholder="e.g. H001"
-                            disabled={!!employee}
                         />
-                        {employee && (
-                            <p className="text-xs text-slate-500 mt-1">HRMS ID cannot be changed</p>
-                        )}
                     </div>
 
                     <div>
