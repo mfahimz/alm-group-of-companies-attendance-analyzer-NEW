@@ -22,11 +22,13 @@ const COMPANIES = [
 
 const DEFAULT_COMPANY_RULES = {
     date_rules: {
-        always_mark_first_date_abnormal: false
+        always_mark_first_date_abnormal: false,
+        special_abnormal_dates: ''
     },
     timestamp_rules: {
         timestamp_format: 'DD/MM/YYYY HH:MM AM/PM',
-        treat_duplicate_timestamps_as_valid: true
+        treat_duplicate_timestamps_as_valid: true,
+        date_time_separate_columns: true
     },
     shift_rules: {
         friday_uses_friday_shift: true,
@@ -335,6 +337,21 @@ export default function RulesSettings() {
                                         onCheckedChange={(checked) => updateRule(company, 'date_rules', 'always_mark_first_date_abnormal', checked)}
                                     />
                                 </div>
+                                
+                                {company === 'Naser Mohsin Auto Parts' && (
+                                    <div>
+                                        <Label className="text-slate-900">Special Abnormal Dates</Label>
+                                        <Input
+                                            value={rules.date_rules?.special_abnormal_dates || ''}
+                                            onChange={(e) => updateRule(company, 'date_rules', 'special_abnormal_dates', e.target.value)}
+                                            placeholder="01/01/2025, 25/12/2025"
+                                            className="mt-2 bg-white border-slate-200 text-slate-900"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Comma-separated dates (DD/MM/YYYY) to always mark as abnormal
+                                        </p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 
@@ -371,6 +388,21 @@ export default function RulesSettings() {
                                         onCheckedChange={(checked) => updateRule(company, 'timestamp_rules', 'treat_duplicate_timestamps_as_valid', checked)}
                                     />
                                 </div>
+                                
+                                {company === 'Naser Mohsin Auto Parts' && (
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <Label className="text-slate-900">Date/Time in Separate Columns</Label>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                CSV has date and time in separate columns during upload
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={rules.timestamp_rules?.date_time_separate_columns ?? true}
+                                            onCheckedChange={(checked) => updateRule(company, 'timestamp_rules', 'date_time_separate_columns', checked)}
+                                        />
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 
