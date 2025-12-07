@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
@@ -13,6 +14,7 @@ import { createPageUrl } from '../../utils';
 export default function CreateProjectDialog({ open, onClose }) {
     const [formData, setFormData] = useState({
         name: '',
+        company: '',
         date_from: '',
         date_to: '',
         department: '',
@@ -54,7 +56,7 @@ export default function CreateProjectDialog({ open, onClose }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         
-        if (!formData.name || !formData.date_from || !formData.date_to) {
+        if (!formData.name || !formData.company || !formData.date_from || !formData.date_to) {
             toast.error('Please fill in all required fields');
             return;
         }
@@ -93,6 +95,24 @@ export default function CreateProjectDialog({ open, onClose }) {
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="e.g. October Week 1"
                         />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="company">Company *</Label>
+                        <Select
+                            value={formData.company}
+                            onValueChange={(value) => setFormData({ ...formData, company: value })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select company" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                                <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                                <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                                <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
