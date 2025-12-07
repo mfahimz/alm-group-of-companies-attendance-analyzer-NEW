@@ -398,12 +398,8 @@ export default function ReportTab({ project }) {
             }
 
             // Calculate late and early checkout for non-overridden days
-            // Only calculate if we have complete punch data
-            const expectedPunches = isSingleShift ? 2 : 4;
-            const hasCompletePunches = dayPunches.length >= expectedPunches;
-            
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && hasCompletePunches) {
-                // AM late - only for complete punch sets
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
+                // AM late - calculate as long as we have at least one punch
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
@@ -422,7 +418,9 @@ export default function ReportTab({ project }) {
                     }
                 }
                 // Early checkout - only for complete punch sets
-                if (shift.pm_end) {
+                const expectedPunches = isSingleShift ? 2 : 4;
+                const hasCompletePunches = dayPunches.length >= expectedPunches;
+                if (shift.pm_end && hasCompletePunches) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
@@ -771,12 +769,8 @@ export default function ReportTab({ project }) {
             // Determine if PM_START was auto-filled (meaning 3rd punch is actually PM checkout, not PM check-in)
             const pmStartAutoFilled = autoFillSuggestion?.type === 'PM_START';
             
-            // Only calculate late/early checkout if we have complete punch data
-            const expectedPunches = isSingleShift ? 2 : 4;
-            const hasCompletePunches = dayPunches.length >= expectedPunches;
-            
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && hasCompletePunches) {
-                // AM shift late check - only for complete punch sets
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
+                // AM shift late check - calculate as long as we have at least one punch
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
@@ -801,7 +795,9 @@ export default function ReportTab({ project }) {
                 }
 
                 // Early checkout check - only for complete punch sets
-                if (shift.pm_end) {
+                const expectedPunches = isSingleShift ? 2 : 4;
+                const hasCompletePunches = dayPunches.length >= expectedPunches;
+                if (shift.pm_end && hasCompletePunches) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
