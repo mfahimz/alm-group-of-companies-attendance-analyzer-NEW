@@ -375,13 +375,13 @@ export default function Employees() {
             const hrmsData = [];
             
             // Skip header, parse rows
+            // Format: attendance_id (column 1), hrms_id (column 2)
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                if (values.length >= 3 && values[0] && values[1]) {
+                if (values.length >= 2 && values[0] && values[1]) {
                     hrmsData.push({
-                        hrms_id: String(values[0]).trim(),
-                        attendance_id: String(values[1]).trim(),
-                        name: String(values[2]).trim()
+                        attendance_id: String(values[0]).trim(),
+                        hrms_id: String(values[1]).trim()
                     });
                 }
             }
