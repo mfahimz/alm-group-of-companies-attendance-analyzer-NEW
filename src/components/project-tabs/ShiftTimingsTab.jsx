@@ -255,6 +255,20 @@ export default function ShiftTimingsTab({ project }) {
         }
     });
 
+    const deleteBlockShiftsMutation = useMutation({
+        mutationFn: async (blockId) => {
+            const blockShifts = shifts.filter(s => s.shift_block === blockId);
+            await Promise.all(blockShifts.map(shift => base44.entities.ShiftTiming.delete(shift.id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['shifts', project.id]);
+            toast.success('All shifts deleted from block');
+        },
+        onError: () => {
+            toast.error('Failed to delete block shifts');
+        }
+    });
+
     const createShiftMutation = useMutation({
         mutationFn: (data) => base44.entities.ShiftTiming.create({
             ...data,
@@ -405,14 +419,31 @@ export default function ShiftTimingsTab({ project }) {
                             </div>
                         </div>
                         {editingBlockRange !== blockId && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditingBlockRange(blockId)}
-                            >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Date Range
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingBlockRange(blockId)}
+                                >
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit Date Range
+                                </Button>
+                                {blockShifts.length > 0 && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        onClick={() => {
+                                            if (window.confirm(`Delete all ${blockShifts.length} shifts from ${blockLabel}?`)) {
+                                                deleteBlockShiftsMutation.mutate(blockId);
+                                            }
+                                        }}
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete All Shifts
+                                    </Button>
+                                )}
+                            </div>
                         )}
                     </div>
                 </CardHeader>
