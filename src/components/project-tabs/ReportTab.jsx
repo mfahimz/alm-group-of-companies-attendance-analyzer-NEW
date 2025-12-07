@@ -563,7 +563,7 @@ export default function ReportTab({ project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'Full Absences', 'Sick Leave', 'Late Minutes', 'Early Checkout Minutes', 'Notes'];
+        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'LOP Days', 'Sick Leave', 'Late Minutes', 'Early Checkout Minutes', 'Notes'];
         const rows = filteredResults.map(r => [
             r.attendance_id,
             r.name,
@@ -1094,7 +1094,7 @@ export default function ReportTab({ project }) {
                                             Present Days
                                         </SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort}>
-                                                Full Absences
+                                                LOP Days
                                             </SortableTableHead>
                                             <SortableTableHead sortKey="sick_leave_count" currentSort={sort} onSort={setSort}>
                                                 Sick Leave
