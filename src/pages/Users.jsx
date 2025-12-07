@@ -13,6 +13,7 @@ import UserDialog from '../components/users/UserDialog';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
+import TablePagination from '../components/ui/TablePagination';
 
 const DEFAULT_PAGES = [
     { page_name: 'Dashboard', description: 'Main dashboard and overview', allowed_roles: 'admin,user' },
@@ -28,6 +29,8 @@ export default function Users() {
     const [selectedUser, setSelectedUser] = useState(null);
     const [showDialog, setShowDialog] = useState(false);
     const [sort, setSort] = useState({ key: 'full_name', direction: 'asc' });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -170,6 +173,15 @@ export default function Users() {
             return 0;
         });
 
+    const paginatedUsers = filteredUsers.slice(
+        (currentPage - 1) * rowsPerPage,
+        currentPage * rowsPerPage
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
     if (!currentUser) {
         return <div className="text-center py-12 text-slate-500">Loading...</div>;
     }
@@ -243,7 +255,7 @@ export default function Users() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredUsers.map((user) => (
+                                {paginatedUsers.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">{user.full_name}</TableCell>
                                         <TableCell>{user.email}</TableCell>
@@ -282,6 +294,18 @@ export default function Users() {
                                 ))}
                             </TableBody>
                         </Table>
+                    )}
+                    {filteredUsers.length > 0 && (
+                        <TablePagination
+                            totalItems={filteredUsers.length}
+                            currentPage={currentPage}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setCurrentPage}
+                            onRowsPerPageChange={(value) => {
+                                setRowsPerPage(value);
+                                setCurrentPage(1);
+                            }}
+                        />
                     )}
                 </CardContent>
             </Card>

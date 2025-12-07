@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditShiftDialog from './EditShiftDialog';
+import TablePagination from '../ui/TablePagination';
 
 export default function ShiftTimingsTab({ project }) {
     const [file, setFile] = useState(null);
@@ -26,6 +27,8 @@ export default function ShiftTimingsTab({ project }) {
     const [isSingleShift, setIsSingleShift] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [uploadDateRange, setUploadDateRange] = useState({ from: project.date_from, to: project.date_to });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -248,6 +251,11 @@ export default function ShiftTimingsTab({ project }) {
             if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
             return 0;
         });
+
+    const paginatedShifts = filteredShifts.slice(
+        (currentPage - 1) * rowsPerPage,
+        currentPage * rowsPerPage
+    );
 
     const toggleSelectAll = () => {
         if (selectedShifts.length === filteredShifts.length) {
@@ -600,7 +608,7 @@ export default function ShiftTimingsTab({ project }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {filteredShifts.map((shift) => {
+                                        {paginatedShifts.map((shift) => {
                                             const employee = employees.find(e => e.attendance_id === shift.attendance_id);
                                             return (
                                                 <TableRow key={shift.id}>
@@ -672,6 +680,18 @@ export default function ShiftTimingsTab({ project }) {
                                     </TableBody>
                                 </Table>
                             </div>
+                            {filteredShifts.length > 0 && (
+                                <TablePagination
+                                    totalItems={filteredShifts.length}
+                                    currentPage={currentPage}
+                                    rowsPerPage={rowsPerPage}
+                                    onPageChange={setCurrentPage}
+                                    onRowsPerPageChange={(value) => {
+                                        setRowsPerPage(value);
+                                        setCurrentPage(1);
+                                    }}
+                                />
+                            )}
                         </div>
                     )}
                 </CardContent>
