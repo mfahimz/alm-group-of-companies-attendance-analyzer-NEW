@@ -74,7 +74,7 @@ export default function ShiftTimingsTab({ project }) {
     }, [project.shift_block_ranges, project.date_from, project.date_to]);
 
     // Group shifts by blocks
-    const block1Shifts = shifts.filter(s => s.shift_block === 'block1' || (!s.shift_block && s.effective_from <= blockDateRanges.block1.to));
+    const block1Shifts = shifts.filter(s => s.shift_block === 'block1');
     const block2Shifts = shifts.filter(s => s.shift_block === 'block2');
 
     const handleFileChange = (e) => {
