@@ -73,9 +73,36 @@ export default function ShiftTimingsTab({ project }) {
         }
     }, [project.shift_block_ranges, project.date_from, project.date_to]);
 
-    // Group shifts by blocks - handle legacy shifts without shift_block
-    const block1Shifts = shifts.filter(s => s.shift_block === 'block1' || !s.shift_block);
-    const block2Shifts = shifts.filter(s => s.shift_block === 'block2');
+    // Group shifts by blocks - intelligently assign legacy shifts based on date ranges
+    const block1Shifts = shifts.filter(s => {
+        if (s.shift_block === 'block1') return true;
+        if (s.shift_block === 'block2') return false;
+        
+        // For legacy shifts without shift_block, check date ranges
+        if (!s.shift_block && s.effective_from && s.effective_to) {
+            const block1Range = blockDateRanges.block1;
+            // If shift dates match block1 range exactly or are within it, assign to block1
+            if (s.effective_from === block1Range.from && s.effective_to === block1Range.to) {
+                return true;
+            }
+        }
+        return false;
+    });
+    
+    const block2Shifts = shifts.filter(s => {
+        if (s.shift_block === 'block2') return true;
+        if (s.shift_block === 'block1') return false;
+        
+        // For legacy shifts without shift_block, check date ranges
+        if (!s.shift_block && s.effective_from && s.effective_to) {
+            const block2Range = blockDateRanges.block2;
+            // If shift dates match block2 range exactly or are within it, assign to block2
+            if (s.effective_from === block2Range.from && s.effective_to === block2Range.to) {
+                return true;
+            }
+        }
+        return false;
+    });
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
