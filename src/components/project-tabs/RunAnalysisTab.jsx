@@ -293,7 +293,14 @@ export default function RunAnalysisTab({ project }) {
                 const from = new Date(s.effective_from);
                 const to = new Date(s.effective_to);
                 // Current date must fall within the shift's effective range
-                return currentDate >= from && currentDate <= to;
+                // Use setHours to compare dates only (ignore time)
+                const currentDateOnly = new Date(currentDate);
+                currentDateOnly.setHours(0, 0, 0, 0);
+                const fromDateOnly = new Date(from);
+                fromDateOnly.setHours(0, 0, 0, 0);
+                const toDateOnly = new Date(to);
+                toDateOnly.setHours(0, 0, 0, 0);
+                return currentDateOnly >= fromDateOnly && currentDateOnly <= toDateOnly;
             };
 
             // First check for date-specific shift that is effective on this date
