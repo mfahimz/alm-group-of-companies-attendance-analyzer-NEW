@@ -24,6 +24,7 @@ export default function OverviewTab({ project }) {
         date_from: project.date_from,
         date_to: project.date_to,
         department: project.department || '',
+        custom_employee_ids: project.custom_employee_ids || '',
         use_carried_grace_minutes: project.use_carried_grace_minutes || false
     });
 
@@ -268,6 +269,7 @@ export default function OverviewTab({ project }) {
                                         date_from: project.date_from,
                                         date_to: project.date_to,
                                         department: project.department || '',
+                                        custom_employee_ids: project.custom_employee_ids || '',
                                         use_carried_grace_minutes: project.use_carried_grace_minutes || false
                                     });
                                     setShowEditDialog(true);
@@ -434,8 +436,19 @@ export default function OverviewTab({ project }) {
                             <Input
                                 value={editData.department}
                                 onChange={(e) => setEditData({ ...editData, department: e.target.value })}
-                                placeholder="Optional"
+                                placeholder="Leave empty for all departments"
                             />
+                        </div>
+                        <div>
+                            <Label>Custom Employee IDs (HRMS IDs)</Label>
+                            <Input
+                                value={editData.custom_employee_ids}
+                                onChange={(e) => setEditData({ ...editData, custom_employee_ids: e.target.value })}
+                                placeholder="e.g., 101, 102, 103 (comma-separated)"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Leave empty to include all employees
+                            </p>
                         </div>
                         <div className="flex items-center space-x-2">
                             <Checkbox 
