@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +56,23 @@ export default function ShiftTimingsTab({ project }) {
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id })
     });
+
+    // Load date ranges from shifts when data is available
+    useEffect(() => {
+        if (shifts.length > 0) {
+            const block1Shift = shifts.find(s => s.shift_block === 'block1');
+            const block2Shift = shifts.find(s => s.shift_block === 'block2');
+            
+            setBlockDateRanges({
+                block1: block1Shift && block1Shift.effective_from && block1Shift.effective_to ? 
+                    { from: block1Shift.effective_from, to: block1Shift.effective_to } :
+                    { from: project.date_from, to: project.date_to },
+                block2: block2Shift && block2Shift.effective_from && block2Shift.effective_to ?
+                    { from: block2Shift.effective_from, to: block2Shift.effective_to } :
+                    { from: project.date_from, to: project.date_to }
+            });
+        }
+    }, [shifts, project.date_from, project.date_to]);
 
     // Group shifts by blocks
     const block1Shifts = shifts.filter(s => s.shift_block === 'block1' || (!s.shift_block && s.effective_from <= blockDateRanges.block1.to));
