@@ -11,10 +11,12 @@ import { toast } from 'sonner';
 
 export default function EmployeeDialog({ open, onClose, employee }) {
     const [formData, setFormData] = useState({
+        hrms_id: '',
         attendance_id: '',
         name: '',
         company: '',
         department: '',
+        weekly_off: 'Sunday',
         active: true
     });
     const queryClient = useQueryClient();
@@ -22,18 +24,22 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     useEffect(() => {
         if (employee) {
             setFormData({
+                hrms_id: employee.hrms_id || '',
                 attendance_id: employee.attendance_id || '',
                 name: employee.name || '',
                 company: employee.company || '',
                 department: employee.department || '',
+                weekly_off: employee.weekly_off || 'Sunday',
                 active: employee.active ?? true
             });
         } else {
             setFormData({
+                hrms_id: '',
                 attendance_id: '',
                 name: '',
                 company: '',
                 department: '',
+                weekly_off: 'Sunday',
                 active: true
             });
         }
@@ -43,6 +49,16 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         queryKey: ['employees'],
         queryFn: () => base44.entities.Employee.list()
     });
+
+    const { data: companySettings = [] } = useQuery({
+        queryKey: ['companySettings'],
+        queryFn: () => base44.entities.CompanySettings.list()
+    });
+
+    const selectedCompanySettings = companySettings.find(cs => cs.company === formData.company);
+    const departments = selectedCompanySettings 
+        ? selectedCompanySettings.departments.split(',').map(d => d.trim())
+        : ['Admin'];
 
     const createMutation = useMutation({
         mutationFn: (data) => base44.entities.Employee.create(data),
@@ -71,16 +87,25 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        if (!formData.attendance_id || !formData.name) {
+        if (!formData.hrms_id || !formData.attendance_id || !formData.name || !formData.company) {
             toast.error('Please fill in all required fields');
             return;
         }
 
+        // Check for duplicate hrms_id
+        const duplicateHrms = existingEmployees.find(
+            emp => emp.hrms_id === formData.hrms_id && emp.id !== employee?.id
+        );
+        if (duplicateHrms) {
+            toast.error('HRMS ID already exists');
+            return;
+        }
+
         // Check for duplicate attendance_id
-        const duplicate = existingEmployees.find(
+        const duplicateAttendance = existingEmployees.find(
             emp => emp.attendance_id === formData.attendance_id && emp.id !== employee?.id
         );
-        if (duplicate) {
+        if (duplicateAttendance) {
             toast.error('Attendance ID already exists');
             return;
         }
@@ -100,17 +125,28 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
+                        <Label htmlFor="hrms_id">HRMS ID *</Label>
+                        <Input
+                            id="hrms_id"
+                            value={formData.hrms_id}
+                            onChange={(e) => setFormData({ ...formData, hrms_id: e.target.value })}
+                            placeholder="e.g. H001"
+                            disabled={!!employee}
+                        />
+                        {employee && (
+                            <p className="text-xs text-slate-500 mt-1">HRMS ID cannot be changed</p>
+                        )}
+                    </div>
+
+                    <div>
                         <Label htmlFor="attendance_id">Attendance ID *</Label>
                         <Input
                             id="attendance_id"
                             value={formData.attendance_id}
                             onChange={(e) => setFormData({ ...formData, attendance_id: e.target.value })}
                             placeholder="e.g. EMP001"
-                            disabled={!!employee}
                         />
-                        {employee && (
-                            <p className="text-xs text-slate-500 mt-1">Attendance ID cannot be changed</p>
-                        )}
+                        <p className="text-xs text-slate-500 mt-1">Used for matching punch data</p>
                     </div>
 
                     <div>
@@ -124,10 +160,10 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                     </div>
 
                     <div>
-                        <Label htmlFor="company">Company</Label>
+                        <Label htmlFor="company">Company *</Label>
                         <Select
                             value={formData.company}
-                            onValueChange={(value) => setFormData({ ...formData, company: value })}
+                            onValueChange={(value) => setFormData({ ...formData, company: value, department: '' })}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select company" />
@@ -135,6 +171,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                             <SelectContent>
                                 <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
                                 <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                                <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                                <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -144,15 +182,36 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         <Select
                             value={formData.department}
                             onValueChange={(value) => setFormData({ ...formData, department: value })}
+                            disabled={!formData.company}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select department" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="Operations">Operations</SelectItem>
-                                <SelectItem value="Front Office">Front Office</SelectItem>
-                                <SelectItem value="Housekeeping">Housekeeping</SelectItem>
+                                {departments.map(dept => (
+                                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="weekly_off">Weekly Off *</Label>
+                        <Select
+                            value={formData.weekly_off}
+                            onValueChange={(value) => setFormData({ ...formData, weekly_off: value })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select weekly off day" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Sunday">Sunday</SelectItem>
+                                <SelectItem value="Monday">Monday</SelectItem>
+                                <SelectItem value="Tuesday">Tuesday</SelectItem>
+                                <SelectItem value="Wednesday">Wednesday</SelectItem>
+                                <SelectItem value="Thursday">Thursday</SelectItem>
+                                <SelectItem value="Friday">Friday</SelectItem>
+                                <SelectItem value="Saturday">Saturday</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
