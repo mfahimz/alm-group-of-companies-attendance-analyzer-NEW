@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle, Edit } from 'lucide-react';
+import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle, Edit, UserCheck } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -224,6 +224,48 @@ export default function Employees() {
         }
     });
 
+    const importHrmsIdMutation = useMutation({
+        mutationFn: async (hrmsData) => {
+            const results = [];
+            let matched = 0;
+            let notMatched = 0;
+            
+            for (const item of hrmsData) {
+                try {
+                    // Find employee by attendance_id
+                    const existingEmployee = employees.find(emp => 
+                        emp.attendance_id?.toLowerCase() === item.attendance_id?.toLowerCase()
+                    );
+                    
+                    if (existingEmployee) {
+                        await base44.entities.Employee.update(existingEmployee.id, {
+                            hrms_id: item.hrms_id
+                        });
+                        matched++;
+                        results.push(existingEmployee.id);
+                    } else {
+                        notMatched++;
+                    }
+                } catch (error) {
+                    console.error('Failed to update employee HRMS ID:', item, error);
+                }
+            }
+            
+            return { matched, notMatched };
+        },
+        onSuccess: ({ matched, notMatched }) => {
+            queryClient.invalidateQueries(['employees']);
+            if (notMatched > 0) {
+                toast.success(`${matched} HRMS IDs updated. ${notMatched} attendance IDs not found.`);
+            } else {
+                toast.success(`${matched} HRMS IDs updated successfully`);
+            }
+        },
+        onError: (error) => {
+            toast.error('Failed to import HRMS IDs: ' + error.message);
+        }
+    });
+
     const handleImport = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -307,6 +349,40 @@ export default function Employees() {
         e.target.value = '';
     };
 
+    const handleHrmsIdImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target.result;
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            const hrmsData = [];
+            
+            // Skip header, parse rows
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                if (values.length >= 3 && values[0] && values[1]) {
+                    hrmsData.push({
+                        hrms_id: String(values[0]).trim(),
+                        attendance_id: String(values[1]).trim(),
+                        name: String(values[2]).trim()
+                    });
+                }
+            }
+
+            if (hrmsData.length > 0) {
+                importHrmsIdMutation.mutate(hrmsData);
+            } else {
+                toast.error('No valid HRMS ID data found in file');
+            }
+        };
+        reader.readAsText(file);
+        
+        e.target.value = '';
+    };
+
     return (
         <div className="space-y-6">
             <Breadcrumb items={[{ label: 'Employees' }]} />
@@ -335,6 +411,22 @@ export default function Employees() {
                             Bulk Edit ({selectedEmployeeIds.length})
                         </Button>
                     )}
+                    <label>
+                        <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleHrmsIdImport}
+                            className="hidden"
+                        />
+                        <Button 
+                            onClick={(e) => e.currentTarget.previousElementSibling.click()}
+                            variant="outline"
+                            disabled={importHrmsIdMutation.isPending}
+                        >
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            {importHrmsIdMutation.isPending ? 'Updating...' : 'Import HRMS IDs'}
+                        </Button>
+                    </label>
                     <label>
                         <input
                             type="file"
@@ -423,6 +515,9 @@ export default function Employees() {
                                             onCheckedChange={toggleSelectAll}
                                         />
                                     </TableHead>
+                                    <SortableTableHead sortKey="hrms_id" currentSort={sort} onSort={setSort}>
+                                        HRMS ID
+                                    </SortableTableHead>
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                         Attendance ID
                                     </SortableTableHead>
@@ -451,6 +546,9 @@ export default function Employees() {
                                                     checked={selectedEmployeeIds.includes(employee.id)}
                                                     onCheckedChange={() => toggleSelectEmployee(employee.id)}
                                                 />
+                                            </TableCell>
+                                            <TableCell className="font-medium text-slate-600">
+                                                {employee.hrms_id || '-'}
                                             </TableCell>
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-2">
