@@ -73,8 +73,8 @@ export default function ShiftTimingsTab({ project }) {
         }
     }, [project.shift_block_ranges, project.date_from, project.date_to]);
 
-    // Group shifts by blocks
-    const block1Shifts = shifts.filter(s => s.shift_block === 'block1');
+    // Group shifts by blocks - handle legacy shifts without shift_block
+    const block1Shifts = shifts.filter(s => s.shift_block === 'block1' || !s.shift_block);
     const block2Shifts = shifts.filter(s => s.shift_block === 'block2');
 
     const handleFileChange = (e) => {
