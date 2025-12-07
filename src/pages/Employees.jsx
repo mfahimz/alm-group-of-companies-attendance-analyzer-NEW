@@ -30,6 +30,7 @@ export default function Employees() {
     const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [companyFilter, setCompanyFilter] = useState('all');
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -153,7 +154,8 @@ export default function Employees() {
             const matchesSearch = emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                 emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesDuplicateFilter = !showOnlyDuplicates || isDuplicate(emp);
-            return matchesSearch && matchesDuplicateFilter;
+            const matchesCompany = companyFilter === 'all' || emp.company === companyFilter;
+            return matchesSearch && matchesDuplicateFilter && matchesCompany;
         })
         .sort((a, b) => {
             let aVal = a[sort.key];
@@ -178,7 +180,7 @@ export default function Employees() {
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, showOnlyDuplicates]);
+    }, [searchTerm, showOnlyDuplicates, companyFilter]);
 
     if (!currentUser) {
         return <div className="text-center py-12 text-slate-500">Loading...</div>;
@@ -481,6 +483,18 @@ export default function Employees() {
                         className="pl-10"
                     />
                 </div>
+                <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                    <SelectTrigger className="w-64">
+                        <SelectValue placeholder="All Companies" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Companies</SelectItem>
+                        <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                        <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                        <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                        <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                    </SelectContent>
+                </Select>
                 <Button
                     variant={showOnlyDuplicates ? "default" : "outline"}
                     onClick={() => setShowOnlyDuplicates(!showOnlyDuplicates)}
