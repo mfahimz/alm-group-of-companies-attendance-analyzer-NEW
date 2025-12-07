@@ -13,11 +13,13 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import AnomalyDetectionCard from './AnomalyDetectionCard';
+import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
 
 export default function OverviewTab({ project }) {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const [showEditDialog, setShowEditDialog] = useState(false);
+    const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
     const [editData, setEditData] = useState({
         name: project.name,
         company: project.company,
@@ -439,17 +441,26 @@ export default function OverviewTab({ project }) {
                                 placeholder="Leave empty for all departments"
                             />
                         </div>
-                        <div>
-                            <Label>Custom Employee IDs (HRMS IDs)</Label>
-                            <Input
-                                value={editData.custom_employee_ids}
-                                onChange={(e) => setEditData({ ...editData, custom_employee_ids: e.target.value })}
-                                placeholder="e.g., 101, 102, 103 (comma-separated)"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">
-                                Leave empty to include all employees
-                            </p>
-                        </div>
+                        {editData.company && (
+                            <div>
+                                <Label>Custom Employee Selection</Label>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full justify-start"
+                                    onClick={() => setShowEmployeeDialog(true)}
+                                >
+                                    <Users className="w-4 h-4 mr-2" />
+                                    {editData.custom_employee_ids 
+                                        ? `${editData.custom_employee_ids.split(',').length} employees selected`
+                                        : 'Select employees for this project'
+                                    }
+                                </Button>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Leave empty to include all employees
+                                </p>
+                            </div>
+                        )}
                         <div className="flex items-center space-x-2">
                             <Checkbox 
                                 id="use_grace" 
@@ -479,6 +490,14 @@ export default function OverviewTab({ project }) {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <EmployeeSelectionDialog
+                open={showEmployeeDialog}
+                onOpenChange={setShowEmployeeDialog}
+                company={editData.company}
+                initialIds={editData.custom_employee_ids}
+                onConfirm={(ids) => setEditData({ ...editData, custom_employee_ids: ids })}
+            />
         </div>
     );
 }
