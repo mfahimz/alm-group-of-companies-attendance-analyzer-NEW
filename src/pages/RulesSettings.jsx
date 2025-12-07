@@ -90,7 +90,7 @@ export default function RulesSettings() {
         }
     }, [currentUser, permissions, navigate]);
 
-    const { data: rulesData = [], isLoading } = useQuery({
+    const { data: rulesData, isLoading } = useQuery({
         queryKey: ['rules'],
         queryFn: () => base44.entities.AttendanceRules.list()
     });
@@ -101,9 +101,13 @@ export default function RulesSettings() {
     });
 
     useEffect(() => {
+        if (!rulesData) return;
+        
         const rules = {};
         COMPANIES.forEach(company => {
-            const existingRule = rulesData.find(r => r.company === company);
+            const existingRule = Array.isArray(rulesData) 
+                ? rulesData.find(r => r.company === company)
+                : null;
             if (existingRule && existingRule.rules_json) {
                 try {
                     rules[company] = JSON.parse(existingRule.rules_json);
@@ -122,7 +126,9 @@ export default function RulesSettings() {
             const user = await base44.auth.me();
             const promises = COMPANIES.map(async (company) => {
                 const rulesJson = JSON.stringify(companyRules[company], null, 2);
-                const existing = rulesData.find(r => r.company === company);
+                const existing = Array.isArray(rulesData) 
+                    ? rulesData.find(r => r.company === company)
+                    : null;
                 
                 if (existing) {
                     return base44.entities.AttendanceRules.update(existing.id, {
