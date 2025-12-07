@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import SortableTableHead from '../ui/SortableTableHead';
@@ -304,6 +304,43 @@ export default function ShiftTimingsTab({ project }) {
         }
     };
 
+    const exportShiftsToCSV = () => {
+        if (shifts.length === 0) {
+            toast.error('No shift data to export');
+            return;
+        }
+
+        const headers = ['Attendance ID', 'Employee Name', 'Department', 'Shift Type', 'Applicable Days', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Effective From', 'Effective To'];
+        const rows = shifts.map(shift => {
+            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+            return [
+                shift.attendance_id,
+                employee?.name || '-',
+                employee?.department || '-',
+                shift.is_single_shift ? 'Single Shift' : 'Regular',
+                shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days'),
+                shift.am_start || '-',
+                shift.am_end || '-',
+                shift.pm_start || '-',
+                shift.pm_end || '-',
+                shift.effective_from ? new Date(shift.effective_from).toLocaleDateString('en-GB') : '-',
+                shift.effective_to ? new Date(shift.effective_to).toLocaleDateString('en-GB') : '-'
+            ];
+        });
+
+        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.name}_shift_timings.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        toast.success('Shift timings exported');
+    };
+
     return (
         <div className="space-y-6">
             {/* Add Shift Form */}
@@ -558,14 +595,24 @@ export default function ShiftTimingsTab({ project }) {
                     {!showAddForm && (
                         <div className="flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-slate-900">Shift Timings by Date Range</h3>
-                            <Button 
-                                onClick={() => setShowAddForm(true)}
-                                size="sm"
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                            >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add Shift Timing
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button 
+                                    onClick={exportShiftsToCSV}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Download className="w-4 h-4 mr-2" />
+                                    Export
+                                </Button>
+                                <Button 
+                                    onClick={() => setShowAddForm(true)}
+                                    size="sm"
+                                    className="bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Shift Timing
+                                </Button>
+                            </div>
                         </div>
                     )}
 
