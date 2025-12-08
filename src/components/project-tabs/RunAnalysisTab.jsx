@@ -571,7 +571,6 @@ export default function RunAnalysisTab({ project }) {
     };
 
     const filterMultiplePunches = (punchList, shift) => {
-        // Always process to identify the key punches
         if (punchList.length <= 1) return punchList;
 
         // For single shift employees, only keep first and last punch
@@ -583,14 +582,10 @@ export default function RunAnalysisTab({ project }) {
 
             if (punchesWithTime.length <= 2) return punchList;
 
-            // Return first and last punch only
             const firstPunch = punchesWithTime[0];
             const lastPunch = punchesWithTime[punchesWithTime.length - 1];
             return [firstPunch, lastPunch].map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
         }
-
-        // Get cluster window from rules, default to 10 minutes
-        const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
 
         const punchesWithTime = punchList.map(p => ({
             ...p,
@@ -611,6 +606,67 @@ export default function RunAnalysisTab({ project }) {
 
         if (deduped.length === 0) return punchList;
         const sortedPunches = deduped.sort((a, b) => a.time - b.time);
+
+        if (!shift || !shift.am_start) {
+            return [sortedPunches[0], sortedPunches[sortedPunches.length - 1]]
+                .map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+        }
+
+        // Parse shift times
+        const amStartTime = parseTime(shift.am_start);
+        const amEndTime = parseTime(shift.am_end);
+        const pmStartTime = parseTime(shift.pm_start);
+        const pmEndTime = parseTime(shift.pm_end);
+
+        if (!amStartTime || !pmEndTime) {
+            return [sortedPunches[0], sortedPunches[sortedPunches.length - 1]]
+                .map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+        }
+
+        const windowMargin = 45; // 45 minute window around each shift time
+
+        // Find punches in each time window based on shift times
+        const morningInWindow = sortedPunches.filter(p => 
+            Math.abs(p.time - amStartTime) / (1000 * 60) <= windowMargin
+        );
+        const morningOutWindow = amEndTime ? sortedPunches.filter(p => 
+            Math.abs(p.time - amEndTime) / (1000 * 60) <= windowMargin
+        ) : [];
+        const pmInWindow = pmStartTime ? sortedPunches.filter(p => 
+            Math.abs(p.time - pmStartTime) / (1000 * 60) <= windowMargin
+        ) : [];
+        const pmOutWindow = sortedPunches.filter(p => 
+            Math.abs(p.time - pmEndTime) / (1000 * 60) <= windowMargin
+        );
+
+        // Select key punches from each window (first for "in", last for "out")
+        const morningPunchIn = morningInWindow.length > 0 ? morningInWindow[0] : null;
+        const morningPunchOut = morningOutWindow.length > 0 ? morningOutWindow[morningOutWindow.length - 1] : null;
+        const pmPunchIn = pmInWindow.length > 0 ? pmInWindow[0] : null;
+        const eveningPunchOut = pmOutWindow.length > 0 ? pmOutWindow[pmOutWindow.length - 1] : null;
+
+        // Fallback: if no punches matched shift windows, use sequential logic
+        if (!morningPunchIn && !morningPunchOut && !pmPunchIn && !eveningPunchOut) {
+            if (sortedPunches.length >= 4) {
+                return [sortedPunches[0], sortedPunches[1], sortedPunches[2], sortedPunches[3]]
+                    .map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+            }
+            return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+        }
+
+        // Build result with unique punches
+        const result = [];
+        const addedIds = new Set();
+
+        for (const punch of [morningPunchIn, morningPunchOut, pmPunchIn, eveningPunchOut]) {
+            if (punch && !addedIds.has(punch.id)) {
+                result.push(punch);
+                addedIds.add(punch.id);
+            }
+        }
+
+        return result.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+    };
 
         // 1. Morning Punch-In: Keep first punch in the cluster window
         let morningPunchIn = null;
