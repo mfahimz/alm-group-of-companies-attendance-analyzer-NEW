@@ -274,8 +274,6 @@ export default function ReportTab({ project }) {
             return [firstPunch, lastPunch].map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
         }
 
-        const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
-
         const punchesWithTime = punchList.map(p => ({
             ...p,
             time: parseTime(p.timestamp_raw)
@@ -296,94 +294,65 @@ export default function ReportTab({ project }) {
         if (deduped.length === 0) return punchList;
         const sortedPunches = deduped.sort((a, b) => a.time - b.time);
 
-        let morningPunchIn = null;
-        const morningCandidates = [];
-        for (let i = 0; i < sortedPunches.length; i++) {
-            if (morningCandidates.length === 0) {
-                morningCandidates.push(sortedPunches[i]);
-            } else {
-                const firstInCluster = morningCandidates[0];
-                const timeDiff = Math.abs(sortedPunches[i].time - firstInCluster.time) / (1000 * 60);
-                if (timeDiff <= clusterWindow) {
-                    morningCandidates.push(sortedPunches[i]);
-                } else {
-                    break;
-                }
+        if (!shift || !shift.am_start) {
+            return [sortedPunches[0], sortedPunches[sortedPunches.length - 1]]
+                .map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+        }
+
+        // Parse shift times
+        const amStartTime = parseTime(shift.am_start);
+        const amEndTime = parseTime(shift.am_end);
+        const pmStartTime = parseTime(shift.pm_start);
+        const pmEndTime = parseTime(shift.pm_end);
+
+        if (!amStartTime || !pmEndTime) {
+            return [sortedPunches[0], sortedPunches[sortedPunches.length - 1]]
+                .map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+        }
+
+        const windowMargin = 45; // 45 minute window around each shift time
+
+        // Find punches in each time window based on shift times
+        const morningInWindow = sortedPunches.filter(p => 
+            Math.abs(p.time - amStartTime) / (1000 * 60) <= windowMargin
+        );
+        const morningOutWindow = amEndTime ? sortedPunches.filter(p => 
+            Math.abs(p.time - amEndTime) / (1000 * 60) <= windowMargin
+        ) : [];
+        const pmInWindow = pmStartTime ? sortedPunches.filter(p => 
+            Math.abs(p.time - pmStartTime) / (1000 * 60) <= windowMargin
+        ) : [];
+        const pmOutWindow = sortedPunches.filter(p => 
+            Math.abs(p.time - pmEndTime) / (1000 * 60) <= windowMargin
+        );
+
+        // Select key punches from each window (first for "in", last for "out")
+        const morningPunchIn = morningInWindow.length > 0 ? morningInWindow[0] : null;
+        const morningPunchOut = morningOutWindow.length > 0 ? morningOutWindow[morningOutWindow.length - 1] : null;
+        const pmPunchIn = pmInWindow.length > 0 ? pmInWindow[0] : null;
+        const eveningPunchOut = pmOutWindow.length > 0 ? pmOutWindow[pmOutWindow.length - 1] : null;
+
+        // Fallback: if no punches matched shift windows, use sequential logic
+        if (!morningPunchIn && !morningPunchOut && !pmPunchIn && !eveningPunchOut) {
+            if (sortedPunches.length >= 4) {
+                return [sortedPunches[0], sortedPunches[1], sortedPunches[2], sortedPunches[3]]
+                    .map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+            }
+            return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+        }
+
+        // Build result with unique punches
+        const result = [];
+        const addedIds = new Set();
+
+        for (const punch of [morningPunchIn, morningPunchOut, pmPunchIn, eveningPunchOut]) {
+            if (punch && !addedIds.has(punch.id)) {
+                result.push(punch);
+                addedIds.add(punch.id);
             }
         }
-        morningPunchIn = morningCandidates[0];
 
-        let morningPunchOut = null;
-        if (shift && shift.am_end && sortedPunches.length > 1) {
-            const pmStartTime = shift.pm_start ? parseTime(shift.pm_start) : null;
-            const morningClusterEndIndex = morningCandidates.length;
-            const amEndCandidates = [];
-
-            for (let i = morningClusterEndIndex; i < sortedPunches.length; i++) {
-                const punch = sortedPunches[i];
-                if (pmStartTime && punch.time >= pmStartTime) continue;
-
-                if (amEndCandidates.length === 0) {
-                    amEndCandidates.push(punch);
-                } else {
-                    const firstInCluster = amEndCandidates[0];
-                    const timeDiff = Math.abs(punch.time - firstInCluster.time) / (1000 * 60);
-                    if (timeDiff <= clusterWindow) {
-                        amEndCandidates.push(punch);
-                    }
-                }
-            }
-            if (amEndCandidates.length > 0) {
-                morningPunchOut = amEndCandidates[amEndCandidates.length - 1];
-            }
-        }
-
-        let pmPunchIn = null;
-        const morningOutIndex = morningPunchOut ? sortedPunches.indexOf(morningPunchOut) : (morningCandidates.length - 1);
-        const pmInCandidates = [];
-        for (let i = morningOutIndex + 1; i < sortedPunches.length; i++) {
-            if (pmInCandidates.length === 0) {
-                pmInCandidates.push(sortedPunches[i]);
-            } else {
-                const firstInCluster = pmInCandidates[0];
-                const timeDiff = Math.abs(sortedPunches[i].time - firstInCluster.time) / (1000 * 60);
-                if (timeDiff <= clusterWindow) {
-                    pmInCandidates.push(sortedPunches[i]);
-                } else {
-                    break;
-                }
-            }
-        }
-        if (pmInCandidates.length > 0) {
-            pmPunchIn = pmInCandidates[0];
-        }
-
-        let eveningPunchOut = null;
-        if (shift && shift.pm_end) {
-            const pmEndTime = parseTime(shift.pm_end);
-            const afterShiftPunches = sortedPunches.filter(p => p.time >= pmEndTime);
-
-            if (afterShiftPunches.length > 0) {
-                eveningPunchOut = afterShiftPunches[afterShiftPunches.length - 1];
-            } else if (sortedPunches.length > 0) {
-                eveningPunchOut = sortedPunches[sortedPunches.length - 1];
-            }
-        } else if (sortedPunches.length > 0) {
-            eveningPunchOut = sortedPunches[sortedPunches.length - 1];
-        }
-
-        const filtered = [];
-        if (morningPunchIn) filtered.push(morningPunchIn);
-        if (morningPunchOut && morningPunchOut !== morningPunchIn) filtered.push(morningPunchOut);
-        if (pmPunchIn && pmPunchIn !== morningPunchOut && pmPunchIn !== morningPunchIn) filtered.push(pmPunchIn);
-        if (eveningPunchOut && 
-            eveningPunchOut !== pmPunchIn && 
-            eveningPunchOut !== morningPunchOut && 
-            eveningPunchOut !== morningPunchIn) {
-            filtered.push(eveningPunchOut);
-        }
-
-        return filtered.map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
+        return result.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
     };
 
     // Helper function to calculate daily breakdown for an employee (used for main table totals)
