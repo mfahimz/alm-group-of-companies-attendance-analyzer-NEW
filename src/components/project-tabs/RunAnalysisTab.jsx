@@ -370,8 +370,12 @@ export default function RunAnalysisTab({ project }) {
             // Filter multiple punches before analysis
             let filteredPunches = filterMultiplePunches(dayPunches, shift);
             
-            // Check if employee has single shift (from shift timing)
-            const isSingleShift = shift?.is_single_shift || false;
+            // Check if employee has single shift (from shift timing or infer from shift structure)
+            // Auto-detect single shift if am_end and pm_start are both null/empty
+            const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
+                                   shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+                                   shift.am_end !== '—' && shift.pm_start !== '—';
+            const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
             
             // Auto-fill missing punch (Conservative mode)
             let autoFilledPunch = null;
