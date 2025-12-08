@@ -204,6 +204,59 @@ export default function ReportTab({ project }) {
         return { isPartial: false, reason: null };
     };
 
+    // Detect which punch is missing and auto-fill it (Conservative mode)
+    const detectAndAutoFillMissingPunch = (dayPunches, shift) => {
+        if (!shift || dayPunches.length !== 3) return { punches: dayPunches, autoFilled: null };
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length !== 3) return { punches: dayPunches, autoFilled: null };
+        
+        const amStart = parseTime(shift.am_start);
+        const amEnd = parseTime(shift.am_end);
+        const pmStart = parseTime(shift.pm_start);
+        const pmEnd = parseTime(shift.pm_end);
+        
+        if (!amStart || !amEnd || !pmStart || !pmEnd) return { punches: dayPunches, autoFilled: null };
+        
+        const [p1, p2, p3] = punchesWithTime;
+        
+        // Calculate time differences to each expected punch time
+        const p1ToAmStart = Math.abs(p1.time - amStart) / (1000 * 60);
+        const p1ToAmEnd = Math.abs(p1.time - amEnd) / (1000 * 60);
+        const p2ToAmEnd = Math.abs(p2.time - amEnd) / (1000 * 60);
+        const p2ToPmStart = Math.abs(p2.time - pmStart) / (1000 * 60);
+        const p3ToPmStart = Math.abs(p3.time - pmStart) / (1000 * 60);
+        const p3ToPmEnd = Math.abs(p3.time - pmEnd) / (1000 * 60);
+        
+        // Threshold for "close enough" to a shift time (30 minutes)
+        const threshold = 30;
+        
+        let autoFilled = null;
+        
+        // Case 1: Missing AM Start (p1 is close to AM End)
+        if (p1ToAmEnd < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
+            autoFilled = { type: 'AM_START', time: shift.am_start };
+        }
+        // Case 2: Missing AM End (p1 close to AM Start, p2 close to PM Start)
+        else if (p1ToAmStart < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
+            autoFilled = { type: 'AM_END', time: shift.am_end };
+        }
+        // Case 3: Missing PM Start (p1 AM Start, p2 AM End, p3 PM End)
+        else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmEnd < threshold) {
+            autoFilled = { type: 'PM_START', time: shift.pm_start };
+        }
+        // Case 4: Missing PM End (most common - p1 AM Start, p2 AM End, p3 PM Start)
+        else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmStart < threshold) {
+            autoFilled = { type: 'PM_END', time: shift.pm_end };
+        }
+        
+        return { punches: dayPunches, autoFilled };
+    };
+
     // Filter multiple punches within configured time windows to get the key punches
     const filterMultiplePunches = (punchList, shift) => {
         if (punchList.length <= 1) return punchList;
@@ -677,59 +730,6 @@ export default function ReportTab({ project }) {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
-    };
-
-    // Detect which punch is missing and auto-fill it (Conservative mode)
-    const detectAndAutoFillMissingPunch = (dayPunches, shift) => {
-        if (!shift || dayPunches.length !== 3) return { punches: dayPunches, autoFilled: null };
-        
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
-        
-        if (punchesWithTime.length !== 3) return { punches: dayPunches, autoFilled: null };
-        
-        const amStart = parseTime(shift.am_start);
-        const amEnd = parseTime(shift.am_end);
-        const pmStart = parseTime(shift.pm_start);
-        const pmEnd = parseTime(shift.pm_end);
-        
-        if (!amStart || !amEnd || !pmStart || !pmEnd) return { punches: dayPunches, autoFilled: null };
-        
-        const [p1, p2, p3] = punchesWithTime;
-        
-        // Calculate time differences to each expected punch time
-        const p1ToAmStart = Math.abs(p1.time - amStart) / (1000 * 60);
-        const p1ToAmEnd = Math.abs(p1.time - amEnd) / (1000 * 60);
-        const p2ToAmEnd = Math.abs(p2.time - amEnd) / (1000 * 60);
-        const p2ToPmStart = Math.abs(p2.time - pmStart) / (1000 * 60);
-        const p3ToPmStart = Math.abs(p3.time - pmStart) / (1000 * 60);
-        const p3ToPmEnd = Math.abs(p3.time - pmEnd) / (1000 * 60);
-        
-        // Threshold for "close enough" to a shift time (30 minutes)
-        const threshold = 30;
-        
-        let autoFilled = null;
-        
-        // Case 1: Missing AM Start (p1 is close to AM End)
-        if (p1ToAmEnd < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
-            autoFilled = { type: 'AM_START', time: shift.am_start };
-        }
-        // Case 2: Missing AM End (p1 close to AM Start, p2 close to PM Start)
-        else if (p1ToAmStart < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
-            autoFilled = { type: 'AM_END', time: shift.am_end };
-        }
-        // Case 3: Missing PM Start (p1 AM Start, p2 AM End, p3 PM End)
-        else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmEnd < threshold) {
-            autoFilled = { type: 'PM_START', time: shift.pm_start };
-        }
-        // Case 4: Missing PM End (most common - p1 AM Start, p2 AM End, p3 PM Start)
-        else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmStart < threshold) {
-            autoFilled = { type: 'PM_END', time: shift.pm_end };
-        }
-        
-        return { punches: dayPunches, autoFilled };
     };
 
     const getDailyBreakdown = () => {
