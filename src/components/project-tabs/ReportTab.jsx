@@ -31,19 +31,21 @@ export default function ReportTab({ project }) {
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
-        if (!timeStr || timeStr === '—') return '—';
+        // Handle null, undefined, empty string, or dash
+        if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
         
         // If already in AM/PM format, return as is
         if (/AM|PM/i.test(timeStr)) return timeStr;
         
         // Parse 24-hour format (HH:MM or HH:MM:SS)
         const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-        if (!match) return timeStr;
+        if (!match) return '—'; // Return dash if format is invalid
         
         let hours = parseInt(match[1]);
         const minutes = match[2];
-        const period = hours >= 12 ? 'PM' : 'AM';
         
+        // Convert 24-hour to 12-hour format
+        const period = hours >= 12 ? 'PM' : 'AM';
         if (hours > 12) hours -= 12;
         if (hours === 0) hours = 12;
         
