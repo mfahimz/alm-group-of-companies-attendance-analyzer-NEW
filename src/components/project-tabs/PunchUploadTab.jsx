@@ -47,13 +47,20 @@ export default function PunchUploadTab({ project }) {
             return { valid: false, error: 'Empty timestamp', warning: false };
         }
         
-        // Check date format (D/M/YYYY or DD/MM/YYYY)
-        const dateMatch = timestamp.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-        if (!dateMatch) {
+        // Check date format - accept both DD/MM/YYYY and YYYY-MM-DD
+        const ddmmyyyyMatch = timestamp.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        const yyyymmddMatch = timestamp.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+        
+        let day, month, year;
+        
+        if (ddmmyyyyMatch) {
+            [, day, month, year] = ddmmyyyyMatch;
+        } else if (yyyymmddMatch) {
+            [, year, month, day] = yyyymmddMatch;
+        } else {
             return { valid: false, error: 'Invalid date format', warning: false };
         }
         
-        const [, day, month, year] = dateMatch;
         const dayNum = parseInt(day);
         const monthNum = parseInt(month);
         const yearNum = parseInt(year);
@@ -122,14 +129,28 @@ export default function PunchUploadTab({ project }) {
                     
                     // Naser Mohsin Auto Parts format: ID, FirstName, Date, Time (4 columns)
                     if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
-                        let dateStr = values[2];
-                        let timeStr = values[3];
+                        let dateStr = values[2].trim();
+                        let timeStr = values[3].trim();
                         
-                        // Convert YYYY-MM-DD to DD/MM/YYYY if needed
+                        // Parse date and convert to DD/MM/YYYY
+                        let day, month, year;
+                        
+                        // Check if date is in YYYY-MM-DD format
                         const isoDateMatch = dateStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
                         if (isoDateMatch) {
-                            const [, year, month, day] = isoDateMatch;
+                            [, year, month, day] = isoDateMatch;
+                        } else {
+                            // Check if date is in DD/MM/YYYY format
+                            const ddmmyyyyMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                            if (ddmmyyyyMatch) {
+                                [, day, month, year] = ddmmyyyyMatch;
+                            }
+                        }
+                        
+                        // Convert to DD/MM/YYYY
+                        if (day && month && year) {
                             dateStr = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
                         }
                         
                         // Convert time to AM/PM format
@@ -139,13 +160,6 @@ export default function PunchUploadTab({ project }) {
                         
                         // Combine date and time
                         timestamp_raw = `${dateStr} ${timeStr}`;
-                        
-                        // Extract punch_date (YYYY-MM-DD)
-                        const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                        if (dateMatch) {
-                            const [, day, month, year] = dateMatch;
-                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                        }
                     }
                     // Standard format: ID, timestamp (or ID, name, timestamp)
                     else {
