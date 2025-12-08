@@ -122,8 +122,15 @@ export default function PunchUploadTab({ project }) {
                     
                     // Naser Mohsin Auto Parts format: ID, FirstName, Date, Time (4 columns)
                     if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
-                        const dateStr = values[2]; // e.g., "02/10/2025"
-                        let timeStr = values[3]; // e.g., "8:54" or "14:30"
+                        let dateStr = values[2];
+                        let timeStr = values[3];
+                        
+                        // Convert YYYY-MM-DD to DD/MM/YYYY if needed
+                        const isoDateMatch = dateStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+                        if (isoDateMatch) {
+                            const [, year, month, day] = isoDateMatch;
+                            dateStr = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+                        }
                         
                         // Convert time to AM/PM format
                         if (!timeStr.match(/AM|PM/i)) {
@@ -164,14 +171,15 @@ export default function PunchUploadTab({ project }) {
 
                     // Check if employee exists
                     const employeeExists = employees.some(e => e.attendance_id === attendance_id);
-                    if (!employeeExists) {
+                    if (!employeeExists && !newWarnings.includes(`Row ${i + 1}: Unknown employee ${attendance_id}`)) {
                         newWarnings.push(`Row ${i + 1}: Unknown employee ${attendance_id}`);
                     }
 
                     // Validate timestamp
                     const timestampValidation = validateTimestamp(timestamp_raw);
-                    if (!timestampValidation.valid) {
-                        newWarnings.push(`Row ${i + 1} (${attendance_id}): ${timestampValidation.error}`);
+                    const warningKey = `Row ${i + 1} (${attendance_id}): ${timestampValidation.error}`;
+                    if (!timestampValidation.valid && !newWarnings.includes(warningKey)) {
+                        newWarnings.push(warningKey);
                     }
 
                     data.push({
