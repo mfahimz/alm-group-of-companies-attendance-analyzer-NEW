@@ -447,6 +447,11 @@ export default function RunAnalysisTab({ project }) {
                         if (punchTime && shiftStart && punchTime > shiftStart) {
                             const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
                             late_minutes += minutes;
+                            console.log(`[${dateStr}] ${attendance_id}: Late AM - ${minutes} min`, {
+                                punch: firstPunch.timestamp_raw,
+                                shiftStart: shift.am_start,
+                                isSingleShift
+                            });
                         }
                     }
 
