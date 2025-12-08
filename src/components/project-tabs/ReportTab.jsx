@@ -783,8 +783,13 @@ export default function ReportTab({ project }) {
             let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
             
-            // Skip ALL late calculations if any punch was auto-filled
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFillSuggestion) {
+            // Skip late calculations for sick leave, manual present/absent/half, and off days
+            const shouldSkipTimeCalculation = dateException && [
+                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+            ].includes(dateException.type);
+            
+            // Skip ALL late calculations if any punch was auto-filled, partial day, or specific exception types
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFillSuggestion && !shouldSkipTimeCalculation) {
                 // AM shift late check - calculate as long as we have at least one punch
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
