@@ -415,11 +415,10 @@ export default function RunAnalysisTab({ project }) {
                 }
 
                 // Calculate late minutes for both AM and PM shifts
-                if (shift && !partialDayResult.isPartial) {
+                // Skip ALL late calculations if any punch was auto-filled (no real lateness to calculate)
+                if (shift && !partialDayResult.isPartial && !autoFilledPunch) {
                     // AM shift late check (first punch of the day)
-                    // Skip if AM_START or PUNCH_IN was auto-filled
-                    const amStartAutoFilled = autoFilledPunch?.type === 'AM_START' || autoFilledPunch?.type === 'PUNCH_IN';
-                    if (shift.am_start && filteredPunches.length > 0 && !amStartAutoFilled) {
+                    if (shift.am_start && filteredPunches.length > 0) {
                         const firstPunch = filteredPunches[0];
                         const punchTime = parseTime(firstPunch.timestamp_raw);
                         const shiftStart = parseTime(shift.am_start);
@@ -431,9 +430,7 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // PM shift late check (third punch - PM check-in) - skip for single shift
-                    // ONLY calculate PM late if we have actual 4 punches (not when PM_START is auto-filled)
-                    const pmStartAutoFilled = autoFilledPunch?.type === 'PM_START';
-                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 4 && !pmStartAutoFilled) {
+                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 4) {
                         const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
