@@ -273,26 +273,39 @@ export default function ReportTab({ project }) {
             const lastPunch = punchesWithTime[punchesWithTime.length - 1];
             return [firstPunch, lastPunch].map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
         }
-        
+
         const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
-        
+
         const punchesWithTime = punchList.map(p => ({
             ...p,
             time: parseTime(p.timestamp_raw)
         })).filter(p => p.time);
-        
+
         if (punchesWithTime.length === 0) return punchList;
+
+        // Remove exact duplicates (same timestamp within 1 minute)
+        const deduped = [];
+        for (let i = 0; i < punchesWithTime.length; i++) {
+            const current = punchesWithTime[i];
+            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 1);
+            if (!isDuplicate) {
+                deduped.push(current);
+            }
+        }
+
+        if (deduped.length === 0) return punchList;
+        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
 
         let morningPunchIn = null;
         const morningCandidates = [];
-        for (let i = 0; i < punchesWithTime.length; i++) {
+        for (let i = 0; i < sortedPunches.length; i++) {
             if (morningCandidates.length === 0) {
-                morningCandidates.push(punchesWithTime[i]);
+                morningCandidates.push(sortedPunches[i]);
             } else {
                 const firstInCluster = morningCandidates[0];
-                const timeDiff = Math.abs(punchesWithTime[i].time - firstInCluster.time) / (1000 * 60);
+                const timeDiff = Math.abs(sortedPunches[i].time - firstInCluster.time) / (1000 * 60);
                 if (timeDiff <= clusterWindow) {
-                    morningCandidates.push(punchesWithTime[i]);
+                    morningCandidates.push(sortedPunches[i]);
                 } else {
                     break;
                 }
@@ -301,15 +314,15 @@ export default function ReportTab({ project }) {
         morningPunchIn = morningCandidates[0];
 
         let morningPunchOut = null;
-        if (shift && shift.am_end && punchesWithTime.length > 1) {
+        if (shift && shift.am_end && sortedPunches.length > 1) {
             const pmStartTime = shift.pm_start ? parseTime(shift.pm_start) : null;
             const morningClusterEndIndex = morningCandidates.length;
             const amEndCandidates = [];
-            
-            for (let i = morningClusterEndIndex; i < punchesWithTime.length; i++) {
-                const punch = punchesWithTime[i];
+
+            for (let i = morningClusterEndIndex; i < sortedPunches.length; i++) {
+                const punch = sortedPunches[i];
                 if (pmStartTime && punch.time >= pmStartTime) continue;
-                
+
                 if (amEndCandidates.length === 0) {
                     amEndCandidates.push(punch);
                 } else {
@@ -326,16 +339,16 @@ export default function ReportTab({ project }) {
         }
 
         let pmPunchIn = null;
-        const morningOutIndex = morningPunchOut ? punchesWithTime.indexOf(morningPunchOut) : (morningCandidates.length - 1);
+        const morningOutIndex = morningPunchOut ? sortedPunches.indexOf(morningPunchOut) : (morningCandidates.length - 1);
         const pmInCandidates = [];
-        for (let i = morningOutIndex + 1; i < punchesWithTime.length; i++) {
+        for (let i = morningOutIndex + 1; i < sortedPunches.length; i++) {
             if (pmInCandidates.length === 0) {
-                pmInCandidates.push(punchesWithTime[i]);
+                pmInCandidates.push(sortedPunches[i]);
             } else {
                 const firstInCluster = pmInCandidates[0];
-                const timeDiff = Math.abs(punchesWithTime[i].time - firstInCluster.time) / (1000 * 60);
+                const timeDiff = Math.abs(sortedPunches[i].time - firstInCluster.time) / (1000 * 60);
                 if (timeDiff <= clusterWindow) {
-                    pmInCandidates.push(punchesWithTime[i]);
+                    pmInCandidates.push(sortedPunches[i]);
                 } else {
                     break;
                 }
@@ -348,15 +361,15 @@ export default function ReportTab({ project }) {
         let eveningPunchOut = null;
         if (shift && shift.pm_end) {
             const pmEndTime = parseTime(shift.pm_end);
-            const afterShiftPunches = punchesWithTime.filter(p => p.time >= pmEndTime);
-            
+            const afterShiftPunches = sortedPunches.filter(p => p.time >= pmEndTime);
+
             if (afterShiftPunches.length > 0) {
                 eveningPunchOut = afterShiftPunches[afterShiftPunches.length - 1];
-            } else if (punchesWithTime.length > 0) {
-                eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+            } else if (sortedPunches.length > 0) {
+                eveningPunchOut = sortedPunches[sortedPunches.length - 1];
             }
-        } else if (punchesWithTime.length > 0) {
-            eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+        } else if (sortedPunches.length > 0) {
+            eveningPunchOut = sortedPunches[sortedPunches.length - 1];
         }
 
         const filtered = [];

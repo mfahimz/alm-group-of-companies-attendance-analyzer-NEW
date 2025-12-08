@@ -573,44 +573,57 @@ export default function RunAnalysisTab({ project }) {
     const filterMultiplePunches = (punchList, shift) => {
         // Always process to identify the key punches
         if (punchList.length <= 1) return punchList;
-        
+
         // For single shift employees, only keep first and last punch
         if (shift?.is_single_shift) {
             const punchesWithTime = punchList.map(p => ({
                 ...p,
                 time: parseTime(p.timestamp_raw)
             })).filter(p => p.time).sort((a, b) => a.time - b.time);
-            
+
             if (punchesWithTime.length <= 2) return punchList;
-            
+
             // Return first and last punch only
             const firstPunch = punchesWithTime[0];
             const lastPunch = punchesWithTime[punchesWithTime.length - 1];
             return [firstPunch, lastPunch].map(fp => punchList.find(p => p.id === fp.id)).filter(Boolean);
         }
-        
+
         // Get cluster window from rules, default to 10 minutes
         const clusterWindow = rules?.punch_filtering?.cluster_window_minutes ?? 10;
-        
+
         const punchesWithTime = punchList.map(p => ({
             ...p,
             time: parseTime(p.timestamp_raw)
         })).filter(p => p.time);
-        
+
         if (punchesWithTime.length === 0) return punchList;
+
+        // Remove exact duplicates (same timestamp within 1 minute)
+        const deduped = [];
+        for (let i = 0; i < punchesWithTime.length; i++) {
+            const current = punchesWithTime[i];
+            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 1);
+            if (!isDuplicate) {
+                deduped.push(current);
+            }
+        }
+
+        if (deduped.length === 0) return punchList;
+        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
 
         // 1. Morning Punch-In: Keep first punch in the cluster window
         let morningPunchIn = null;
         const morningCandidates = [];
-        for (let i = 0; i < punchesWithTime.length; i++) {
+        for (let i = 0; i < sortedPunches.length; i++) {
             if (morningCandidates.length === 0) {
-                morningCandidates.push(punchesWithTime[i]);
+                morningCandidates.push(sortedPunches[i]);
             } else {
                 // Compare against the FIRST punch in cluster, not the last
                 const firstInCluster = morningCandidates[0];
-                const timeDiff = Math.abs(punchesWithTime[i].time - firstInCluster.time) / (1000 * 60);
+                const timeDiff = Math.abs(sortedPunches[i].time - firstInCluster.time) / (1000 * 60);
                 if (timeDiff <= clusterWindow) {
-                    morningCandidates.push(punchesWithTime[i]);
+                    morningCandidates.push(sortedPunches[i]);
                 } else {
                     break;
                 }
@@ -620,17 +633,17 @@ export default function RunAnalysisTab({ project }) {
 
         // 2. Morning Punch-Out: Keep last punch before PM start
         let morningPunchOut = null;
-        if (shift && shift.am_end && punchesWithTime.length > 1) {
+        if (shift && shift.am_end && sortedPunches.length > 1) {
             const pmStartTime = shift.pm_start ? parseTime(shift.pm_start) : null;
-            
+
             // Find punches around AM end time (not in morning cluster)
             const morningClusterEndIndex = morningCandidates.length;
             const amEndCandidates = [];
-            
-            for (let i = morningClusterEndIndex; i < punchesWithTime.length; i++) {
-                const punch = punchesWithTime[i];
+
+            for (let i = morningClusterEndIndex; i < sortedPunches.length; i++) {
+                const punch = sortedPunches[i];
                 if (pmStartTime && punch.time >= pmStartTime) continue;
-                
+
                 if (amEndCandidates.length === 0) {
                     amEndCandidates.push(punch);
                 } else {
@@ -649,17 +662,17 @@ export default function RunAnalysisTab({ project }) {
 
         // 3. PM Punch-In: First punch after AM punch-out cluster
         let pmPunchIn = null;
-        const morningOutIndex = morningPunchOut ? punchesWithTime.indexOf(morningPunchOut) : (morningCandidates.length - 1);
+        const morningOutIndex = morningPunchOut ? sortedPunches.indexOf(morningPunchOut) : (morningCandidates.length - 1);
         const pmInCandidates = [];
-        for (let i = morningOutIndex + 1; i < punchesWithTime.length; i++) {
+        for (let i = morningOutIndex + 1; i < sortedPunches.length; i++) {
             if (pmInCandidates.length === 0) {
-                pmInCandidates.push(punchesWithTime[i]);
+                pmInCandidates.push(sortedPunches[i]);
             } else {
                 // Compare against the FIRST punch in this cluster
                 const firstInCluster = pmInCandidates[0];
-                const timeDiff = Math.abs(punchesWithTime[i].time - firstInCluster.time) / (1000 * 60);
+                const timeDiff = Math.abs(sortedPunches[i].time - firstInCluster.time) / (1000 * 60);
                 if (timeDiff <= clusterWindow) {
-                    pmInCandidates.push(punchesWithTime[i]);
+                    pmInCandidates.push(sortedPunches[i]);
                 } else {
                     break;
                 }
@@ -673,15 +686,15 @@ export default function RunAnalysisTab({ project }) {
         let eveningPunchOut = null;
         if (shift && shift.pm_end) {
             const pmEndTime = parseTime(shift.pm_end);
-            const afterShiftPunches = punchesWithTime.filter(p => p.time >= pmEndTime);
-            
+            const afterShiftPunches = sortedPunches.filter(p => p.time >= pmEndTime);
+
             if (afterShiftPunches.length > 0) {
                 eveningPunchOut = afterShiftPunches[afterShiftPunches.length - 1];
-            } else if (punchesWithTime.length > 0) {
-                eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+            } else if (sortedPunches.length > 0) {
+                eveningPunchOut = sortedPunches[sortedPunches.length - 1];
             }
-        } else if (punchesWithTime.length > 0) {
-            eveningPunchOut = punchesWithTime[punchesWithTime.length - 1];
+        } else if (sortedPunches.length > 0) {
+            eveningPunchOut = sortedPunches[sortedPunches.length - 1];
         }
 
         // Build filtered result
