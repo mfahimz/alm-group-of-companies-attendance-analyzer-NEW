@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, AlertTriangle, Search, Trash2, Eye } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Eye, Edit } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
@@ -22,6 +22,7 @@ export default function PunchUploadTab({ project }) {
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+    const [editingPunch, setEditingPunch] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -244,6 +245,18 @@ export default function PunchUploadTab({ project }) {
         onError: (error) => {
             toast.error('Failed to upload punches: ' + (error.message || 'Unknown error'));
             setUploadProgress(null);
+        }
+    });
+
+    const updatePunchMutation = useMutation({
+        mutationFn: ({ id, data }) => base44.entities.Punch.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['punches', project.id]);
+            setEditingPunch(null);
+            toast.success('Punch updated');
+        },
+        onError: () => {
+            toast.error('Failed to update punch');
         }
     });
 
@@ -487,19 +500,71 @@ export default function PunchUploadTab({ project }) {
                                                 </TableCell>
                                                 <TableCell className="font-medium">{punch.attendance_id}</TableCell>
                                                 <TableCell>{punch.employee_name}</TableCell>
-                                                <TableCell>{punch.timestamp_raw}</TableCell>
+                                                <TableCell>
+                                                    {editingPunch?.id === punch.id ? (
+                                                        <Input
+                                                            value={editingPunch.timestamp_raw}
+                                                            onChange={(e) => setEditingPunch({ ...editingPunch, timestamp_raw: e.target.value })}
+                                                            className="h-8 w-48"
+                                                        />
+                                                    ) : (
+                                                        punch.timestamp_raw
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => {
-                                                            if (window.confirm('Delete this punch record?')) {
-                                                                deleteMutation.mutate(punch.id);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-red-600" />
-                                                    </Button>
+                                                    <div className="flex gap-1 justify-end">
+                                                        {editingPunch?.id === punch.id ? (
+                                                            <>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => {
+                                                                        const dateMatch = editingPunch.timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                                                                        let punch_date = editingPunch.punch_date;
+                                                                        if (dateMatch) {
+                                                                            const [, day, month, year] = dateMatch;
+                                                                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                                                                        }
+                                                                        updatePunchMutation.mutate({
+                                                                            id: editingPunch.id,
+                                                                            data: { timestamp_raw: editingPunch.timestamp_raw, punch_date }
+                                                                        });
+                                                                    }}
+                                                                    className="text-green-600"
+                                                                >
+                                                                    Save
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => setEditingPunch(null)}
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => setEditingPunch(punch)}
+                                                                >
+                                                                    <Edit className="w-4 h-4 text-indigo-600" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => {
+                                                                        if (window.confirm('Delete this punch record?')) {
+                                                                            deleteMutation.mutate(punch.id);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                                </Button>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
