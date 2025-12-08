@@ -120,8 +120,9 @@ export default function PunchUploadTab({ project }) {
                     let timestamp_raw = '';
                     let punch_date = '';
                     
-                    // Check if we have 4 columns: ID, Name, Date, Time (Naser Mohsin format)
-                    if (values.length >= 4 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/) && values[3].match(/\d{1,2}:\d{2}/)) {
+                    // Check if we have 4 columns: ID, Name, Date, Time (Naser Mohsin Auto Parts format only)
+                    const isNaserMohsin = project.company === 'Naser Mohsin Auto Parts';
+                    if (isNaserMohsin && values.length >= 4 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/) && values[3].match(/\d{1,2}:\d{2}/)) {
                         // Format: ID, Name, Date, Time (separate columns)
                         const dateStr = values[2]; // e.g., "02/10/2025"
                         let timeStr = values[3]; // e.g., "8:54" or "14:30"
