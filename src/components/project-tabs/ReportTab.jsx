@@ -361,14 +361,36 @@ export default function ReportTab({ project }) {
                 return currentDate >= exFrom && currentDate <= exTo;
             });
 
+            // Helper to check if shift is effective on current date
+            const isShiftEffective = (s) => {
+                if (!s.effective_from || !s.effective_to) return true;
+                const from = new Date(s.effective_from);
+                const to = new Date(s.effective_to);
+                const currentDateOnly = new Date(currentDate);
+                currentDateOnly.setHours(0, 0, 0, 0);
+                const fromDateOnly = new Date(from);
+                fromDateOnly.setHours(0, 0, 0, 0);
+                const toDateOnly = new Date(to);
+                toDateOnly.setHours(0, 0, 0, 0);
+                return currentDateOnly >= fromDateOnly && currentDateOnly <= toDateOnly;
+            };
+
             let shift = null;
-            shift = employeeShifts.find(s => s.date === dateStr);
+            // First check for date-specific shift that is effective on this date
+            shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
+            
+            // If no date-specific shift, check for day-based shift that is effective
             if (!shift) {
-                if (dayOfWeek === 5) {
-                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
-                    if (!shift) shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                if (dayOfWeek === 5) { // Friday
+                    // Look for general Friday shift (not date-specific) that is effective on this date
+                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
+                    // Fallback to regular shift if no Friday-specific shift exists (that is effective)
+                    if (!shift) {
+                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                    }
                 } else {
-                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                    // Look for regular working day shift (not Friday, not date-specific) that is effective
+                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                 }
             }
 
@@ -717,22 +739,36 @@ export default function ReportTab({ project }) {
                 return currentDate >= exFrom && currentDate <= exTo;
             });
 
+            // Helper to check if shift is effective on current date
+            const isShiftEffective = (s) => {
+                if (!s.effective_from || !s.effective_to) return true;
+                const from = new Date(s.effective_from);
+                const to = new Date(s.effective_to);
+                const currentDateOnly = new Date(currentDate);
+                currentDateOnly.setHours(0, 0, 0, 0);
+                const fromDateOnly = new Date(from);
+                fromDateOnly.setHours(0, 0, 0, 0);
+                const toDateOnly = new Date(to);
+                toDateOnly.setHours(0, 0, 0, 0);
+                return currentDateOnly >= fromDateOnly && currentDateOnly <= toDateOnly;
+            };
+
             let shift = null;
-            // First check for date-specific shift
-            shift = employeeShifts.find(s => s.date === dateStr);
+            // First check for date-specific shift that is effective on this date
+            shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
             
-            // If no date-specific shift, check for day-based shift
+            // If no date-specific shift, check for day-based shift that is effective
             if (!shift) {
                 if (dayOfWeek === 5) { // Friday
-                    // Look for general Friday shift (not date-specific)
-                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date);
-                    // Fallback to regular shift if no Friday-specific shift exists
+                    // Look for general Friday shift (not date-specific) that is effective on this date
+                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
+                    // Fallback to regular shift if no Friday-specific shift exists (that is effective)
                     if (!shift) {
-                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                     }
                 } else {
-                    // Look for regular working day shift (not Friday, not date-specific)
-                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date);
+                    // Look for regular working day shift (not Friday, not date-specific) that is effective
+                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                 }
             }
 
