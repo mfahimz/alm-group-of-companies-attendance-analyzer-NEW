@@ -7,12 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, AlertTriangle, Search, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 
 export default function PunchUploadTab({ project }) {
     const [file, setFile] = useState(null);
     const [parsedData, setParsedData] = useState([]);
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewData, setPreviewData] = useState([]);
     const [warnings, setWarnings] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFrom, setDateFrom] = useState('');
@@ -91,11 +94,30 @@ export default function PunchUploadTab({ project }) {
                 }
             }
 
-            setParsedData(data);
+            setPreviewData(data);
+            setShowPreview(true);
             setWarnings([...new Set(newWarnings)]);
             toast.success(`Parsed ${data.length} punch records`);
         };
         reader.readAsText(file);
+    };
+
+    const handleConfirmImport = () => {
+        setParsedData(previewData);
+        setShowPreview(false);
+        toast.success(`${previewData.length} punches ready to upload`);
+    };
+
+    const handleEditPreview = (index, field, value) => {
+        setPreviewData(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], [field]: value };
+            return updated;
+        });
+    };
+
+    const handleDeletePreviewRow = (index) => {
+        setPreviewData(prev => prev.filter((_, i) => i !== index));
     };
 
     const uploadMutation = useMutation({
@@ -397,9 +419,9 @@ export default function PunchUploadTab({ project }) {
                     )}
                 </CardContent>
             </Card>
-
-            {/* Preview Dialog */}
-            <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        </div>
+    );
+}
                 <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Preview Import Data ({previewData.length} punches)</DialogTitle>
