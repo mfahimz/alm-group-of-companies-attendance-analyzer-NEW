@@ -373,17 +373,24 @@ export default function RunAnalysisTab({ project }) {
             // Check if employee has single shift (from shift timing)
             const isSingleShift = shift?.is_single_shift || false;
             
-            // Auto-fill missing punch (Conservative mode - only for regular shifts with exactly 3 punches)
+            // Auto-fill missing punch (Conservative mode)
             let autoFilledPunch = null;
-            if (!isSingleShift && filteredPunches.length === 3 && shift) {
-                const autoFillResult = detectAndAutoFillMissingPunch(filteredPunches, shift);
-                autoFilledPunch = autoFillResult.autoFilled;
-                if (autoFilledPunch) {
-                    auto_resolutions.push({
-                        date: dateStr,
-                        type: 'MISSING_PUNCH_AUTO_FILL',
-                        details: `Auto-filled ${autoFilledPunch.type.replace('_', ' ')} with ${autoFilledPunch.time}`
-                    });
+            if (shift) {
+                // For single shift: auto-fill if exactly 1 punch
+                // For regular shift: auto-fill if exactly 3 punches
+                const shouldAutoFill = (isSingleShift && filteredPunches.length === 1) || 
+                                       (!isSingleShift && filteredPunches.length === 3);
+                
+                if (shouldAutoFill) {
+                    const autoFillResult = detectAndAutoFillMissingPunch(filteredPunches, shift, isSingleShift);
+                    autoFilledPunch = autoFillResult.autoFilled;
+                    if (autoFilledPunch) {
+                        auto_resolutions.push({
+                            date: dateStr,
+                            type: 'MISSING_PUNCH_AUTO_FILL',
+                            details: `Auto-filled ${autoFilledPunch.type.replace(/_/g, ' ')} with ${autoFilledPunch.time}`
+                        });
+                    }
                 }
             }
 
