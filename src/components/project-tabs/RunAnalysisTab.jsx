@@ -143,7 +143,18 @@ export default function RunAnalysisTab({ project }) {
             const shiftStart = parseTime(shift.am_start);
             const shiftEnd = parseTime(shift.pm_end);
             
-            if (!shiftStart || !shiftEnd) return { punches: dayPunches, autoFilled: null };
+            console.log('Auto-fill check for single shift:', {
+                shiftStart: shift.am_start,
+                shiftEnd: shift.pm_end,
+                shiftStartParsed: shiftStart,
+                shiftEndParsed: shiftEnd,
+                punch: punchesWithTime[0].timestamp_raw
+            });
+            
+            if (!shiftStart || !shiftEnd) {
+                console.log('Auto-fill FAILED: Cannot parse shift times');
+                return { punches: dayPunches, autoFilled: null };
+            }
             
             const singlePunch = punchesWithTime[0];
             const threshold = 30; // 30 minutes threshold
@@ -151,15 +162,25 @@ export default function RunAnalysisTab({ project }) {
             const toStart = Math.abs(singlePunch.time - shiftStart) / (1000 * 60);
             const toEnd = Math.abs(singlePunch.time - shiftEnd) / (1000 * 60);
             
+            console.log('Auto-fill distances:', {
+                toStart: Math.round(toStart),
+                toEnd: Math.round(toEnd),
+                threshold
+            });
+            
             let autoFilled = null;
             
             // If punch is closer to shift start, auto-fill punch out
             if (toStart < toEnd && toStart < threshold) {
                 autoFilled = { type: 'PUNCH_OUT', time: shift.pm_end };
+                console.log('Auto-fill PUNCH_OUT triggered');
             }
             // If punch is closer to shift end, auto-fill punch in
             else if (toEnd < toStart && toEnd < threshold) {
                 autoFilled = { type: 'PUNCH_IN', time: shift.am_start };
+                console.log('Auto-fill PUNCH_IN triggered');
+            } else {
+                console.log('Auto-fill NOT triggered: Conditions not met');
             }
             
             return { punches: dayPunches, autoFilled };
