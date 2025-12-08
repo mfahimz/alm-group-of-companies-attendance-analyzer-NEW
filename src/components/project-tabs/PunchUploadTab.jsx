@@ -370,12 +370,25 @@ export default function PunchUploadTab({ project }) {
                             accept=".csv"
                             onChange={handleFileChange}
                         />
-                        <p className="text-sm text-slate-500 mt-2">
-                            CSV format: attendance_id, name (optional), timestamp
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                            Timestamp format: DD/MM/YYYY HH:MM AM/PM (e.g., 02/10/2025 8:54 AM)
-                        </p>
+                        {project.company === 'Naser Mohsin Auto Parts' ? (
+                            <>
+                                <p className="text-sm text-slate-500 mt-2">
+                                    CSV format: attendance_id, first_name, date, time
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Date format: DD/MM/YYYY, Time format: HH:MM (will be converted to AM/PM automatically)
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-slate-500 mt-2">
+                                    CSV format: attendance_id, name (optional), timestamp
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Timestamp format: DD/MM/YYYY HH:MM AM/PM (e.g., 02/10/2025 8:54 AM)
+                                </p>
+                            </>
+                        )}
                     </div>
 
                     {warnings.length > 0 && (
