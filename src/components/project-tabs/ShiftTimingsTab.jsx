@@ -213,7 +213,7 @@ export default function ShiftTimingsTab({ project }) {
 
     const handleUpdatePreviewRow = (index, field, value) => {
         setParsedData(prev => prev.map((row, i) => 
-            i === index ? { ...row, [field]: normalizeTime(value) } : row
+            i === index ? { ...row, [field]: value } : row
         ));
     };
 
