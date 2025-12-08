@@ -87,6 +87,27 @@ export default function PunchUploadTab({ project }) {
         return { valid: true, error: null, warning: false };
     };
 
+    // Helper function to convert 24-hour time to 12-hour AM/PM format
+    const convertTo12Hour = (timeStr) => {
+        if (!timeStr) return timeStr;
+        
+        // Already in AM/PM format
+        if (/AM|PM/i.test(timeStr)) return timeStr;
+        
+        // Match 24-hour format: HH:MM or H:MM
+        const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (!match) return timeStr;
+        
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        
+        const period = hours >= 12 ? 'PM' : 'AM';
+        if (hours > 12) hours -= 12;
+        if (hours === 0) hours = 12;
+        
+        return `${hours}:${minutes} ${period}`;
+    };
+
     const parseCSV = (file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -101,10 +122,21 @@ export default function PunchUploadTab({ project }) {
                 const values = lines[i].split(',').map(v => v.trim());
                 if (values.length >= 2) {
                     const attendance_id = values[0];
-                    
-                    // Detect which column is the timestamp by checking for date pattern (supports D/M/YYYY or DD/MM/YYYY)
                     let timestamp_raw = '';
-                    if (values[1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
+                    
+                    // Check if this is a 4-column format: ID, Name, Date, Time (separate columns)
+                    if (values.length >= 4 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/) && values[3].match(/\d{1,2}:\d{2}/)) {
+                        // Format: ID, Name, Date, Time (Naser Mohsin Auto Parts format)
+                        const date = values[2]; // DD/MM/YYYY
+                        let time = values[3]; // HH:MM or HH:MM AM/PM
+                        
+                        // Convert time to AM/PM format if it's in 24-hour format
+                        time = convertTo12Hour(time);
+                        
+                        timestamp_raw = `${date} ${time}`;
+                    }
+                    // Check for standard format with date in timestamp
+                    else if (values[1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
                         // Format: ID, timestamp
                         timestamp_raw = values[1];
                     } else if (values.length >= 3 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
