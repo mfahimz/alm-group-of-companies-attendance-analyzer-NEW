@@ -424,8 +424,13 @@ export default function ReportTab({ project }) {
             }
 
             // Calculate late and early checkout for non-overridden days
-            // Skip ALL late calculations if any punch was auto-filled
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFilledPunch) {
+            // Skip late calculations for sick leave, manual present/absent/half, and off days
+            const shouldSkipTimeCalculation = dateException && [
+                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+            ].includes(dateException.type);
+            
+            // Skip ALL late calculations if any punch was auto-filled, partial day, or specific exception types
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFilledPunch && !shouldSkipTimeCalculation) {
                 // AM late - calculate as long as we have at least one punch
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
@@ -784,12 +789,12 @@ export default function ReportTab({ project }) {
             let earlyCheckoutInfo = '';
             
             // Skip late calculations for sick leave, manual present/absent/half, and off days
-            const shouldSkipTimeCalculation = dateException && [
+            const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
             // Skip ALL late calculations if any punch was auto-filled, partial day, or specific exception types
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFillSuggestion && !shouldSkipTimeCalculation) {
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFillSuggestion && !shouldSkipTimeCalc) {
                 // AM shift late check - calculate as long as we have at least one punch
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
