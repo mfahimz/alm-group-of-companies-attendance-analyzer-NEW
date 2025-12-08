@@ -129,7 +129,7 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
-    // Detect which punch is missing and auto-fill it (Conservative mode)
+    // Detect which punch is missing and auto-fill it (Intelligent mode)
     const detectAndAutoFillMissingPunch = (dayPunches, shift, isSingleShift) => {
         if (!shift) return { punches: dayPunches, autoFilled: null };
         
@@ -143,44 +143,19 @@ export default function RunAnalysisTab({ project }) {
             const shiftStart = parseTime(shift.am_start);
             const shiftEnd = parseTime(shift.pm_end);
             
-            console.log('Auto-fill check for single shift:', {
-                shiftStart: shift.am_start,
-                shiftEnd: shift.pm_end,
-                shiftStartParsed: shiftStart,
-                shiftEndParsed: shiftEnd,
-                punch: punchesWithTime[0].timestamp_raw
-            });
-            
-            if (!shiftStart || !shiftEnd) {
-                console.log('Auto-fill FAILED: Cannot parse shift times');
-                return { punches: dayPunches, autoFilled: null };
-            }
+            if (!shiftStart || !shiftEnd) return { punches: dayPunches, autoFilled: null };
             
             const singlePunch = punchesWithTime[0];
-            const threshold = 30; // 30 minutes threshold
+            const shiftMidpoint = new Date((shiftStart.getTime() + shiftEnd.getTime()) / 2);
             
-            const toStart = Math.abs(singlePunch.time - shiftStart) / (1000 * 60);
-            const toEnd = Math.abs(singlePunch.time - shiftEnd) / (1000 * 60);
-            
-            console.log('Auto-fill distances:', {
-                toStart: Math.round(toStart),
-                toEnd: Math.round(toEnd),
-                threshold
-            });
-            
+            // Determine if punch is closer to start or end
+            // If punch is before midpoint, assume it's punch in -> auto-fill punch out
+            // If punch is after midpoint, assume it's punch out -> auto-fill punch in
             let autoFilled = null;
-            
-            // If punch is closer to shift start, auto-fill punch out
-            if (toStart < toEnd && toStart < threshold) {
+            if (singlePunch.time < shiftMidpoint) {
                 autoFilled = { type: 'PUNCH_OUT', time: shift.pm_end };
-                console.log('Auto-fill PUNCH_OUT triggered');
-            }
-            // If punch is closer to shift end, auto-fill punch in
-            else if (toEnd < toStart && toEnd < threshold) {
-                autoFilled = { type: 'PUNCH_IN', time: shift.am_start };
-                console.log('Auto-fill PUNCH_IN triggered');
             } else {
-                console.log('Auto-fill NOT triggered: Conditions not met');
+                autoFilled = { type: 'PUNCH_IN', time: shift.am_start };
             }
             
             return { punches: dayPunches, autoFilled };
@@ -197,7 +172,7 @@ export default function RunAnalysisTab({ project }) {
             
             const [p1, p2, p3] = punchesWithTime;
             
-            // Calculate time differences to each expected punch time
+            // Calculate distances from each punch to expected shift times
             const p1ToAmStart = Math.abs(p1.time - amStart) / (1000 * 60);
             const p1ToAmEnd = Math.abs(p1.time - amEnd) / (1000 * 60);
             const p2ToAmEnd = Math.abs(p2.time - amEnd) / (1000 * 60);
@@ -205,23 +180,28 @@ export default function RunAnalysisTab({ project }) {
             const p3ToPmStart = Math.abs(p3.time - pmStart) / (1000 * 60);
             const p3ToPmEnd = Math.abs(p3.time - pmEnd) / (1000 * 60);
             
-            const threshold = 30;
             let autoFilled = null;
             
-            // Case 1: Missing AM Start (p1 is close to AM End)
-            if (p1ToAmEnd < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
-                autoFilled = { type: 'AM_START', time: shift.am_start };
-            }
-            // Case 2: Missing AM End (p1 close to AM Start, p2 close to PM Start)
-            else if (p1ToAmStart < threshold && p2ToPmStart < threshold && p3ToPmEnd < threshold) {
-                autoFilled = { type: 'AM_END', time: shift.am_end };
-            }
-            // Case 3: Missing PM Start (p1 AM Start, p2 AM End, p3 PM End)
-            else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmEnd < threshold) {
+            // Determine position of each punch by finding closest match
+            const p1IsAmStart = p1ToAmStart < p1ToAmEnd;
+            const p2IsAmEnd = p2ToAmEnd < p2ToPmStart;
+            const p3IsPmEnd = p3ToPmEnd < p3ToPmStart;
+            
+            // Based on pattern, determine missing punch
+            if (p1IsAmStart && p2IsAmEnd && p3IsPmEnd) {
+                // Pattern: AM Start, AM End, PM End -> Missing PM Start
                 autoFilled = { type: 'PM_START', time: shift.pm_start };
-            }
-            // Case 4: Missing PM End (most common - p1 AM Start, p2 AM End, p3 PM Start)
-            else if (p1ToAmStart < threshold && p2ToAmEnd < threshold && p3ToPmStart < threshold) {
+            } else if (p1IsAmStart && !p2IsAmEnd && p3IsPmEnd) {
+                // Pattern: AM Start, PM Start, PM End -> Missing AM End
+                autoFilled = { type: 'AM_END', time: shift.am_end };
+            } else if (p1IsAmStart && p2IsAmEnd && !p3IsPmEnd) {
+                // Pattern: AM Start, AM End, PM Start -> Missing PM End
+                autoFilled = { type: 'PM_END', time: shift.pm_end };
+            } else if (!p1IsAmStart && p2IsAmEnd && p3IsPmEnd) {
+                // Pattern: AM End, PM Start, PM End -> Missing AM Start
+                autoFilled = { type: 'AM_START', time: shift.am_start };
+            } else {
+                // Fallback: Use most common case - missing PM End
                 autoFilled = { type: 'PM_END', time: shift.pm_end };
             }
             
