@@ -44,13 +44,13 @@ export default function PunchUploadTab({ project }) {
 
     const validateTimestamp = (timestamp) => {
         if (!timestamp || timestamp.trim() === '') {
-            return { valid: false, error: 'Empty timestamp' };
+            return { valid: false, error: 'Empty timestamp', warning: false };
         }
         
         // Check date format (D/M/YYYY or DD/MM/YYYY)
         const dateMatch = timestamp.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
         if (!dateMatch) {
-            return { valid: false, error: 'Invalid date format' };
+            return { valid: false, error: 'Invalid date format', warning: false };
         }
         
         const [, day, month, year] = dateMatch;
@@ -59,13 +59,15 @@ export default function PunchUploadTab({ project }) {
         const yearNum = parseInt(year);
         
         if (dayNum < 1 || dayNum > 31) {
-            return { valid: false, error: 'Invalid day (1-31)' };
+            return { valid: false, error: 'Invalid day (1-31)', warning: false };
         }
         if (monthNum < 1 || monthNum > 12) {
-            return { valid: false, error: 'Invalid month (1-12)' };
+            return { valid: false, error: 'Invalid month (1-12)', warning: false };
         }
+        
+        // Make year validation a warning, not an error
         if (yearNum < 2020 || yearNum > 2030) {
-            return { valid: false, error: 'Year out of range' };
+            return { valid: true, error: 'Year seems unusual', warning: true };
         }
         
         // Check time format if present
@@ -75,14 +77,14 @@ export default function PunchUploadTab({ project }) {
             const minutes = parseInt(timeMatch[2]);
             
             if (hours < 1 || hours > 12) {
-                return { valid: false, error: 'Hours must be 1-12' };
+                return { valid: false, error: 'Hours must be 1-12', warning: false };
             }
             if (minutes < 0 || minutes > 59) {
-                return { valid: false, error: 'Minutes must be 0-59' };
+                return { valid: false, error: 'Minutes must be 0-59', warning: false };
             }
         }
         
-        return { valid: true, error: null };
+        return { valid: true, error: null, warning: false };
     };
 
     const parseCSV = (file) => {
@@ -490,9 +492,30 @@ export default function PunchUploadTab({ project }) {
                                                     <Input
                                                         value={row.timestamp_raw}
                                                         onChange={(e) => {
-                                                            setParsedData(prev => prev.map((r, i) => 
-                                                                i === index ? { ...r, timestamp_raw: e.target.value } : r
-                                                            ));
+                                                            const newTimestamp = e.target.value;
+                                                            setParsedData(prev => prev.map((r, i) => {
+                                                                if (i === index) {
+                                                                    // Recalculate punch_date when timestamp changes
+                                                                    const dateMatch = newTimestamp.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                                                                    let punch_date = '';
+                                                                    if (dateMatch) {
+                                                                        const [, day, month, year] = dateMatch;
+                                                                        punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                                                                    }
+                                                                    
+                                                                    // Re-validate
+                                                                    const timestampValidation = validateTimestamp(newTimestamp);
+                                                                    
+                                                                    return { 
+                                                                        ...r, 
+                                                                        timestamp_raw: newTimestamp,
+                                                                        punch_date,
+                                                                        timestampValidation,
+                                                                        hasInvalidTimestamp: !timestampValidation.valid
+                                                                    };
+                                                                }
+                                                                return r;
+                                                            }));
                                                         }}
                                                         className={`h-8 w-48 ${row.timestampValidation?.valid === false ? 'border-red-500' : ''}`}
                                                     />
