@@ -417,7 +417,9 @@ export default function RunAnalysisTab({ project }) {
                 // Calculate late minutes for both AM and PM shifts
                 if (shift && !partialDayResult.isPartial) {
                     // AM shift late check (first punch of the day)
-                    if (shift.am_start && filteredPunches.length > 0) {
+                    // Skip if AM_START or PUNCH_IN was auto-filled
+                    const amStartAutoFilled = autoFilledPunch?.type === 'AM_START' || autoFilledPunch?.type === 'PUNCH_IN';
+                    if (shift.am_start && filteredPunches.length > 0 && !amStartAutoFilled) {
                         const firstPunch = filteredPunches[0];
                         const punchTime = parseTime(firstPunch.timestamp_raw);
                         const shiftStart = parseTime(shift.am_start);
