@@ -419,9 +419,9 @@ export default function PunchUploadTab({ project }) {
                     )}
                 </CardContent>
             </Card>
-        </div>
-    );
-}
+
+            {/* Preview Dialog */}
+            <Dialog open={showPreview} onOpenChange={setShowPreview}>
                 <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Preview Import Data ({previewData.length} punches)</DialogTitle>
