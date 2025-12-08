@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditShiftDialog from './EditShiftDialog';
@@ -28,6 +29,7 @@ export default function ShiftTimingsTab({ project }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [editingBlockRange, setEditingBlockRange] = useState(null);
+    const [showPreviewDialog, setShowPreviewDialog] = useState(false);
     const [blockDateRanges, setBlockDateRanges] = useState({
         block1: { from: project.date_from, to: project.date_to },
         block2: { from: project.date_from, to: project.date_to }
@@ -172,7 +174,7 @@ export default function ShiftTimingsTab({ project }) {
 
             setParsedData(data);
             setWarnings([...new Set(newWarnings)]);
-            toast.success(`Parsed ${data.length} shift records`);
+            setShowPreviewDialog(true);
         };
         reader.readAsText(file);
     };
@@ -202,11 +204,18 @@ export default function ShiftTimingsTab({ project }) {
             toast.success('Shift timings uploaded successfully');
             setParsedData([]);
             setFile(null);
+            setShowPreviewDialog(false);
         },
         onError: () => {
             toast.error('Failed to upload shift timings');
         }
     });
+
+    const handleUpdatePreviewRow = (index, field, value) => {
+        setParsedData(prev => prev.map((row, i) => 
+            i === index ? { ...row, [field]: normalizeTime(value) } : row
+        ));
+    };
 
     const updateBlockRangeMutation = useMutation({
         mutationFn: async ({ block, newRange }) => {
@@ -643,15 +652,14 @@ export default function ShiftTimingsTab({ project }) {
                     {parsedData.length > 0 && (
                         <div>
                             <p className="text-sm text-slate-600 mb-2">
-                                Preview: {parsedData.length} records ready to upload to {selectedBlock === 'block1' ? 'Block 1' : 'Block 2'}
+                                {parsedData.length} records parsed and ready for review
                             </p>
                             <Button 
-                                onClick={() => uploadMutation.mutate()}
-                                disabled={uploadMutation.isPending}
-                                className="bg-indigo-600 hover:bg-indigo-700"
+                                onClick={() => setShowPreviewDialog(true)}
+                                variant="outline"
                             >
-                                <Upload className="w-4 h-4 mr-2" />
-                                {uploadMutation.isPending ? 'Uploading...' : `Upload to ${selectedBlock === 'block1' ? 'Block 1' : 'Block 2'}`}
+                                <Eye className="w-4 h-4 mr-2" />
+                                Preview & Edit
                             </Button>
                         </div>
                     )}
@@ -671,6 +679,123 @@ export default function ShiftTimingsTab({ project }) {
                 shift={editingShift}
                 projectId={project.id}
             />
+
+            {/* Preview Dialog */}
+            <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+                <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Preview & Edit Shift Data</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm text-slate-600">
+                                {parsedData.length} shifts | Uploading to: <strong>{selectedBlock === 'block1' ? 'Block 1' : 'Block 2'}</strong> ({new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')})
+                            </p>
+                        </div>
+                        
+                        {warnings.length > 0 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium text-amber-900">Warnings</p>
+                                        <ul className="text-xs text-amber-700 mt-1 space-y-0.5">
+                                            {warnings.map((warning, idx) => (
+                                                <li key={idx}>• {warning}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>AM Start</TableHead>
+                                        <TableHead>AM End</TableHead>
+                                        <TableHead>PM Start</TableHead>
+                                        <TableHead>PM End</TableHead>
+                                        <TableHead>Days</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {parsedData.map((row, index) => {
+                                        const employee = employees.find(e => e.attendance_id === row.attendance_id);
+                                        return (
+                                            <TableRow key={index} className={!row.employeeExists ? 'bg-red-50' : ''}>
+                                                <TableCell className="font-medium">{row.attendance_id}</TableCell>
+                                                <TableCell className="text-sm">{employee?.name || '❌ Unknown'}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        value={row.am_start}
+                                                        onChange={(e) => handleUpdatePreviewRow(index, 'am_start', e.target.value)}
+                                                        className="h-8 w-24"
+                                                        placeholder="—"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        value={row.am_end}
+                                                        onChange={(e) => handleUpdatePreviewRow(index, 'am_end', e.target.value)}
+                                                        className="h-8 w-24"
+                                                        placeholder="—"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        value={row.pm_start}
+                                                        onChange={(e) => handleUpdatePreviewRow(index, 'pm_start', e.target.value)}
+                                                        className="h-8 w-24"
+                                                        placeholder="—"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        value={row.pm_end}
+                                                        onChange={(e) => handleUpdatePreviewRow(index, 'pm_end', e.target.value)}
+                                                        className="h-8 w-24"
+                                                        placeholder="—"
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-xs">
+                                                    {row.is_friday_shift && (
+                                                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded">Friday</span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <Button 
+                                onClick={() => uploadMutation.mutate()}
+                                disabled={uploadMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                <Upload className="w-4 h-4 mr-2" />
+                                {uploadMutation.isPending ? 'Uploading...' : `Confirm & Upload`}
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                onClick={() => {
+                                    setShowPreviewDialog(false);
+                                    setParsedData([]);
+                                    setFile(null);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
