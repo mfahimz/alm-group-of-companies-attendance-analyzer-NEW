@@ -833,10 +833,8 @@ export default function ReportTab({ project }) {
             let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
             
-            // Determine if PM_START was auto-filled (meaning 3rd punch is actually PM checkout, not PM check-in)
-            const pmStartAutoFilled = autoFillSuggestion?.type === 'PM_START';
-            
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial) {
+            // Skip ALL late calculations if any punch was auto-filled
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFillSuggestion) {
                 // AM shift late check - calculate as long as we have at least one punch
                 if (shift.am_start) {
                     const firstPunch = dayPunches[0];
@@ -848,8 +846,8 @@ export default function ReportTab({ project }) {
                         lateInfo += `AM: ${minutes} min late`;
                     }
                 }
-                // PM shift late check - ONLY if we have actual 4 punches (not when PM_START is auto-filled)
-                if (shift.pm_start && dayPunches.length >= 4 && !pmStartAutoFilled && !isSingleShift) {
+                // PM shift late check - ONLY if we have actual 4 punches (not single shift)
+                if (shift.pm_start && dayPunches.length >= 4 && !isSingleShift) {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
                     const shiftStart = parseTime(shift.pm_start);
