@@ -35,10 +35,10 @@ export default function ShiftTimingsTab({ project }) {
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
-        if (!timeStr || timeStr === '—') return '—';
+        if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
         if (/AM|PM/i.test(timeStr)) return timeStr;
         const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-        if (!match) return timeStr;
+        if (!match) return '—';
         let hours = parseInt(match[1]);
         const minutes = match[2];
         const period = hours >= 12 ? 'PM' : 'AM';
