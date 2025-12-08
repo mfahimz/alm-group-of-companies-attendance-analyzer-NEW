@@ -786,17 +786,46 @@ export default function ReportTab({ project }) {
             // Filter multiple punches to get the 4 key punches
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
 
-            // Check if employee has single shift
-            const isSingleShift = shift?.is_single_shift || false;
+            // Check if employee has single shift (auto-detect if am_end and pm_start are missing/empty)
+            const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
+                                   shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+                                   shift.am_end !== '—' && shift.pm_start !== '—' &&
+                                   shift.am_end !== '-' && shift.pm_start !== '-';
+            const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
             
             // Detect partial day
             const partialDayResult = detectPartialDay(dayPunches, shift);
             
-            // Detect and show auto-fill suggestion for 3 punches
+            // Detect and show auto-fill suggestion
             let autoFillSuggestion = null;
-            if (!isSingleShift && dayPunches.length === 3 && shift) {
-                const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
-                autoFillSuggestion = autoFillResult.autoFilled;
+            if (shift) {
+                // For single shift: check if 1 punch, for regular: check if 3 punches
+                if ((isSingleShift && dayPunches.length === 1) || (!isSingleShift && dayPunches.length === 3)) {
+                    if (isSingleShift && dayPunches.length === 1) {
+                        // Single shift auto-fill logic
+                        const shiftStart = parseTime(shift.am_start);
+                        const shiftEnd = parseTime(shift.pm_end);
+                        
+                        if (shiftStart && shiftEnd) {
+                            const punchTime = parseTime(dayPunches[0].timestamp_raw);
+                            if (punchTime) {
+                                const toStart = Math.abs(punchTime - shiftStart) / (1000 * 60);
+                                const toEnd = Math.abs(punchTime - shiftEnd) / (1000 * 60);
+                                const threshold = 30;
+                                
+                                if (toStart < toEnd && toStart < threshold) {
+                                    autoFillSuggestion = { type: 'PUNCH_OUT', time: shift.pm_end };
+                                } else if (toEnd < toStart && toEnd < threshold) {
+                                    autoFillSuggestion = { type: 'PUNCH_IN', time: shift.am_start };
+                                }
+                            }
+                        }
+                    } else {
+                        // Regular shift auto-fill logic (3 punches)
+                        const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
+                        autoFillSuggestion = autoFillResult.autoFilled;
+                    }
+                }
             }
 
             // Calculate late minutes and early checkout
