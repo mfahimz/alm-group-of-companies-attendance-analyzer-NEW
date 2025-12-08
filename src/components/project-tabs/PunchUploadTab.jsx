@@ -397,6 +397,72 @@ export default function PunchUploadTab({ project }) {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Preview Dialog */}
+            <Dialog open={showPreview} onOpenChange={setShowPreview}>
+                <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Preview Import Data ({previewData.length} punches)</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Attendance ID</TableHead>
+                                    <TableHead>Timestamp</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {previewData.map((punch, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell>
+                                            <Input
+                                                value={punch.attendance_id}
+                                                onChange={(e) => handleEditPreview(index, 'attendance_id', e.target.value)}
+                                                className="h-8"
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Input
+                                                value={punch.timestamp_raw}
+                                                onChange={(e) => handleEditPreview(index, 'timestamp_raw', e.target.value)}
+                                                className="h-8"
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Input
+                                                type="date"
+                                                value={punch.punch_date}
+                                                onChange={(e) => handleEditPreview(index, 'punch_date', e.target.value)}
+                                                className="h-8"
+                                            />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => handleDeletePreviewRow(index)}
+                                            >
+                                                <Trash2 className="w-4 h-4 text-red-600" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button variant="outline" onClick={() => setShowPreview(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleConfirmImport} className="bg-indigo-600 hover:bg-indigo-700">
+                            Confirm & Continue
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
