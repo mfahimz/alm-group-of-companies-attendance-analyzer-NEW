@@ -580,12 +580,12 @@ export default function RunAnalysisTab({ project }) {
 
         if (punchesWithTime.length === 0) return punchList;
 
-        // ONLY remove exact duplicates (same timestamp within 1 minute)
+        // ONLY remove exact duplicates (same timestamp within 10 minutes)
         // Do NOT filter based on shift times - keep ALL valid punches
         const deduped = [];
         for (let i = 0; i < punchesWithTime.length; i++) {
             const current = punchesWithTime[i];
-            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 1);
+            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
             if (!isDuplicate) {
                 deduped.push(current);
             }
