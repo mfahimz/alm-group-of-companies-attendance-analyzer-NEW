@@ -498,8 +498,23 @@ export default function PunchUploadTab({ project }) {
                                                         onCheckedChange={() => toggleSelectPunch(punch.id)}
                                                     />
                                                 </TableCell>
-                                                <TableCell className="font-medium">{punch.attendance_id}</TableCell>
-                                                <TableCell>{punch.employee_name}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {editingPunch?.id === punch.id ? (
+                                                        <Input
+                                                            value={editingPunch.attendance_id}
+                                                            onChange={(e) => setEditingPunch({ ...editingPunch, attendance_id: e.target.value })}
+                                                            className="h-8 w-24"
+                                                        />
+                                                    ) : (
+                                                        punch.attendance_id
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {editingPunch?.id === punch.id 
+                                                        ? employees.find(e => e.attendance_id === editingPunch.attendance_id)?.name || '-'
+                                                        : punch.employee_name
+                                                    }
+                                                </TableCell>
                                                 <TableCell>
                                                     {editingPunch?.id === punch.id ? (
                                                         <Input
@@ -527,7 +542,11 @@ export default function PunchUploadTab({ project }) {
                                                                         }
                                                                         updatePunchMutation.mutate({
                                                                             id: editingPunch.id,
-                                                                            data: { timestamp_raw: editingPunch.timestamp_raw, punch_date }
+                                                                            data: { 
+                                                                                attendance_id: editingPunch.attendance_id,
+                                                                                timestamp_raw: editingPunch.timestamp_raw, 
+                                                                                punch_date 
+                                                                            }
                                                                         });
                                                                     }}
                                                                     className="text-green-600"
