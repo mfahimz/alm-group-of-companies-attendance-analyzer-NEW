@@ -523,7 +523,6 @@ export default function PunchUploadTab({ project }) {
                                         <TableHead>Attendance ID</TableHead>
                                         <TableHead>Employee Name</TableHead>
                                         <TableHead>Timestamp</TableHead>
-                                        <TableHead>Date</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -575,7 +574,6 @@ export default function PunchUploadTab({ project }) {
                                                         <p className="text-xs text-red-600 mt-0.5">{row.timestampValidation.error}</p>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="text-sm">{row.punch_date || '—'}</TableCell>
                                             </TableRow>
                                         );
                                     })}
