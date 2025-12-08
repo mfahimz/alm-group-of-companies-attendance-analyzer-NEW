@@ -120,68 +120,24 @@ export default function PunchUploadTab({ project }) {
                     let timestamp_raw = '';
                     let punch_date = '';
                     
-                    // Check if we have 4 columns: ID, Name, Date, Time (Naser Mohsin Auto Parts format only)
-                    const isNaserMohsin = project.company === 'Naser Mohsin Auto Parts';
-                    
-                    // Debug log for first row
-                    if (i === 1) {
-                        console.log('CSV Parsing Debug:', {
-                            company: project.company,
-                            isNaserMohsin,
-                            rowLength: values.length,
-                            row: values
-                        });
-                    }
-                    
-                    if (isNaserMohsin && values.length >= 4) {
-                        // Check if column 3 (index 2) is a date and column 4 (index 3) is a time
-                        const hasDateInCol3 = values[2] && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/);
-                        const hasTimeInCol4 = values[3] && values[3].match(/\d{1,2}:\d{2}/);
+                    // Naser Mohsin Auto Parts format: ID, FirstName, Date, Time (4 columns)
+                    if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
+                        const dateStr = values[2]; // e.g., "02/10/2025"
+                        let timeStr = values[3]; // e.g., "8:54" or "14:30"
                         
-                        if (hasDateInCol3 && hasTimeInCol4) {
-                            // Format: ID, Name, Date, Time (separate columns)
-                            const dateStr = values[2]; // e.g., "02/10/2025"
-                            let timeStr = values[3]; // e.g., "8:54" or "14:30"
-                            
-                            // Convert time to AM/PM format if it's in 24-hour format
-                            if (!timeStr.match(/AM|PM/i)) {
-                                timeStr = convertTo12Hour(timeStr);
-                            }
-                            
-                            // Combine date and time
-                            timestamp_raw = `${dateStr} ${timeStr}`;
-                            
-                            // Extract punch_date
-                            const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                            if (dateMatch) {
-                                const [, day, month, year] = dateMatch;
-                                punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                            }
-                            
-                            if (i === 1) {
-                                console.log('Naser Mohsin format detected:', {
-                                    dateStr,
-                                    originalTime: values[3],
-                                    convertedTime: timeStr,
-                                    timestamp_raw,
-                                    punch_date
-                                });
-                            }
-                        } else {
-                            // Fallback to standard format
-                            if (values[1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                                timestamp_raw = values[1];
-                            } else if (values.length >= 3 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                                timestamp_raw = values[2];
-                            } else {
-                                timestamp_raw = values[1];
-                            }
-
-                            const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                            if (dateMatch) {
-                                const [, day, month, year] = dateMatch;
-                                punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                            }
+                        // Convert time to AM/PM format
+                        if (!timeStr.match(/AM|PM/i)) {
+                            timeStr = convertTo12Hour(timeStr);
+                        }
+                        
+                        // Combine date and time
+                        timestamp_raw = `${dateStr} ${timeStr}`;
+                        
+                        // Extract punch_date (YYYY-MM-DD)
+                        const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                        if (dateMatch) {
+                            const [, day, month, year] = dateMatch;
+                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
                         }
                     }
                     // Standard format: ID, timestamp (or ID, name, timestamp)
