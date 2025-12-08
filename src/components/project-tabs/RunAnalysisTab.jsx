@@ -403,11 +403,18 @@ export default function RunAnalysisTab({ project }) {
                     const autoFillResult = detectAndAutoFillMissingPunch(filteredPunches, shift, isSingleShift);
                     autoFilledPunch = autoFillResult.autoFilled;
                     if (autoFilledPunch) {
+                        console.log(`[${dateStr}] ${attendance_id}: Auto-fill triggered`, {
+                            type: autoFilledPunch.type,
+                            time: autoFilledPunch.time,
+                            actualPunches: filteredPunches.map(p => p.timestamp_raw)
+                        });
                         auto_resolutions.push({
                             date: dateStr,
                             type: 'MISSING_PUNCH_AUTO_FILL',
                             details: `Auto-filled ${autoFilledPunch.type.replace(/_/g, ' ')} with ${autoFilledPunch.time}`
                         });
+                    } else {
+                        console.log(`[${dateStr}] ${attendance_id}: Auto-fill NOT triggered (shouldAutoFill=${shouldAutoFill}, punches=${filteredPunches.length})`);
                     }
                 }
             }
