@@ -87,6 +87,21 @@ export default function PunchUploadTab({ project }) {
         return { valid: true, error: null, warning: false };
     };
 
+    const convertTo12Hour = (time24) => {
+        // Parse 24-hour time and convert to 12-hour AM/PM format
+        const timeMatch = time24.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (!timeMatch) return time24; // Return as-is if not recognized
+        
+        let hours = parseInt(timeMatch[1]);
+        const minutes = timeMatch[2];
+        
+        const period = hours >= 12 ? 'PM' : 'AM';
+        if (hours > 12) hours -= 12;
+        if (hours === 0) hours = 12;
+        
+        return `${hours}:${minutes} ${period}`;
+    };
+
     const parseCSV = (file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -102,25 +117,50 @@ export default function PunchUploadTab({ project }) {
                 if (values.length >= 2) {
                     const attendance_id = values[0];
                     
-                    // Detect which column is the timestamp by checking for date pattern (supports D/M/YYYY or DD/MM/YYYY)
                     let timestamp_raw = '';
-                    if (values[1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                        // Format: ID, timestamp
-                        timestamp_raw = values[1];
-                    } else if (values.length >= 3 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                        // Format: ID, name, timestamp
-                        timestamp_raw = values[2];
-                    } else {
-                        // Fallback to second column
-                        timestamp_raw = values[1];
-                    }
-
-                    // Extract date from timestamp (D/M/YYYY or DD/MM/YYYY HH:MM AM/PM)
-                    const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
                     let punch_date = '';
-                    if (dateMatch) {
-                        const [, day, month, year] = dateMatch;
-                        punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                    
+                    // Check if we have 4 columns: ID, Name, Date, Time (Naser Mohsin format)
+                    if (values.length >= 4 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/) && values[3].match(/\d{1,2}:\d{2}/)) {
+                        // Format: ID, Name, Date, Time (separate columns)
+                        const dateStr = values[2]; // e.g., "02/10/2025"
+                        let timeStr = values[3]; // e.g., "8:54" or "14:30"
+                        
+                        // Convert time to AM/PM format if it's in 24-hour format
+                        if (!timeStr.match(/AM|PM/i)) {
+                            timeStr = convertTo12Hour(timeStr);
+                        }
+                        
+                        // Combine date and time
+                        timestamp_raw = `${dateStr} ${timeStr}`;
+                        
+                        // Extract punch_date
+                        const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                        if (dateMatch) {
+                            const [, day, month, year] = dateMatch;
+                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
+                    }
+                    // Standard format: ID, timestamp (or ID, name, timestamp)
+                    else {
+                        // Detect which column is the timestamp by checking for date pattern
+                        if (values[1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
+                            // Format: ID, timestamp
+                            timestamp_raw = values[1];
+                        } else if (values.length >= 3 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
+                            // Format: ID, name, timestamp
+                            timestamp_raw = values[2];
+                        } else {
+                            // Fallback to second column
+                            timestamp_raw = values[1];
+                        }
+
+                        // Extract date from timestamp (D/M/YYYY or DD/MM/YYYY HH:MM AM/PM)
+                        const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                        if (dateMatch) {
+                            const [, day, month, year] = dateMatch;
+                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
                     }
 
                     // Check if employee exists
