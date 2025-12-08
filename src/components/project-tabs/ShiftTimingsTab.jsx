@@ -133,6 +133,42 @@ export default function ShiftTimingsTab({ project }) {
         return `${hours}:${minutes} ${period}`;
     };
 
+    const validateTime = (timeStr) => {
+        if (!timeStr || timeStr === '—' || timeStr.trim() === '') return { valid: true, error: null };
+        
+        // Check for AM/PM format
+        const ampmMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (ampmMatch) {
+            const hours = parseInt(ampmMatch[1]);
+            const minutes = parseInt(ampmMatch[2]);
+            
+            if (hours < 1 || hours > 12) {
+                return { valid: false, error: 'Hours must be 1-12' };
+            }
+            if (minutes < 0 || minutes > 59) {
+                return { valid: false, error: 'Minutes must be 0-59' };
+            }
+            return { valid: true, error: null };
+        }
+        
+        // Check for 24-hour format
+        const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (timeMatch) {
+            const hours = parseInt(timeMatch[1]);
+            const minutes = parseInt(timeMatch[2]);
+            
+            if (hours < 0 || hours > 23) {
+                return { valid: false, error: 'Hours must be 0-23' };
+            }
+            if (minutes < 0 || minutes > 59) {
+                return { valid: false, error: 'Minutes must be 0-59' };
+            }
+            return { valid: true, error: null };
+        }
+        
+        return { valid: false, error: 'Invalid time format' };
+    };
+
     const parseCSV = (file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -158,6 +194,23 @@ export default function ShiftTimingsTab({ project }) {
 
                     const is_friday_shift = applicableDays.toLowerCase().includes('friday');
 
+                    // Validate times
+                    const timeValidations = {
+                        am_start: validateTime(am_start),
+                        am_end: validateTime(am_end),
+                        pm_start: validateTime(pm_start),
+                        pm_end: validateTime(pm_end)
+                    };
+
+                    const hasInvalidTime = Object.values(timeValidations).some(v => !v.valid);
+                    if (hasInvalidTime) {
+                        const invalidFields = Object.entries(timeValidations)
+                            .filter(([_, v]) => !v.valid)
+                            .map(([field, v]) => `${field}: ${v.error}`)
+                            .join(', ');
+                        newWarnings.push(`Row ${i + 1} (${attendance_id}): ${invalidFields}`);
+                    }
+
                     data.push({
                         attendance_id,
                         date: null,
@@ -167,7 +220,9 @@ export default function ShiftTimingsTab({ project }) {
                         am_end,
                         pm_start,
                         pm_end,
-                        employeeExists
+                        employeeExists,
+                        timeValidations,
+                        hasInvalidTime
                     });
                 }
             }
@@ -725,41 +780,60 @@ export default function ShiftTimingsTab({ project }) {
                                 <TableBody>
                                     {parsedData.map((row, index) => {
                                         const employee = employees.find(e => e.attendance_id === row.attendance_id);
+                                        const rowClass = !row.employeeExists ? 'bg-red-50' : row.hasInvalidTime ? 'bg-amber-50' : '';
+
                                         return (
-                                            <TableRow key={index} className={!row.employeeExists ? 'bg-red-50' : ''}>
-                                                <TableCell className="font-medium">{row.attendance_id}</TableCell>
+                                            <TableRow key={index} className={rowClass}>
+                                                <TableCell className="font-medium">
+                                                    {row.attendance_id}
+                                                    {row.hasInvalidTime && (
+                                                        <AlertTriangle className="w-4 h-4 text-amber-600 inline ml-1" />
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-sm">{employee?.name || '❌ Unknown'}</TableCell>
                                                 <TableCell>
                                                     <Input
                                                         value={row.am_start}
                                                         onChange={(e) => handleUpdatePreviewRow(index, 'am_start', e.target.value)}
-                                                        className="h-8 w-24"
+                                                        className={`h-8 w-24 ${row.timeValidations?.am_start?.valid === false ? 'border-red-500' : ''}`}
                                                         placeholder="—"
                                                     />
+                                                    {row.timeValidations?.am_start?.valid === false && (
+                                                        <p className="text-xs text-red-600 mt-0.5">{row.timeValidations.am_start.error}</p>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
                                                         value={row.am_end}
                                                         onChange={(e) => handleUpdatePreviewRow(index, 'am_end', e.target.value)}
-                                                        className="h-8 w-24"
+                                                        className={`h-8 w-24 ${row.timeValidations?.am_end?.valid === false ? 'border-red-500' : ''}`}
                                                         placeholder="—"
                                                     />
+                                                    {row.timeValidations?.am_end?.valid === false && (
+                                                        <p className="text-xs text-red-600 mt-0.5">{row.timeValidations.am_end.error}</p>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
                                                         value={row.pm_start}
                                                         onChange={(e) => handleUpdatePreviewRow(index, 'pm_start', e.target.value)}
-                                                        className="h-8 w-24"
+                                                        className={`h-8 w-24 ${row.timeValidations?.pm_start?.valid === false ? 'border-red-500' : ''}`}
                                                         placeholder="—"
                                                     />
+                                                    {row.timeValidations?.pm_start?.valid === false && (
+                                                        <p className="text-xs text-red-600 mt-0.5">{row.timeValidations.pm_start.error}</p>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
                                                         value={row.pm_end}
                                                         onChange={(e) => handleUpdatePreviewRow(index, 'pm_end', e.target.value)}
-                                                        className="h-8 w-24"
+                                                        className={`h-8 w-24 ${row.timeValidations?.pm_end?.valid === false ? 'border-red-500' : ''}`}
                                                         placeholder="—"
                                                     />
+                                                    {row.timeValidations?.pm_end?.valid === false && (
+                                                        <p className="text-xs text-red-600 mt-0.5">{row.timeValidations.pm_end.error}</p>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="text-xs">
                                                     {row.is_friday_shift && (
