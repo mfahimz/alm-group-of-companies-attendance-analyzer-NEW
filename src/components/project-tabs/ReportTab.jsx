@@ -507,10 +507,11 @@ export default function ReportTab({ project }) {
 
             // Detect 2-punch auto-fill for late calculation
             let autoFilledPunches = [];
-            if (shift && !isSingleShift && dayPunches.length === 2) {
-                const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
-                autoFilledPunches = autoFillResult.autoFilled || [];
-            }
+            // Two-punch auto-fill disabled
+            // if (shift && !isSingleShift && dayPunches.length === 2) {
+            //     const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
+            //     autoFilledPunches = autoFillResult.autoFilled || [];
+            // }
 
             // Calculate late and early checkout for non-overridden days
             // Skip late calculations for sick leave, manual present/absent/half, and off days
@@ -899,10 +900,10 @@ export default function ReportTab({ project }) {
                             }
                         }
                     } else if (dayPunches.length === 2) {
-                        // 2-punch auto-fill logic (NEW)
-                        const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
-                        autoFillSuggestions = autoFillResult.autoFilled || [];
-                        autoFilledTypes = autoFillSuggestions.map(p => p.type);
+                        // 2-punch auto-fill logic disabled
+                        // const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
+                        // autoFillSuggestions = autoFillResult.autoFilled || [];
+                        // autoFilledTypes = autoFillSuggestions.map(p => p.type);
                     } else {
                         // Regular shift auto-fill logic (3 punches)
                         const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
