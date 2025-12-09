@@ -11,9 +11,6 @@ export default function RunAnalysisTab({ project }) {
     const [progress, setProgress] = useState(null);
     const queryClient = useQueryClient();
     
-    // FEATURE FLAG: Intelligent punch matching enabled
-    const ENABLE_INTELLIGENT_PUNCH_MATCHING = true;
-
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id })
@@ -54,6 +51,164 @@ export default function RunAnalysisTab({ project }) {
             queryClient.invalidateQueries(['projects']);
         }
     });
+
+    // Intelligent punch matching - match each punch to closest shift point
+    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+        if (!shift || dayPunches.length === 0) return [];
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length === 0) return [];
+        
+        // Define shift points
+        const shiftPoints = [
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
+            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+        ].filter(sp => sp.time); // Only include valid shift points
+        
+        // Match each punch to closest shift point within 1 hour (60 minutes)
+        const matches = [];
+        const usedShiftPoints = new Set(); // Track which shift points are already matched
+        
+        for (const punch of punchesWithTime) {
+            let closestMatch = null;
+            let minDistance = Infinity;
+            
+            for (const shiftPoint of shiftPoints) {
+                // Skip if this shift point already matched to another punch
+                if (usedShiftPoints.has(shiftPoint.type)) continue;
+                
+                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60); // in minutes
+                
+                // Must be within 60 minutes (1 hour) radius
+                if (distance <= 60 && distance < minDistance) {
+                    minDistance = distance;
+                    closestMatch = shiftPoint;
+                }
+            }
+            
+            if (closestMatch) {
+                matches.push({
+                    punch,
+                    matchedTo: closestMatch.type,
+                    shiftTime: closestMatch.time,
+                    distance: minDistance
+                });
+                usedShiftPoints.add(closestMatch.type); // Mark as used
+            } else {
+                // No match within 1 hour - mark as unmatched
+                matches.push({
+                    punch,
+                    matchedTo: null,
+                    shiftTime: null,
+                    distance: null
+                });
+            }
+        }
+        
+        return matches;
+    };
+
+    const parseTime = (timeStr) => {
+        try {
+            if (!timeStr || timeStr === '—') return null;
+            
+            // Try AM/PM format first: "8:00 AM" or "08:00 AM" or "DD/MM/YYYY 8:00 AM"
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = timeMatch[3].toUpperCase();
+                
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+            
+            // Fallback: Try 24-hour format for backwards compatibility: "08:00:00", "08:00"
+            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (timeMatch) {
+                const hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+            
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
+    // Detect partial day (employee came but left early - worked less than half the expected hours)
+    const detectPartialDay = (dayPunches, shift) => {
+        if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
+        
+        const firstPunch = punchesWithTime[0].time;
+        const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
+        
+        const amStart = parseTime(shift.am_start);
+        const pmEnd = parseTime(shift.pm_end);
+        
+        if (!amStart || !pmEnd) return { isPartial: false, reason: null };
+        
+        // Calculate expected work hours and actual work hours
+        const expectedMinutes = (pmEnd - amStart) / (1000 * 60);
+        const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
+        
+        // If worked less than 50% of expected time, it's a partial/half day
+        if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
+            return { 
+                isPartial: true, 
+                reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)` 
+            };
+        }
+        
+        return { isPartial: false, reason: null };
+    };
+
+    const filterMultiplePunches = (punchList, shift) => {
+        if (punchList.length <= 1) return punchList;
+
+        const punchesWithTime = punchList.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time);
+
+        if (punchesWithTime.length === 0) return punchList;
+
+        // ONLY remove exact duplicates (same timestamp within 10 minutes)
+        // Do NOT filter based on shift times - keep ALL valid punches
+        const deduped = [];
+        for (let i = 0; i < punchesWithTime.length; i++) {
+            const current = punchesWithTime[i];
+            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
+            if (!isDuplicate) {
+                deduped.push(current);
+            }
+        }
+
+        // Sort by time and return all non-duplicate punches
+        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
+        return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+    };
 
     const runAnalysis = async () => {
         if (!rules) {
@@ -132,70 +287,7 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
-    // NEW: Intelligent punch matching - match each punch to closest shift point
-    const matchPunchesToShiftPoints = (dayPunches, shift) => {
-        if (!shift || dayPunches.length === 0) return [];
-        
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
-        
-        if (punchesWithTime.length === 0) return [];
-        
-        // Define shift points
-        const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
-            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
-        ].filter(sp => sp.time); // Only include valid shift points
-        
-        // Match each punch to closest shift point within 1 hour (60 minutes)
-        const matches = [];
-        const usedShiftPoints = new Set(); // Track which shift points are already matched
-        
-        for (const punch of punchesWithTime) {
-            let closestMatch = null;
-            let minDistance = Infinity;
-            
-            for (const shiftPoint of shiftPoints) {
-                // Skip if this shift point already matched to another punch
-                if (usedShiftPoints.has(shiftPoint.type)) continue;
-                
-                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60); // in minutes
-                
-                // Must be within 60 minutes (1 hour) radius
-                if (distance <= 60 && distance < minDistance) {
-                    minDistance = distance;
-                    closestMatch = shiftPoint;
-                }
-            }
-            
-            if (closestMatch) {
-                matches.push({
-                    punch,
-                    matchedTo: closestMatch.type,
-                    shiftTime: closestMatch.time,
-                    distance: minDistance
-                });
-                usedShiftPoints.add(closestMatch.type); // Mark as used
-            } else {
-                // No match within 1 hour - mark as unmatched
-                matches.push({
-                    punch,
-                    matchedTo: null,
-                    shiftTime: null,
-                    distance: null
-                });
-            }
-        }
-        
-        return matches;
-    };
-    
-    // OLD: Detect TWO missing punches (for regular shifts with 2 actual punches)
-    const detectTwoMissingPunches = (dayPunches, shift) => {
+    const runAnalysis = async () => {
         if (!shift || dayPunches.length !== 2) return { punches: dayPunches, autoFilled: [] };
         
         const punchesWithTime = dayPunches.map(p => ({
@@ -378,6 +470,31 @@ export default function RunAnalysisTab({ project }) {
         return { isPartial: false, reason: null };
     };
 
+    const filterMultiplePunches = (punchList, shift) => {
+        if (punchList.length <= 1) return punchList;
+
+        const punchesWithTime = punchList.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time);
+
+        if (punchesWithTime.length === 0) return punchList;
+
+        // ONLY remove exact duplicates (same timestamp within 10 minutes)
+        const deduped = [];
+        for (let i = 0; i < punchesWithTime.length; i++) {
+            const current = punchesWithTime[i];
+            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
+            if (!isDuplicate) {
+                deduped.push(current);
+            }
+        }
+
+        // Sort by time and return all non-duplicate punches
+        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
+        return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+    };
+
     const analyzeEmployee = async (attendance_id) => {
         const employeePunches = punches.filter(p => 
             p.attendance_id === attendance_id && 
@@ -504,26 +621,26 @@ export default function RunAnalysisTab({ project }) {
             // Filter multiple punches before analysis
             let filteredPunches = filterMultiplePunches(dayPunches, shift);
             
-            // NEW: Intelligent punch matching
+            // Intelligent punch matching
             let punchMatches = [];
             let hasUnmatchedPunch = false;
-            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && filteredPunches.length > 0) {
+            if (shift && filteredPunches.length > 0) {
                 punchMatches = matchPunchesToShiftPoints(filteredPunches, shift);
                 hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
             }
             
             // Check if employee has single shift (from shift timing or infer from shift structure)
-            // Auto-detect single shift if am_end and pm_start are both null/empty or "—"
             const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
                                    shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
                                    shift.am_end !== '—' && shift.pm_start !== '—' &&
                                    shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
+            // Detect partial day (worked but left early)
+            const partialDayResult = detectPartialDay(filteredPunches, shift);
+
             // Presence rule
             if (filteredPunches.length > 0) {
-                // Detect partial day (worked but left early)
-                const partialDayResult = detectPartialDay(filteredPunches, shift);
                 if (partialDayResult.isPartial) {
                     present_days++;
                     half_absence_count++;
@@ -536,67 +653,7 @@ export default function RunAnalysisTab({ project }) {
                     present_days++;
                 }
 
-                // Calculate late minutes for both AM and PM shifts
-                if (shift && !partialDayResult.isPartial) {
-                    // Calculate effective punch count (actual punches + auto-filled)
-                    const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
-                    const autoFilledTypes = autoFilledPunches.map(p => p.type);
-                    
-                    // AM shift late check (first punch of the day)
-                    // Skip if AM_START/PUNCH_IN was auto-filled
-                    if (shift.am_start && filteredPunches.length > 0 && 
-                        autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN' &&
-                        !autoFilledTypes.includes('AM_START') && !autoFilledTypes.includes('PUNCH_IN')) {
-                        const firstPunch = filteredPunches[0];
-                        const punchTime = parseTime(firstPunch.timestamp_raw);
-                        const shiftStart = parseTime(shift.am_start);
-
-                        if (punchTime && shiftStart && punchTime > shiftStart) {
-                            const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
-                            late_minutes += minutes;
-                            console.log(`[${dateStr}] ${attendance_id}: Late AM - ${minutes} min`, {
-                                punch: firstPunch.timestamp_raw,
-                                shiftStart: shift.am_start,
-                                isSingleShift
-                            });
-                        }
-                    }
-
-                    // PM shift late check (third punch - PM check-in) - skip for single shift
-                    // Skip if PM_START was auto-filled
-                    // Use effectivePunchCount to consider auto-filled punches
-                    if (!isSingleShift && shift.pm_start && effectivePunchCount >= 4 && 
-                        filteredPunches.length >= 3 && autoFilledPunch?.type !== 'PM_START' &&
-                        !autoFilledTypes.includes('PM_START')) {
-                        const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
-                        const punchTime = parseTime(pmCheckIn.timestamp_raw);
-                        const shiftStart = parseTime(shift.pm_start);
-
-                        if (punchTime && shiftStart && punchTime > shiftStart) {
-                            const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
-                            late_minutes += minutes;
-                        }
-                    }
-
-                    // Early checkout check - PM only (last punch before PM shift end)
-                    // Skip if PM_END/PUNCH_OUT was auto-filled
-                    const expectedPunches = isSingleShift ? 2 : 4;
-                    if (shift.pm_end && effectivePunchCount >= expectedPunches && 
-                        autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT' &&
-                        !autoFilledTypes.includes('PM_END') && !autoFilledTypes.includes('PUNCH_OUT')) {
-                        const lastPunch = filteredPunches[filteredPunches.length - 1];
-                        const punchTime = parseTime(lastPunch.timestamp_raw);
-                        const shiftEnd = parseTime(shift.pm_end);
-
-                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                            early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
-                        }
-                    }
-                }
-                
                 // Half day detection (simple rule: less than 2 punches)
-                // Skip half day detection if employee has single shift (expects only 2 punches)
-                // Also skip if partial day was already detected above
                 if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
                     if (filteredPunches.length < 2 && !isSingleShift) {
                         half_absence_count++;
@@ -607,19 +664,47 @@ export default function RunAnalysisTab({ project }) {
                 full_absence_count++;
             }
 
-            // Abnormality detection (use filtered punches)
-            // For single shift employees, expected punches is 2, otherwise 4
+            // Calculate late and early checkout using intelligent matching
+            const shouldSkipTimeCalculation = dateException && [
+                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+            ].includes(dateException.type);
+
+            if (shift && punchMatches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
+                for (const match of punchMatches) {
+                    if (!match.matchedTo) continue;
+                    
+                    const punchTime = match.punch.time;
+                    const shiftTime = match.shiftTime;
+                    
+                    // Calculate late for START points
+                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                        if (punchTime > shiftTime) {
+                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                            late_minutes += minutes;
+                        }
+                    }
+                    
+                    // Calculate early checkout for END points
+                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                        if (punchTime < shiftTime) {
+                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                            early_checkout_minutes += minutes;
+                        }
+                    }
+                }
+            }
+
+            // Abnormality detection
             const expectedPunches = isSingleShift ? 2 : 4;
             
             // Mark as abnormal if any punch couldn't be matched within 1 hour
             if (hasUnmatchedPunch) {
                 abnormal_dates_list.push(dateStr);
             }
-            // Also mark as abnormal if missing punches (less than expected)
+            // Also mark as abnormal if missing punches
             if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
                 abnormal_dates_list.push(dateStr);
             }
-            
             if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
                 abnormal_dates_list.push(dateStr);
             }
@@ -663,33 +748,7 @@ export default function RunAnalysisTab({ project }) {
         };
     };
 
-    const filterMultiplePunches = (punchList, shift) => {
-        if (punchList.length <= 1) return punchList;
-
-        const punchesWithTime = punchList.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw)
-        })).filter(p => p.time);
-
-        if (punchesWithTime.length === 0) return punchList;
-
-        // ONLY remove exact duplicates (same timestamp within 10 minutes)
-        // Do NOT filter based on shift times - keep ALL valid punches
-        const deduped = [];
-        for (let i = 0; i < punchesWithTime.length; i++) {
-            const current = punchesWithTime[i];
-            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
-            if (!isDuplicate) {
-                deduped.push(current);
-            }
-        }
-
-        // Sort by time and return all non-duplicate punches
-        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
-        return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
-    };
-
-    const parseTime = (timeStr) => {
+    const analyzeEmployee = async (attendance_id) => {
         try {
             if (!timeStr || timeStr === '—') return null;
             
