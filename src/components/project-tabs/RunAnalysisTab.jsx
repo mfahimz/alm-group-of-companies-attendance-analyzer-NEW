@@ -534,8 +534,8 @@ export default function RunAnalysisTab({ project }) {
             : '';
         
         const employee = employees.find(e => e.attendance_id === attendance_id);
-        const dept = employee?.department || 'Operations';
-        const baseGrace = rules.grace_minutes?.[dept] ?? 15;
+        const dept = employee?.department || 'Admin';
+        const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
         const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
         
         return {
