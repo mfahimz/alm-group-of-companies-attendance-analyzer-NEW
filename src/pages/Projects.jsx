@@ -4,18 +4,22 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Copy, Trash2 } from 'lucide-react';
+import { Plus, Search, Copy, Trash2, Edit } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
 import DuplicateProjectDialog from '../components/projects/DuplicateProjectDialog';
+import BulkEditProjectDialog from '../components/projects/BulkEditProjectDialog';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function Projects() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [duplicateProject, setDuplicateProject] = useState(null);
+    const [selectedProjects, setSelectedProjects] = useState([]);
+    const [showBulkEdit, setShowBulkEdit] = useState(false);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -109,13 +113,25 @@ export default function Projects() {
                     <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Projects</h1>
                     <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
                 </div>
-                <Button 
-                    onClick={() => setShowCreateDialog(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Project
-                </Button>
+                <div className="flex gap-2">
+                    {selectedProjects.length > 0 && isAdmin && (
+                        <Button
+                            onClick={() => setShowBulkEdit(true)}
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                        >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Bulk Edit ({selectedProjects.length})
+                        </Button>
+                    )}
+                    <Button 
+                        onClick={() => setShowCreateDialog(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        New Project
+                    </Button>
+                </div>
             </div>
 
             {/* Search */}
@@ -151,7 +167,22 @@ export default function Projects() {
                                 project.status === 'analyzed' ? 'bg-green-500' :
                                 'bg-slate-300'
                             }`} />
-                            <CardContent className="p-6">
+                            <CardContent className="p-6 relative">
+                                {isAdmin && (
+                                    <div className="absolute top-4 right-4 z-10">
+                                        <Checkbox
+                                            checked={selectedProjects.some(p => p.id === project.id)}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                    setSelectedProjects([...selectedProjects, project]);
+                                                } else {
+                                                    setSelectedProjects(selectedProjects.filter(p => p.id !== project.id));
+                                                }
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+                                )}
                                 <Link to={createPageUrl(`ProjectDetail?id=${project.id}`)}>
                                     <div className="flex items-start justify-between mb-4">
                                         <h3 className="font-bold text-slate-900 text-lg group-hover:text-indigo-600 transition-colors leading-tight">{project.name}</h3>
@@ -234,6 +265,15 @@ export default function Projects() {
                 onClose={() => setDuplicateProject(null)}
                 sourceProject={duplicateProject}
                 projects={projects}
+            />
+
+            <BulkEditProjectDialog
+                open={showBulkEdit}
+                onClose={() => {
+                    setShowBulkEdit(false);
+                    setSelectedProjects([]);
+                }}
+                selectedProjects={selectedProjects}
             />
         </div>
     );
