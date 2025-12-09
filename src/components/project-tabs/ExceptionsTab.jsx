@@ -408,10 +408,11 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                             <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
+                                            </SelectContent>
+                                            </Select>
+                                            </div>
+                                            </div>
+                                            </div>
 
                             {formData.type !== 'SINGLE_SHIFT' && (
                                     <>
