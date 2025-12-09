@@ -438,6 +438,9 @@ export default function RunAnalysisTab({ project }) {
 
                 // Calculate late minutes for both AM and PM shifts
                 if (shift && !partialDayResult.isPartial) {
+                    // Calculate effective punch count (actual punches + auto-filled)
+                    const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0);
+                    
                     // AM shift late check (first punch of the day)
                     // Skip if AM_START/PUNCH_IN was auto-filled
                     if (shift.am_start && filteredPunches.length > 0 && 
@@ -459,8 +462,9 @@ export default function RunAnalysisTab({ project }) {
 
                     // PM shift late check (third punch - PM check-in) - skip for single shift
                     // Skip if PM_START was auto-filled
-                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 4 && 
-                        autoFilledPunch?.type !== 'PM_START') {
+                    // Use effectivePunchCount to consider auto-filled punches
+                    if (!isSingleShift && shift.pm_start && effectivePunchCount >= 4 && 
+                        filteredPunches.length >= 3 && autoFilledPunch?.type !== 'PM_START') {
                         const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
@@ -474,7 +478,7 @@ export default function RunAnalysisTab({ project }) {
                     // Early checkout check - PM only (last punch before PM shift end)
                     // Skip if PM_END/PUNCH_OUT was auto-filled
                     const expectedPunches = isSingleShift ? 2 : 4;
-                    if (shift.pm_end && filteredPunches.length >= expectedPunches && 
+                    if (shift.pm_end && effectivePunchCount >= expectedPunches && 
                         autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT') {
                         const lastPunch = filteredPunches[filteredPunches.length - 1];
                         const punchTime = parseTime(lastPunch.timestamp_raw);
