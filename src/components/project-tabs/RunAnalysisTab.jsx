@@ -469,19 +469,15 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // Early checkout check - PM only (last punch before PM shift end)
-                    // Only calculate early checkout if employee has all expected punches OR auto-filled
+                    // Skip early checkout calculation if ANY punch was auto-filled (no real data to compare)
                     const expectedPunches = isSingleShift ? 2 : 4;
-                    const hasAllPunches = filteredPunches.length >= expectedPunches || autoFilledPunch;
-                    if (shift.pm_end && hasAllPunches) {
-                        // If PM_END was auto-filled, no early checkout (assume full day)
-                        if (autoFilledPunch?.type !== 'PM_END') {
-                            const lastPunch = filteredPunches[filteredPunches.length - 1];
-                            const punchTime = parseTime(lastPunch.timestamp_raw);
-                            const shiftEnd = parseTime(shift.pm_end);
+                    if (shift.pm_end && filteredPunches.length >= expectedPunches && !autoFilledPunch) {
+                        const lastPunch = filteredPunches[filteredPunches.length - 1];
+                        const punchTime = parseTime(lastPunch.timestamp_raw);
+                        const shiftEnd = parseTime(shift.pm_end);
 
-                            if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                                early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
-                            }
+                        if (punchTime && shiftEnd && punchTime < shiftEnd) {
+                            early_checkout_minutes += Math.round((shiftEnd - punchTime) / (1000 * 60));
                         }
                     }
                 }
