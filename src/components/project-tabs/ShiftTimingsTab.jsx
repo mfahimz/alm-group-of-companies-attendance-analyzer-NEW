@@ -38,6 +38,15 @@ export default function ShiftTimingsTab({ project }) {
     });
     const [selectedShifts, setSelectedShifts] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
+    const [formData, setFormData] = useState({
+        attendance_id: '',
+        am_start: '',
+        am_end: '',
+        pm_start: '',
+        pm_end: '',
+        is_single_shift: false,
+        is_friday_shift: false
+    });
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -372,11 +381,33 @@ export default function ShiftTimingsTab({ project }) {
             queryClient.invalidateQueries(['shifts', project.id]);
             toast.success('Shift timing added successfully');
             setShowAddForm(false);
+            setFormData({
+                attendance_id: '',
+                am_start: '',
+                am_end: '',
+                pm_start: '',
+                pm_end: '',
+                is_single_shift: false,
+                is_friday_shift: false
+            });
         },
         onError: () => {
             toast.error('Failed to add shift timing');
         }
     });
+
+    const handleSubmitShift = (e) => {
+        e.preventDefault();
+        if (!formData.attendance_id) {
+            toast.error('Please select an employee');
+            return;
+        }
+        if (!formData.am_start || !formData.pm_end) {
+            toast.error('Please fill in shift start and end times');
+            return;
+        }
+        createShiftMutation.mutate(formData);
+    };
 
     const exportShiftsToCSV = () => {
         if (shifts.length === 0) {
@@ -726,19 +757,150 @@ export default function ShiftTimingsTab({ project }) {
 
     return (
         <div className="space-y-6">
+            {/* Add Shift Form */}
+            {showAddForm && (
+                <Card className="border-0 shadow-sm">
+                    <CardHeader>
+                        <CardTitle>Add Shift Timing</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmitShift} className="space-y-4">
+                            <div>
+                                <Label>Employee *</Label>
+                                <Select
+                                    value={formData.attendance_id}
+                                    onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select employee" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {employees.map(emp => (
+                                            <SelectItem key={emp.id} value={emp.attendance_id}>
+                                                {emp.attendance_id} - {emp.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                        checked={formData.is_single_shift}
+                                        onCheckedChange={(checked) => setFormData({ ...formData, is_single_shift: checked })}
+                                    />
+                                    <Label>Single Shift (Punch In/Out only)</Label>
+                                </div>
+                                {project.company === 'Naser Mohsin Auto Parts' && (
+                                    <div className="flex items-center space-x-2">
+                                        <Switch
+                                            checked={formData.is_friday_shift}
+                                            onCheckedChange={(checked) => setFormData({ ...formData, is_friday_shift: checked })}
+                                        />
+                                        <Label>Friday Shift</Label>
+                                    </div>
+                                )}
+                            </div>
+
+                            {formData.is_single_shift ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label>Punch In *</Label>
+                                        <Input
+                                            placeholder="8:00 AM"
+                                            value={formData.am_start}
+                                            onChange={(e) => setFormData({ ...formData, am_start: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Punch Out *</Label>
+                                        <Input
+                                            placeholder="5:00 PM"
+                                            value={formData.pm_end}
+                                            onChange={(e) => setFormData({ ...formData, pm_end: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-4 gap-4">
+                                    <div>
+                                        <Label>AM Start *</Label>
+                                        <Input
+                                            placeholder="8:00 AM"
+                                            value={formData.am_start}
+                                            onChange={(e) => setFormData({ ...formData, am_start: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>AM End</Label>
+                                        <Input
+                                            placeholder="12:00 PM"
+                                            value={formData.am_end}
+                                            onChange={(e) => setFormData({ ...formData, am_end: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>PM Start</Label>
+                                        <Input
+                                            placeholder="1:00 PM"
+                                            value={formData.pm_start}
+                                            onChange={(e) => setFormData({ ...formData, pm_start: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>PM End *</Label>
+                                        <Input
+                                            placeholder="5:00 PM"
+                                            value={formData.pm_end}
+                                            onChange={(e) => setFormData({ ...formData, pm_end: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            <p className="text-sm text-slate-500">
+                                This shift will be added to <strong>{selectedBlock === 'block1' ? 'Block 1' : 'Block 2'}</strong> ({new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')})
+                            </p>
+
+                            <div className="flex gap-3">
+                                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createShiftMutation.isPending}>
+                                    {createShiftMutation.isPending ? 'Adding...' : 'Add Shift'}
+                                </Button>
+                                <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Upload Section */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <CardTitle>Upload Shift Timings</CardTitle>
-                        <Button 
-                            onClick={exportShiftsToCSV}
-                            size="sm"
-                            variant="outline"
-                        >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export All Shifts
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button 
+                                onClick={exportShiftsToCSV}
+                                size="sm"
+                                variant="outline"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Export All Shifts
+                            </Button>
+                            {!showAddForm && (
+                                <Button
+                                    onClick={() => setShowAddForm(true)}
+                                    size="sm"
+                                    className="bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Shift
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
