@@ -13,6 +13,7 @@ import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import TablePagination from '../ui/TablePagination';
 
 // Map user-friendly names to system type codes
 const TYPE_MAP = {
@@ -63,6 +64,8 @@ export default function ExceptionsTab({ project }) {
     const [editedRows, setEditedRows] = useState({});
     const [selectedExceptions, setSelectedExceptions] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const queryClient = useQueryClient();
 
     const { data: exceptions = [] } = useQuery({
@@ -353,6 +356,11 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
 
+    const paginatedExceptions = filteredExceptions.slice(
+        (currentPage - 1) * rowsPerPage,
+        currentPage * rowsPerPage
+    );
+
     return (
         <div className="space-y-6">
             {/* Add Exception Form */}
@@ -639,7 +647,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredExceptions.map((exception) => (
+                                    {paginatedExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
                                             <TableCell className="p-1">
                                                 <Checkbox
@@ -733,6 +741,18 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                 </TableBody>
                             </Table>
                         </div>
+                    )}
+                    {filteredExceptions.length > 0 && (
+                        <TablePagination
+                            totalItems={filteredExceptions.length}
+                            currentPage={currentPage}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setCurrentPage}
+                            onRowsPerPageChange={(value) => {
+                                setRowsPerPage(value);
+                                setCurrentPage(1);
+                            }}
+                        />
                     )}
                 </CardContent>
             </Card>
