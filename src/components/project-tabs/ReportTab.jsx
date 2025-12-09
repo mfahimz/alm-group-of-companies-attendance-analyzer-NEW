@@ -204,6 +204,73 @@ export default function ReportTab({ project }) {
         return { isPartial: false, reason: null };
     };
 
+    // NEW: Detect TWO missing punches (for regular shifts with 2 actual punches)
+    const detectTwoMissingPunches = (dayPunches, shift) => {
+        if (!shift || dayPunches.length !== 2) return { punches: dayPunches, autoFilled: [] };
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length !== 2) return { punches: dayPunches, autoFilled: [] };
+        
+        const [firstPunch, secondPunch] = punchesWithTime;
+        const amStart = parseTime(shift.am_start);
+        const amEnd = parseTime(shift.am_end);
+        const pmStart = parseTime(shift.pm_start);
+        const pmEnd = parseTime(shift.pm_end);
+        
+        if (!amStart || !amEnd || !pmStart || !pmEnd) return { punches: dayPunches, autoFilled: [] };
+        
+        // Calculate time difference between the two punches (in hours)
+        const timeDiff = (secondPunch.time - firstPunch.time) / (1000 * 60 * 60);
+        
+        // Pattern 1: Punches are far apart (>4 hours) → Likely AM Start + PM End (skipped break punches)
+        if (timeDiff > 4) {
+            return {
+                punches: dayPunches,
+                autoFilled: [
+                    { type: 'AM_END', time: shift.am_end },
+                    { type: 'PM_START', time: shift.pm_start }
+                ]
+            };
+        }
+        
+        // Pattern 2: Punches are close together - determine which shift block
+        const amMidpoint = new Date((amStart.getTime() + amEnd.getTime()) / 2);
+        const pmMidpoint = new Date((pmStart.getTime() + pmEnd.getTime()) / 2);
+        
+        if (secondPunch.time < amMidpoint) {
+            // Both punches are in AM shift → Missing PM Start and PM End
+            return {
+                punches: dayPunches,
+                autoFilled: [
+                    { type: 'PM_START', time: shift.pm_start },
+                    { type: 'PM_END', time: shift.pm_end }
+                ]
+            };
+        } else if (firstPunch.time > pmMidpoint) {
+            // Both punches are in PM shift → Missing AM Start and AM End
+            return {
+                punches: dayPunches,
+                autoFilled: [
+                    { type: 'AM_START', time: shift.am_start },
+                    { type: 'AM_END', time: shift.am_end }
+                ]
+            };
+        }
+        
+        // Default: Assume most common pattern (skipped break punches)
+        return {
+            punches: dayPunches,
+            autoFilled: [
+                { type: 'AM_END', time: shift.am_end },
+                { type: 'PM_START', time: shift.pm_start }
+            ]
+        };
+    };
+
     // Detect which punch is missing and auto-fill it (Conservative mode)
     const detectAndAutoFillMissingPunch = (dayPunches, shift) => {
         if (!shift || dayPunches.length !== 3) return { punches: dayPunches, autoFilled: null };
@@ -799,9 +866,10 @@ export default function ReportTab({ project }) {
             
             // Detect and show auto-fill suggestion
             let autoFillSuggestion = null;
+            let autoFillSuggestions = []; // For 2-punch scenario
             if (shift) {
-                // For single shift: check if 1 punch, for regular: check if 3 punches
-                if ((isSingleShift && dayPunches.length === 1) || (!isSingleShift && dayPunches.length === 3)) {
+                // For single shift: check if 1 punch, for regular: check if 3 or 2 punches
+                if ((isSingleShift && dayPunches.length === 1) || (!isSingleShift && dayPunches.length === 3) || (!isSingleShift && dayPunches.length === 2)) {
                     if (isSingleShift && dayPunches.length === 1) {
                         // Single shift auto-fill logic
                         const shiftStart = parseTime(shift.am_start);
@@ -821,6 +889,10 @@ export default function ReportTab({ project }) {
                                 }
                             }
                         }
+                    } else if (dayPunches.length === 2) {
+                        // 2-punch auto-fill logic (NEW)
+                        const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
+                        autoFillSuggestions = autoFillResult.autoFilled || [];
                     } else {
                         // Regular shift auto-fill logic (3 punches)
                         const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
@@ -855,7 +927,7 @@ export default function ReportTab({ project }) {
                     }
                 }
                 // PM shift late check - check if we have enough punches (3 actual + 1 auto = 4 effective) and PM_START wasn't auto-filled
-                if (shift.pm_start && effectivePunchCount >= 4 && dayPunches.length >= 3 && !isSingleShift && autoFillSuggestion?.type !== 'PM_START') {
+                if (shift.pm_start && effectivePunchCount >= 4 && dayPunches.length >= 3 && !isSingleShift && autoFillSuggestion?.type !== 'PM_START' && !autoFilledTypes.includes('PM_START')) {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
                     const shiftStart = parseTime(shift.pm_start);
@@ -869,7 +941,7 @@ export default function ReportTab({ project }) {
 
                 // Early checkout check - only for complete punch sets and PM_END wasn't auto-filled
                 const expectedPunches = isSingleShift ? 2 : 4;
-                if (shift.pm_end && effectivePunchCount >= expectedPunches && autoFillSuggestion?.type !== 'PM_END' && autoFillSuggestion?.type !== 'PUNCH_OUT') {
+                if (shift.pm_end && effectivePunchCount >= expectedPunches && autoFillSuggestion?.type !== 'PM_END' && autoFillSuggestion?.type !== 'PUNCH_OUT' && !autoFilledTypes.includes('PM_END')) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
@@ -950,6 +1022,7 @@ export default function ReportTab({ project }) {
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 hasOverride: !!dayOverride,
                 autoFillSuggestion,
+                autoFillSuggestions,
                 partialDayReason: partialDayResult.reason
             });
         }
@@ -1303,6 +1376,11 @@ export default function ReportTab({ project }) {
                                                 {day.autoFillSuggestion && (
                                                     <span className="text-indigo-600 block text-[10px]">
                                                         🔧 +{day.autoFillSuggestion.time}
+                                                    </span>
+                                                )}
+                                                {day.autoFillSuggestions && day.autoFillSuggestions.length > 0 && (
+                                                    <span className="text-indigo-600 block text-[10px]">
+                                                        🔧 +{day.autoFillSuggestions.map(s => s.time).join(', +')}
                                                     </span>
                                                 )}
                                             </div>
