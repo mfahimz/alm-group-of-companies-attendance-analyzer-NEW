@@ -12,7 +12,7 @@ export default function RunAnalysisTab({ project }) {
     const queryClient = useQueryClient();
     
     // FEATURE FLAG: Set to false to disable 2-punch auto-fill
-    const ENABLE_TWO_PUNCH_AUTO_FILL = true;
+    const ENABLE_TWO_PUNCH_AUTO_FILL = false;
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
