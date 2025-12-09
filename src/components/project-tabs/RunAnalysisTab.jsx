@@ -519,70 +519,6 @@ export default function RunAnalysisTab({ project }) {
                                    shift.am_end !== '—' && shift.pm_start !== '—' &&
                                    shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
-            
-            // Debug logging for single shift detection
-            if (filteredPunches.length === 1 && shift) {
-                console.log(`[${dateStr}] ${attendance_id}: Single punch detected`, {
-                    punchTime: filteredPunches[0].timestamp_raw,
-                    shiftStart: shift.am_start,
-                    shiftEnd: shift.pm_end,
-                    amEnd: shift.am_end,
-                    pmStart: shift.pm_start,
-                    hasMiddleTimes,
-                    isSingleShift
-                });
-            }
-            
-            // Auto-fill missing punch (Conservative mode)
-            let autoFilledPunch = null;
-            let autoFilledPunches = []; // For 2-punch scenario
-            if (shift) {
-                // For single shift: auto-fill if exactly 1 punch
-                // For regular shift: auto-fill if exactly 3 punches OR 2 punches (NEW)
-                const shouldAutoFill = (isSingleShift && filteredPunches.length === 1) || 
-                                       (!isSingleShift && filteredPunches.length === 3) ||
-                                       (!isSingleShift && filteredPunches.length === 2 && ENABLE_TWO_PUNCH_AUTO_FILL);
-                
-                if (shouldAutoFill) {
-                    // Handle 2-punch scenario (NEW)
-                    if (!isSingleShift && filteredPunches.length === 2 && ENABLE_TWO_PUNCH_AUTO_FILL) {
-                        const autoFillResult = detectTwoMissingPunches(filteredPunches, shift);
-                        autoFilledPunches = autoFillResult.autoFilled || [];
-                        if (autoFilledPunches.length > 0) {
-                            console.log(`[${dateStr}] ${attendance_id}: Two-punch auto-fill triggered`, {
-                                types: autoFilledPunches.map(p => p.type),
-                                times: autoFilledPunches.map(p => p.time),
-                                actualPunches: filteredPunches.map(p => p.timestamp_raw)
-                            });
-                            autoFilledPunches.forEach(filled => {
-                                auto_resolutions.push({
-                                    date: dateStr,
-                                    type: 'MISSING_PUNCH_AUTO_FILL',
-                                    details: `Auto-filled ${filled.type.replace(/_/g, ' ')} with ${filled.time}`
-                                });
-                            });
-                        }
-                    } else {
-                        // Original 1-punch or 3-punch scenario
-                        const autoFillResult = detectAndAutoFillMissingPunch(filteredPunches, shift, isSingleShift);
-                        autoFilledPunch = autoFillResult.autoFilled;
-                        if (autoFilledPunch) {
-                            console.log(`[${dateStr}] ${attendance_id}: Auto-fill triggered`, {
-                                type: autoFilledPunch.type,
-                                time: autoFilledPunch.time,
-                                actualPunches: filteredPunches.map(p => p.timestamp_raw)
-                            });
-                            auto_resolutions.push({
-                                date: dateStr,
-                                type: 'MISSING_PUNCH_AUTO_FILL',
-                                details: `Auto-filled ${autoFilledPunch.type.replace(/_/g, ' ')} with ${autoFilledPunch.time}`
-                            });
-                        } else {
-                            console.log(`[${dateStr}] ${attendance_id}: Auto-fill NOT triggered (shouldAutoFill=${shouldAutoFill}, punches=${filteredPunches.length})`);
-                        }
-                    }
-                }
-            }
 
             // Presence rule
             if (filteredPunches.length > 0) {
@@ -675,21 +611,13 @@ export default function RunAnalysisTab({ project }) {
             // For single shift employees, expected punches is 2, otherwise 4
             const expectedPunches = isSingleShift ? 2 : 4;
             
-            if (ENABLE_INTELLIGENT_PUNCH_MATCHING) {
-                // NEW: Mark as abnormal if any punch couldn't be matched within 1 hour
-                if (hasUnmatchedPunch) {
-                    abnormal_dates_list.push(dateStr);
-                }
-                // Also mark as abnormal if missing punches (less than expected)
-                if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
-                    abnormal_dates_list.push(dateStr);
-                }
-            } else {
-                // OLD: Original abnormality detection
-                const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
-                if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && effectivePunchCount < expectedPunches) {
-                    abnormal_dates_list.push(dateStr);
-                }
+            // Mark as abnormal if any punch couldn't be matched within 1 hour
+            if (hasUnmatchedPunch) {
+                abnormal_dates_list.push(dateStr);
+            }
+            // Also mark as abnormal if missing punches (less than expected)
+            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
+                abnormal_dates_list.push(dateStr);
             }
             
             if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {

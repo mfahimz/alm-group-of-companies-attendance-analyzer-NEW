@@ -138,10 +138,7 @@ export default function ReportTab({ project }) {
         }
     });
 
-    // FEATURE FLAG: Intelligent punch matching enabled
-    const ENABLE_INTELLIGENT_PUNCH_MATCHING = true;
-    
-    // NEW: Intelligent punch matching - match each punch to closest shift point
+    // Intelligent punch matching - match each punch to closest shift point
     const matchPunchesToShiftPoints = (dayPunches, shift) => {
         if (!shift || dayPunches.length === 0) return [];
         
@@ -538,9 +535,9 @@ export default function ReportTab({ project }) {
                 continue; // Skip normal calculation for overridden days
             }
 
-            // NEW: Intelligent punch matching for totals calculation
+            // Intelligent punch matching for totals calculation
             let punchMatchesTotals = [];
-            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && dayPunches.length > 0) {
+            if (shift && dayPunches.length > 0) {
                 punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift);
             }
 
@@ -550,7 +547,7 @@ export default function ReportTab({ project }) {
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
-            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
+            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
                 // NEW: Intelligent matching - calculate based on matched shift points
                 for (const match of punchMatchesTotals) {
                     if (!match.matchedTo) continue; // Skip unmatched punches
@@ -895,10 +892,10 @@ export default function ReportTab({ project }) {
             // Detect partial day
             const partialDayResult = detectPartialDay(dayPunches, shift);
             
-            // NEW: Intelligent punch matching
+            // Intelligent punch matching
             let punchMatches = [];
             let hasUnmatchedPunch = false;
-            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && dayPunches.length > 0) {
+            if (shift && dayPunches.length > 0) {
                 punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
                 hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
             }
@@ -907,20 +904,16 @@ export default function ReportTab({ project }) {
             let lateInfo = '';
             let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
-            let matchDetails = []; // Store match details for display
             
             // Skip late calculations for sick leave, manual present/absent/half, and off days
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
-            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && punchMatches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
-                // NEW: Intelligent matching - calculate and display based on matched shift points
+            if (shift && punchMatches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
+                // Intelligent matching - calculate based on matched shift points only
                 for (const match of punchMatches) {
-                    if (!match.matchedTo) {
-                        // Unmatched punch - don't calculate, just mark as error
-                        continue;
-                    }
+                    if (!match.matchedTo) continue; // Skip unmatched punches
                     
                     const punchTime = match.punch.time;
                     const shiftTime = match.shiftTime;
@@ -971,22 +964,14 @@ export default function ReportTab({ project }) {
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
-            if (ENABLE_INTELLIGENT_PUNCH_MATCHING) {
-                // NEW: Mark as abnormal if any punch couldn't be matched
-                if (hasUnmatchedPunch) {
-                    isAbnormal = true;
-                }
-                // Also mark as abnormal if missing punches
-                const expectedPunchCount = isSingleShift ? 2 : 4;
-                if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
-                    isAbnormal = true;
-                }
-            } else {
-                // OLD: Original abnormality detection
-                const expectedPunchCount = isSingleShift ? 2 : 4;
-                if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
-                    isAbnormal = true;
-                }
+            // Mark as abnormal if any punch couldn't be matched
+            if (hasUnmatchedPunch) {
+                isAbnormal = true;
+            }
+            // Also mark as abnormal if missing punches
+            const expectedPunchCount = isSingleShift ? 2 : 4;
+            if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
+                isAbnormal = true;
             }
             
             // Check for day-specific overrides in this report
@@ -1031,10 +1016,8 @@ export default function ReportTab({ project }) {
                 lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 hasOverride: !!dayOverride,
-                autoFillSuggestion,
-                autoFillSuggestions,
                 partialDayReason: partialDayResult.reason,
-                punchMatches: ENABLE_INTELLIGENT_PUNCH_MATCHING ? punchMatches : [],
+                punchMatches,
                 hasUnmatchedPunch
             });
         }
@@ -1384,7 +1367,7 @@ export default function ReportTab({ project }) {
                                         <TableCell>{day.punches}</TableCell>
                                         <TableCell className="text-xs max-w-xs">
                                             <div title={day.allPunchTimes || day.punchTimes}>
-                                                {ENABLE_INTELLIGENT_PUNCH_MATCHING && day.punchMatches && day.punchMatches.length > 0 ? (
+                                                {day.punchMatches && day.punchMatches.length > 0 ? (
                                                     <div className="space-y-0.5">
                                                         {day.punchMatches.map((match, matchIdx) => {
                                                             const extractTime = (ts) => {
