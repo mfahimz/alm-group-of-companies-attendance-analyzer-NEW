@@ -115,14 +115,30 @@ export default function ShiftTimingsTab({ project }) {
     };
 
     const normalizeTime = (timeStr) => {
-        if (!timeStr || timeStr === '—') return '—';
+        if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
+
+        // Handle AM/PM format - fix invalid hours if present
         if (/AM|PM/i.test(timeStr)) {
             const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (match) {
-                return `${match[1]}:${match[2]} ${match[3].toUpperCase()}`;
+                let hours = parseInt(match[1]);
+                const minutes = match[2];
+                const period = match[3].toUpperCase();
+
+                // Fix invalid hours (e.g., "14:00 PM" or "0:00 AM")
+                if (hours === 0 || hours > 12) {
+                    const newPeriod = hours >= 12 ? 'PM' : 'AM';
+                    if (hours > 12) hours -= 12;
+                    if (hours === 0) hours = 12;
+                    return `${hours}:${minutes} ${newPeriod}`;
+                }
+
+                return `${hours}:${minutes} ${period}`;
             }
             return timeStr;
         }
+
+        // Handle 24-hour format
         const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
         if (!match) return timeStr;
         let hours = parseInt(match[1]);
