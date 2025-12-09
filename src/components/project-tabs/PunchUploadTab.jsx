@@ -293,39 +293,40 @@ export default function PunchUploadTab({ project }) {
         }
     });
 
-    // Filter punches based on search and date range
-    const filteredPunches = punches.filter(punch => {
-        const matchesSearch = !searchTerm || punch.attendance_id.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        let matchesDateRange = true;
-        if (dateFrom && dateTo) {
-            matchesDateRange = punch.punch_date >= dateFrom && punch.punch_date <= dateTo;
-        } else if (dateFrom) {
-            matchesDateRange = punch.punch_date >= dateFrom;
-        } else if (dateTo) {
-            matchesDateRange = punch.punch_date <= dateTo;
-        }
-        
-        return matchesSearch && matchesDateRange;
-    });
-
-    // Enrich punches with employee names
-    const enrichedPunches = filteredPunches
-        .map(punch => ({
-            ...punch,
-            employee_name: employees.find(e => e.attendance_id === punch.attendance_id)?.name || '-'
-        }))
-        .sort((a, b) => {
-            let aVal = a[sort.key];
-            let bVal = b[sort.key];
+    // Filter and enrich punches - optimized with useMemo
+    const enrichedPunches = React.useMemo(() => {
+        const filtered = punches.filter(punch => {
+            const matchesSearch = !searchTerm || punch.attendance_id.toLowerCase().includes(searchTerm.toLowerCase());
             
-            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
-            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            let matchesDateRange = true;
+            if (dateFrom && dateTo) {
+                matchesDateRange = punch.punch_date >= dateFrom && punch.punch_date <= dateTo;
+            } else if (dateFrom) {
+                matchesDateRange = punch.punch_date >= dateFrom;
+            } else if (dateTo) {
+                matchesDateRange = punch.punch_date <= dateTo;
+            }
             
-            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
-            return 0;
+            return matchesSearch && matchesDateRange;
         });
+
+        return filtered
+            .map(punch => ({
+                ...punch,
+                employee_name: employees.find(e => e.attendance_id === punch.attendance_id)?.name || '-'
+            }))
+            .sort((a, b) => {
+                let aVal = a[sort.key];
+                let bVal = b[sort.key];
+                
+                if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+                
+                if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+    }, [punches, searchTerm, dateFrom, dateTo, employees, sort]);
 
     const toggleSelectAll = () => {
         if (selectedPunches.length === enrichedPunches.length) {
