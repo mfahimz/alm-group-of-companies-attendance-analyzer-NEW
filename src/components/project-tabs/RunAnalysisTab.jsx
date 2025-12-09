@@ -10,7 +10,7 @@ export default function RunAnalysisTab({ project }) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [progress, setProgress] = useState(null);
     const queryClient = useQueryClient();
-    
+
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id })
@@ -52,73 +52,10 @@ export default function RunAnalysisTab({ project }) {
         }
     });
 
-    // Intelligent punch matching - match each punch to closest shift point
-    const matchPunchesToShiftPoints = (dayPunches, shift) => {
-        if (!shift || dayPunches.length === 0) return [];
-        
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
-        
-        if (punchesWithTime.length === 0) return [];
-        
-        // Define shift points
-        const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
-            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
-        ].filter(sp => sp.time); // Only include valid shift points
-        
-        // Match each punch to closest shift point within 1 hour (60 minutes)
-        const matches = [];
-        const usedShiftPoints = new Set(); // Track which shift points are already matched
-        
-        for (const punch of punchesWithTime) {
-            let closestMatch = null;
-            let minDistance = Infinity;
-            
-            for (const shiftPoint of shiftPoints) {
-                // Skip if this shift point already matched to another punch
-                if (usedShiftPoints.has(shiftPoint.type)) continue;
-                
-                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60); // in minutes
-                
-                // Must be within 60 minutes (1 hour) radius
-                if (distance <= 60 && distance < minDistance) {
-                    minDistance = distance;
-                    closestMatch = shiftPoint;
-                }
-            }
-            
-            if (closestMatch) {
-                matches.push({
-                    punch,
-                    matchedTo: closestMatch.type,
-                    shiftTime: closestMatch.time,
-                    distance: minDistance
-                });
-                usedShiftPoints.add(closestMatch.type); // Mark as used
-            } else {
-                // No match within 1 hour - mark as unmatched
-                matches.push({
-                    punch,
-                    matchedTo: null,
-                    shiftTime: null,
-                    distance: null
-                });
-            }
-        }
-        
-        return matches;
-    };
-
     const parseTime = (timeStr) => {
         try {
             if (!timeStr || timeStr === '—') return null;
             
-            // Try AM/PM format first: "8:00 AM" or "08:00 AM" or "DD/MM/YYYY 8:00 AM"
             let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
@@ -133,7 +70,6 @@ export default function RunAnalysisTab({ project }) {
                 return date;
             }
             
-            // Fallback: Try 24-hour format for backwards compatibility: "08:00:00", "08:00"
             timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
@@ -150,7 +86,62 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
-    // Detect partial day (employee came but left early - worked less than half the expected hours)
+    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+        if (!shift || dayPunches.length === 0) return [];
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length === 0) return [];
+        
+        const shiftPoints = [
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
+            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+        ].filter(sp => sp.time);
+        
+        const matches = [];
+        const usedShiftPoints = new Set();
+        
+        for (const punch of punchesWithTime) {
+            let closestMatch = null;
+            let minDistance = Infinity;
+            
+            for (const shiftPoint of shiftPoints) {
+                if (usedShiftPoints.has(shiftPoint.type)) continue;
+                
+                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                
+                if (distance <= 60 && distance < minDistance) {
+                    minDistance = distance;
+                    closestMatch = shiftPoint;
+                }
+            }
+            
+            if (closestMatch) {
+                matches.push({
+                    punch,
+                    matchedTo: closestMatch.type,
+                    shiftTime: closestMatch.time,
+                    distance: minDistance
+                });
+                usedShiftPoints.add(closestMatch.type);
+            } else {
+                matches.push({
+                    punch,
+                    matchedTo: null,
+                    shiftTime: null,
+                    distance: null
+                });
+            }
+        }
+        
+        return matches;
+    };
+
     const detectPartialDay = (dayPunches, shift) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
         
@@ -169,11 +160,9 @@ export default function RunAnalysisTab({ project }) {
         
         if (!amStart || !pmEnd) return { isPartial: false, reason: null };
         
-        // Calculate expected work hours and actual work hours
         const expectedMinutes = (pmEnd - amStart) / (1000 * 60);
         const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
         
-        // If worked less than 50% of expected time, it's a partial/half day
         if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
             return { 
                 isPartial: true, 
@@ -194,8 +183,6 @@ export default function RunAnalysisTab({ project }) {
 
         if (punchesWithTime.length === 0) return punchList;
 
-        // ONLY remove exact duplicates (same timestamp within 10 minutes)
-        // Do NOT filter based on shift times - keep ALL valid punches
         const deduped = [];
         for (let i = 0; i < punchesWithTime.length; i++) {
             const current = punchesWithTime[i];
@@ -205,9 +192,228 @@ export default function RunAnalysisTab({ project }) {
             }
         }
 
-        // Sort by time and return all non-duplicate punches
         const sortedPunches = deduped.sort((a, b) => a.time - b.time);
         return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+    };
+
+    const analyzeEmployee = async (attendance_id) => {
+        const employeePunches = punches.filter(p => 
+            p.attendance_id === attendance_id && 
+            p.punch_date >= project.date_from && 
+            p.punch_date <= project.date_to
+        );
+        const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
+        const employeeExceptions = exceptions.filter(e => e.attendance_id === attendance_id || e.attendance_id === 'ALL');
+
+        let working_days = 0;
+        let present_days = 0;
+        let full_absence_count = 0;
+        let half_absence_count = 0;
+        let sick_leave_count = 0;
+        let late_minutes = 0;
+        let early_checkout_minutes = 0;
+        const abnormal_dates_list = [];
+        const auto_resolutions = [];
+
+        const startDate = new Date(project.date_from);
+        const endDate = new Date(project.date_to);
+        
+        for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
+            const currentDate = new Date(d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay();
+
+            if (rules.date_rules?.holidays?.includes('Sunday') && dayOfWeek === 0) {
+                continue;
+            }
+
+            working_days++;
+
+            const dateException = employeeExceptions.find(ex => {
+                const exFrom = new Date(ex.date_from);
+                const exTo = new Date(ex.date_to);
+                return currentDate >= exFrom && currentDate <= exTo && 
+                       (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
+            });
+
+            if (dateException) {
+                if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
+                    working_days--;
+                    continue;
+                } else if (dateException.type === 'MANUAL_PRESENT') {
+                    present_days++;
+                    continue;
+                } else if (dateException.type === 'MANUAL_ABSENT') {
+                    full_absence_count++;
+                    continue;
+                } else if (dateException.type === 'MANUAL_HALF') {
+                    present_days++;
+                    half_absence_count++;
+                    continue;
+                } else if (dateException.type === 'SICK_LEAVE') {
+                    present_days++;
+                    sick_leave_count++;
+                    continue;
+                } else if (dateException.type === 'MANUAL_EARLY_CHECKOUT') {
+                    early_checkout_minutes += dateException.early_checkout_minutes || 0;
+                }
+            }
+
+            const isShiftEffective = (s) => {
+                if (!s.effective_from || !s.effective_to) return true;
+                const from = new Date(s.effective_from);
+                const to = new Date(s.effective_to);
+                const currentDateOnly = new Date(currentDate);
+                currentDateOnly.setHours(0, 0, 0, 0);
+                const fromDateOnly = new Date(from);
+                fromDateOnly.setHours(0, 0, 0, 0);
+                const toDateOnly = new Date(to);
+                toDateOnly.setHours(0, 0, 0, 0);
+                return currentDateOnly >= fromDateOnly && currentDateOnly <= toDateOnly;
+            };
+
+            let shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
+
+            if (!shift) {
+                if (dayOfWeek === 5) {
+                    shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
+                    if (!shift) {
+                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                    }
+                } else {
+                    shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                }
+            }
+
+            if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                shift = {
+                    am_start: dateException.new_am_start,
+                    am_end: dateException.new_am_end,
+                    pm_start: dateException.new_pm_start,
+                    pm_end: dateException.new_pm_end
+                };
+            }
+
+            const dayPunches = employeePunches
+                .filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+
+            let filteredPunches = filterMultiplePunches(dayPunches, shift);
+            
+            let punchMatches = [];
+            let hasUnmatchedPunch = false;
+            if (shift && filteredPunches.length > 0) {
+                punchMatches = matchPunchesToShiftPoints(filteredPunches, shift);
+                hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+            }
+            
+            const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
+                                   shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+                                   shift.am_end !== '—' && shift.pm_start !== '—' &&
+                                   shift.am_end !== '-' && shift.pm_start !== '-';
+            const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
+
+            const partialDayResult = detectPartialDay(filteredPunches, shift);
+
+            if (filteredPunches.length > 0) {
+                if (partialDayResult.isPartial) {
+                    present_days++;
+                    half_absence_count++;
+                    auto_resolutions.push({
+                        date: dateStr,
+                        type: 'PARTIAL_DAY_DETECTED',
+                        details: partialDayResult.reason
+                    });
+                } else {
+                    present_days++;
+                }
+
+                if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
+                    if (filteredPunches.length < 2 && !isSingleShift) {
+                        half_absence_count++;
+                    }
+                }
+            } else {
+                full_absence_count++;
+            }
+
+            const shouldSkipTimeCalculation = dateException && [
+                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+            ].includes(dateException.type);
+
+            if (shift && punchMatches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
+                for (const match of punchMatches) {
+                    if (!match.matchedTo) continue;
+                    
+                    const punchTime = match.punch.time;
+                    const shiftTime = match.shiftTime;
+                    
+                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                        if (punchTime > shiftTime) {
+                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                            late_minutes += minutes;
+                        }
+                    }
+                    
+                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                        if (punchTime < shiftTime) {
+                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                            early_checkout_minutes += minutes;
+                        }
+                    }
+                }
+            }
+
+            const expectedPunches = isSingleShift ? 2 : 4;
+            
+            if (hasUnmatchedPunch) {
+                abnormal_dates_list.push(dateStr);
+            }
+            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
+                abnormal_dates_list.push(dateStr);
+            }
+            if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
+                abnormal_dates_list.push(dateStr);
+            }
+
+            const dateFormatted = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
+            if (rules.date_rules?.special_abnormal_dates?.includes(dateFormatted)) {
+                abnormal_dates_list.push(dateStr);
+            }
+
+            if (rules.date_rules?.always_mark_first_date_abnormal && currentDate.getTime() === startDate.getTime()) {
+                abnormal_dates_list.push(dateStr);
+            }
+        }
+
+        const abnormalDatesFormatted = [...new Set(abnormal_dates_list)].map(d => new Date(d).toLocaleDateString()).join(', ');
+        const autoResolutionNotes = auto_resolutions.length > 0 
+            ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
+            : '';
+        
+        const employee = employees.find(e => e.attendance_id === attendance_id);
+        const dept = employee?.department || 'Admin';
+        const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
+        const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
+        
+        return {
+            attendance_id,
+            working_days,
+            present_days,
+            full_absence_count,
+            half_absence_count,
+            sick_leave_count,
+            late_minutes,
+            early_checkout_minutes,
+            grace_minutes: baseGrace + carriedGrace,
+            abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
+            notes: abnormalDatesFormatted,
+            auto_resolutions: autoResolutionNotes
+        };
     };
 
     const runAnalysis = async () => {
@@ -227,13 +433,11 @@ export default function RunAnalysisTab({ project }) {
         try {
             const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-            // Create a new report run (keeping old reports intact)
             const reportRun = await base44.entities.ReportRun.create({
                 project_id: project.id,
                 employee_count: uniqueEmployeeIds.length
             });
 
-            // Process all employees and collect results
             const allResults = [];
             for (let i = 0; i < uniqueEmployeeIds.length; i++) {
                 const attendance_id = uniqueEmployeeIds[i];
@@ -262,7 +466,6 @@ export default function RunAnalysisTab({ project }) {
                 });
             }
 
-            // Bulk create results in batches
             setProgress({ current: uniqueEmployeeIds.length, total: uniqueEmployeeIds.length, status: 'Saving results...' });
             const createBatchSize = 15;
             for (let i = 0; i < allResults.length; i += createBatchSize) {
@@ -287,8 +490,6 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
-
-
     return (
         <div className="space-y-6">
             <Card className="border-0 shadow-md bg-white ring-1 ring-slate-950/5">
@@ -296,7 +497,6 @@ export default function RunAnalysisTab({ project }) {
                     <CardTitle>Run Attendance Analysis</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {/* Pre-check Status */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-3">
                             {punches.length > 0 ? (
@@ -336,7 +536,6 @@ export default function RunAnalysisTab({ project }) {
                         </div>
                     </div>
 
-                    {/* Progress */}
                     {progress && (
                         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
                             <div className="flex items-center gap-3 mb-2">
@@ -355,7 +554,6 @@ export default function RunAnalysisTab({ project }) {
                         </div>
                     )}
 
-                    {/* Run Button */}
                     <div>
                         <Button
                             onClick={runAnalysis}
