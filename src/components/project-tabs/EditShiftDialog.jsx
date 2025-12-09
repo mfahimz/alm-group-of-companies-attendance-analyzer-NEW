@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 export default function EditShiftDialog({ open, onClose, shift, projectId }) {
@@ -16,18 +17,38 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
         pm_start: '',
         pm_end: '',
         applicable_days: '',
+        applicable_days_array: [],
         is_single_shift: false
     });
     const queryClient = useQueryClient();
+    
+    const { data: project } = useQuery({
+        queryKey: ['project', projectId],
+        queryFn: async () => {
+            const projects = await base44.entities.Project.list();
+            return projects.find(p => p.id === projectId);
+        },
+        enabled: !!projectId
+    });
 
     useEffect(() => {
         if (shift) {
+            let daysArray = [];
+            try {
+                daysArray = JSON.parse(shift.applicable_days || '[]');
+            } catch {
+                if (shift.applicable_days) {
+                    daysArray = shift.applicable_days.split(',').map(d => d.trim()).filter(Boolean);
+                }
+            }
+            
             setFormData({
                 am_start: shift.am_start || '',
                 am_end: shift.am_end || '',
                 pm_start: shift.pm_start || '',
                 pm_end: shift.pm_end || '',
                 applicable_days: shift.applicable_days || '',
+                applicable_days_array: Array.isArray(daysArray) ? daysArray : [],
                 is_single_shift: shift.is_single_shift || false
             });
         }
@@ -48,17 +69,34 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         
-        // Detect if this is a Friday shift based on applicable_days
-        const is_friday_shift = formData.applicable_days.toLowerCase().includes('friday');
+        const applicableDaysToSave = project?.company === 'Naser Mohsin Auto Parts' 
+            ? JSON.stringify(formData.applicable_days_array)
+            : formData.applicable_days;
+        
+        const is_friday_shift = project?.company === 'Naser Mohsin Auto Parts'
+            ? formData.applicable_days_array.includes('Friday') && formData.applicable_days_array.length === 1
+            : formData.applicable_days.toLowerCase().includes('friday');
         
         updateMutation.mutate({
             am_start: formData.am_start,
             am_end: formData.is_single_shift ? null : formData.am_end,
             pm_start: formData.is_single_shift ? null : formData.pm_start,
             pm_end: formData.pm_end,
-            applicable_days: formData.applicable_days,
+            applicable_days: applicableDaysToSave,
             is_friday_shift,
             is_single_shift: formData.is_single_shift
+        });
+    };
+    
+    const toggleDay = (day) => {
+        setFormData(prev => {
+            const newArray = prev.applicable_days_array.includes(day)
+                ? prev.applicable_days_array.filter(d => d !== day)
+                : [...prev.applicable_days_array, day];
+            return {
+                ...prev,
+                applicable_days_array: newArray
+            };
         });
     };
 
@@ -145,19 +183,36 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                     )}
                     <div>
                         <Label>Applicable Days *</Label>
-                        <Select
-                            value={formData.applicable_days}
-                            onValueChange={(value) => setFormData({ ...formData, applicable_days: value })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Monday to Thursday and Saturday">Monday to Thursday and Saturday</SelectItem>
-                                <SelectItem value="Friday">Friday</SelectItem>
-                                <SelectItem value="Monday to Saturday">Monday to Saturday</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        {project?.company === 'Naser Mohsin Auto Parts' ? (
+                            <div className="grid grid-cols-2 gap-2 mt-2 p-3 border rounded-lg">
+                                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                                    <div key={day} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`day-${day}`}
+                                            checked={formData.applicable_days_array.includes(day)}
+                                            onCheckedChange={() => toggleDay(day)}
+                                        />
+                                        <Label htmlFor={`day-${day}`} className="font-normal cursor-pointer">
+                                            {day}
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <Select
+                                value={formData.applicable_days}
+                                onValueChange={(value) => setFormData({ ...formData, applicable_days: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Monday to Thursday and Saturday">Monday to Thursday and Saturday</SelectItem>
+                                    <SelectItem value="Friday">Friday</SelectItem>
+                                    <SelectItem value="Monday to Saturday">Monday to Saturday</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
                     </div>
                     <div className="flex gap-3 pt-4">
                         <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={updateMutation.isPending}>
