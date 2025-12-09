@@ -524,12 +524,18 @@ export default function ReportTab({ project }) {
             }
 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
-                shift = {
-                    am_start: dateException.new_am_start,
-                    am_end: dateException.new_am_end,
-                    pm_start: dateException.new_pm_start,
-                    pm_end: dateException.new_pm_end
-                };
+                // Check if include_friday flag exists and current day is Friday
+                const isFriday = dayOfWeek === 5;
+                const shouldApplyOverride = dateException.include_friday || !isFriday;
+                
+                if (shouldApplyOverride) {
+                    shift = {
+                        am_start: dateException.new_am_start,
+                        am_end: dateException.new_am_end,
+                        pm_start: dateException.new_pm_start,
+                        pm_end: dateException.new_pm_end
+                    };
+                }
             }
 
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
@@ -906,12 +912,18 @@ export default function ReportTab({ project }) {
             }
 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
-                shift = {
-                    am_start: dateException.new_am_start,
-                    am_end: dateException.new_am_end,
-                    pm_start: dateException.new_pm_start,
-                    pm_end: dateException.new_pm_end
-                };
+                // Check if include_friday flag exists and current day is Friday
+                const isFriday = dayOfWeek === 5;
+                const shouldApplyOverride = dateException.include_friday || !isFriday;
+                
+                if (shouldApplyOverride) {
+                    shift = {
+                        am_start: dateException.new_am_start,
+                        am_end: dateException.new_am_end,
+                        pm_start: dateException.new_pm_start,
+                        pm_end: dateException.new_pm_end
+                    };
+                }
             }
 
             // Filter multiple punches to get the 4 key punches
