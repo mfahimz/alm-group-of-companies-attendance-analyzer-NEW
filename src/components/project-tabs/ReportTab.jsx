@@ -938,92 +938,57 @@ export default function ReportTab({ project }) {
             // Detect partial day
             const partialDayResult = detectPartialDay(dayPunches, shift);
             
-            // Detect and show auto-fill suggestion
-            let autoFillSuggestion = null;
-            let autoFillSuggestions = []; // For 2-punch scenario
-            let autoFilledTypes = []; // Track auto-filled punch types
-            if (shift) {
-                // For single shift: check if 1 punch, for regular: check if 3 or 2 punches
-                if ((isSingleShift && dayPunches.length === 1) || (!isSingleShift && dayPunches.length === 3) || (!isSingleShift && dayPunches.length === 2)) {
-                    if (isSingleShift && dayPunches.length === 1) {
-                        // Single shift auto-fill logic
-                        const shiftStart = parseTime(shift.am_start);
-                        const shiftEnd = parseTime(shift.pm_end);
-                        
-                        if (shiftStart && shiftEnd) {
-                            const punchTime = parseTime(dayPunches[0].timestamp_raw);
-                            if (punchTime) {
-                                const toStart = Math.abs(punchTime - shiftStart) / (1000 * 60);
-                                const toEnd = Math.abs(punchTime - shiftEnd) / (1000 * 60);
-                                const threshold = 30;
-                                
-                                if (toStart < toEnd && toStart < threshold) {
-                                    autoFillSuggestion = { type: 'PUNCH_OUT', time: shift.pm_end };
-                                } else if (toEnd < toStart && toEnd < threshold) {
-                                    autoFillSuggestion = { type: 'PUNCH_IN', time: shift.am_start };
-                                }
-                            }
-                        }
-                    } else if (dayPunches.length === 2) {
-                        // 2-punch auto-fill logic disabled
-                        // const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
-                        // autoFillSuggestions = autoFillResult.autoFilled || [];
-                        // autoFilledTypes = autoFillSuggestions.map(p => p.type);
-                    } else {
-                        // Regular shift auto-fill logic (3 punches)
-                        const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
-                        autoFillSuggestion = autoFillResult.autoFilled;
-                    }
-                }
+            // NEW: Intelligent punch matching
+            let punchMatches = [];
+            let hasUnmatchedPunch = false;
+            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && dayPunches.length > 0) {
+                punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
+                hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
             }
 
             // Calculate late minutes and early checkout
             let lateInfo = '';
             let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
+            let matchDetails = []; // Store match details for display
             
             // Skip late calculations for sick leave, manual present/absent/half, and off days
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
-                // Calculate effective punch count (actual punches + auto-filled)
-                const effectivePunchCount = dayPunches.length + (autoFillSuggestion ? 1 : 0) + autoFillSuggestions.length;
-                
-                // AM shift late check - calculate as long as we have at least one punch and AM_START wasn't auto-filled
-                if (shift.am_start && autoFillSuggestion?.type !== 'AM_START' && autoFillSuggestion?.type !== 'PUNCH_IN' && !autoFilledTypes.includes('AM_START')) {
-                    const firstPunch = dayPunches[0];
-                    const punchTime = parseTime(firstPunch.timestamp_raw);
-                    const shiftStart = parseTime(shift.am_start);
-                    if (punchTime && shiftStart && punchTime > shiftStart) {
-                        const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
-                        lateMinutesTotal += minutes;
-                        lateInfo += `AM: ${minutes} min late`;
+            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && punchMatches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
+                // NEW: Intelligent matching - calculate and display based on matched shift points
+                for (const match of punchMatches) {
+                    if (!match.matchedTo) {
+                        // Unmatched punch - don't calculate, just mark as error
+                        continue;
                     }
-                }
-                // PM shift late check - check if we have enough punches (3 actual + 1 auto = 4 effective) and PM_START wasn't auto-filled
-                if (shift.pm_start && effectivePunchCount >= 4 && dayPunches.length >= 3 && !isSingleShift && autoFillSuggestion?.type !== 'PM_START' && !autoFilledTypes.includes('PM_START')) {
-                    const pmCheckIn = dayPunches[2];
-                    const punchTime = parseTime(pmCheckIn.timestamp_raw);
-                    const shiftStart = parseTime(shift.pm_start);
-                    if (punchTime && shiftStart && punchTime > shiftStart) {
-                        const minutes = Math.round((punchTime - shiftStart) / (1000 * 60));
-                        lateMinutesTotal += minutes;
-                        if (lateInfo) lateInfo += ' | ';
-                        lateInfo += `PM: ${minutes} min late`;
+                    
+                    const punchTime = match.punch.time;
+                    const shiftTime = match.shiftTime;
+                    
+                    // Calculate late for START points
+                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                        if (punchTime > shiftTime) {
+                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                            lateMinutesTotal += minutes;
+                            const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
+                            if (lateInfo) lateInfo += ' | ';
+                            lateInfo += `${label}: ${minutes} min late`;
+                        }
                     }
-                }
-
-                // Early checkout check - only for complete punch sets and PM_END wasn't auto-filled
-                const expectedPunches = isSingleShift ? 2 : 4;
-                if (shift.pm_end && effectivePunchCount >= expectedPunches && autoFillSuggestion?.type !== 'PM_END' && autoFillSuggestion?.type !== 'PUNCH_OUT' && !autoFilledTypes.includes('PM_END')) {
-                    const lastPunch = dayPunches[dayPunches.length - 1];
-                    const punchTime = parseTime(lastPunch.timestamp_raw);
-                    const shiftEnd = parseTime(shift.pm_end);
-                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                        const minutes = Math.round((shiftEnd - punchTime) / (1000 * 60));
-                        earlyCheckoutInfo = `${minutes} min`;
+                    
+                    // Calculate early checkout for END points
+                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                        if (punchTime < shiftTime) {
+                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                            if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
+                                earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
+                            } else {
+                                earlyCheckoutInfo = `${minutes} min`;
+                            }
+                        }
                     }
                 }
             }
@@ -1464,37 +1429,33 @@ export default function ReportTab({ project }) {
                                             <div title={day.allPunchTimes || day.punchTimes}>
                                                 {ENABLE_INTELLIGENT_PUNCH_MATCHING && day.punchMatches && day.punchMatches.length > 0 ? (
                                                     <div className="space-y-0.5">
-                                                        {day.punchMatches.map((match, idx) => (
-                                                            <div key={idx} className="flex items-center gap-1">
-                                                                <span className={match.matchedTo ? '' : 'text-red-600 font-bold'}>
-                                                                    {extractTime(match.punch.timestamp_raw)}
-                                                                </span>
-                                                                {match.matchedTo && (
-                                                                    <span className="text-[9px] text-slate-500">
-                                                                        →{match.matchedTo.replace('_', ' ')}
+                                                        {day.punchMatches.map((match, matchIdx) => {
+                                                            const extractTime = (ts) => {
+                                                                const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+                                                                return match ? match[1] : ts;
+                                                            };
+                                                            return (
+                                                                <div key={matchIdx} className="flex items-center gap-1">
+                                                                    <span className={match.matchedTo ? '' : 'text-red-600 font-bold'}>
+                                                                        {extractTime(match.punch.timestamp_raw)}
                                                                     </span>
-                                                                )}
-                                                                {!match.matchedTo && (
-                                                                    <span className="text-[9px] text-red-600 font-bold">
-                                                                        ⚠️ NO MATCH
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                                                    {match.matchedTo && (
+                                                                        <span className="text-[9px] text-slate-500">
+                                                                            →{match.matchedTo.replace(/_/g, ' ')}
+                                                                        </span>
+                                                                    )}
+                                                                    {!match.matchedTo && (
+                                                                        <span className="text-[9px] text-red-600 font-bold">
+                                                                            ⚠️ NO MATCH
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 ) : (
                                                     <>
                                                         {day.punchTimesShort || '-'}
-                                                        {day.autoFillSuggestion && (
-                                                            <span className="text-indigo-600 block text-[10px]">
-                                                                🔧 +{day.autoFillSuggestion.time}
-                                                            </span>
-                                                        )}
-                                                        {day.autoFillSuggestions && day.autoFillSuggestions.length > 0 && (
-                                                            <span className="text-indigo-600 block text-[10px]">
-                                                                🔧 +{day.autoFillSuggestions.map(s => s.time).join(', +')}
-                                                            </span>
-                                                        )}
                                                     </>
                                                 )}
                                             </div>
