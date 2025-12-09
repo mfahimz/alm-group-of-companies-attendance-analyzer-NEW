@@ -875,6 +875,7 @@ export default function ReportTab({ project }) {
             // Detect and show auto-fill suggestion
             let autoFillSuggestion = null;
             let autoFillSuggestions = []; // For 2-punch scenario
+            let autoFilledTypes = []; // Track auto-filled punch types
             if (shift) {
                 // For single shift: check if 1 punch, for regular: check if 3 or 2 punches
                 if ((isSingleShift && dayPunches.length === 1) || (!isSingleShift && dayPunches.length === 3) || (!isSingleShift && dayPunches.length === 2)) {
@@ -901,6 +902,7 @@ export default function ReportTab({ project }) {
                         // 2-punch auto-fill logic (NEW)
                         const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
                         autoFillSuggestions = autoFillResult.autoFilled || [];
+                        autoFilledTypes = autoFillSuggestions.map(p => p.type);
                     } else {
                         // Regular shift auto-fill logic (3 punches)
                         const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
