@@ -38,6 +38,113 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         enabled: !!dayRecord && !!project?.id
     });
 
+    const parseTime = (timeStr) => {
+        try {
+            if (!timeStr || timeStr === '—') return null;
+            
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = timeMatch[3].toUpperCase();
+                
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+            
+            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (timeMatch) {
+                const hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+            
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
+    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+        if (!shift || dayPunches.length === 0) return [];
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length === 0) return [];
+        
+        const shiftPoints = [
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
+            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+        ].filter(sp => sp.time);
+        
+        const matches = [];
+        const usedShiftPoints = new Set();
+        
+        for (const punch of punchesWithTime) {
+            let closestMatch = null;
+            let minDistance = Infinity;
+            let isExtendedMatch = false;
+            
+            for (const shiftPoint of shiftPoints) {
+                if (usedShiftPoints.has(shiftPoint.type)) continue;
+                
+                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                
+                if (distance <= 60 && distance < minDistance) {
+                    minDistance = distance;
+                    closestMatch = shiftPoint;
+                }
+            }
+            
+            if (!closestMatch) {
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    
+                    if (distance <= 120 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                        isExtendedMatch = true;
+                    }
+                }
+            }
+            
+            if (closestMatch) {
+                matches.push({
+                    punch,
+                    matchedTo: closestMatch.type,
+                    shiftTime: closestMatch.time,
+                    distance: minDistance,
+                    isExtendedMatch
+                });
+                usedShiftPoints.add(closestMatch.type);
+            } else {
+                matches.push({
+                    punch,
+                    matchedTo: null,
+                    shiftTime: null,
+                    distance: null,
+                    isExtendedMatch: false
+                });
+            }
+        }
+        
+        return matches;
+    };
+
     const getDayPunches = () => {
         if (!dayRecord) return [];
         const [day, month, year] = dayRecord.date.split('/');
@@ -136,7 +243,57 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 });
             }
         }
-    }, [dayRecord, open, analysisResult]);
+        }, [dayRecord, open, analysisResult]);
+
+        // Auto-calculate late and early checkout when shift override changes
+        React.useEffect(() => {
+        if (!formData.shiftOverride.enabled || !dayRecord) return;
+
+        const dayPunches = getDayPunches();
+        if (dayPunches.length === 0) return;
+
+        const overriddenShift = {
+            am_start: formData.shiftOverride.am_start,
+            am_end: formData.shiftOverride.am_end,
+            pm_start: formData.shiftOverride.pm_start,
+            pm_end: formData.shiftOverride.pm_end
+        };
+
+        // Check if all shift times are provided
+        if (!overriddenShift.am_start || !overriddenShift.pm_end) return;
+
+        const punchMatches = matchPunchesToShiftPoints(dayPunches, overriddenShift);
+
+        let calculatedLate = 0;
+        let calculatedEarlyCheckout = 0;
+
+        for (const match of punchMatches) {
+            if (!match.matchedTo) continue;
+
+            const punchTime = match.punch.time;
+            const shiftTime = match.shiftTime;
+
+            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                if (punchTime > shiftTime) {
+                    const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                    calculatedLate += minutes;
+                }
+            }
+
+            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                if (punchTime < shiftTime) {
+                    const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                    calculatedEarlyCheckout += minutes;
+                }
+            }
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            lateMinutes: calculatedLate,
+            earlyCheckoutMinutes: calculatedEarlyCheckout
+        }));
+        }, [formData.shiftOverride.enabled, formData.shiftOverride.am_start, formData.shiftOverride.am_end, formData.shiftOverride.pm_start, formData.shiftOverride.pm_end, dayRecord]);
 
     const updateDayMutation = useMutation({
         mutationFn: async (data) => {
@@ -320,8 +477,12 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             value={formData.lateMinutes}
                             onChange={(e) => setFormData({ ...formData, lateMinutes: parseInt(e.target.value) || 0 })}
                             placeholder="0"
+                            disabled={formData.shiftOverride.enabled}
+                            className={formData.shiftOverride.enabled ? 'bg-slate-100' : ''}
                         />
-                        <p className="text-xs text-slate-500 mt-1">Combined AM + PM late minutes</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {formData.shiftOverride.enabled ? 'Auto-calculated from shift override' : 'Combined AM + PM late minutes'}
+                        </p>
                     </div>
 
                     {/* Early Checkout Minutes */}
@@ -334,8 +495,12 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             value={formData.earlyCheckoutMinutes}
                             onChange={(e) => setFormData({ ...formData, earlyCheckoutMinutes: parseInt(e.target.value) || 0 })}
                             placeholder="0"
+                            disabled={formData.shiftOverride.enabled}
+                            className={formData.shiftOverride.enabled ? 'bg-slate-100' : ''}
                         />
-                        <p className="text-xs text-slate-500 mt-1">Combined AM + PM early checkout minutes</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {formData.shiftOverride.enabled ? 'Auto-calculated from shift override' : 'Combined AM + PM early checkout minutes'}
+                        </p>
                     </div>
 
                     {/* Abnormality Toggle */}
