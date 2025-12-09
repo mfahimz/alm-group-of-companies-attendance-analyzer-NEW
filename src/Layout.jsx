@@ -97,7 +97,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
+        <div className="h-screen overflow-hidden bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
             {/* Mobile Sidebar Backdrop */}
             {sidebarOpen && (
                 <div 
@@ -108,11 +108,11 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Sidebar */}
             <aside className={cn(
-                "fixed inset-y-0 left-0 z-50 bg-white/80 backdrop-blur-xl border-r border-white/20 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shadow-2xl shadow-indigo-100/50",
+                "fixed inset-y-0 left-0 z-50 bg-white/80 backdrop-blur-xl border-r border-white/20 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shadow-2xl shadow-indigo-100/50 h-screen",
                 sidebarOpen ? "translate-x-0" : "-translate-x-full",
                 sidebarCollapsed ? "w-20" : "w-72"
             )}>
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col h-full overflow-hidden">
                     {/* Logo */}
                     <div className={cn("flex items-center justify-between h-20 mb-2", sidebarCollapsed ? "px-4 justify-center" : "px-8")}>
                         <div className="flex items-center gap-3">
@@ -265,9 +265,9 @@ export default function Layout({ children, currentPageName }) {
             </aside>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
                 {/* Mobile Header */}
-                <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 h-16 flex items-center">
+                <header className="lg:hidden flex-shrink-0 z-30 bg-white border-b border-slate-200 px-4 h-16 flex items-center">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -280,7 +280,7 @@ export default function Layout({ children, currentPageName }) {
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 p-6 lg:p-8">
+                <main className="flex-1 overflow-y-auto p-6 lg:p-8 min-h-0">
                     <div className="max-w-7xl mx-auto">
                         {children}
                     </div>
