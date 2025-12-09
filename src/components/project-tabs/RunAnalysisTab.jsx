@@ -364,7 +364,7 @@ export default function RunAnalysisTab({ project }) {
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
-            if (shift && punchMatches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
+            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
                 for (const match of punchMatches) {
                     if (!match.matchedTo) continue;
                     

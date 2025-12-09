@@ -926,8 +926,8 @@ export default function ReportTab({ project }) {
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
-            
-            if (shift && punchMatches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
+
+            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
                 // Intelligent matching - calculate based on matched shift points only
                 for (const match of punchMatches) {
                     if (!match.matchedTo) continue; // Skip unmatched punches
