@@ -429,10 +429,12 @@ export default function ReportTab({ project }) {
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
-            // Skip ALL late calculations if any punch was auto-filled, partial day, or specific exception types
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !autoFilledPunch && !shouldSkipTimeCalculation) {
-                // AM late - calculate as long as we have at least one punch
-                if (shift.am_start) {
+            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
+                // Calculate effective punch count (actual punches + auto-filled)
+                const effectivePunchCount = dayPunches.length + (autoFilledPunch ? 1 : 0);
+                
+                // AM late - calculate as long as we have at least one punch and AM_START wasn't auto-filled
+                if (shift.am_start && autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN') {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
                     const shiftStart = parseTime(shift.am_start);
@@ -440,8 +442,8 @@ export default function ReportTab({ project }) {
                         totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
                     }
                 }
-                // PM late - ONLY if we have actual 4 punches (not single shift)
-                if (shift.pm_start && dayPunches.length >= 4 && !isSingleShift) {
+                // PM late - check if we have enough punches (3 actual + 1 auto = 4 effective) and PM_START wasn't auto-filled
+                if (shift.pm_start && effectivePunchCount >= 4 && dayPunches.length >= 3 && !isSingleShift && autoFilledPunch?.type !== 'PM_START') {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
                     const shiftStart = parseTime(shift.pm_start);
@@ -449,10 +451,9 @@ export default function ReportTab({ project }) {
                         totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
                     }
                 }
-                // Early checkout - only for complete punch sets
+                // Early checkout - only for complete punch sets and PM_END wasn't auto-filled
                 const expectedPunches = isSingleShift ? 2 : 4;
-                const hasCompletePunches = dayPunches.length >= expectedPunches;
-                if (shift.pm_end && hasCompletePunches) {
+                if (shift.pm_end && effectivePunchCount >= expectedPunches && autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT') {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
