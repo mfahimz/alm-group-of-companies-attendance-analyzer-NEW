@@ -505,6 +505,13 @@ export default function ReportTab({ project }) {
                 continue; // Skip normal calculation for overridden days
             }
 
+            // Detect 2-punch auto-fill for late calculation
+            let autoFilledPunches = [];
+            if (shift && !isSingleShift && dayPunches.length === 2) {
+                const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
+                autoFilledPunches = autoFillResult.autoFilled || [];
+            }
+
             // Calculate late and early checkout for non-overridden days
             // Skip late calculations for sick leave, manual present/absent/half, and off days
             const shouldSkipTimeCalculation = dateException && [
@@ -513,10 +520,11 @@ export default function ReportTab({ project }) {
             
             if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
                 // Calculate effective punch count (actual punches + auto-filled)
-                const effectivePunchCount = dayPunches.length + (autoFilledPunch ? 1 : 0);
+                const effectivePunchCount = dayPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
+                const autoFilledTypes = autoFilledPunches.map(p => p.type);
                 
                 // AM late - calculate as long as we have at least one punch and AM_START wasn't auto-filled
-                if (shift.am_start && autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN') {
+                if (shift.am_start && autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN' && !autoFilledTypes.includes('AM_START')) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
                     const shiftStart = parseTime(shift.am_start);
@@ -525,7 +533,7 @@ export default function ReportTab({ project }) {
                     }
                 }
                 // PM late - check if we have enough punches (3 actual + 1 auto = 4 effective) and PM_START wasn't auto-filled
-                if (shift.pm_start && effectivePunchCount >= 4 && dayPunches.length >= 3 && !isSingleShift && autoFilledPunch?.type !== 'PM_START') {
+                if (shift.pm_start && effectivePunchCount >= 4 && dayPunches.length >= 3 && !isSingleShift && autoFilledPunch?.type !== 'PM_START' && !autoFilledTypes.includes('PM_START')) {
                     const pmCheckIn = dayPunches[2];
                     const punchTime = parseTime(pmCheckIn.timestamp_raw);
                     const shiftStart = parseTime(shift.pm_start);
@@ -535,7 +543,7 @@ export default function ReportTab({ project }) {
                 }
                 // Early checkout - only for complete punch sets and PM_END wasn't auto-filled
                 const expectedPunches = isSingleShift ? 2 : 4;
-                if (shift.pm_end && effectivePunchCount >= expectedPunches && autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT') {
+                if (shift.pm_end && effectivePunchCount >= expectedPunches && autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT' && !autoFilledTypes.includes('PM_END')) {
                     const lastPunch = dayPunches[dayPunches.length - 1];
                     const punchTime = parseTime(lastPunch.timestamp_raw);
                     const shiftEnd = parseTime(shift.pm_end);
