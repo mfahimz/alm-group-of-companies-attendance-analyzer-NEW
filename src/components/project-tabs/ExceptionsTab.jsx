@@ -408,32 +408,31 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                             <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                            </SelectContent>
-                                            </Select>
-                                            </div>
-                                            </div>
-                                            </div>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
 
                             {formData.type !== 'SINGLE_SHIFT' && (
-                                    <>
-                                        <div>
-                                            <Label>From Date *</Label>
-                                            <Input
-                                                type="date"
-                                                value={formData.date_from}
-                                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>To Date *</Label>
-                                            <Input
-                                                type="date"
-                                                value={formData.date_to}
-                                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
-                                            />
-                                        </div>
-                                        </>
-                                        )}
+                                <>
+                                    <div>
+                                        <Label>From Date *</Label>
+                                        <Input
+                                            type="date"
+                                            value={formData.date_from}
+                                            onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>To Date *</Label>
+                                        <Input
+                                            type="date"
+                                            value={formData.date_to}
+                                            onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                                        />
+                                    </div>
+                                </>
+                            )}
 
                             {needsShiftOverride && (
                                 <div>
