@@ -294,6 +294,9 @@ export default function ReportTab({ project }) {
         const employeeShifts = shifts.filter(s => s.attendance_id === result.attendance_id);
         const employeeExceptions = exceptions.filter(e => e.attendance_id === result.attendance_id);
 
+        // Get employee to check weekly off day (for Naser Mohsin)
+        const employee = employees.find(e => e.attendance_id === result.attendance_id);
+
         let dayOverrides = {};
         if (result.day_overrides) {
             try {
@@ -307,12 +310,24 @@ export default function ReportTab({ project }) {
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
 
+        // Map day names to numbers
+        const dayNameToNumber = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
 
-            if (dayOfWeek === 0) continue; // Skip Sundays
+            // Skip weekly off day based on company
+            if (project.company === 'Naser Mohsin Auto Parts' && employee?.weekly_off) {
+                const weeklyOffDay = dayNameToNumber[employee.weekly_off];
+                if (dayOfWeek === weeklyOffDay) continue;
+            } else {
+                if (dayOfWeek === 0) continue; // Default: Skip Sundays
+            }
 
             const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
@@ -506,6 +521,15 @@ export default function ReportTab({ project }) {
         const startDate = new Date(filters.dateFrom || project.date_from);
         const endDate = new Date(filters.dateTo || project.date_to);
 
+        // Get employee to check weekly off day (for Naser Mohsin)
+        const employee = employees.find(e => e.attendance_id === result.attendance_id);
+
+        // Map day names to numbers
+        const dayNameToNumber = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
         let hasMatchingDay = false;
 
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
@@ -513,7 +537,13 @@ export default function ReportTab({ project }) {
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
 
-            if (dayOfWeek === 0) continue; // Skip Sundays
+            // Skip weekly off day based on company
+            if (project.company === 'Naser Mohsin Auto Parts' && employee?.weekly_off) {
+                const weeklyOffDay = dayNameToNumber[employee.weekly_off];
+                if (dayOfWeek === weeklyOffDay) continue;
+            } else {
+                if (dayOfWeek === 0) continue; // Default: Skip Sundays
+            }
 
             const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
             const dateException = employeeExceptions.find(ex => {
@@ -677,12 +707,27 @@ export default function ReportTab({ project }) {
         const employeeShifts = shifts.filter(s => s.attendance_id === currentResult.attendance_id);
         const employeeExceptions = exceptions.filter(e => e.attendance_id === currentResult.attendance_id);
 
+        // Get employee to check weekly off day (for Naser Mohsin)
+        const employee = employees.find(e => e.attendance_id === currentResult.attendance_id);
+
+        // Map day names to numbers
+        const dayNameToNumber = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
 
-            if (dayOfWeek === 0) continue; // Skip Sundays
+            // Skip weekly off day based on company
+            if (project.company === 'Naser Mohsin Auto Parts' && employee?.weekly_off) {
+                const weeklyOffDay = dayNameToNumber[employee.weekly_off];
+                if (dayOfWeek === weeklyOffDay) continue;
+            } else {
+                if (dayOfWeek === 0) continue; // Default: Skip Sundays
+            }
 
             const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
