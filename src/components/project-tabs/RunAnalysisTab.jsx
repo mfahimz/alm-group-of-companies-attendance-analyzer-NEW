@@ -223,6 +223,9 @@ export default function RunAnalysisTab({ project }) {
         );
         const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
         const employeeExceptions = exceptions.filter(e => e.attendance_id === attendance_id || e.attendance_id === 'ALL');
+        
+        // Get employee to determine weekly off day
+        const employee = employees.find(e => e.attendance_id === attendance_id);
 
         let working_days = 0;
         let present_days = 0;
@@ -237,12 +240,27 @@ export default function RunAnalysisTab({ project }) {
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
         
+        // Map day names to numbers
+        const dayNameToNumber = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+        
         for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
 
-            if (rules.date_rules?.holidays?.includes('Sunday') && dayOfWeek === 0) {
+            // Check for weekly off override in project
+            let weeklyOffDay = null;
+            if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+            } else if (employee?.weekly_off) {
+                weeklyOffDay = dayNameToNumber[employee.weekly_off];
+            }
+            
+            // Skip weekly off day (don't count as working day or absence)
+            if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                 continue;
             }
 
@@ -416,7 +434,6 @@ export default function RunAnalysisTab({ project }) {
             ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
             : '';
         
-        const employee = employees.find(e => e.attendance_id === attendance_id);
         const dept = employee?.department || 'Admin';
         const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
         const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
