@@ -32,9 +32,9 @@ export default function RunAnalysisTab({ project }) {
     });
 
     const { data: rules } = useQuery({
-        queryKey: ['rules'],
+        queryKey: ['rules', project.company],
         queryFn: async () => {
-            const rulesList = await base44.entities.AttendanceRules.list();
+            const rulesList = await base44.entities.AttendanceRules.filter({ company: project.company });
             if (rulesList.length > 0) {
                 return JSON.parse(rulesList[0].rules_json);
             }
