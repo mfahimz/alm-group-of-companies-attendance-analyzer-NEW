@@ -39,13 +39,18 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                 try {
                     daysArray = JSON.parse(shift.applicable_days || '[]');
                 } catch {
-                    // Fallback parsing or default
                     daysArray = [];
                 }
                 
-                // If empty or invalid, set default (all days except Sunday and Friday)
+                // If empty or invalid, set default based on shift type
                 if (!Array.isArray(daysArray) || daysArray.length === 0) {
-                    daysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+                    // Check if it's a Friday shift
+                    if (shift.is_friday_shift) {
+                        daysArray = ['Friday'];
+                    } else {
+                        // Regular shift: all days except Sunday and Friday
+                        daysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+                    }
                 }
             }
             
