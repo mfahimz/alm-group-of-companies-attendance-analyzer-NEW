@@ -437,10 +437,11 @@ export default function RunAnalysisTab({ project }) {
                 }
 
                 // Calculate late minutes for both AM and PM shifts
-                // Skip ALL late calculations if any punch was auto-filled (no real lateness to calculate)
-                if (shift && !partialDayResult.isPartial && !autoFilledPunch) {
+                if (shift && !partialDayResult.isPartial) {
                     // AM shift late check (first punch of the day)
-                    if (shift.am_start && filteredPunches.length > 0) {
+                    // Skip if AM_START/PUNCH_IN was auto-filled
+                    if (shift.am_start && filteredPunches.length > 0 && 
+                        autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN') {
                         const firstPunch = filteredPunches[0];
                         const punchTime = parseTime(firstPunch.timestamp_raw);
                         const shiftStart = parseTime(shift.am_start);
@@ -457,7 +458,9 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // PM shift late check (third punch - PM check-in) - skip for single shift
-                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 4) {
+                    // Skip if PM_START was auto-filled
+                    if (!isSingleShift && shift.pm_start && filteredPunches.length >= 4 && 
+                        autoFilledPunch?.type !== 'PM_START') {
                         const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
@@ -469,9 +472,10 @@ export default function RunAnalysisTab({ project }) {
                     }
 
                     // Early checkout check - PM only (last punch before PM shift end)
-                    // Skip early checkout calculation if ANY punch was auto-filled (no real data to compare)
+                    // Skip if PM_END/PUNCH_OUT was auto-filled
                     const expectedPunches = isSingleShift ? 2 : 4;
-                    if (shift.pm_end && filteredPunches.length >= expectedPunches && !autoFilledPunch) {
+                    if (shift.pm_end && filteredPunches.length >= expectedPunches && 
+                        autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT') {
                         const lastPunch = filteredPunches[filteredPunches.length - 1];
                         const punchTime = parseTime(lastPunch.timestamp_raw);
                         const shiftEnd = parseTime(shift.pm_end);
