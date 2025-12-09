@@ -10,6 +10,9 @@ export default function RunAnalysisTab({ project }) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [progress, setProgress] = useState(null);
     const queryClient = useQueryClient();
+    
+    // FEATURE FLAG: Set to false to disable 2-punch auto-fill
+    const ENABLE_TWO_PUNCH_AUTO_FILL = true;
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
@@ -127,6 +130,74 @@ export default function RunAnalysisTab({ project }) {
                 setProgress(null);
             }, 2000);
         }
+    };
+
+    // NEW: Detect TWO missing punches (for regular shifts with 2 actual punches)
+    const detectTwoMissingPunches = (dayPunches, shift) => {
+        if (!shift || dayPunches.length !== 2) return { punches: dayPunches, autoFilled: [] };
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length !== 2) return { punches: dayPunches, autoFilled: [] };
+        
+        const [firstPunch, secondPunch] = punchesWithTime;
+        const amStart = parseTime(shift.am_start);
+        const amEnd = parseTime(shift.am_end);
+        const pmStart = parseTime(shift.pm_start);
+        const pmEnd = parseTime(shift.pm_end);
+        
+        if (!amStart || !amEnd || !pmStart || !pmEnd) return { punches: dayPunches, autoFilled: [] };
+        
+        // Calculate time difference between the two punches (in hours)
+        const timeDiff = (secondPunch.time - firstPunch.time) / (1000 * 60 * 60);
+        
+        // Pattern 1: Punches are far apart (>4 hours) → Likely AM Start + PM End (skipped break punches)
+        if (timeDiff > 4) {
+            return {
+                punches: dayPunches,
+                autoFilled: [
+                    { type: 'AM_END', time: shift.am_end },
+                    { type: 'PM_START', time: shift.pm_start }
+                ]
+            };
+        }
+        
+        // Pattern 2: Punches are close together - determine which shift block
+        // Check if both punches are in AM period
+        const amMidpoint = new Date((amStart.getTime() + amEnd.getTime()) / 2);
+        const pmMidpoint = new Date((pmStart.getTime() + pmEnd.getTime()) / 2);
+        
+        if (secondPunch.time < amMidpoint) {
+            // Both punches are in AM shift → Missing PM Start and PM End
+            return {
+                punches: dayPunches,
+                autoFilled: [
+                    { type: 'PM_START', time: shift.pm_start },
+                    { type: 'PM_END', time: shift.pm_end }
+                ]
+            };
+        } else if (firstPunch.time > pmMidpoint) {
+            // Both punches are in PM shift → Missing AM Start and AM End
+            return {
+                punches: dayPunches,
+                autoFilled: [
+                    { type: 'AM_START', time: shift.am_start },
+                    { type: 'AM_END', time: shift.am_end }
+                ]
+            };
+        }
+        
+        // Default: Assume most common pattern (skipped break punches)
+        return {
+            punches: dayPunches,
+            autoFilled: [
+                { type: 'AM_END', time: shift.am_end },
+                { type: 'PM_START', time: shift.pm_start }
+            ]
+        };
     };
 
     // Detect which punch is missing and auto-fill it (Intelligent mode)
@@ -394,28 +465,51 @@ export default function RunAnalysisTab({ project }) {
             
             // Auto-fill missing punch (Conservative mode)
             let autoFilledPunch = null;
+            let autoFilledPunches = []; // For 2-punch scenario
             if (shift) {
                 // For single shift: auto-fill if exactly 1 punch
-                // For regular shift: auto-fill if exactly 3 punches
+                // For regular shift: auto-fill if exactly 3 punches OR 2 punches (NEW)
                 const shouldAutoFill = (isSingleShift && filteredPunches.length === 1) || 
-                                       (!isSingleShift && filteredPunches.length === 3);
+                                       (!isSingleShift && filteredPunches.length === 3) ||
+                                       (!isSingleShift && filteredPunches.length === 2 && ENABLE_TWO_PUNCH_AUTO_FILL);
                 
                 if (shouldAutoFill) {
-                    const autoFillResult = detectAndAutoFillMissingPunch(filteredPunches, shift, isSingleShift);
-                    autoFilledPunch = autoFillResult.autoFilled;
-                    if (autoFilledPunch) {
-                        console.log(`[${dateStr}] ${attendance_id}: Auto-fill triggered`, {
-                            type: autoFilledPunch.type,
-                            time: autoFilledPunch.time,
-                            actualPunches: filteredPunches.map(p => p.timestamp_raw)
-                        });
-                        auto_resolutions.push({
-                            date: dateStr,
-                            type: 'MISSING_PUNCH_AUTO_FILL',
-                            details: `Auto-filled ${autoFilledPunch.type.replace(/_/g, ' ')} with ${autoFilledPunch.time}`
-                        });
+                    // Handle 2-punch scenario (NEW)
+                    if (!isSingleShift && filteredPunches.length === 2 && ENABLE_TWO_PUNCH_AUTO_FILL) {
+                        const autoFillResult = detectTwoMissingPunches(filteredPunches, shift);
+                        autoFilledPunches = autoFillResult.autoFilled || [];
+                        if (autoFilledPunches.length > 0) {
+                            console.log(`[${dateStr}] ${attendance_id}: Two-punch auto-fill triggered`, {
+                                types: autoFilledPunches.map(p => p.type),
+                                times: autoFilledPunches.map(p => p.time),
+                                actualPunches: filteredPunches.map(p => p.timestamp_raw)
+                            });
+                            autoFilledPunches.forEach(filled => {
+                                auto_resolutions.push({
+                                    date: dateStr,
+                                    type: 'MISSING_PUNCH_AUTO_FILL',
+                                    details: `Auto-filled ${filled.type.replace(/_/g, ' ')} with ${filled.time}`
+                                });
+                            });
+                        }
                     } else {
-                        console.log(`[${dateStr}] ${attendance_id}: Auto-fill NOT triggered (shouldAutoFill=${shouldAutoFill}, punches=${filteredPunches.length})`);
+                        // Original 1-punch or 3-punch scenario
+                        const autoFillResult = detectAndAutoFillMissingPunch(filteredPunches, shift, isSingleShift);
+                        autoFilledPunch = autoFillResult.autoFilled;
+                        if (autoFilledPunch) {
+                            console.log(`[${dateStr}] ${attendance_id}: Auto-fill triggered`, {
+                                type: autoFilledPunch.type,
+                                time: autoFilledPunch.time,
+                                actualPunches: filteredPunches.map(p => p.timestamp_raw)
+                            });
+                            auto_resolutions.push({
+                                date: dateStr,
+                                type: 'MISSING_PUNCH_AUTO_FILL',
+                                details: `Auto-filled ${autoFilledPunch.type.replace(/_/g, ' ')} with ${autoFilledPunch.time}`
+                            });
+                        } else {
+                            console.log(`[${dateStr}] ${attendance_id}: Auto-fill NOT triggered (shouldAutoFill=${shouldAutoFill}, punches=${filteredPunches.length})`);
+                        }
                     }
                 }
             }
@@ -439,12 +533,14 @@ export default function RunAnalysisTab({ project }) {
                 // Calculate late minutes for both AM and PM shifts
                 if (shift && !partialDayResult.isPartial) {
                     // Calculate effective punch count (actual punches + auto-filled)
-                    const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0);
+                    const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
+                    const autoFilledTypes = autoFilledPunches.map(p => p.type);
                     
                     // AM shift late check (first punch of the day)
                     // Skip if AM_START/PUNCH_IN was auto-filled
                     if (shift.am_start && filteredPunches.length > 0 && 
-                        autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN') {
+                        autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN' &&
+                        !autoFilledTypes.includes('AM_START') && !autoFilledTypes.includes('PUNCH_IN')) {
                         const firstPunch = filteredPunches[0];
                         const punchTime = parseTime(firstPunch.timestamp_raw);
                         const shiftStart = parseTime(shift.am_start);
@@ -464,7 +560,8 @@ export default function RunAnalysisTab({ project }) {
                     // Skip if PM_START was auto-filled
                     // Use effectivePunchCount to consider auto-filled punches
                     if (!isSingleShift && shift.pm_start && effectivePunchCount >= 4 && 
-                        filteredPunches.length >= 3 && autoFilledPunch?.type !== 'PM_START') {
+                        filteredPunches.length >= 3 && autoFilledPunch?.type !== 'PM_START' &&
+                        !autoFilledTypes.includes('PM_START')) {
                         const pmCheckIn = filteredPunches[2]; // 3rd punch is PM check-in
                         const punchTime = parseTime(pmCheckIn.timestamp_raw);
                         const shiftStart = parseTime(shift.pm_start);
@@ -479,7 +576,8 @@ export default function RunAnalysisTab({ project }) {
                     // Skip if PM_END/PUNCH_OUT was auto-filled
                     const expectedPunches = isSingleShift ? 2 : 4;
                     if (shift.pm_end && effectivePunchCount >= expectedPunches && 
-                        autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT') {
+                        autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT' &&
+                        !autoFilledTypes.includes('PM_END') && !autoFilledTypes.includes('PUNCH_OUT')) {
                         const lastPunch = filteredPunches[filteredPunches.length - 1];
                         const punchTime = parseTime(lastPunch.timestamp_raw);
                         const shiftEnd = parseTime(shift.pm_end);
@@ -506,8 +604,8 @@ export default function RunAnalysisTab({ project }) {
             // Abnormality detection (use filtered punches)
             // For single shift employees, expected punches is 2, otherwise 4
             const expectedPunches = isSingleShift ? 2 : 4;
-            // Don't mark as abnormal if we auto-filled the missing punch
-            const effectivePunchCount = autoFilledPunch ? filteredPunches.length + 1 : filteredPunches.length;
+            // Don't mark as abnormal if we auto-filled the missing punch(es)
+            const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
             if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && effectivePunchCount < expectedPunches) {
                 abnormal_dates_list.push(dateStr);
             }
