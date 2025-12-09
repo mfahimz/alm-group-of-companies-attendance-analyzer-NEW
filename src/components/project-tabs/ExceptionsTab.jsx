@@ -74,8 +74,8 @@ export default function ExceptionsTab({ project }) {
     });
 
     const { data: employees = [] } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list()
+        queryKey: ['employees', project.company],
+        queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
     const createMutation = useMutation({

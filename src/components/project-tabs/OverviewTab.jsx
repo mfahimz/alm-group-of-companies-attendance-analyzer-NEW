@@ -54,8 +54,8 @@ export default function OverviewTab({ project }) {
     });
 
     const { data: employees = [] } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list()
+        queryKey: ['employees', project.company],
+        queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
     const uniqueEmployees = new Set(punches.map(p => p.attendance_id)).size;
