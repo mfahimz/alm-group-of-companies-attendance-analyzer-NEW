@@ -181,65 +181,10 @@ export default function ShiftTimingsTab({ project }) {
                 const values = lines[i].split(',').map(v => v.trim());
                 if (values.length >= 7) {
                     const attendance_id = values[0];
-
-                    // For Naser Mohsin Auto Parts, convert 24-hour format to 12-hour AM/PM
-                    let am_start = values[3];
-                    let am_end = values[4];
-                    let pm_start = values[5];
-                    let pm_end = values[6];
-
-                    if (project.company === 'Naser Mohsin Auto Parts') {
-                        // Convert 24-hour format to 12-hour AM/PM if not already in AM/PM format
-                        if (am_start && !am_start.match(/AM|PM/i)) {
-                            const match = am_start.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-                            if (match) {
-                                let hours = parseInt(match[1]);
-                                const minutes = match[2];
-                                const period = hours >= 12 ? 'PM' : 'AM';
-                                if (hours > 12) hours -= 12;
-                                if (hours === 0) hours = 12;
-                                am_start = `${hours}:${minutes} ${period}`;
-                            }
-                        }
-                        if (am_end && !am_end.match(/AM|PM/i)) {
-                            const match = am_end.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-                            if (match) {
-                                let hours = parseInt(match[1]);
-                                const minutes = match[2];
-                                const period = hours >= 12 ? 'PM' : 'AM';
-                                if (hours > 12) hours -= 12;
-                                if (hours === 0) hours = 12;
-                                am_end = `${hours}:${minutes} ${period}`;
-                            }
-                        }
-                        if (pm_start && !pm_start.match(/AM|PM/i)) {
-                            const match = pm_start.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-                            if (match) {
-                                let hours = parseInt(match[1]);
-                                const minutes = match[2];
-                                const period = hours >= 12 ? 'PM' : 'AM';
-                                if (hours > 12) hours -= 12;
-                                if (hours === 0) hours = 12;
-                                pm_start = `${hours}:${minutes} ${period}`;
-                            }
-                        }
-                        if (pm_end && !pm_end.match(/AM|PM/i)) {
-                            const match = pm_end.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-                            if (match) {
-                                let hours = parseInt(match[1]);
-                                const minutes = match[2];
-                                const period = hours >= 12 ? 'PM' : 'AM';
-                                if (hours > 12) hours -= 12;
-                                if (hours === 0) hours = 12;
-                                pm_end = `${hours}:${minutes} ${period}`;
-                            }
-                        }
-                    }
-
-                    am_start = normalizeTime(am_start);
-                    am_end = normalizeTime(am_end);
-                    pm_start = normalizeTime(pm_start);
-                    pm_end = normalizeTime(pm_end);
+                    const am_start = normalizeTime(values[3]);
+                    const am_end = normalizeTime(values[4]);
+                    const pm_start = normalizeTime(values[5]);
+                    const pm_end = normalizeTime(values[6]);
 
                     let applicableDays = values[8] || '';
 
