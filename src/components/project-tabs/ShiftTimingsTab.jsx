@@ -196,15 +196,21 @@ export default function ShiftTimingsTab({ project }) {
                     const pm_end = normalizeTime(values[6]);
 
                     let applicableDays = values[8] || '';
+                    let applicableDaysArray = [];
 
-                    // For Naser Mohsin Auto Parts, set default applicable days (exclude Sunday and Friday)
+                    // For Naser Mohsin Auto Parts, set default applicable days
                     if (project.company === 'Naser Mohsin Auto Parts') {
                         const isFridayShift = applicableDays.toLowerCase().includes('friday');
                         if (isFridayShift) {
-                            applicableDays = 'Friday only';
+                            applicableDaysArray = ['Friday'];
                         } else if (!applicableDays || applicableDays.trim() === '') {
-                            applicableDays = 'Saturday-Thursday (excluding Sunday)';
+                            // Default: All days except Sunday and Friday
+                            applicableDaysArray = ['Saturday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+                        } else {
+                            // Parse existing string
+                            applicableDaysArray = applicableDays.split(',').map(d => d.trim());
                         }
+                        applicableDays = JSON.stringify(applicableDaysArray);
                     }
 
                     const employeeExists = employees.some(e => e.attendance_id === attendance_id);
@@ -611,7 +617,22 @@ export default function ShiftTimingsTab({ project }) {
                                                             )}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days')}
+                                                            {(() => {
+                                                                if (shift.date) return new Date(shift.date).toLocaleDateString('en-GB');
+                                                                if (!shift.applicable_days) return 'All days';
+
+                                                                // Try to parse as JSON array (Naser Mohsin format)
+                                                                try {
+                                                                    const daysArray = JSON.parse(shift.applicable_days);
+                                                                    if (Array.isArray(daysArray)) {
+                                                                        return daysArray.join(', ');
+                                                                    }
+                                                                } catch {
+                                                                    // Not JSON, return as string
+                                                                }
+
+                                                                return shift.applicable_days;
+                                                            })()}
                                                             {shift.is_friday_shift && (
                                                                 <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
                                                                     Friday
