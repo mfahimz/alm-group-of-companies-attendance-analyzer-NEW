@@ -14,6 +14,8 @@ import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditShiftDialog from './EditShiftDialog';
 import TablePagination from '../ui/TablePagination';
+import BulkEditShiftDialog from '../shifts/BulkEditShiftDialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ShiftTimingsTab({ project }) {
     const [file, setFile] = useState(null);
@@ -34,6 +36,8 @@ export default function ShiftTimingsTab({ project }) {
         block1: { from: project.date_from, to: project.date_to },
         block2: { from: project.date_from, to: project.date_to }
     });
+    const [selectedShifts, setSelectedShifts] = useState([]);
+    const [showBulkEdit, setShowBulkEdit] = useState(false);
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -541,9 +545,21 @@ export default function ShiftTimingsTab({ project }) {
                         ) : (
                             <>
                                 <div className="flex items-center justify-between">
-                                    <p className="text-sm text-slate-600">
-                                        {filteredShifts.length !== blockShifts.length && `${filteredShifts.length} of ${blockShifts.length} shown`}
-                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <p className="text-sm text-slate-600">
+                                            {filteredShifts.length !== blockShifts.length && `${filteredShifts.length} of ${blockShifts.length} shown`}
+                                        </p>
+                                        {selectedShifts.length > 0 && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => setShowBulkEdit(true)}
+                                                className="bg-indigo-600 hover:bg-indigo-700"
+                                            >
+                                                <Edit className="w-4 h-4 mr-2" />
+                                                Bulk Edit ({selectedShifts.length})
+                                            </Button>
+                                        )}
+                                    </div>
                                     <div className="flex gap-3">
                                         <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                                             <SelectTrigger className="w-40">
@@ -572,6 +588,18 @@ export default function ShiftTimingsTab({ project }) {
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
+                                                <TableHead className="w-12">
+                                                    <Checkbox
+                                                        checked={selectedShifts.length === filteredShifts.length && filteredShifts.length > 0}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setSelectedShifts(filteredShifts.map(s => s));
+                                                            } else {
+                                                                setSelectedShifts([]);
+                                                            }
+                                                        }}
+                                                    />
+                                                </TableHead>
                                                 <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                                     Attendance ID
                                                 </SortableTableHead>
@@ -593,6 +621,18 @@ export default function ShiftTimingsTab({ project }) {
                                                 const employee = employees.find(e => e.attendance_id === shift.attendance_id);
                                                 return (
                                                     <TableRow key={shift.id}>
+                                                        <TableCell>
+                                                            <Checkbox
+                                                                checked={selectedShifts.some(s => s.id === shift.id)}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setSelectedShifts([...selectedShifts, shift]);
+                                                                    } else {
+                                                                        setSelectedShifts(selectedShifts.filter(s => s.id !== shift.id));
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </TableCell>
                                                         <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                         <TableCell>{employee?.name || '-'}</TableCell>
                                                         <TableCell>{employee?.department || '-'}</TableCell>
@@ -784,6 +824,18 @@ export default function ShiftTimingsTab({ project }) {
                 onClose={() => setEditingShift(null)}
                 shift={editingShift}
                 projectId={project.id}
+            />
+
+            {/* Bulk Edit Dialog */}
+            <BulkEditShiftDialog
+                open={showBulkEdit}
+                onClose={() => {
+                    setShowBulkEdit(false);
+                    setSelectedShifts([]);
+                }}
+                selectedShifts={selectedShifts}
+                projectId={project.id}
+                company={project.company}
             />
 
             {/* Preview Dialog */}
