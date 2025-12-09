@@ -32,13 +32,20 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
     });
 
     useEffect(() => {
-        if (shift) {
+        if (shift && project) {
             let daysArray = [];
-            try {
-                daysArray = JSON.parse(shift.applicable_days || '[]');
-            } catch {
-                if (shift.applicable_days) {
-                    daysArray = shift.applicable_days.split(',').map(d => d.trim()).filter(Boolean);
+            
+            if (project.company === 'Naser Mohsin Auto Parts') {
+                try {
+                    daysArray = JSON.parse(shift.applicable_days || '[]');
+                } catch {
+                    // Fallback parsing or default
+                    daysArray = [];
+                }
+                
+                // If empty or invalid, set default (all days except Sunday and Friday)
+                if (!Array.isArray(daysArray) || daysArray.length === 0) {
+                    daysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
                 }
             }
             
@@ -48,11 +55,11 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                 pm_start: shift.pm_start || '',
                 pm_end: shift.pm_end || '',
                 applicable_days: shift.applicable_days || '',
-                applicable_days_array: Array.isArray(daysArray) ? daysArray : [],
+                applicable_days_array: daysArray,
                 is_single_shift: shift.is_single_shift || false
             });
         }
-    }, [shift]);
+    }, [shift, project]);
 
     const updateMutation = useMutation({
         mutationFn: (data) => base44.entities.ShiftTiming.update(shift.id, data),
