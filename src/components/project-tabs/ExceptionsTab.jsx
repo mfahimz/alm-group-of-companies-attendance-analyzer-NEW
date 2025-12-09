@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-import { Plus, Trash2, Search, Upload, Download, Save } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
+import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 // Map user-friendly names to system type codes
 const TYPE_MAP = {
@@ -59,6 +61,8 @@ export default function ExceptionsTab({ project }) {
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [importProgress, setImportProgress] = useState(null);
     const [editedRows, setEditedRows] = useState({});
+    const [selectedExceptions, setSelectedExceptions] = useState([]);
+    const [showBulkEdit, setShowBulkEdit] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: exceptions = [] } = useQuery({
@@ -405,8 +409,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                         </SelectContent>
-                                    </Select>
-                                </div>
+                                        </Select>
+                                        </div>
+                                        </div>
                                 {formData.type !== 'SINGLE_SHIFT' && (
                                     <>
                                         <div>
@@ -553,7 +558,18 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}
-                    <div className="flex gap-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex gap-4 flex-1">
+                            {selectedExceptions.length > 0 && (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setShowBulkEdit(true)}
+                                    className="bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Bulk Edit ({selectedExceptions.length})
+                                </Button>
+                            )}
                         <div className="relative flex-1 max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <Input
@@ -592,9 +608,21 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead className="w-12">
+                                            <Checkbox
+                                                checked={selectedExceptions.length === filteredExceptions.length && filteredExceptions.length > 0}
+                                                onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                        setSelectedExceptions(filteredExceptions);
+                                                    } else {
+                                                        setSelectedExceptions([]);
+                                                    }
+                                                }}
+                                            />
+                                        </TableHead>
                                         <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                                                                          ID
-                                                                                      </SortableTableHead>
+                                            ID
+                                        </SortableTableHead>
                                                                                       <TableHead>Name</TableHead>
                                         <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
                                             Type
@@ -612,6 +640,18 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                 <TableBody>
                                     {filteredExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
+                                            <TableCell className="p-1">
+                                                <Checkbox
+                                                    checked={selectedExceptions.some(e => e.id === exception.id)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            setSelectedExceptions([...selectedExceptions, exception]);
+                                                        } else {
+                                                            setSelectedExceptions(selectedExceptions.filter(e => e.id !== exception.id));
+                                                        }
+                                                    }}
+                                                />
+                                            </TableCell>
                                             <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
                                                     {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
@@ -695,6 +735,17 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                     )}
                 </CardContent>
             </Card>
+
+            {/* Bulk Edit Dialog */}
+            <BulkEditExceptionDialog
+                open={showBulkEdit}
+                onClose={() => {
+                    setShowBulkEdit(false);
+                    setSelectedExceptions([]);
+                }}
+                selectedExceptions={selectedExceptions}
+                projectId={project.id}
+            />
         </div>
     );
 }
