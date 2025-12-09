@@ -241,7 +241,17 @@ export default function ShiftTimingsTab({ project }) {
                     pm_start = normalizeTime(pm_start);
                     pm_end = normalizeTime(pm_end);
 
-                    const applicableDays = values[8] || '';
+                    let applicableDays = values[8] || '';
+
+                    // For Naser Mohsin Auto Parts, set default applicable days
+                    if (project.company === 'Naser Mohsin Auto Parts') {
+                        const isFridayShift = applicableDays.toLowerCase().includes('friday');
+                        if (isFridayShift) {
+                            applicableDays = 'Friday';
+                        } else if (!applicableDays || applicableDays.trim() === '') {
+                            applicableDays = 'Saturday-Thursday';
+                        }
+                    }
 
                     const employeeExists = employees.some(e => e.attendance_id === attendance_id);
                     if (!employeeExists) {
