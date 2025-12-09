@@ -525,38 +525,6 @@ export default function ReportTab({ project }) {
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
             
             const partialDayResult = detectPartialDay(dayPunches, shift);
-            
-            // Detect if auto-fill would apply to this day
-            let autoFilledPunch = null;
-            if (shift) {
-                const shouldAutoFill = (isSingleShift && dayPunches.length === 1) || 
-                                       (!isSingleShift && dayPunches.length === 3);
-                
-                if (shouldAutoFill) {
-                    if (isSingleShift && dayPunches.length === 1) {
-                        const shiftStart = parseTime(shift.am_start);
-                        const shiftEnd = parseTime(shift.pm_end);
-                        
-                        if (shiftStart && shiftEnd) {
-                            const punchTime = parseTime(dayPunches[0].timestamp_raw);
-                            if (punchTime) {
-                                const toStart = Math.abs(punchTime - shiftStart) / (1000 * 60);
-                                const toEnd = Math.abs(punchTime - shiftEnd) / (1000 * 60);
-                                const threshold = 30;
-                                
-                                if (toStart < toEnd && toStart < threshold) {
-                                    autoFilledPunch = { type: 'PUNCH_OUT', time: shift.pm_end };
-                                } else if (toEnd < toStart && toEnd < threshold) {
-                                    autoFilledPunch = { type: 'PUNCH_IN', time: shift.am_start };
-                                }
-                            }
-                        }
-                    } else if (dayPunches.length === 3) {
-                        const autoFillResult = detectAndAutoFillMissingPunch(dayPunches, shift);
-                        autoFilledPunch = autoFillResult.autoFilled;
-                    }
-                }
-            }
 
             // Check for day override first
             const dayOverride = dayOverrides[dateStr];
@@ -570,13 +538,11 @@ export default function ReportTab({ project }) {
                 continue; // Skip normal calculation for overridden days
             }
 
-            // Detect 2-punch auto-fill for late calculation
-            let autoFilledPunches = [];
-            // Two-punch auto-fill disabled
-            // if (shift && !isSingleShift && dayPunches.length === 2) {
-            //     const autoFillResult = detectTwoMissingPunches(dayPunches, shift);
-            //     autoFilledPunches = autoFillResult.autoFilled || [];
-            // }
+            // NEW: Intelligent punch matching for totals calculation
+            let punchMatchesTotals = [];
+            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && dayPunches.length > 0) {
+                punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift);
+            }
 
             // Calculate late and early checkout for non-overridden days
             // Skip late calculations for sick leave, manual present/absent/half, and off days
@@ -584,37 +550,28 @@ export default function ReportTab({ project }) {
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
-            if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
-                // Calculate effective punch count (actual punches + auto-filled)
-                const effectivePunchCount = dayPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
-                const autoFilledTypes = autoFilledPunches.map(p => p.type);
-                
-                // AM late - calculate as long as we have at least one punch and AM_START wasn't auto-filled
-                if (shift.am_start && autoFilledPunch?.type !== 'AM_START' && autoFilledPunch?.type !== 'PUNCH_IN' && !autoFilledTypes.includes('AM_START')) {
-                    const firstPunch = dayPunches[0];
-                    const punchTime = parseTime(firstPunch.timestamp_raw);
-                    const shiftStart = parseTime(shift.am_start);
-                    if (punchTime && shiftStart && punchTime > shiftStart) {
-                        totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
+            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
+                // NEW: Intelligent matching - calculate based on matched shift points
+                for (const match of punchMatchesTotals) {
+                    if (!match.matchedTo) continue; // Skip unmatched punches
+                    
+                    const punchTime = match.punch.time;
+                    const shiftTime = match.shiftTime;
+                    
+                    // Calculate late for START points (AM_START, PM_START)
+                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                        if (punchTime > shiftTime) {
+                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                            totalLateMinutes += minutes;
+                        }
                     }
-                }
-                // PM late - check if we have enough punches (3 actual + 1 auto = 4 effective) and PM_START wasn't auto-filled
-                if (shift.pm_start && effectivePunchCount >= 4 && dayPunches.length >= 3 && !isSingleShift && autoFilledPunch?.type !== 'PM_START' && !autoFilledTypes.includes('PM_START')) {
-                    const pmCheckIn = dayPunches[2];
-                    const punchTime = parseTime(pmCheckIn.timestamp_raw);
-                    const shiftStart = parseTime(shift.pm_start);
-                    if (punchTime && shiftStart && punchTime > shiftStart) {
-                        totalLateMinutes += Math.round((punchTime - shiftStart) / (1000 * 60));
-                    }
-                }
-                // Early checkout - only for complete punch sets and PM_END wasn't auto-filled
-                const expectedPunches = isSingleShift ? 2 : 4;
-                if (shift.pm_end && effectivePunchCount >= expectedPunches && autoFilledPunch?.type !== 'PM_END' && autoFilledPunch?.type !== 'PUNCH_OUT' && !autoFilledTypes.includes('PM_END')) {
-                    const lastPunch = dayPunches[dayPunches.length - 1];
-                    const punchTime = parseTime(lastPunch.timestamp_raw);
-                    const shiftEnd = parseTime(shift.pm_end);
-                    if (punchTime && shiftEnd && punchTime < shiftEnd) {
-                        totalEarlyCheckout += Math.round((shiftEnd - punchTime) / (1000 * 60));
+                    
+                    // Calculate early checkout for END points (AM_END, PM_END)
+                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                        if (punchTime < shiftTime) {
+                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                            totalEarlyCheckout += minutes;
+                        }
                     }
                 }
             }
