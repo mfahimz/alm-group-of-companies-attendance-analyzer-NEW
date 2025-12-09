@@ -61,50 +61,43 @@ export default function ShiftTimingsTab({ project }) {
 
     // Load date ranges from project configuration
     useEffect(() => {
+        const blocksCount = project.shift_blocks_count || 2;
+        const defaultRanges = {};
+        for (let i = 1; i <= blocksCount; i++) {
+            defaultRanges[`block${i}`] = { from: project.date_from, to: project.date_to };
+        }
+
         if (project.shift_block_ranges) {
             try {
                 const savedRanges = JSON.parse(project.shift_block_ranges);
-                setBlockDateRanges(savedRanges);
+                setBlockDateRanges({ ...defaultRanges, ...savedRanges });
             } catch (e) {
-                // Invalid JSON, use defaults
-                setBlockDateRanges({
-                    block1: { from: project.date_from, to: project.date_to },
-                    block2: { from: project.date_from, to: project.date_to }
-                });
+                setBlockDateRanges(defaultRanges);
             }
+        } else {
+            setBlockDateRanges(defaultRanges);
         }
-    }, [project.shift_block_ranges, project.date_from, project.date_to]);
+    }, [project.shift_block_ranges, project.date_from, project.date_to, project.shift_blocks_count]);
 
-    // Group shifts by blocks - intelligently assign legacy shifts based on date ranges
-    const block1Shifts = shifts.filter(s => {
-        if (s.shift_block === 'block1') return true;
-        if (s.shift_block === 'block2') return false;
-        
-        // For legacy shifts without shift_block, check date ranges
-        if (!s.shift_block && s.effective_from && s.effective_to) {
-            const block1Range = blockDateRanges.block1;
-            // If shift dates match block1 range exactly or are within it, assign to block1
-            if (s.effective_from === block1Range.from && s.effective_to === block1Range.to) {
-                return true;
+    // Group shifts by blocks dynamically
+    const blocksCount = project.shift_blocks_count || 2;
+    const shiftsByBlock = {};
+
+    for (let i = 1; i <= blocksCount; i++) {
+        const blockId = `block${i}`;
+        shiftsByBlock[blockId] = shifts.filter(s => {
+            if (s.shift_block === blockId) return true;
+
+            // For legacy shifts without shift_block, check date ranges
+            if (!s.shift_block && s.effective_from && s.effective_to && blockDateRanges[blockId]) {
+                const blockRange = blockDateRanges[blockId];
+                if (s.effective_from === blockRange.from && s.effective_to === blockRange.to) {
+                    return true;
+                }
             }
-        }
-        return false;
-    });
-    
-    const block2Shifts = shifts.filter(s => {
-        if (s.shift_block === 'block2') return true;
-        if (s.shift_block === 'block1') return false;
-        
-        // For legacy shifts without shift_block, check date ranges
-        if (!s.shift_block && s.effective_from && s.effective_to) {
-            const block2Range = blockDateRanges.block2;
-            // If shift dates match block2 range exactly or are within it, assign to block2
-            if (s.effective_from === block2Range.from && s.effective_to === block2Range.to) {
-                return true;
-            }
-        }
-        return false;
-    });
+            return false;
+        });
+    }
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
@@ -692,8 +685,15 @@ export default function ShiftTimingsTab({ project }) {
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="block1">Block 1 ({new Date(blockDateRanges.block1.from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges.block1.to).toLocaleDateString('en-GB')})</SelectItem>
-                                <SelectItem value="block2">Block 2 ({new Date(blockDateRanges.block2.from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges.block2.to).toLocaleDateString('en-GB')})</SelectItem>
+                                {Array.from({ length: blocksCount }, (_, i) => i + 1).map(num => {
+                                    const blockId = `block${num}`;
+                                    const range = blockDateRanges[blockId];
+                                    return (
+                                        <SelectItem key={blockId} value={blockId}>
+                                            Block {num} ({range ? `${new Date(range.from).toLocaleDateString('en-GB')} - ${new Date(range.to).toLocaleDateString('en-GB')}` : 'Not configured'})
+                                        </SelectItem>
+                                    );
+                                })}
                             </SelectContent>
                         </Select>
                     </div>
@@ -748,11 +748,11 @@ export default function ShiftTimingsTab({ project }) {
                 </CardContent>
             </Card>
 
-            {/* Block 1 */}
-            {renderShiftBlock('block1', block1Shifts, 'Block 1')}
-
-            {/* Block 2 */}
-            {renderShiftBlock('block2', block2Shifts, 'Block 2')}
+            {/* Render dynamic blocks */}
+            {Array.from({ length: blocksCount }, (_, i) => i + 1).map(num => {
+                const blockId = `block${num}`;
+                return renderShiftBlock(blockId, shiftsByBlock[blockId] || [], `Block ${num}`);
+            })}
 
             {/* Edit Shift Dialog */}
             <EditShiftDialog
