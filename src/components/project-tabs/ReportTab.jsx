@@ -923,10 +923,10 @@ export default function ReportTab({ project }) {
             
             if (shift && dayPunches.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
                 // Calculate effective punch count (actual punches + auto-filled)
-                const effectivePunchCount = dayPunches.length + (autoFillSuggestion ? 1 : 0);
+                const effectivePunchCount = dayPunches.length + (autoFillSuggestion ? 1 : 0) + autoFillSuggestions.length;
                 
                 // AM shift late check - calculate as long as we have at least one punch and AM_START wasn't auto-filled
-                if (shift.am_start && autoFillSuggestion?.type !== 'AM_START' && autoFillSuggestion?.type !== 'PUNCH_IN') {
+                if (shift.am_start && autoFillSuggestion?.type !== 'AM_START' && autoFillSuggestion?.type !== 'PUNCH_IN' && !autoFilledTypes.includes('AM_START')) {
                     const firstPunch = dayPunches[0];
                     const punchTime = parseTime(firstPunch.timestamp_raw);
                     const shiftStart = parseTime(shift.am_start);
