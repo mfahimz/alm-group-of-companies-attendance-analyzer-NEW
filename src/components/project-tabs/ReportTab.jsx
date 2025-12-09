@@ -28,6 +28,8 @@ export default function ReportTab({ project }) {
         abnormality: 'all'
     });
     const [showFilters, setShowFilters] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 20;
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -594,19 +596,21 @@ export default function ReportTab({ project }) {
         return { totalLateMinutes, totalEarlyCheckout };
     };
 
-    const enrichedResults = results.map(result => {
-        const employee = employees.find(e => e.attendance_id === result.attendance_id);
-        
-        // Calculate totals from daily breakdown to match what's shown in the breakdown dialog
-        const { totalLateMinutes, totalEarlyCheckout } = calculateEmployeeTotals(result);
-        
-        return {
-            ...result,
-            name: employee?.name || 'Unknown',
-            late_minutes: Math.max(0, totalLateMinutes),
-            early_checkout_minutes: Math.max(0, totalEarlyCheckout)
-        };
-    });
+    const enrichedResults = React.useMemo(() => {
+        return results.map(result => {
+            const employee = employees.find(e => e.attendance_id === result.attendance_id);
+            
+            // Calculate totals from daily breakdown to match what's shown in the breakdown dialog
+            const { totalLateMinutes, totalEarlyCheckout } = calculateEmployeeTotals(result);
+            
+            return {
+                ...result,
+                name: employee?.name || 'Unknown',
+                late_minutes: Math.max(0, totalLateMinutes),
+                early_checkout_minutes: Math.max(0, totalEarlyCheckout)
+            };
+        });
+    }, [results, employees, punches, shifts, exceptions, project]);
 
     // Helper function to check if employee matches filter criteria based on daily breakdown
     const matchesAdvancedFilters = (result) => {
@@ -714,23 +718,37 @@ export default function ReportTab({ project }) {
         return hasMatchingDay;
     };
 
-    const filteredResults = enrichedResults
-        .filter(result =>
-            (result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            result.name.toLowerCase().includes(searchTerm.toLowerCase())) &&
-            matchesAdvancedFilters(result)
-        )
-        .sort((a, b) => {
-            let aVal = a[sort.key];
-            let bVal = b[sort.key];
-            
-            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
-            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-            
-            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
-            return 0;
-        });
+    const filteredResults = React.useMemo(() => {
+        return enrichedResults
+            .filter(result =>
+                (result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                result.name.toLowerCase().includes(searchTerm.toLowerCase())) &&
+                matchesAdvancedFilters(result)
+            )
+            .sort((a, b) => {
+                let aVal = a[sort.key];
+                let bVal = b[sort.key];
+                
+                if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+                
+                if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+    }, [enrichedResults, searchTerm, sort, filters]);
+    
+    // Pagination
+    const totalPages = Math.ceil(filteredResults.length / pageSize);
+    const paginatedResults = React.useMemo(() => {
+        const startIndex = (currentPage - 1) * pageSize;
+        return filteredResults.slice(startIndex, startIndex + pageSize);
+    }, [filteredResults, currentPage, pageSize]);
+    
+    // Reset to page 1 when filters change
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filters, sort]);
 
     const exportToExcel = () => {
         if (filteredResults.length === 0) {
@@ -791,7 +809,7 @@ export default function ReportTab({ project }) {
         return `${day}/${month}/${year}`;
     };
 
-    const getDailyBreakdown = () => {
+    const getDailyBreakdown = React.useMemo(() => {
         if (!selectedEmployee) return [];
 
         // Get the latest version of this employee's result from enrichedResults
@@ -1092,7 +1110,7 @@ export default function ReportTab({ project }) {
         }
 
         return breakdown;
-    };
+    }, [selectedEmployee, enrichedResults, punches, shifts, exceptions, employees, project]);
 
     return (
         <div className="space-y-6">
@@ -1286,13 +1304,36 @@ export default function ReportTab({ project }) {
                             No results found for this report.
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                            Attendance ID
-                                        </SortableTableHead>
+                        <>
+                            <div className="flex items-center justify-between mb-4 text-sm text-slate-600">
+                                <span>Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredResults.length)} of {filteredResults.length} employees</span>
+                                <div className="flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <span className="flex items-center px-3">Page {currentPage} of {totalPages}</span>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                                Attendance ID
+                                            </SortableTableHead>
                                         <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
                                             Name
                                         </SortableTableHead>
@@ -1321,7 +1362,7 @@ export default function ReportTab({ project }) {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredResults.map((result) => (
+                                    {paginatedResults.map((result) => (
                                         <TableRow key={result.id}>
                                             <TableCell className="font-medium">{result.attendance_id}</TableCell>
                                             <TableCell>{result.name}</TableCell>
@@ -1399,11 +1440,12 @@ export default function ReportTab({ project }) {
                                         </TableRow>
                                     ))}
                                 </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                </Table>
+                                </div>
+                                </>
+                                )}
+                                </CardContent>
+                                </Card>
 
             {/* Daily Breakdown Dialog */}
             <Dialog open={showBreakdown} onOpenChange={setShowBreakdown}>
@@ -1430,7 +1472,7 @@ export default function ReportTab({ project }) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {getDailyBreakdown().map((day, idx) => (
+                                {getDailyBreakdown.map((day, idx) => (
                                     <TableRow key={idx} className={`${day.hasUnmatchedPunch ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
