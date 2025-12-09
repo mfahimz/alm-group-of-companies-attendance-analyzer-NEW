@@ -412,7 +412,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                         </Select>
                                         </div>
                                         </div>
-                            </div>
+                                        </div>
+
                             {formData.type !== 'SINGLE_SHIFT' && (
                                     <>
                                         <div>
