@@ -138,6 +138,71 @@ export default function ReportTab({ project }) {
         }
     });
 
+    // FEATURE FLAG: Intelligent punch matching enabled
+    const ENABLE_INTELLIGENT_PUNCH_MATCHING = true;
+    
+    // NEW: Intelligent punch matching - match each punch to closest shift point
+    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+        if (!shift || dayPunches.length === 0) return [];
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length === 0) return [];
+        
+        // Define shift points
+        const shiftPoints = [
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
+            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+        ].filter(sp => sp.time); // Only include valid shift points
+        
+        // Match each punch to closest shift point within 1 hour (60 minutes)
+        const matches = [];
+        const usedShiftPoints = new Set(); // Track which shift points are already matched
+        
+        for (const punch of punchesWithTime) {
+            let closestMatch = null;
+            let minDistance = Infinity;
+            
+            for (const shiftPoint of shiftPoints) {
+                // Skip if this shift point already matched to another punch
+                if (usedShiftPoints.has(shiftPoint.type)) continue;
+                
+                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60); // in minutes
+                
+                // Must be within 60 minutes (1 hour) radius
+                if (distance <= 60 && distance < minDistance) {
+                    minDistance = distance;
+                    closestMatch = shiftPoint;
+                }
+            }
+            
+            if (closestMatch) {
+                matches.push({
+                    punch,
+                    matchedTo: closestMatch.type,
+                    shiftTime: closestMatch.time,
+                    distance: minDistance
+                });
+                usedShiftPoints.add(closestMatch.type); // Mark as used
+            } else {
+                // No match within 1 hour - mark as unmatched
+                matches.push({
+                    punch,
+                    matchedTo: null,
+                    shiftTime: null,
+                    distance: null
+                });
+            }
+        }
+        
+        return matches;
+    };
+    
     const parseTime = (timeStr) => {
         try {
             if (!timeStr || timeStr === '—') return null;
@@ -984,10 +1049,22 @@ export default function ReportTab({ project }) {
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
-            // Also mark as abnormal if punches don't match expected count
-            const expectedPunchCount = isSingleShift ? 2 : 4;
-            if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
-                isAbnormal = true;
+            if (ENABLE_INTELLIGENT_PUNCH_MATCHING) {
+                // NEW: Mark as abnormal if any punch couldn't be matched
+                if (hasUnmatchedPunch) {
+                    isAbnormal = true;
+                }
+                // Also mark as abnormal if missing punches
+                const expectedPunchCount = isSingleShift ? 2 : 4;
+                if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
+                    isAbnormal = true;
+                }
+            } else {
+                // OLD: Original abnormality detection
+                const expectedPunchCount = isSingleShift ? 2 : 4;
+                if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
+                    isAbnormal = true;
+                }
             }
             
             // Check for day-specific overrides in this report
@@ -1034,7 +1111,9 @@ export default function ReportTab({ project }) {
                 hasOverride: !!dayOverride,
                 autoFillSuggestion,
                 autoFillSuggestions,
-                partialDayReason: partialDayResult.reason
+                partialDayReason: partialDayResult.reason,
+                punchMatches: ENABLE_INTELLIGENT_PUNCH_MATCHING ? punchMatches : [],
+                hasUnmatchedPunch
             });
         }
 
@@ -1378,21 +1457,45 @@ export default function ReportTab({ project }) {
                             </TableHeader>
                             <TableBody>
                                 {getDailyBreakdown().map((day, idx) => (
-                                    <TableRow key={idx} className={`${day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                    <TableRow key={idx} className={`${day.hasUnmatchedPunch ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
                                         <TableCell className="text-xs max-w-xs">
                                             <div title={day.allPunchTimes || day.punchTimes}>
-                                                {day.punchTimesShort || '-'}
-                                                {day.autoFillSuggestion && (
-                                                    <span className="text-indigo-600 block text-[10px]">
-                                                        🔧 +{day.autoFillSuggestion.time}
-                                                    </span>
-                                                )}
-                                                {day.autoFillSuggestions && day.autoFillSuggestions.length > 0 && (
-                                                    <span className="text-indigo-600 block text-[10px]">
-                                                        🔧 +{day.autoFillSuggestions.map(s => s.time).join(', +')}
-                                                    </span>
+                                                {ENABLE_INTELLIGENT_PUNCH_MATCHING && day.punchMatches && day.punchMatches.length > 0 ? (
+                                                    <div className="space-y-0.5">
+                                                        {day.punchMatches.map((match, idx) => (
+                                                            <div key={idx} className="flex items-center gap-1">
+                                                                <span className={match.matchedTo ? '' : 'text-red-600 font-bold'}>
+                                                                    {extractTime(match.punch.timestamp_raw)}
+                                                                </span>
+                                                                {match.matchedTo && (
+                                                                    <span className="text-[9px] text-slate-500">
+                                                                        →{match.matchedTo.replace('_', ' ')}
+                                                                    </span>
+                                                                )}
+                                                                {!match.matchedTo && (
+                                                                    <span className="text-[9px] text-red-600 font-bold">
+                                                                        ⚠️ NO MATCH
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {day.punchTimesShort || '-'}
+                                                        {day.autoFillSuggestion && (
+                                                            <span className="text-indigo-600 block text-[10px]">
+                                                                🔧 +{day.autoFillSuggestion.time}
+                                                            </span>
+                                                        )}
+                                                        {day.autoFillSuggestions && day.autoFillSuggestions.length > 0 && (
+                                                            <span className="text-indigo-600 block text-[10px]">
+                                                                🔧 +{day.autoFillSuggestions.map(s => s.time).join(', +')}
+                                                            </span>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </TableCell>

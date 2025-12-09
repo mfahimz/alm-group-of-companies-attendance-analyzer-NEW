@@ -11,8 +11,8 @@ export default function RunAnalysisTab({ project }) {
     const [progress, setProgress] = useState(null);
     const queryClient = useQueryClient();
     
-    // FEATURE FLAG: Set to false to disable 2-punch auto-fill
-    const ENABLE_TWO_PUNCH_AUTO_FILL = false;
+    // FEATURE FLAG: Intelligent punch matching enabled
+    const ENABLE_INTELLIGENT_PUNCH_MATCHING = true;
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
@@ -132,7 +132,69 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
-    // NEW: Detect TWO missing punches (for regular shifts with 2 actual punches)
+    // NEW: Intelligent punch matching - match each punch to closest shift point
+    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+        if (!shift || dayPunches.length === 0) return [];
+        
+        const punchesWithTime = dayPunches.map(p => ({
+            ...p,
+            time: parseTime(p.timestamp_raw)
+        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        
+        if (punchesWithTime.length === 0) return [];
+        
+        // Define shift points
+        const shiftPoints = [
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
+            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+        ].filter(sp => sp.time); // Only include valid shift points
+        
+        // Match each punch to closest shift point within 1 hour (60 minutes)
+        const matches = [];
+        const usedShiftPoints = new Set(); // Track which shift points are already matched
+        
+        for (const punch of punchesWithTime) {
+            let closestMatch = null;
+            let minDistance = Infinity;
+            
+            for (const shiftPoint of shiftPoints) {
+                // Skip if this shift point already matched to another punch
+                if (usedShiftPoints.has(shiftPoint.type)) continue;
+                
+                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60); // in minutes
+                
+                // Must be within 60 minutes (1 hour) radius
+                if (distance <= 60 && distance < minDistance) {
+                    minDistance = distance;
+                    closestMatch = shiftPoint;
+                }
+            }
+            
+            if (closestMatch) {
+                matches.push({
+                    punch,
+                    matchedTo: closestMatch.type,
+                    shiftTime: closestMatch.time,
+                    distance: minDistance
+                });
+                usedShiftPoints.add(closestMatch.type); // Mark as used
+            } else {
+                // No match within 1 hour - mark as unmatched
+                matches.push({
+                    punch,
+                    matchedTo: null,
+                    shiftTime: null,
+                    distance: null
+                });
+            }
+        }
+        
+        return matches;
+    };
+    
+    // OLD: Detect TWO missing punches (for regular shifts with 2 actual punches)
     const detectTwoMissingPunches = (dayPunches, shift) => {
         if (!shift || dayPunches.length !== 2) return { punches: dayPunches, autoFilled: [] };
         
@@ -442,6 +504,14 @@ export default function RunAnalysisTab({ project }) {
             // Filter multiple punches before analysis
             let filteredPunches = filterMultiplePunches(dayPunches, shift);
             
+            // NEW: Intelligent punch matching
+            let punchMatches = [];
+            let hasUnmatchedPunch = false;
+            if (ENABLE_INTELLIGENT_PUNCH_MATCHING && shift && filteredPunches.length > 0) {
+                punchMatches = matchPunchesToShiftPoints(filteredPunches, shift);
+                hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+            }
+            
             // Check if employee has single shift (from shift timing or infer from shift structure)
             // Auto-detect single shift if am_end and pm_start are both null/empty or "—"
             const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
@@ -604,11 +674,24 @@ export default function RunAnalysisTab({ project }) {
             // Abnormality detection (use filtered punches)
             // For single shift employees, expected punches is 2, otherwise 4
             const expectedPunches = isSingleShift ? 2 : 4;
-            // Don't mark as abnormal if we auto-filled the missing punch(es)
-            const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
-            if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && effectivePunchCount < expectedPunches) {
-                abnormal_dates_list.push(dateStr);
+            
+            if (ENABLE_INTELLIGENT_PUNCH_MATCHING) {
+                // NEW: Mark as abnormal if any punch couldn't be matched within 1 hour
+                if (hasUnmatchedPunch) {
+                    abnormal_dates_list.push(dateStr);
+                }
+                // Also mark as abnormal if missing punches (less than expected)
+                if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
+                    abnormal_dates_list.push(dateStr);
+                }
+            } else {
+                // OLD: Original abnormality detection
+                const effectivePunchCount = filteredPunches.length + (autoFilledPunch ? 1 : 0) + autoFilledPunches.length;
+                if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && effectivePunchCount < expectedPunches) {
+                    abnormal_dates_list.push(dateStr);
+                }
             }
+            
             if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
                 abnormal_dates_list.push(dateStr);
             }
