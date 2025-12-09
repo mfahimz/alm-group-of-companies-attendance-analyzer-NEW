@@ -27,7 +27,8 @@ export default function OverviewTab({ project }) {
         date_to: project.date_to,
         department: project.department || '',
         custom_employee_ids: project.custom_employee_ids || '',
-        use_carried_grace_minutes: project.use_carried_grace_minutes || false
+        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
+        shift_blocks_count: project.shift_blocks_count || 2
     });
 
     const { data: currentUser } = useQuery({
@@ -272,7 +273,8 @@ export default function OverviewTab({ project }) {
                                         date_to: project.date_to,
                                         department: project.department || '',
                                         custom_employee_ids: project.custom_employee_ids || '',
-                                        use_carried_grace_minutes: project.use_carried_grace_minutes || false
+                                        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
+                                        shift_blocks_count: project.shift_blocks_count || 2
                                     });
                                     setShowEditDialog(true);
                                 }}
@@ -470,6 +472,27 @@ export default function OverviewTab({ project }) {
                             <Label htmlFor="use_grace" className="font-normal">
                                 Use carried forward grace minutes
                             </Label>
+                        </div>
+                        <div>
+                            <Label>Number of Shift Blocks *</Label>
+                            <Select
+                                value={String(editData.shift_blocks_count || 2)}
+                                onValueChange={(value) => setEditData({ ...editData, shift_blocks_count: parseInt(value) })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="1">1 Block</SelectItem>
+                                    <SelectItem value="2">2 Blocks</SelectItem>
+                                    <SelectItem value="3">3 Blocks</SelectItem>
+                                    <SelectItem value="4">4 Blocks</SelectItem>
+                                    <SelectItem value="5">5 Blocks</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-slate-500 mt-1">
+                                How many shift timing blocks this project needs
+                            </p>
                         </div>
                         <div className="flex gap-3 pt-2">
                             <Button
