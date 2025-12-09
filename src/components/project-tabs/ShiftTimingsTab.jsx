@@ -243,13 +243,13 @@ export default function ShiftTimingsTab({ project }) {
 
                     let applicableDays = values[8] || '';
 
-                    // For Naser Mohsin Auto Parts, set default applicable days
+                    // For Naser Mohsin Auto Parts, set default applicable days (exclude Sunday and Friday)
                     if (project.company === 'Naser Mohsin Auto Parts') {
                         const isFridayShift = applicableDays.toLowerCase().includes('friday');
                         if (isFridayShift) {
-                            applicableDays = 'Friday';
+                            applicableDays = 'Friday only';
                         } else if (!applicableDays || applicableDays.trim() === '') {
-                            applicableDays = 'Saturday-Thursday';
+                            applicableDays = 'Saturday-Thursday (excluding Sunday)';
                         }
                     }
 
