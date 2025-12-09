@@ -56,7 +56,8 @@ export default function ExceptionsTab({ project }) {
         new_pm_start: '',
         new_pm_end: '',
         early_checkout_minutes: '',
-        details: ''
+        details: '',
+        include_friday: false
     });
     const [filter, setFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
@@ -282,7 +283,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             new_pm_start: '',
             new_pm_end: '',
             early_checkout_minutes: '',
-            details: ''
+            details: '',
+            include_friday: false
         });
     };
 
@@ -320,6 +322,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             cleanedData.new_am_end = submitData.new_am_end || null;
             cleanedData.new_pm_start = submitData.new_pm_start || null;
             cleanedData.new_pm_end = submitData.new_pm_end || null;
+            cleanedData.include_friday = submitData.include_friday || false;
         }
         
         if (submitData.type === 'MANUAL_EARLY_CHECKOUT' && submitData.early_checkout_minutes) {
@@ -443,8 +446,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                             )}
 
                             {needsShiftOverride && (
-                                <div>
-                                    <Label className="mb-2 block">Override Shift Times</Label>
+                                <div className="space-y-4">
+                                    <Label className="block">Override Shift Times</Label>
                                     <div className="grid grid-cols-4 gap-4">
                                         <div>
                                             <Label className="text-xs">AM Start</Label>
@@ -479,6 +482,21 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             />
                                         </div>
                                     </div>
+                                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-slate-50">
+                                        <Checkbox
+                                            id="include-friday"
+                                            checked={formData.include_friday}
+                                            onCheckedChange={(checked) => setFormData({ ...formData, include_friday: checked })}
+                                        />
+                                        <Label htmlFor="include-friday" className="cursor-pointer">
+                                            Include Friday in shift override
+                                        </Label>
+                                    </div>
+                                    <p className="text-xs text-slate-500">
+                                        {formData.include_friday 
+                                            ? 'This override will apply to all days including Friday' 
+                                            : 'This override will apply to all working days except Friday'}
+                                    </p>
                                 </div>
                             )}
 
