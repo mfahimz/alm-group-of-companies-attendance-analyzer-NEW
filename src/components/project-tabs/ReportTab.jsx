@@ -157,24 +157,39 @@ export default function ReportTab({ project }) {
             { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
         ].filter(sp => sp.time); // Only include valid shift points
         
-        // Match each punch to closest shift point within 1 hour (60 minutes)
+        // Match each punch to closest shift point - two-tier approach
         const matches = [];
         const usedShiftPoints = new Set(); // Track which shift points are already matched
         
         for (const punch of punchesWithTime) {
             let closestMatch = null;
             let minDistance = Infinity;
+            let isExtendedMatch = false;
             
+            // First pass: Try 60-minute radius (normal)
             for (const shiftPoint of shiftPoints) {
-                // Skip if this shift point already matched to another punch
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
                 
-                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60); // in minutes
+                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
                 
-                // Must be within 60 minutes (1 hour) radius
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
                     closestMatch = shiftPoint;
+                }
+            }
+            
+            // Second pass: If no match, try 120-minute radius (extended)
+            if (!closestMatch) {
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    
+                    if (distance <= 120 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                        isExtendedMatch = true;
+                    }
                 }
             }
             
@@ -183,16 +198,18 @@ export default function ReportTab({ project }) {
                     punch,
                     matchedTo: closestMatch.type,
                     shiftTime: closestMatch.time,
-                    distance: minDistance
+                    distance: minDistance,
+                    isExtendedMatch
                 });
                 usedShiftPoints.add(closestMatch.type); // Mark as used
             } else {
-                // No match within 1 hour - mark as unmatched
+                // No match within 2 hours - mark as unmatched
                 matches.push({
                     punch,
                     matchedTo: null,
                     shiftTime: null,
-                    distance: null
+                    distance: null,
+                    isExtendedMatch: false
                 });
             }
         }
@@ -964,8 +981,9 @@ export default function ReportTab({ project }) {
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
-            // Mark as abnormal if any punch couldn't be matched
-            if (hasUnmatchedPunch) {
+            // Mark as abnormal if any punch couldn't be matched or needed extended matching
+            const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
+            if (hasUnmatchedPunch || hasExtendedMatch) {
                 isAbnormal = true;
             }
             // Also mark as abnormal if missing punches
@@ -1376,12 +1394,13 @@ export default function ReportTab({ project }) {
                                                             };
                                                             return (
                                                                 <div key={matchIdx} className="flex items-center gap-1">
-                                                                    <span className={match.matchedTo ? '' : 'text-red-600 font-bold'}>
+                                                                    <span className={match.matchedTo ? (match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') : 'text-red-600 font-bold'}>
                                                                         {extractTime(match.punch.timestamp_raw)}
                                                                     </span>
                                                                     {match.matchedTo && (
-                                                                        <span className="text-[9px] text-slate-500">
+                                                                        <span className={`text-[9px] ${match.isExtendedMatch ? 'text-amber-600' : 'text-slate-500'}`}>
                                                                             →{match.matchedTo.replace(/_/g, ' ')}
+                                                                            {match.isExtendedMatch && ' ⚠️'}
                                                                         </span>
                                                                     )}
                                                                     {!match.matchedTo && (

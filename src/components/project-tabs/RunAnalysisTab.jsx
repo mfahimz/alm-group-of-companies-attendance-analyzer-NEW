@@ -109,7 +109,9 @@ export default function RunAnalysisTab({ project }) {
         for (const punch of punchesWithTime) {
             let closestMatch = null;
             let minDistance = Infinity;
+            let isExtendedMatch = false;
             
+            // First pass: Try 60-minute radius (normal)
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
                 
@@ -121,12 +123,28 @@ export default function RunAnalysisTab({ project }) {
                 }
             }
             
+            // Second pass: If no match, try 120-minute radius (extended)
+            if (!closestMatch) {
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    
+                    if (distance <= 120 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                        isExtendedMatch = true;
+                    }
+                }
+            }
+            
             if (closestMatch) {
                 matches.push({
                     punch,
                     matchedTo: closestMatch.type,
                     shiftTime: closestMatch.time,
-                    distance: minDistance
+                    distance: minDistance,
+                    isExtendedMatch
                 });
                 usedShiftPoints.add(closestMatch.type);
             } else {
@@ -134,7 +152,8 @@ export default function RunAnalysisTab({ project }) {
                     punch,
                     matchedTo: null,
                     shiftTime: null,
-                    distance: null
+                    distance: null,
+                    isExtendedMatch: false
                 });
             }
         }
@@ -370,7 +389,9 @@ export default function RunAnalysisTab({ project }) {
 
             const expectedPunches = isSingleShift ? 2 : 4;
             
-            if (hasUnmatchedPunch) {
+            // Mark as abnormal if any punch couldn't be matched or needed extended matching
+            const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
+            if (hasUnmatchedPunch || hasExtendedMatch) {
                 abnormal_dates_list.push(dateStr);
             }
             if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
