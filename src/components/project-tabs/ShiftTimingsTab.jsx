@@ -576,6 +576,9 @@ export default function ShiftTimingsTab({ project }) {
                                                     Employee Name
                                                 </SortableTableHead>
                                                 <TableHead>Department</TableHead>
+                                                {project.company === 'Naser Mohsin Auto Parts' && (
+                                                    <TableHead>Weekly Off</TableHead>
+                                                )}
                                                 <TableHead>Shift Type</TableHead>
                                                 <TableHead>Shift Times</TableHead>
                                                 <TableHead>Applicable Days</TableHead>
@@ -590,6 +593,9 @@ export default function ShiftTimingsTab({ project }) {
                                                         <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                         <TableCell>{employee?.name || '-'}</TableCell>
                                                         <TableCell>{employee?.department || '-'}</TableCell>
+                                                        {project.company === 'Naser Mohsin Auto Parts' && (
+                                                            <TableCell>{employee?.weekly_off || 'Sunday'}</TableCell>
+                                                        )}
                                                         <TableCell>
                                                             {shift.is_single_shift ? (
                                                                 <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Single Shift</span>
