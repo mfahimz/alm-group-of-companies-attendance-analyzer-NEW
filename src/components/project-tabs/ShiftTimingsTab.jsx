@@ -203,12 +203,9 @@ export default function ShiftTimingsTab({ project }) {
                         const isFridayShift = applicableDays.toLowerCase().includes('friday');
                         if (isFridayShift) {
                             applicableDaysArray = ['Friday'];
-                        } else if (!applicableDays || applicableDays.trim() === '') {
-                            // Default: All days except Sunday and Friday
-                            applicableDaysArray = ['Saturday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
                         } else {
-                            // Parse existing string
-                            applicableDaysArray = applicableDays.split(',').map(d => d.trim());
+                            // Default: All days except Sunday and Friday
+                            applicableDaysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
                         }
                         applicableDays = JSON.stringify(applicableDaysArray);
                     }
