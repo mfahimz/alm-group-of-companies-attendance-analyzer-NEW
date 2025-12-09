@@ -995,12 +995,63 @@ export default function ReportTab({ project }) {
             // Check for day-specific overrides in this report
             const dayOverride = dayOverrides[dateStr];
             if (dayOverride) {
+                // Apply shift override if present
+                if (dayOverride.shiftOverride) {
+                    shift = {
+                        am_start: dayOverride.shiftOverride.am_start,
+                        am_end: dayOverride.shiftOverride.am_end,
+                        pm_start: dayOverride.shiftOverride.pm_start,
+                        pm_end: dayOverride.shiftOverride.pm_end
+                    };
+
+                    // Recalculate matches with new shift times
+                    if (dayPunches.length > 0) {
+                        punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
+                        hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+
+                        // Recalculate late and early checkout
+                        lateInfo = '';
+                        lateMinutesTotal = 0;
+                        earlyCheckoutInfo = '';
+
+                        if (!shouldSkipTimeCalc) {
+                            for (const match of punchMatches) {
+                                if (!match.matchedTo) continue;
+
+                                const punchTime = match.punch.time;
+                                const shiftTime = match.shiftTime;
+
+                                if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                                    if (punchTime > shiftTime) {
+                                        const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                                        lateMinutesTotal += minutes;
+                                        const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
+                                        if (lateInfo) lateInfo += ' | ';
+                                        lateInfo += `${label}: ${minutes} min late`;
+                                    }
+                                }
+
+                                if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                                    if (punchTime < shiftTime) {
+                                        const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                                        if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
+                                            earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
+                                        } else {
+                                            earlyCheckoutInfo = `${minutes} min`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Apply override values
                 if (dayOverride.type === 'MANUAL_PRESENT') status = 'Present (Edited)';
                 else if (dayOverride.type === 'MANUAL_ABSENT') status = 'Absent (Edited)';
                 else if (dayOverride.type === 'MANUAL_HALF') status = 'Half Day (Edited)';
                 else if (dayOverride.type === 'OFF') status = 'Off (Edited)';
-                
+
                 if (dayOverride.lateMinutes !== undefined) {
                     lateMinutesTotal = dayOverride.lateMinutes;
                     lateInfo = dayOverride.lateMinutes > 0 ? `${dayOverride.lateMinutes} min (edited)` : '-';

@@ -15,13 +15,26 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         details: '',
         lateMinutes: 0,
         earlyCheckoutMinutes: 0,
-        isAbnormal: false
+        isAbnormal: false,
+        shiftOverride: {
+            enabled: false,
+            am_start: '',
+            am_end: '',
+            pm_start: '',
+            pm_end: ''
+        }
     });
     const queryClient = useQueryClient();
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project?.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
+        enabled: !!dayRecord && !!project?.id
+    });
+
+    const { data: shifts = [] } = useQuery({
+        queryKey: ['shifts', project?.id],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
         enabled: !!dayRecord && !!project?.id
     });
 
@@ -53,13 +66,24 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 }
             }
 
+            // Get current shift for this day
+            const currentShift = dayRecord.shift || '';
+            const shiftTimes = currentShift.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/gi) || [];
+            
             if (existingOverride) {
                 setFormData({
                     type: existingOverride.type || 'MANUAL_PRESENT',
                     details: existingOverride.details || '',
                     lateMinutes: existingOverride.lateMinutes || 0,
                     earlyCheckoutMinutes: existingOverride.earlyCheckoutMinutes || 0,
-                    isAbnormal: existingOverride.isAbnormal || false
+                    isAbnormal: existingOverride.isAbnormal || false,
+                    shiftOverride: {
+                        enabled: !!existingOverride.shiftOverride,
+                        am_start: existingOverride.shiftOverride?.am_start || shiftTimes[0] || '',
+                        am_end: existingOverride.shiftOverride?.am_end || shiftTimes[1] || '',
+                        pm_start: existingOverride.shiftOverride?.pm_start || shiftTimes[2] || '',
+                        pm_end: existingOverride.shiftOverride?.pm_end || shiftTimes[3] || ''
+                    }
                 });
             } else {
                 // Default initialization from calculated values
@@ -101,7 +125,14 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     details: '',
                     lateMinutes: lateMinutes,
                     earlyCheckoutMinutes: earlyCheckoutMinutes,
-                    isAbnormal: dayRecord.abnormal || false
+                    isAbnormal: dayRecord.abnormal || false,
+                    shiftOverride: {
+                        enabled: false,
+                        am_start: shiftTimes[0] || '',
+                        am_end: shiftTimes[1] || '',
+                        pm_start: shiftTimes[2] || '',
+                        pm_end: shiftTimes[3] || ''
+                    }
                 });
             }
         }
@@ -137,7 +168,13 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 earlyCheckoutMinutes: data.earlyCheckoutMinutes,
                 isAbnormal: data.isAbnormal,
                 originalLateMinutes: existingOverride?.originalLateMinutes ?? data.originalLateMinutes,
-                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? data.originalEarlyCheckout
+                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? data.originalEarlyCheckout,
+                shiftOverride: data.shiftOverride?.enabled ? {
+                    am_start: data.shiftOverride.am_start,
+                    am_end: data.shiftOverride.am_end,
+                    pm_start: data.shiftOverride.pm_start,
+                    pm_end: data.shiftOverride.pm_end
+                } : null
             };
 
             // Recalculate only abnormal dates
@@ -314,6 +351,79 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             </label>
                             <p className="text-xs text-slate-500">Flag this day for special attention</p>
                         </div>
+                    </div>
+
+                    {/* Shift Override Section */}
+                    <div className="border rounded-lg p-4 space-y-4 bg-slate-50">
+                        <div className="flex items-center gap-3">
+                            <Checkbox
+                                id="enableShiftOverride"
+                                checked={formData.shiftOverride.enabled}
+                                onCheckedChange={(checked) => setFormData({ 
+                                    ...formData, 
+                                    shiftOverride: { ...formData.shiftOverride, enabled: checked }
+                                })}
+                            />
+                            <div className="flex-1">
+                                <label htmlFor="enableShiftOverride" className="text-sm font-semibold cursor-pointer">
+                                    Override Shift Times for This Day
+                                </label>
+                                <p className="text-xs text-slate-500">Late/Early calculations will use these times</p>
+                            </div>
+                        </div>
+
+                        {formData.shiftOverride.enabled && (
+                            <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                                <div>
+                                    <Label className="text-xs">AM Start</Label>
+                                    <Input
+                                        value={formData.shiftOverride.am_start}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            shiftOverride: { ...formData.shiftOverride, am_start: e.target.value }
+                                        })}
+                                        placeholder="8:00 AM"
+                                        className="h-8"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">AM End</Label>
+                                    <Input
+                                        value={formData.shiftOverride.am_end}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            shiftOverride: { ...formData.shiftOverride, am_end: e.target.value }
+                                        })}
+                                        placeholder="12:00 PM"
+                                        className="h-8"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">PM Start</Label>
+                                    <Input
+                                        value={formData.shiftOverride.pm_start}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            shiftOverride: { ...formData.shiftOverride, pm_start: e.target.value }
+                                        })}
+                                        placeholder="1:00 PM"
+                                        className="h-8"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">PM End</Label>
+                                    <Input
+                                        value={formData.shiftOverride.pm_end}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            shiftOverride: { ...formData.shiftOverride, pm_end: e.target.value }
+                                        })}
+                                        placeholder="5:00 PM"
+                                        className="h-8"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Notes */}
