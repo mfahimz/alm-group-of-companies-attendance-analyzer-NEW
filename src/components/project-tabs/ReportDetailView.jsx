@@ -255,6 +255,11 @@ export default function ReportDetailView({ reportRun, project }) {
 
         let totalLateMinutes = 0;
         let totalEarlyCheckout = 0;
+        let workingDays = 0;
+        let presentDays = 0;
+        let fullAbsenceCount = 0;
+        let halfAbsenceCount = 0;
+        let sickLeaveCount = 0;
 
         const startDate = new Date(dateFrom);
         const endDate = new Date(dateTo);
@@ -344,16 +349,30 @@ export default function ReportDetailView({ reportRun, project }) {
             const partialDayResult = detectPartialDay(dayPunches, shift);
 
             const dayOverride = dayOverrides[dateStr];
-            
-            // If there's a manual override (no shift change), use those values directly and skip calculation
-            if (dayOverride && !dayOverride.shiftOverride) {
-                if (dayOverride.lateMinutes !== undefined) {
-                    totalLateMinutes += dayOverride.lateMinutes;
+
+            // Handle day override status changes
+            if (dayOverride) {
+                if (dayOverride.type === 'MANUAL_PRESENT') {
+                    presentDays++;
+                } else if (dayOverride.type === 'MANUAL_ABSENT') {
+                    fullAbsenceCount++;
+                } else if (dayOverride.type === 'MANUAL_HALF') {
+                    presentDays++;
+                    halfAbsenceCount++;
+                } else if (dayOverride.type === 'OFF') {
+                    workingDays--;
                 }
-                if (dayOverride.earlyCheckoutMinutes !== undefined) {
-                    totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
+
+                // If there's a manual override (no shift change), use those values directly and skip calculation
+                if (!dayOverride.shiftOverride) {
+                    if (dayOverride.lateMinutes !== undefined) {
+                        totalLateMinutes += dayOverride.lateMinutes;
+                    }
+                    if (dayOverride.earlyCheckoutMinutes !== undefined) {
+                        totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
+                    }
+                    continue;
                 }
-                continue;
             }
             
             // If there's a shift override, apply it
@@ -374,6 +393,39 @@ export default function ReportDetailView({ reportRun, project }) {
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
+
+            // Count based on actual attendance (if no override handled it)
+            if (!dayOverride) {
+                if (dateException) {
+                    if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
+                        workingDays--;
+                    } else if (dateException.type === 'MANUAL_PRESENT') {
+                        presentDays++;
+                    } else if (dateException.type === 'MANUAL_ABSENT') {
+                        fullAbsenceCount++;
+                    } else if (dateException.type === 'MANUAL_HALF') {
+                        presentDays++;
+                        halfAbsenceCount++;
+                    } else if (dateException.type === 'SICK_LEAVE') {
+                        workingDays--;
+                        sickLeaveCount++;
+                    } else if (dayPunches.length > 0) {
+                        presentDays++;
+                    } else {
+                        fullAbsenceCount++;
+                    }
+                } else if (dayPunches.length > 0) {
+                    const partialDayResult = detectPartialDay(dayPunches, shift);
+                    if (partialDayResult.isPartial) {
+                        presentDays++;
+                        halfAbsenceCount++;
+                    } else {
+                        presentDays++;
+                    }
+                } else {
+                    fullAbsenceCount++;
+                }
+            }
             
             // Calculate times from punches (either with original or overridden shift)
             if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
@@ -400,17 +452,38 @@ export default function ReportDetailView({ reportRun, project }) {
             }
         }
 
-        return { totalLateMinutes, totalEarlyCheckout };
-    };
+        return { 
+            totalLateMinutes, 
+            totalEarlyCheckout, 
+            workingDays, 
+            presentDays, 
+            fullAbsenceCount, 
+            halfAbsenceCount, 
+            sickLeaveCount 
+        };
+        };
 
     const enrichedResults = React.useMemo(() => {
         return results.map(result => {
             const employee = employees.find(e => e.attendance_id === result.attendance_id);
-            const { totalLateMinutes, totalEarlyCheckout } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
-            
+            const { 
+                totalLateMinutes, 
+                totalEarlyCheckout, 
+                workingDays, 
+                presentDays, 
+                fullAbsenceCount, 
+                halfAbsenceCount, 
+                sickLeaveCount 
+            } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
+
             return {
                 ...result,
                 name: employee?.name || 'Unknown',
+                working_days: workingDays,
+                present_days: presentDays,
+                full_absence_count: fullAbsenceCount,
+                half_absence_count: halfAbsenceCount,
+                sick_leave_count: sickLeaveCount,
                 late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout),
                 isVerified: verifiedEmployees.includes(result.attendance_id)
