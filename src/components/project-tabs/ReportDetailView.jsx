@@ -376,7 +376,7 @@ export default function ReportDetailView({ reportRun, project }) {
             ].includes(dateException.type);
             
             // Calculate times from punches (either with original or overridden shift)
-            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
+            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
                 for (const match of punchMatchesTotals) {
                     if (!match.matchedTo) continue;
                     
