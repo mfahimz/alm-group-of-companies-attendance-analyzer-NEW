@@ -1,35 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Trash2, Edit, Filter, X } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import SortableTableHead from '../ui/SortableTableHead';
+import { Eye, Trash2, FileText, CheckCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
-import EditDayRecordDialog from './EditDayRecordDialog';
 
 export default function ReportTab({ project }) {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const [showBreakdown, setShowBreakdown] = useState(false);
-    const [selectedReportRun, setSelectedReportRun] = useState(null);
-    const [editingDay, setEditingDay] = useState(null);
-    const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
-    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
-    const [filters, setFilters] = useState({
-        dateFrom: '',
-        dateTo: '',
-        status: 'all',
-        abnormality: 'all'
-    });
-    const [showFilters, setShowFilters] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 20;
     const queryClient = useQueryClient();
 
     const formatTime = (timeStr) => {
@@ -59,43 +39,22 @@ export default function ReportTab({ project }) {
         queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date')
     });
 
+
+
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', project.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ project_id: project.id })
     });
 
-    // Set the most recent report run as default, and update when new reports are added
-    React.useEffect(() => {
-        if (reportRuns.length > 0) {
-            // Always select the most recent report (first in list since sorted by -created_date)
-            const mostRecentId = reportRuns[0].id;
-            // If current selection doesn't exist in the list (deleted) or no selection yet, update
-            const currentExists = reportRuns.some(r => r.id === selectedReportRun);
-            if (!selectedReportRun || !currentExists) {
-                setSelectedReportRun(mostRecentId);
-            }
-        } else {
-            setSelectedReportRun(null);
-        }
-    }, [reportRuns]);
-
-    const results = selectedReportRun 
-        ? allResults.filter(r => r.report_run_id === selectedReportRun)
-        : [];
-
     const deleteReportMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // Delete all analysis results for this report run
             const resultsToDelete = allResults.filter(r => r.report_run_id === reportRunId);
             await Promise.all(resultsToDelete.map(r => base44.entities.AnalysisResult.delete(r.id)));
-            
-            // Delete the report run
             await base44.entities.ReportRun.delete(reportRunId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['reportRuns', project.id]);
             queryClient.invalidateQueries(['results', project.id]);
-            setSelectedReportRun(null);
             toast.success('Report deleted successfully');
         },
         onError: () => {
@@ -109,39 +68,92 @@ export default function ReportTab({ project }) {
         }
     };
 
-    const { data: employees = [] } = useQuery({
-        queryKey: ['employees', project.company],
-        queryFn: () => base44.entities.Employee.filter({ company: project.company })
-    });
+    return (
+        <div className="space-y-6">
+            <Card className="border-0 shadow-sm">
+                <CardHeader>
+                    <CardTitle>Generated Reports</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {reportRuns.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            No reports generated yet. Go to Analysis tab to generate your first report.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Generated On</TableHead>
+                                        <TableHead>Period</TableHead>
+                                        <TableHead>Employees</TableHead>
+                                        <TableHead>Verified</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {reportRuns.map((run) => {
+                                        const runResults = allResults.filter(r => r.report_run_id === run.id);
+                                        const verifiedCount = run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0;
+                                        
+                                        return (
+                                            <TableRow key={run.id}>
+                                                <TableCell className="font-medium">
+                                                    {new Date(run.created_date).toLocaleString('en-US', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        timeZone: 'Asia/Dubai'
+                                                    })}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {new Date(run.date_from).toLocaleDateString()} - {new Date(run.date_to).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell>{run.employee_count}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600'}>
+                                                            {verifiedCount} / {run.employee_count}
+                                                        </span>
+                                                        {verifiedCount === run.employee_count && (
+                                                            <CheckCircle className="w-4 h-4 text-green-600" />
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex gap-1 justify-end">
+                                                        <Link to={createPageUrl('ReportDetail') + `?id=${run.id}&project_id=${project.id}`}>
+                                                            <Button size="sm" variant="ghost">
+                                                                <Eye className="w-4 h-4 text-indigo-600" />
+                                                            </Button>
+                                                        </Link>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => handleDeleteReport(run.id)}
+                                                            disabled={deleteReportMutation.isPending}
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
 
-    const { data: punches = [] } = useQuery({
-        queryKey: ['punches', project.id],
-        queryFn: () => base44.entities.Punch.filter({ project_id: project.id })
-    });
-
-    const { data: shifts = [] } = useQuery({
-        queryKey: ['shifts', project.id],
-        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id })
-    });
-
-    const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions', project.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
-    });
-
-    const { data: rules } = useQuery({
-        queryKey: ['rules', project.company],
-        queryFn: async () => {
-            const rulesList = await base44.entities.AttendanceRules.filter({ company: project.company });
-            if (rulesList.length > 0) {
-                return JSON.parse(rulesList[0].rules_json);
-            }
-            return null;
-        }
-    });
-
-    // Intelligent punch matching - match each punch to closest shift point
-    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+// OLD CODE BELOW - KEEPING FOR REFERENCE BUT NOT USED ANYMORE
+const matchPunchesToShiftPoints_OLD = (dayPunches, shift) => {
         if (!shift || dayPunches.length === 0) return [];
         
         const punchesWithTime = dayPunches.map(p => ({
@@ -1651,4 +1663,4 @@ export default function ReportTab({ project }) {
             </Dialog>
         </div>
     );
-}
+};*/
