@@ -64,15 +64,25 @@ Deno.serve(async (req) => {
                 if (existingEmployees.length > 0) {
                     employee = existingEmployees[0];
                 } else {
-                    // Generate unique HRMS ID
+                    // Generate unique random HRMS ID between 1-1000
                     const allEmployees = await base44.asServiceRole.entities.Employee.filter({
                         company: 'Astra Auto Parts'
                     });
-                    const maxHrmsNum = allEmployees.reduce((max, emp) => {
-                        const match = emp.hrms_id?.match(/ASTRA-(\d+)/);
-                        return match ? Math.max(max, parseInt(match[1])) : max;
-                    }, 0);
-                    const newHrmsId = `ASTRA-${String(maxHrmsNum + 1).padStart(4, '0')}`;
+                    const existingHrmsIds = new Set(
+                        allEmployees.map(emp => emp.hrms_id?.match(/ASTRA-(\d+)/)?.[1]).filter(Boolean).map(Number)
+                    );
+                    
+                    let randomNum;
+                    let attempts = 0;
+                    do {
+                        randomNum = Math.floor(Math.random() * 1000) + 1;
+                        attempts++;
+                        if (attempts > 1000) {
+                            throw new Error('Unable to generate unique HRMS ID - all numbers taken');
+                        }
+                    } while (existingHrmsIds.has(randomNum));
+                    
+                    const newHrmsId = `ASTRA-${String(randomNum).padStart(4, '0')}`;
                     
                     // Create new employee
                     employee = await base44.asServiceRole.entities.Employee.create({
