@@ -786,6 +786,85 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                 </CardContent>
             </Card>
 
+            {/* Report-Generated Exceptions */}
+            {reportExceptions.length > 0 && (
+                <Card className="border-0 shadow-sm bg-purple-50/50 ring-1 ring-purple-200">
+                    <CardHeader>
+                        <CardTitle className="text-purple-900">Report-Generated Exceptions</CardTitle>
+                        <p className="text-sm text-purple-700 mt-1">
+                            These exceptions were automatically created from saved reports
+                        </p>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-12">Use</TableHead>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>From</TableHead>
+                                        <TableHead>To</TableHead>
+                                        <TableHead>Details</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {reportExceptions.map((exception) => (
+                                        <TableRow key={exception.id}>
+                                            <TableCell className="p-1">
+                                                <Checkbox
+                                                    checked={exception.use_in_analysis !== false}
+                                                    onCheckedChange={(checked) => {
+                                                        toggleUseInAnalysisMutation.mutate({
+                                                            id: exception.id,
+                                                            use_in_analysis: checked
+                                                        });
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="p-1">
+                                                <span className="text-sm text-slate-900">
+                                                    {exception.attendance_id === 'ALL' ? 'ALL' : exception.attendance_id}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="p-1">
+                                                <span className="text-sm text-slate-900">
+                                                    {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id)?.name || '—')}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="p-1 text-sm">{exception.type}</TableCell>
+                                            <TableCell className="p-1 text-sm">
+                                                {new Date(exception.date_from).toLocaleDateString()}
+                                            </TableCell>
+                                            <TableCell className="p-1 text-sm">
+                                                {new Date(exception.date_to).toLocaleDateString()}
+                                            </TableCell>
+                                            <TableCell className="p-1 text-xs text-slate-600 max-w-xs truncate">
+                                                {exception.details || '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right p-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => deleteMutation.mutate(exception.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <p className="text-xs text-purple-600 mt-4">
+                            💡 Uncheck "Use" to exclude an exception from future analysis runs. You can also delete report-generated exceptions if needed.
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Bulk Edit Dialog */}
             <BulkEditExceptionDialog
                 open={showBulkEdit}
