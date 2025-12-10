@@ -225,13 +225,22 @@ export default function PunchUploadTab({ project }) {
                 punch_date: p.punch_date
             }));
 
-            setUploadProgress({ phase: 'Uploading records...', current: 0, total: punchRecords.length });
-            
+            setUploadProgress({ 
+              phase: 'Uploading punch records to database...', 
+              current: 0, 
+              total: punchRecords.length 
+            });
+
             const batchSize = 100;
             for (let i = 0; i < punchRecords.length; i += batchSize) {
-                const batch = punchRecords.slice(i, i + batchSize);
-                await base44.entities.Punch.bulkCreate(batch);
-                setUploadProgress({ phase: 'Uploading records...', current: Math.min(i + batchSize, punchRecords.length), total: punchRecords.length });
+              const batch = punchRecords.slice(i, i + batchSize);
+              await base44.entities.Punch.bulkCreate(batch);
+              const uploaded = Math.min(i + batchSize, punchRecords.length);
+              setUploadProgress({ 
+                  phase: `Uploading batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(punchRecords.length / batchSize)}...`, 
+                  current: uploaded, 
+                  total: punchRecords.length 
+              });
             }
         },
         onSuccess: () => {
