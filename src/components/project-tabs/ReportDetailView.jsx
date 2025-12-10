@@ -963,7 +963,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                 <TableRow>
                                     <TableHead className="w-12">Verified</TableHead>
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                        Attendance ID
+                                        ID
                                     </SortableTableHead>
                                     <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
                                         Name
