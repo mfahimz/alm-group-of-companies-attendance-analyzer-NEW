@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Filter, X, Save, CheckCircle } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Download, Search, Eye, Edit, Save } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
@@ -455,7 +454,6 @@ export default function ReportDetailView({ reportRun, project }) {
             setIsSaving(true);
             const exceptionsToCreate = [];
             
-            // Go through all results and check for day_overrides
             for (const result of results) {
                 if (!result.day_overrides) continue;
                 
@@ -466,7 +464,6 @@ export default function ReportDetailView({ reportRun, project }) {
                     continue;
                 }
 
-                // Group consecutive dates by exception type
                 const datesByType = {};
                 Object.entries(dayOverrides).forEach(([dateStr, override]) => {
                     const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
@@ -476,11 +473,9 @@ export default function ReportDetailView({ reportRun, project }) {
                     datesByType[key].dates.push(dateStr);
                 });
 
-                // Create exceptions for each group
                 for (const group of Object.values(datesByType)) {
                     const sortedDates = group.dates.sort();
                     
-                    // Group consecutive dates
                     let currentRange = { start: sortedDates[0], end: sortedDates[0] };
                     const ranges = [];
                     
@@ -498,7 +493,6 @@ export default function ReportDetailView({ reportRun, project }) {
                     }
                     ranges.push(currentRange);
 
-                    // Create exception for each range
                     for (const range of ranges) {
                         const exceptionData = {
                             project_id: project.id,
@@ -512,9 +506,9 @@ export default function ReportDetailView({ reportRun, project }) {
                             use_in_analysis: true
                         };
 
-                        if (group.data.lateMinutes) {
+                        if (group.data.lateMinutes && group.data.type === 'MANUAL_EARLY_CHECKOUT') {
                             exceptionData.early_checkout_minutes = group.data.lateMinutes + (group.data.earlyCheckoutMinutes || 0);
-                        } else if (group.data.earlyCheckoutMinutes) {
+                        } else if (group.data.earlyCheckoutMinutes && group.data.type === 'MANUAL_EARLY_CHECKOUT') {
                             exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
                         }
 
@@ -531,7 +525,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
 
-            // Save exceptions in batches
             if (exceptionsToCreate.length > 0) {
                 const batchSize = 20;
                 for (let i = 0; i < exceptionsToCreate.length; i += batchSize) {
@@ -540,7 +533,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
 
-            // Update report with verified employees
             await base44.entities.ReportRun.update(reportRun.id, {
                 verified_employees: verifiedEmployees.join(',')
             });
@@ -1199,8 +1191,8 @@ export default function ReportDetailView({ reportRun, project }) {
                             </TableBody>
                         </Table>
                     </div>
-                </CardContent>
-            </Card>
+                </DialogContent>
+            </Dialog>
 
             {/* Edit Day Record Dialog */}
             <EditDayRecordDialog
