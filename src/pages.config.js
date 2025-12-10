@@ -8,6 +8,7 @@ import UserProfile from './pages/UserProfile';
 import Documentation from './pages/Documentation';
 import Diagnostics from './pages/Diagnostics';
 import ReportDetail from './pages/ReportDetail';
+import AstraImport from './pages/AstraImport';
 import __Layout from './Layout.jsx';
 
 
@@ -22,6 +23,7 @@ export const PAGES = {
     "Documentation": Documentation,
     "Diagnostics": Diagnostics,
     "ReportDetail": ReportDetail,
+    "AstraImport": AstraImport,
 }
 
 export const pagesConfig = {
