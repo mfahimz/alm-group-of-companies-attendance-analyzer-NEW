@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 export default function RunAnalysisTab({ project }) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [progress, setProgress] = useState(null);
+    const [dateFrom, setDateFrom] = useState(project.date_from);
+    const [dateTo, setDateTo] = useState(project.date_to);
     const queryClient = useQueryClient();
 
     const { data: punches = [] } = useQuery({
@@ -218,11 +220,14 @@ export default function RunAnalysisTab({ project }) {
     const analyzeEmployee = async (attendance_id) => {
         const employeePunches = punches.filter(p => 
             p.attendance_id === attendance_id && 
-            p.punch_date >= project.date_from && 
-            p.punch_date <= project.date_to
+            p.punch_date >= dateFrom && 
+            p.punch_date <= dateTo
         );
         const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
-        const employeeExceptions = exceptions.filter(e => e.attendance_id === attendance_id || e.attendance_id === 'ALL');
+        const employeeExceptions = exceptions.filter(e => 
+            (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
+            e.use_in_analysis !== false
+        );
         
         // Get employee to determine weekly off day
         const employee = employees.find(e => e.attendance_id === attendance_id);
@@ -237,8 +242,8 @@ export default function RunAnalysisTab({ project }) {
         const abnormal_dates_list = [];
         const auto_resolutions = [];
 
-        const startDate = new Date(project.date_from);
-        const endDate = new Date(project.date_to);
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
         
         // Map day names to numbers
         const dayNameToNumber = {
@@ -479,16 +484,21 @@ export default function RunAnalysisTab({ project }) {
 
             const reportRun = await base44.entities.ReportRun.create({
                 project_id: project.id,
+                date_from: dateFrom,
+                date_to: dateTo,
                 employee_count: uniqueEmployeeIds.length
             });
 
             const allResults = [];
             for (let i = 0; i < uniqueEmployeeIds.length; i++) {
                 const attendance_id = uniqueEmployeeIds[i];
+                const employee = employees.find(e => e.attendance_id === attendance_id);
+                const employeeName = employee?.name || attendance_id;
                 setProgress({ 
                     current: i + 1, 
                     total: uniqueEmployeeIds.length, 
-                    status: `Processing ${attendance_id}...` 
+                    status: `Analyzing ${i + 1}/${uniqueEmployeeIds.length}: ${employeeName}`,
+                    subStatus: 'Reading punch data and calculating attendance...'
                 });
 
                 const result = await analyzeEmployee(attendance_id);
@@ -510,19 +520,35 @@ export default function RunAnalysisTab({ project }) {
                 });
             }
 
-            setProgress({ current: uniqueEmployeeIds.length, total: uniqueEmployeeIds.length, status: 'Saving results...' });
+            setProgress({ 
+                current: uniqueEmployeeIds.length, 
+                total: uniqueEmployeeIds.length, 
+                status: 'Saving results to database...',
+                subStatus: `Saving batch ${Math.floor(0 / 15) + 1}...`
+            });
             const createBatchSize = 15;
             for (let i = 0; i < allResults.length; i += createBatchSize) {
                 const batch = allResults.slice(i, i + createBatchSize);
                 await base44.entities.AnalysisResult.bulkCreate(batch);
+                setProgress({ 
+                    current: uniqueEmployeeIds.length, 
+                    total: uniqueEmployeeIds.length, 
+                    status: 'Saving results to database...',
+                    subStatus: `Saved ${Math.min(i + createBatchSize, allResults.length)}/${allResults.length} records`
+                });
                 await delay(800);
             }
 
             await updateProjectMutation.mutateAsync('analyzed');
             queryClient.invalidateQueries(['results', project.id]);
             queryClient.invalidateQueries(['reportRuns', project.id]);
-            toast.success('Analysis completed successfully');
-            setProgress({ current: uniqueEmployeeIds.length, total: uniqueEmployeeIds.length, status: 'Complete!' });
+            toast.success(`Analysis completed for ${dateFrom} to ${dateTo}`);
+            setProgress({ 
+                current: uniqueEmployeeIds.length, 
+                total: uniqueEmployeeIds.length, 
+                status: 'Complete!',
+                subStatus: 'Report generated successfully'
+            });
         } catch (error) {
             toast.error('Analysis failed: ' + error.message);
             console.error(error);
@@ -580,28 +606,60 @@ export default function RunAnalysisTab({ project }) {
                         </div>
                     </div>
 
-                    {progress && (
-                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                            <div className="flex items-center gap-3 mb-2">
-                                <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-                                <span className="font-medium text-indigo-900">{progress.status}</span>
-                            </div>
-                            <div className="w-full bg-indigo-200 rounded-full h-2">
-                                <div 
-                                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label>From Date</Label>
+                                <Input
+                                    type="date"
+                                    value={dateFrom}
+                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    min={project.date_from}
+                                    max={project.date_to}
+                                    disabled={isAnalyzing}
                                 />
                             </div>
-                            <p className="text-sm text-indigo-700 mt-2">
-                                {progress.current} / {progress.total} employees processed
-                            </p>
+                            <div>
+                                <Label>To Date</Label>
+                                <Input
+                                    type="date"
+                                    value={dateTo}
+                                    onChange={(e) => setDateTo(e.target.value)}
+                                    min={dateFrom}
+                                    max={project.date_to}
+                                    disabled={isAnalyzing}
+                                />
+                            </div>
                         </div>
-                    )}
+
+                        {progress && (
+                            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                                    <div className="flex-1">
+                                        <p className="font-medium text-indigo-900">{progress.status}</p>
+                                        {progress.subStatus && (
+                                            <p className="text-sm text-indigo-700 mt-0.5">{progress.subStatus}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="w-full bg-indigo-200 rounded-full h-2">
+                                    <div 
+                                        className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                                    />
+                                </div>
+                                <p className="text-sm text-indigo-700 mt-2">
+                                    {progress.current} / {progress.total} employees processed
+                                </p>
+                            </div>
+                        )}
+                    </div>
 
                     <div>
                         <Button
                             onClick={runAnalysis}
-                            disabled={isAnalyzing || !rules || punches.length === 0}
+                            disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo}
                             className="bg-indigo-600 hover:bg-indigo-700"
                             size="lg"
                         >
@@ -609,7 +667,7 @@ export default function RunAnalysisTab({ project }) {
                             {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
                         </Button>
                         <p className="text-sm text-slate-500 mt-2">
-                            This will process attendance for all employees in the date range and generate results.
+                            Select a date range and run analysis to generate attendance report for that period.
                         </p>
                     </div>
                 </CardContent>
