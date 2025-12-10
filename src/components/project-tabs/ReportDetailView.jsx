@@ -442,12 +442,22 @@ export default function ReportDetailView({ reportRun, project }) {
             });
     }, [enrichedResults, searchTerm, sort]);
 
+    const updateVerificationMutation = useMutation({
+        mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
+            verified_employees: verifiedList.join(',')
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['reportRun', reportRun.id]);
+        }
+    });
+
     const toggleVerification = (attendanceId) => {
-        setVerifiedEmployees(prev => 
-            prev.includes(attendanceId) 
-                ? prev.filter(id => id !== attendanceId)
-                : [...prev, attendanceId]
-        );
+        const newVerified = verifiedEmployees.includes(attendanceId) 
+            ? verifiedEmployees.filter(id => id !== attendanceId)
+            : [...verifiedEmployees, attendanceId];
+        
+        setVerifiedEmployees(newVerified);
+        updateVerificationMutation.mutate(newVerified);
     };
 
     const saveReportMutation = useMutation({
@@ -533,10 +543,6 @@ export default function ReportDetailView({ reportRun, project }) {
                     await base44.entities.Exception.bulkCreate(batch);
                 }
             }
-
-            await base44.entities.ReportRun.update(reportRun.id, {
-                verified_employees: verifiedEmployees.join(',')
-            });
 
             return exceptionsToCreate.length;
         },
