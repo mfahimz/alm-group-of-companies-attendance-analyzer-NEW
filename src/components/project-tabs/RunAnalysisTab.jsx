@@ -295,7 +295,6 @@ export default function RunAnalysisTab({ project }) {
                     half_absence_count++;
                     continue;
                 } else if (dateException.type === 'SICK_LEAVE') {
-                    present_days++;
                     sick_leave_count++;
                     continue;
                 } else if (dateException.type === 'MANUAL_EARLY_CHECKOUT') {

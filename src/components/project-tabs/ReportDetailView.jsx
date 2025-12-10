@@ -371,7 +371,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift);
             }
 
-            const shouldSkipTimeCalculation = dateException && [
+            const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
@@ -764,7 +764,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
                 else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
                 else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
-                else if (dateException.type === 'SICK_LEAVE') status = 'Present (Sick Leave)';
+                else if (dateException.type === 'SICK_LEAVE') status = 'Sick Leave';
             } else if (dayPunches.length > 0) {
                 if (partialDayResult.isPartial) {
                     status = 'Half Day (Partial)';
