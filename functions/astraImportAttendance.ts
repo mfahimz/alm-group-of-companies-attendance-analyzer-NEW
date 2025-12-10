@@ -58,17 +58,31 @@ Deno.serve(async (req) => {
                 let employee = null;
                 const existingEmployees = await base44.asServiceRole.entities.Employee.filter({
                     company: 'Astra Auto Parts',
-                    employee_code: block.employeeCode
+                    attendance_id: block.employeeCode
                 });
 
                 if (existingEmployees.length > 0) {
                     employee = existingEmployees[0];
                 } else {
+                    // Generate unique HRMS ID
+                    const allEmployees = await base44.asServiceRole.entities.Employee.filter({
+                        company: 'Astra Auto Parts'
+                    });
+                    const maxHrmsNum = allEmployees.reduce((max, emp) => {
+                        const match = emp.hrms_id?.match(/ASTRA-(\d+)/);
+                        return match ? Math.max(max, parseInt(match[1])) : max;
+                    }, 0);
+                    const newHrmsId = `ASTRA-${String(maxHrmsNum + 1).padStart(4, '0')}`;
+                    
                     // Create new employee
                     employee = await base44.asServiceRole.entities.Employee.create({
+                        hrms_id: newHrmsId,
+                        attendance_id: block.employeeCode,
                         employee_code: block.employeeCode,
-                        full_name: block.employeeName || block.employeeCode,
-                        company: 'Astra Auto Parts'
+                        name: block.employeeName || block.employeeCode,
+                        company: 'Astra Auto Parts',
+                        department: 'Admin',
+                        active: true
                     });
                 }
 
