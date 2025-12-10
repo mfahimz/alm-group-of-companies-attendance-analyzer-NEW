@@ -551,13 +551,26 @@ export default function ReportTab({ project }) {
             // Check for day override first
             const dayOverride = dayOverrides[dateStr];
             if (dayOverride) {
-                if (dayOverride.lateMinutes !== undefined) {
-                    totalLateMinutes += dayOverride.lateMinutes;
+                // Apply shift override if present
+                if (dayOverride.shiftOverride) {
+                    shift = {
+                        am_start: dayOverride.shiftOverride.am_start,
+                        am_end: dayOverride.shiftOverride.am_end,
+                        pm_start: dayOverride.shiftOverride.pm_start,
+                        pm_end: dayOverride.shiftOverride.pm_end
+                    };
+                    // Recalculate with overridden shift times
+                    // Don't skip - fall through to calculation below
+                } else {
+                    // No shift override, use stored values
+                    if (dayOverride.lateMinutes !== undefined) {
+                        totalLateMinutes += dayOverride.lateMinutes;
+                    }
+                    if (dayOverride.earlyCheckoutMinutes !== undefined) {
+                        totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
+                    }
+                    continue; // Skip normal calculation for overridden days
                 }
-                if (dayOverride.earlyCheckoutMinutes !== undefined) {
-                    totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
-                }
-                continue; // Skip normal calculation for overridden days
             }
 
             // Intelligent punch matching for totals calculation
@@ -595,6 +608,20 @@ export default function ReportTab({ project }) {
                             totalEarlyCheckout += minutes;
                         }
                     }
+                }
+            }
+            
+            // Apply override values if they exist (for non-shift overrides)
+            if (dayOverride && !dayOverride.shiftOverride) {
+                // Already handled above with continue statement
+            } else if (dayOverride && dayOverride.shiftOverride) {
+                // Use the overridden values if manually set, otherwise use calculated
+                if (dayOverride.lateMinutes !== undefined) {
+                    // Remove the calculated amount and use override
+                    totalLateMinutes = totalLateMinutes - (totalLateMinutes > 0 ? Math.min(totalLateMinutes, 999999) : 0) + dayOverride.lateMinutes;
+                }
+                if (dayOverride.earlyCheckoutMinutes !== undefined) {
+                    totalEarlyCheckout = totalEarlyCheckout - (totalEarlyCheckout > 0 ? Math.min(totalEarlyCheckout, 999999) : 0) + dayOverride.earlyCheckoutMinutes;
                 }
             }
         }
