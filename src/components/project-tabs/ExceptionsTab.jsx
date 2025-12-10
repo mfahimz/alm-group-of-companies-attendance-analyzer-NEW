@@ -69,10 +69,13 @@ export default function ExceptionsTab({ project }) {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const queryClient = useQueryClient();
 
-    const { data: exceptions = [] } = useQuery({
+    const { data: allExceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
     });
+    
+    const exceptions = allExceptions.filter(ex => !ex.created_from_report);
+    const reportExceptions = allExceptions.filter(ex => ex.created_from_report);
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
@@ -107,6 +110,14 @@ export default function ExceptionsTab({ project }) {
         mutationFn: ({ id, data }) => base44.entities.Exception.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['exceptions', project.id]);
+        }
+    });
+
+    const toggleUseInAnalysisMutation = useMutation({
+        mutationFn: ({ id, use_in_analysis }) => base44.entities.Exception.update(id, { use_in_analysis }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['exceptions', project.id]);
+            toast.success('Exception updated');
         }
     });
 
