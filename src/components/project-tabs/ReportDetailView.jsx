@@ -344,23 +344,26 @@ export default function ReportDetailView({ reportRun, project }) {
             const partialDayResult = detectPartialDay(dayPunches, shift);
 
             const dayOverride = dayOverrides[dateStr];
-            if (dayOverride) {
-                if (dayOverride.shiftOverride) {
-                    shift = {
-                        am_start: dayOverride.shiftOverride.am_start,
-                        am_end: dayOverride.shiftOverride.am_end,
-                        pm_start: dayOverride.shiftOverride.pm_start,
-                        pm_end: dayOverride.shiftOverride.pm_end
-                    };
-                } else {
-                    if (dayOverride.lateMinutes !== undefined) {
-                        totalLateMinutes += dayOverride.lateMinutes;
-                    }
-                    if (dayOverride.earlyCheckoutMinutes !== undefined) {
-                        totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
-                    }
-                    continue;
+            
+            // If there's a manual override (no shift change), use those values directly and skip calculation
+            if (dayOverride && !dayOverride.shiftOverride) {
+                if (dayOverride.lateMinutes !== undefined) {
+                    totalLateMinutes += dayOverride.lateMinutes;
                 }
+                if (dayOverride.earlyCheckoutMinutes !== undefined) {
+                    totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
+                }
+                continue;
+            }
+            
+            // If there's a shift override, apply it
+            if (dayOverride?.shiftOverride) {
+                shift = {
+                    am_start: dayOverride.shiftOverride.am_start,
+                    am_end: dayOverride.shiftOverride.am_end,
+                    pm_start: dayOverride.shiftOverride.pm_start,
+                    pm_end: dayOverride.shiftOverride.pm_end
+                };
             }
 
             let punchMatchesTotals = [];
@@ -372,6 +375,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
             
+            // Calculate times from punches (either with original or overridden shift)
             if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalculation) {
                 for (const match of punchMatchesTotals) {
                     if (!match.matchedTo) continue;
@@ -392,15 +396,6 @@ export default function ReportDetailView({ reportRun, project }) {
                             totalEarlyCheckout += minutes;
                         }
                     }
-                }
-            }
-            
-            if (dayOverride && dayOverride.shiftOverride) {
-                if (dayOverride.lateMinutes !== undefined) {
-                    totalLateMinutes = totalLateMinutes - (totalLateMinutes > 0 ? Math.min(totalLateMinutes, 999999) : 0) + dayOverride.lateMinutes;
-                }
-                if (dayOverride.earlyCheckoutMinutes !== undefined) {
-                    totalEarlyCheckout = totalEarlyCheckout - (totalEarlyCheckout > 0 ? Math.min(totalEarlyCheckout, 999999) : 0) + dayOverride.earlyCheckoutMinutes;
                 }
             }
         }
