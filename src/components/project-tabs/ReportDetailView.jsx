@@ -285,6 +285,8 @@ export default function ReportDetailView({ reportRun, project }) {
                 continue;
             }
 
+            workingDays++;
+
             const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
                     const timeA = parseTime(a.timestamp_raw);
