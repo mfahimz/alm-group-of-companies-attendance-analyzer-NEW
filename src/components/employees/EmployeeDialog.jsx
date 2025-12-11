@@ -19,7 +19,18 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         weekly_off: 'Sunday',
         active: true
     });
+    const [showNewDeptDialog, setShowNewDeptDialog] = useState(false);
+    const [showNewSubDeptDialog, setShowNewSubDeptDialog] = useState(false);
+    const [newDeptName, setNewDeptName] = useState('');
+    const [newSubDeptName, setNewSubDeptName] = useState('');
     const queryClient = useQueryClient();
+
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+    
+    const isAdmin = currentUser?.role === 'admin';
 
     useEffect(() => {
         if (employee) {
@@ -57,8 +68,72 @@ export default function EmployeeDialog({ open, onClose, employee }) {
 
     const selectedCompanySettings = companySettings.find(cs => cs.company === formData.company);
     const departments = selectedCompanySettings 
-        ? selectedCompanySettings.departments.split(',').map(d => d.trim())
+        ? selectedCompanySettings.departments.split(',').map(d => d.trim()).filter(Boolean)
         : ['Admin'];
+
+    const createDepartmentMutation = useMutation({
+        mutationFn: async (deptName) => {
+            if (selectedCompanySettings) {
+                const currentDepts = selectedCompanySettings.departments.split(',').map(d => d.trim()).filter(Boolean);
+                if (currentDepts.includes(deptName)) {
+                    throw new Error('Department already exists');
+                }
+                const updatedDepts = [...currentDepts, deptName].join(',');
+                await base44.entities.CompanySettings.update(selectedCompanySettings.id, {
+                    departments: updatedDepts
+                });
+            } else {
+                await base44.entities.CompanySettings.create({
+                    company: formData.company,
+                    departments: `Admin,${deptName}`
+                });
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['companySettings']);
+            toast.success('Department created successfully');
+            setShowNewDeptDialog(false);
+            setNewDeptName('');
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to create department');
+        }
+    });
+
+    const createSubDepartmentMutation = useMutation({
+        mutationFn: async (subDeptName) => {
+            if (!formData.department) {
+                throw new Error('Please select a parent department first');
+            }
+            const fullName = `${formData.department} - ${subDeptName}`;
+            if (selectedCompanySettings) {
+                const currentDepts = selectedCompanySettings.departments.split(',').map(d => d.trim()).filter(Boolean);
+                if (currentDepts.includes(fullName)) {
+                    throw new Error('Sub-department already exists');
+                }
+                const updatedDepts = [...currentDepts, fullName].join(',');
+                await base44.entities.CompanySettings.update(selectedCompanySettings.id, {
+                    departments: updatedDepts
+                });
+            } else {
+                await base44.entities.CompanySettings.create({
+                    company: formData.company,
+                    departments: `Admin,${fullName}`
+                });
+            }
+            return fullName;
+        },
+        onSuccess: (fullName) => {
+            queryClient.invalidateQueries(['companySettings']);
+            setFormData({ ...formData, department: fullName });
+            toast.success('Sub-department created successfully');
+            setShowNewSubDeptDialog(false);
+            setNewSubDeptName('');
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to create sub-department');
+        }
+    });
 
     const createMutation = useMutation({
         mutationFn: (data) => base44.entities.Employee.create(data),
@@ -175,20 +250,45 @@ export default function EmployeeDialog({ open, onClose, employee }) {
 
                     <div>
                         <Label htmlFor="department">Department</Label>
-                        <Select
-                            value={formData.department}
-                            onValueChange={(value) => setFormData({ ...formData, department: value })}
-                            disabled={!formData.company}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select department" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {departments.map(dept => (
-                                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <div className="flex gap-2">
+                            <Select
+                                value={formData.department}
+                                onValueChange={(value) => {
+                                    if (value === '__create_new__') {
+                                        setShowNewDeptDialog(true);
+                                    } else if (value === '__create_sub__') {
+                                        setShowNewSubDeptDialog(true);
+                                    } else {
+                                        setFormData({ ...formData, department: value });
+                                    }
+                                }}
+                                disabled={!formData.company}
+                            >
+                                <SelectTrigger className="flex-1">
+                                    <SelectValue placeholder="Select department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {departments.map(dept => (
+                                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                    ))}
+                                    {isAdmin && (
+                                        <>
+                                            <SelectItem value="__create_new__" className="text-indigo-600 font-medium">
+                                                + Create New Department
+                                            </SelectItem>
+                                            <SelectItem value="__create_sub__" className="text-purple-600 font-medium">
+                                                + Create Sub-Department
+                                            </SelectItem>
+                                        </>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {formData.department && (
+                            <p className="text-xs text-slate-500 mt-1">
+                                Current: {formData.department}
+                            </p>
+                        )}
                     </div>
 
                     <div>
@@ -238,6 +338,101 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                     </div>
                 </form>
             </DialogContent>
+
+            {/* Create New Department Dialog */}
+            <Dialog open={showNewDeptDialog} onOpenChange={setShowNewDeptDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Create New Department</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="newDept">Department Name</Label>
+                            <Input
+                                id="newDept"
+                                value={newDeptName}
+                                onChange={(e) => setNewDeptName(e.target.value)}
+                                placeholder="e.g. Sales, Operations"
+                            />
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => {
+                                setShowNewDeptDialog(false);
+                                setNewDeptName('');
+                            }}>
+                                Cancel
+                            </Button>
+                            <Button 
+                                onClick={() => {
+                                    if (newDeptName.trim()) {
+                                        createDepartmentMutation.mutate(newDeptName.trim());
+                                    }
+                                }}
+                                disabled={!newDeptName.trim() || createDepartmentMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                {createDepartmentMutation.isPending ? 'Creating...' : 'Create'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Create Sub-Department Dialog */}
+            <Dialog open={showNewSubDeptDialog} onOpenChange={setShowNewSubDeptDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Create Sub-Department</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        {!formData.department ? (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                                Please select a parent department first
+                            </div>
+                        ) : (
+                            <>
+                                <div>
+                                    <Label>Parent Department</Label>
+                                    <div className="mt-1 text-sm font-medium text-slate-700">
+                                        {formData.department}
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label htmlFor="newSubDept">Sub-Department Name</Label>
+                                    <Input
+                                        id="newSubDept"
+                                        value={newSubDeptName}
+                                        onChange={(e) => setNewSubDeptName(e.target.value)}
+                                        placeholder="e.g. Regional, Warehouse"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Will be created as: {formData.department} - {newSubDeptName}
+                                    </p>
+                                </div>
+                            </>
+                        )}
+                        <div className="flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => {
+                                setShowNewSubDeptDialog(false);
+                                setNewSubDeptName('');
+                            }}>
+                                Cancel
+                            </Button>
+                            <Button 
+                                onClick={() => {
+                                    if (newSubDeptName.trim() && formData.department) {
+                                        createSubDepartmentMutation.mutate(newSubDeptName.trim());
+                                    }
+                                }}
+                                disabled={!newSubDeptName.trim() || !formData.department || createSubDepartmentMutation.isPending}
+                                className="bg-purple-600 hover:bg-purple-700"
+                            >
+                                {createSubDepartmentMutation.isPending ? 'Creating...' : 'Create'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Dialog>
     );
 }
