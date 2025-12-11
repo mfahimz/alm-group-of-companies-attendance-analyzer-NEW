@@ -25,6 +25,10 @@ export default function CreateProjectDialog({ open, onClose }) {
         weekly_off_override: ''
     });
     const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+    const [showRamadanDialog, setShowRamadanDialog] = useState(false);
+    const [ramadanSchedule, setRamadanSchedule] = useState(null);
+    const [applyRamadan, setApplyRamadan] = useState(false);
+    const [ramadanDateRange, setRamadanDateRange] = useState({ from: '', to: '' });
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -34,11 +38,31 @@ export default function CreateProjectDialog({ open, onClose }) {
         enabled: open
     });
 
+    const { data: ramadanSchedules = [] } = useQuery({
+        queryKey: ['ramadanSchedules', formData.company],
+        queryFn: () => base44.entities.RamadanSchedule.filter({ company: formData.company, active: true }),
+        enabled: open && !!formData.company
+    });
+
     const createMutation = useMutation({
-        mutationFn: (data) => base44.entities.Project.create(data),
+        mutationFn: async (data) => {
+            const project = await base44.entities.Project.create(data);
+            
+            // Apply Ramadan shifts if requested
+            if (applyRamadan && ramadanSchedule && ramadanDateRange.from && ramadanDateRange.to) {
+                await base44.functions.invoke('applyRamadanShifts', {
+                    projectId: project.id,
+                    ramadanScheduleId: ramadanSchedule.id,
+                    ramadanFrom: ramadanDateRange.from,
+                    ramadanTo: ramadanDateRange.to
+                });
+            }
+            
+            return project;
+        },
         onSuccess: (project) => {
             queryClient.invalidateQueries(['projects']);
-            toast.success('Project created successfully');
+            toast.success(applyRamadan ? 'Project created with Ramadan shifts applied' : 'Project created successfully');
             onClose();
             navigate(createPageUrl(`ProjectDetail?id=${project.id}`));
         },
@@ -57,6 +81,37 @@ export default function CreateProjectDialog({ open, onClose }) {
             const pEnd = new Date(p.date_to);
             return (startDate <= pEnd && endDate >= pStart);
         });
+    };
+
+    const checkRamadanOverlap = (from, to) => {
+        if (!from || !to || ramadanSchedules.length === 0) {
+            setShowRamadanDialog(false);
+            return;
+        }
+
+        const projectStart = new Date(from);
+        const projectEnd = new Date(to);
+
+        const overlappingSchedule = ramadanSchedules.find(schedule => {
+            const ramadanStart = new Date(schedule.ramadan_start_date);
+            const ramadanEnd = new Date(schedule.ramadan_end_date);
+            return projectStart <= ramadanEnd && projectEnd >= ramadanStart;
+        });
+
+        if (overlappingSchedule) {
+            setRamadanSchedule(overlappingSchedule);
+            setShowRamadanDialog(true);
+            
+            const overlapStart = new Date(Math.max(projectStart, new Date(overlappingSchedule.ramadan_start_date)));
+            const overlapEnd = new Date(Math.min(projectEnd, new Date(overlappingSchedule.ramadan_end_date)));
+            setRamadanDateRange({
+                from: overlapStart.toISOString().split('T')[0],
+                to: overlapEnd.toISOString().split('T')[0]
+            });
+        } else {
+            setShowRamadanDialog(false);
+            setApplyRamadan(false);
+        }
     };
 
     const handleSubmit = (e) => {
@@ -125,22 +180,79 @@ export default function CreateProjectDialog({ open, onClose }) {
                         <div>
                             <Label htmlFor="date_from">Start Date *</Label>
                             <Input
-                                id="date_from"
-                                type="date"
-                                value={formData.date_from}
-                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                               id="date_from"
+                               type="date"
+                               value={formData.date_from}
+                               onChange={(e) => {
+                                   const newFrom = e.target.value;
+                                   setFormData({ ...formData, date_from: newFrom });
+                                   checkRamadanOverlap(newFrom, formData.date_to);
+                               }}
                             />
-                        </div>
-                        <div>
+                            </div>
+                            <div>
                             <Label htmlFor="date_to">End Date *</Label>
                             <Input
-                                id="date_to"
-                                type="date"
-                                value={formData.date_to}
-                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                               id="date_to"
+                               type="date"
+                               value={formData.date_to}
+                               onChange={(e) => {
+                                   const newTo = e.target.value;
+                                   setFormData({ ...formData, date_to: newTo });
+                                   checkRamadanOverlap(formData.date_from, newTo);
+                               }}
                             />
-                        </div>
-                    </div>
+                            </div>
+                            </div>
+
+                            {showRamadanDialog && ramadanSchedule && (
+                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
+                            <div className="flex items-start gap-2">
+                               <div className="flex-1">
+                                   <p className="font-medium text-purple-900">🌙 Ramadan Period Detected</p>
+                                   <p className="text-sm text-purple-700 mt-1">
+                                       Your project overlaps with Ramadan ({new Date(ramadanSchedule.ramadan_start_date).toLocaleDateString()} - {new Date(ramadanSchedule.ramadan_end_date).toLocaleDateString()})
+                                   </p>
+                               </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                               <Checkbox 
+                                   id="apply_ramadan" 
+                                   checked={applyRamadan}
+                                   onCheckedChange={(checked) => setApplyRamadan(checked)}
+                               />
+                               <Label htmlFor="apply_ramadan" className="font-normal text-sm">
+                                   Apply Ramadan shift schedule
+                               </Label>
+                            </div>
+                            {applyRamadan && (
+                               <div className="grid grid-cols-2 gap-3 pt-2">
+                                   <div>
+                                       <Label className="text-xs">Ramadan From</Label>
+                                       <Input
+                                           type="date"
+                                           value={ramadanDateRange.from}
+                                           onChange={(e) => setRamadanDateRange({ ...ramadanDateRange, from: e.target.value })}
+                                           className="h-8"
+                                           min={formData.date_from}
+                                           max={formData.date_to}
+                                       />
+                                   </div>
+                                   <div>
+                                       <Label className="text-xs">Ramadan To</Label>
+                                       <Input
+                                           type="date"
+                                           value={ramadanDateRange.to}
+                                           onChange={(e) => setRamadanDateRange({ ...ramadanDateRange, to: e.target.value })}
+                                           className="h-8"
+                                           min={ramadanDateRange.from || formData.date_from}
+                                           max={formData.date_to}
+                                       />
+                                   </div>
+                               </div>
+                            )}
+                            </div>
+                            )}
 
                     <div>
                         <Label htmlFor="department">Department</Label>
