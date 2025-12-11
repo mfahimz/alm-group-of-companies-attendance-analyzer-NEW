@@ -68,10 +68,21 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         }));
     };
 
+    const handleShiftOptionChange = (attendanceId, weekNum, option) => {
+        const setter = weekNum === 1 ? setWeek1Shifts : setWeek2Shifts;
+        setter(prev => ({
+            ...prev,
+            [attendanceId]: {
+                ...prev[attendanceId],
+                shift_option: option
+            }
+        }));
+    };
+
     const handleExport = (week) => {
         const shifts = week === 1 ? week1Shifts : week2Shifts;
         const csvData = [
-            ['Attendance ID', 'Employee Name', 'Shift 1 Start', 'Shift 1 End', 'Shift 2 Start', 'Shift 2 End', 'Night Start', 'Night End']
+            ['Attendance ID', 'Employee Name', 'Shift Option', 'Shift 1 Start', 'Shift 1 End', 'Shift 2 Start', 'Shift 2 End', 'Night Start', 'Night End']
         ];
 
         employees.forEach(emp => {
@@ -79,6 +90,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             csvData.push([
                 emp.attendance_id,
                 emp.name,
+                shift.shift_option || 'two_shifts',
                 shift.shift1_start || '',
                 shift.shift1_end || '',
                 shift.shift2_start || '',
@@ -113,9 +125,10 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                 const importedShifts = {};
 
                 rows.forEach(row => {
-                    const [attendanceId, , shift1Start, shift1End, shift2Start, shift2End, nightStart, nightEnd] = row.split(',');
+                    const [attendanceId, , shiftOption, shift1Start, shift1End, shift2Start, shift2End, nightStart, nightEnd] = row.split(',');
                     if (attendanceId && attendanceId.trim()) {
                         importedShifts[attendanceId.trim()] = {
+                            shift_option: shiftOption?.trim() || 'two_shifts',
                             shift1_start: shift1Start?.trim() || '',
                             shift1_end: shift1End?.trim() || '',
                             shift2_start: shift2Start?.trim() || '',
@@ -166,6 +179,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                         <TableRow>
                             <TableHead className="w-32">Attendance ID</TableHead>
                             <TableHead className="w-48">Name</TableHead>
+                            <TableHead>Shift Option</TableHead>
                             <TableHead>Shift 1 Start</TableHead>
                             <TableHead>Shift 1 End</TableHead>
                             <TableHead>Shift 2 Start</TableHead>
@@ -182,6 +196,17 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     <TableCell className="font-medium">{emp.attendance_id}</TableCell>
                                     <TableCell>{emp.name}</TableCell>
                                     <TableCell>
+                                        <select
+                                            className="w-32 h-9 px-2 border rounded-md text-sm"
+                                            value={shift.shift_option || 'two_shifts'}
+                                            onChange={(e) => handleShiftOptionChange(emp.attendance_id, weekNum, e.target.value)}
+                                        >
+                                            <option value="two_shifts">Two Shifts</option>
+                                            <option value="one_shift">One Shift</option>
+                                            <option value="no_night_end">No Night End</option>
+                                        </select>
+                                    </TableCell>
+                                    <TableCell>
                                         <Input
                                             placeholder="8:00 AM"
                                             value={shift.shift1_start || ''}
@@ -195,6 +220,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                             value={shift.shift1_end || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'shift1_end', e.target.value)}
                                             className="w-28"
+                                            disabled={shift.shift_option === 'one_shift'}
                                         />
                                     </TableCell>
                                     <TableCell>
@@ -203,6 +229,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                             value={shift.shift2_start || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'shift2_start', e.target.value)}
                                             className="w-28"
+                                            disabled={shift.shift_option === 'one_shift'}
                                         />
                                     </TableCell>
                                     <TableCell>
@@ -227,6 +254,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                             value={shift.night_end || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'night_end', e.target.value)}
                                             className="w-28"
+                                            disabled={shift.shift_option === 'no_night_end'}
                                         />
                                     </TableCell>
                                 </TableRow>
