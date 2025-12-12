@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import AnomalyDetectionCard from './AnomalyDetectionCard';
 import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
+import CloseProjectDialog from './CloseProjectDialog';
 
 export default function OverviewTab({ project }) {
     const [showCloseDialog, setShowCloseDialog] = useState(false);
