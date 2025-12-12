@@ -61,9 +61,8 @@ export default function ExceptionsTab({ project }) {
     });
     const [filter, setFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
-    const [importProgress, setImportProgress] = useState(null);
     const [uploadProgress, setUploadProgress] = useState(null);
-    const [editedRows, setEditedRows] = useState([]);
+    const [editedRows, setEditedRows] = useState({});
     const [selectedItems, setSelectedItems] = useState([]);
     const [selectedExceptions, setSelectedExceptions] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
