@@ -25,6 +25,8 @@ export default function PunchUploadTab({ project }) {
     const [editingPunch, setEditingPunch] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [punchToDelete, setPunchToDelete] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(50);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -350,11 +352,18 @@ export default function PunchUploadTab({ project }) {
             });
     }, [punches, searchTerm, dateFrom, dateTo, employees, sort]);
 
+    const paginatedPunches = React.useMemo(() => {
+        return enrichedPunches.slice(
+            (currentPage - 1) * rowsPerPage,
+            currentPage * rowsPerPage
+        );
+    }, [enrichedPunches, currentPage, rowsPerPage]);
+
     const toggleSelectAll = () => {
-        if (selectedPunches.length === enrichedPunches.length) {
+        if (selectedPunches.length === paginatedPunches.length) {
             setSelectedPunches([]);
         } else {
-            setSelectedPunches(enrichedPunches.map(p => p.id));
+            setSelectedPunches(paginatedPunches.map(p => p.id));
         }
     };
 
@@ -512,13 +521,13 @@ export default function PunchUploadTab({ project }) {
                                     </div>
                                 </div>
                             </div>
-                            <div className="max-h-96 overflow-auto">
+                            <div className="overflow-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead className="w-12">
                                                 <Checkbox
-                                                    checked={selectedPunches.length === enrichedPunches.length && enrichedPunches.length > 0}
+                                                    checked={selectedPunches.length === paginatedPunches.length && paginatedPunches.length > 0}
                                                     onCheckedChange={toggleSelectAll}
                                                 />
                                             </TableHead>
@@ -535,7 +544,7 @@ export default function PunchUploadTab({ project }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {enrichedPunches.map((punch) => (
+                                        {paginatedPunches.map((punch) => (
                                             <TableRow key={punch.id}>
                                                 <TableCell>
                                                     <Checkbox
@@ -635,6 +644,16 @@ export default function PunchUploadTab({ project }) {
                                     </TableBody>
                                 </Table>
                             </div>
+                            <TablePagination
+                                totalItems={enrichedPunches.length}
+                                currentPage={currentPage}
+                                rowsPerPage={rowsPerPage}
+                                onPageChange={setCurrentPage}
+                                onRowsPerPageChange={(value) => {
+                                    setRowsPerPage(value);
+                                    setCurrentPage(1);
+                                }}
+                            />
                         </div>
                     )}
                 </CardContent>
