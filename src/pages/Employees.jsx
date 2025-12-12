@@ -31,6 +31,7 @@ export default function Employees() {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [companyFilter, setCompanyFilter] = useState('all');
+    const [importProgress, setImportProgress] = useState(null);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
