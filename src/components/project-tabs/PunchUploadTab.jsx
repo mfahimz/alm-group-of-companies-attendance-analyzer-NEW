@@ -9,6 +9,7 @@ import { Upload, AlertTriangle, Search, Trash2, Eye, Edit } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
+import TablePagination from '../ui/TablePagination';
 import { toast } from 'sonner';
 
 export default function PunchUploadTab({ project }) {
