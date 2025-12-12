@@ -447,6 +447,43 @@ export default function ShiftTimingsTab({ project }) {
         toast.success('Shift timings exported');
     };
 
+    const exportBlockShiftsToCSV = (blockId, blockShifts) => {
+        if (blockShifts.length === 0) {
+            toast.error('No shifts in this block to export');
+            return;
+        }
+
+        const headers = ['Attendance ID', 'Employee Name', 'Department', 'Shift Type', 'Applicable Days', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Effective From', 'Effective To'];
+        const rows = blockShifts.map(shift => {
+            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+            return [
+                shift.attendance_id,
+                employee?.name || '-',
+                employee?.department || '-',
+                shift.is_single_shift ? 'Single Shift' : 'Regular',
+                shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days'),
+                shift.am_start || '-',
+                shift.am_end || '-',
+                shift.pm_start || '-',
+                shift.pm_end || '-',
+                shift.effective_from ? new Date(shift.effective_from).toLocaleDateString('en-GB') : '-',
+                shift.effective_to ? new Date(shift.effective_to).toLocaleDateString('en-GB') : '-'
+            ];
+        });
+
+        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.name}_${blockId}_shifts.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        toast.success(`${blockId.replace('block', 'Block ')} shifts exported`);
+    };
+
     const renderShiftBlock = (blockId, blockShifts, blockLabel) => {
         const blockRange = blockDateRanges[blockId];
         
@@ -551,19 +588,29 @@ export default function ShiftTimingsTab({ project }) {
                                     Edit Date Range
                                 </Button>
                                 {blockShifts.length > 0 && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        onClick={() => {
-                                            if (window.confirm(`Delete all ${blockShifts.length} shifts from ${blockLabel}?`)) {
-                                                deleteBlockShiftsMutation.mutate(blockId);
-                                            }
-                                        }}
-                                    >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete All Shifts
-                                    </Button>
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => exportBlockShiftsToCSV(blockId, blockShifts)}
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />
+                                            Export {blockLabel}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            onClick={() => {
+                                                if (window.confirm(`Delete all ${blockShifts.length} shifts from ${blockLabel}?`)) {
+                                                    deleteBlockShiftsMutation.mutate(blockId);
+                                                }
+                                            }}
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Delete All Shifts
+                                        </Button>
+                                    </>
                                 )}
                             </div>
                         )}
