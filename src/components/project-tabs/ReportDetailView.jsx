@@ -535,6 +535,12 @@ export default function ReportDetailView({ reportRun, project }) {
         mutationFn: async () => {
             setIsSaving(true);
             setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
+            
+            // Set this as the last saved report
+            await base44.entities.Project.update(project.id, {
+                last_saved_report_id: reportRun.id
+            });
+            
             const exceptionsToCreate = [];
             
             for (const result of results) {

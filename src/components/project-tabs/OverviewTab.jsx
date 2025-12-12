@@ -16,6 +16,15 @@ import AnomalyDetectionCard from './AnomalyDetectionCard';
 import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
 
 export default function OverviewTab({ project }) {
+    const [showCloseDialog, setShowCloseDialog] = useState(false);
+
+    const { data: lastSavedReport } = useQuery({
+        queryKey: ['lastSavedReport', project.last_saved_report_id],
+        queryFn: () => project.last_saved_report_id 
+            ? base44.entities.ReportRun.filter({ id: project.last_saved_report_id }).then(r => r[0])
+            : null,
+        enabled: !!project.last_saved_report_id
+    });
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const [showEditDialog, setShowEditDialog] = useState(false);
@@ -232,8 +241,32 @@ export default function OverviewTab({ project }) {
         { label: 'Exceptions', value: exceptions.length, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' }
     ];
 
+    const canCloseProject = project.status === 'analyzed' && project.status !== 'closed';
+
     return (
         <div className="space-y-6">
+            {/* Close & Finalize Button */}
+            {canCloseProject && (
+                <Card className="border-red-200 bg-red-50">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="font-medium text-red-900">Ready to close this project?</p>
+                                <p className="text-sm text-red-700 mt-1">
+                                    Once closed, all punch data will be deleted and the project becomes read-only
+                                </p>
+                            </div>
+                            <Button 
+                                onClick={() => setShowCloseDialog(true)}
+                                className="bg-red-600 hover:bg-red-700"
+                            >
+                                <Lock className="w-4 h-4 mr-2" />
+                                Close & Finalize
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {stats.map((stat) => {
@@ -520,6 +553,12 @@ export default function OverviewTab({ project }) {
                 company={editData.company}
                 initialIds={editData.custom_employee_ids}
                 onConfirm={(ids) => setEditData({ ...editData, custom_employee_ids: ids })}
+            />
+            <CloseProjectDialog
+                open={showCloseDialog}
+                onClose={() => setShowCloseDialog(false)}
+                project={project}
+                lastSavedReport={lastSavedReport}
             />
         </div>
     );

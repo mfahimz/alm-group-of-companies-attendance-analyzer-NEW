@@ -12,10 +12,15 @@ import { toast } from 'sonner';
 export default function ReportTab({ project }) {
     const queryClient = useQueryClient();
 
-    const { data: reportRuns = [] } = useQuery({
+    const { data: allReportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
         queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date')
     });
+
+    // If project is closed, only show the last saved report
+    const reportRuns = project.status === 'closed' && project.last_saved_report_id
+        ? allReportRuns.filter(r => r.id === project.last_saved_report_id)
+        : allReportRuns;
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', project.id],
