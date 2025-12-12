@@ -36,14 +36,17 @@ export default function ReportDetailView({ reportRun, project }) {
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
+    // Only fetch punches and shifts if project is NOT closed (data is deleted on close)
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
-        queryFn: () => base44.entities.Punch.filter({ project_id: project.id })
+        queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
+        enabled: project.status !== 'closed'
     });
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
-        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id })
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
+        enabled: project.status !== 'closed'
     });
 
     const { data: exceptions = [] } = useQuery({
@@ -469,6 +472,24 @@ export default function ReportDetailView({ reportRun, project }) {
     const enrichedResults = React.useMemo(() => {
         return results.map(result => {
             const employee = employees.find(e => e.attendance_id === result.attendance_id);
+            
+            // For closed projects, use saved data from AnalysisResult (punches are deleted)
+            if (project.status === 'closed') {
+                return {
+                    ...result,
+                    name: employee?.name || 'Unknown',
+                    working_days: result.working_days,
+                    present_days: result.present_days,
+                    full_absence_count: result.full_absence_count,
+                    half_absence_count: result.half_absence_count,
+                    sick_leave_count: result.sick_leave_count || 0,
+                    late_minutes: result.late_minutes || 0,
+                    early_checkout_minutes: result.early_checkout_minutes || 0,
+                    isVerified: verifiedEmployees.includes(result.attendance_id)
+                };
+            }
+            
+            // For open projects, recalculate from punch data
             const { 
                 totalLateMinutes, 
                 totalEarlyCheckout, 
@@ -492,7 +513,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 isVerified: verifiedEmployees.includes(result.attendance_id)
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, verifiedEmployees]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, verifiedEmployees, project.status]);
 
     const filteredResults = React.useMemo(() => {
         return enrichedResults
@@ -1034,21 +1055,23 @@ export default function ReportDetailView({ reportRun, project }) {
                             )}
                         </div>
                         <div className="flex gap-2">
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                            >
-                                <Download className="w-4 h-4 mr-2" />
-                                Export
-                            </Button>
-                            <Button
-                                onClick={() => setShowSaveConfirmation(true)}
-                                disabled={isSaving}
-                                className="bg-green-600 hover:bg-green-700"
-                            >
-                                <Save className="w-4 h-4 mr-2" />
-                                {isSaving ? 'Saving...' : 'Save Report'}
-                            </Button>
+                           <Button
+                               onClick={exportToExcel}
+                               variant="outline"
+                           >
+                               <Download className="w-4 h-4 mr-2" />
+                               Export
+                           </Button>
+                           {project.status !== 'closed' && (
+                               <Button
+                                   onClick={() => setShowSaveConfirmation(true)}
+                                   disabled={isSaving}
+                                   className="bg-green-600 hover:bg-green-700"
+                               >
+                                   <Save className="w-4 h-4 mr-2" />
+                                   {isSaving ? 'Saving...' : 'Save Report'}
+                               </Button>
+                           )}
                         </div>
                     </div>
                 </CardContent>
@@ -1177,13 +1200,18 @@ export default function ReportDetailView({ reportRun, project }) {
                                             {result.notes || '-'}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => showDailyBreakdown(result)}
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                            </Button>
+                                            {project.status === 'closed' ? (
+                                                <span className="text-xs text-slate-400">—</span>
+                                            ) : (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => showDailyBreakdown(result)}
+                                                    title="View daily breakdown"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
