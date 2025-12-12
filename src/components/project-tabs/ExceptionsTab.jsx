@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
@@ -66,6 +66,7 @@ export default function ExceptionsTab({ project }) {
     const [selectedItems, setSelectedItems] = useState([]);
     const [selectedExceptions, setSelectedExceptions] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
+    const [viewingException, setViewingException] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const queryClient = useQueryClient();
@@ -781,6 +782,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             </TableCell>
                                             <TableCell className="text-right p-1">
                                                 <div className="flex gap-1 justify-end">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setViewingException(exception)}
+                                                        title="View details"
+                                                    >
+                                                        <Eye className="w-4 h-4 text-indigo-600" />
+                                                    </Button>
                                                     {editedRows[exception.id] && (
                                                         <Button
                                                             size="sm"
@@ -880,13 +889,23 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                                 {exception.details || '-'}
                                             </TableCell>
                                             <TableCell className="text-right p-1">
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => deleteMutation.mutate(exception.id)}
-                                                >
-                                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                                </Button>
+                                                <div className="flex gap-1 justify-end">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setViewingException(exception)}
+                                                        title="View details"
+                                                    >
+                                                        <Eye className="w-4 h-4 text-indigo-600" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => deleteMutation.mutate(exception.id)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -910,6 +929,120 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                 selectedExceptions={selectedExceptions}
                 projectId={project.id}
             />
-        </div>
-    );
-}
+
+            {/* View Exception Dialog */}
+            <Dialog open={!!viewingException} onOpenChange={() => setViewingException(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Exception Details</DialogTitle>
+                    </DialogHeader>
+                    {viewingException && (
+                        <div className="space-y-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label className="text-slate-500 text-xs">Employee ID</Label>
+                                    <p className="font-medium text-slate-900">
+                                        {viewingException.attendance_id === 'ALL' ? 'All Employees' : viewingException.attendance_id}
+                                    </p>
+                                </div>
+                                <div>
+                                    <Label className="text-slate-500 text-xs">Employee Name</Label>
+                                    <p className="font-medium text-slate-900">
+                                        {viewingException.attendance_id === 'ALL' 
+                                            ? '—' 
+                                            : employees.find(e => e.attendance_id === viewingException.attendance_id)?.name || '—'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <Label className="text-slate-500 text-xs">Exception Type</Label>
+                                    <p className="font-medium text-slate-900">{viewingException.type.replace(/_/g, ' ')}</p>
+                                </div>
+                                <div>
+                                    <Label className="text-slate-500 text-xs">Created From Report</Label>
+                                    <p className="font-medium text-slate-900">
+                                        {viewingException.created_from_report ? 'Yes' : 'No'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <Label className="text-slate-500 text-xs">From Date</Label>
+                                    <p className="font-medium text-slate-900">
+                                        {new Date(viewingException.date_from).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div>
+                                    <Label className="text-slate-500 text-xs">To Date</Label>
+                                    <p className="font-medium text-slate-900">
+                                        {new Date(viewingException.date_to).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {viewingException.type === 'SHIFT_OVERRIDE' && (
+                                <div className="border-t pt-4">
+                                    <Label className="text-slate-500 text-xs mb-2 block">Shift Override Times</Label>
+                                    <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg">
+                                        <div>
+                                            <span className="text-xs text-slate-600">AM Start:</span>
+                                            <p className="font-medium">{viewingException.new_am_start || '—'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-600">AM End:</span>
+                                            <p className="font-medium">{viewingException.new_am_end || '—'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-600">PM Start:</span>
+                                            <p className="font-medium">{viewingException.new_pm_start || '—'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-600">PM End:</span>
+                                            <p className="font-medium">{viewingException.new_pm_end || '—'}</p>
+                                        </div>
+                                    </div>
+                                    {viewingException.include_friday !== undefined && (
+                                        <p className="text-sm text-slate-600 mt-2">
+                                            {viewingException.include_friday 
+                                                ? '✓ Includes Friday' 
+                                                : '✗ Excludes Friday'}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {viewingException.type === 'MANUAL_EARLY_CHECKOUT' && viewingException.early_checkout_minutes && (
+                                <div className="border-t pt-4">
+                                    <Label className="text-slate-500 text-xs">Early Checkout Minutes</Label>
+                                    <p className="font-medium text-slate-900">{viewingException.early_checkout_minutes} minutes</p>
+                                </div>
+                            )}
+
+                            {viewingException.details && (
+                                <div className="border-t pt-4">
+                                    <Label className="text-slate-500 text-xs">Details / Reason</Label>
+                                    <p className="text-slate-900 mt-1">{viewingException.details}</p>
+                                </div>
+                            )}
+
+                            <div className="border-t pt-4">
+                                <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
+                                    <div>
+                                        <span>Created:</span>
+                                        <p className="text-slate-900">
+                                            {new Date(viewingException.created_date).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span>Created By:</span>
+                                        <p className="text-slate-900">{viewingException.created_by || '—'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex justify-end">
+                        <Button onClick={() => setViewingException(null)}>Close</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+            </div>
+            );
+            }
