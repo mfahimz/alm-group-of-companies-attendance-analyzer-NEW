@@ -86,6 +86,7 @@ export default function ReportTab({ project }) {
                                                         year: 'numeric',
                                                         hour: '2-digit',
                                                         minute: '2-digit',
+                                                        hour12: true,
                                                         timeZone: 'Asia/Dubai'
                                                     })}
                                                 </TableCell>

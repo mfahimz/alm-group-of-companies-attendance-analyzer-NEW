@@ -212,7 +212,15 @@ export default function Projects() {
                                             <div className="p-2 rounded-lg bg-slate-50">
                                                 <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-1">Created</p>
                                                 <p className="font-semibold text-slate-700 truncate">
-                                                    {new Date(project.created_date).toLocaleDateString('en-GB')}
+                                                    {new Date(project.created_date).toLocaleString('en-US', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: true,
+                                                        timeZone: 'Asia/Dubai'
+                                                    })}
                                                 </p>
                                             </div>
                                         </div>
