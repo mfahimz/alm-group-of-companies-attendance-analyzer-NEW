@@ -1028,7 +1028,15 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                     <div>
                                         <span>Created:</span>
                                         <p className="text-slate-900">
-                                            {new Date(viewingException.created_date).toLocaleString()}
+                                            {new Date(viewingException.created_date).toLocaleString('en-US', {
+                                                day: '2-digit',
+                                                month: '2-digit',
+                                                year: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                hour12: true,
+                                                timeZone: 'Asia/Dubai'
+                                            })}
                                         </p>
                                     </div>
                                     <div>
