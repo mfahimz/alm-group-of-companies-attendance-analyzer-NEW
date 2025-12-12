@@ -363,27 +363,35 @@ export default function ShiftTimingsTab({ project }) {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (id) => base44.entities.ShiftTiming.delete(id),
+        mutationFn: async (id) => {
+            await base44.entities.ShiftTiming.delete(id);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', project.id]);
+            setSelectedShifts([]);
             toast.success('Shift deleted');
         },
-        onError: () => {
-            toast.error('Failed to delete shift');
+        onError: (error) => {
+            console.error('Delete error:', error);
+            toast.error('Failed to delete shift: ' + (error.message || 'Unknown error'));
         }
     });
 
     const deleteBlockShiftsMutation = useMutation({
         mutationFn: async (blockId) => {
             const blockShifts = shifts.filter(s => s.shift_block === blockId);
-            await Promise.all(blockShifts.map(shift => base44.entities.ShiftTiming.delete(shift.id)));
+            for (const shift of blockShifts) {
+                await base44.entities.ShiftTiming.delete(shift.id);
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', project.id]);
+            setSelectedShifts([]);
             toast.success('All shifts deleted from block');
         },
-        onError: () => {
-            toast.error('Failed to delete block shifts');
+        onError: (error) => {
+            console.error('Delete block shifts error:', error);
+            toast.error('Failed to delete block shifts: ' + (error.message || 'Unknown error'));
         }
     });
 

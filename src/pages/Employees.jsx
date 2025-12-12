@@ -65,13 +65,16 @@ export default function Employees() {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (id) => base44.entities.Employee.delete(id),
+        mutationFn: async (id) => {
+            await base44.entities.Employee.delete(id);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['employees']);
             toast.success('Employee deleted successfully');
         },
-        onError: () => {
-            toast.error('Failed to delete employee');
+        onError: (error) => {
+            console.error('Delete employee error:', error);
+            toast.error('Failed to delete employee: ' + (error.message || 'Unknown error'));
         }
     });
 
