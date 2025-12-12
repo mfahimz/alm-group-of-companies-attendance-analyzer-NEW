@@ -62,6 +62,7 @@ export default function ProjectDetail() {
                     ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
                     ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
                     ${project.status === 'locked' ? 'bg-slate-100 text-slate-700' : ''}
+                    ${project.status === 'closed' ? 'bg-red-100 text-red-700' : ''}
                 `}>
                     {project.status}
                 </span>
@@ -71,10 +72,18 @@ export default function ProjectDetail() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <TabsList className="bg-white border border-slate-200 p-1 flex flex-wrap h-auto gap-1">
                     <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-                    <TabsTrigger value="punches" className="text-xs sm:text-sm">Punches</TabsTrigger>
-                    <TabsTrigger value="shifts" className="text-xs sm:text-sm">Shifts</TabsTrigger>
-                    <TabsTrigger value="exceptions" className="text-xs sm:text-sm">Exceptions</TabsTrigger>
-                    <TabsTrigger value="analysis" className="text-xs sm:text-sm">Analysis</TabsTrigger>
+                    <TabsTrigger value="punches" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
+                        Punches {project.status === 'closed' && '🔒'}
+                    </TabsTrigger>
+                    <TabsTrigger value="shifts" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
+                        Shifts {project.status === 'closed' && '🔒'}
+                    </TabsTrigger>
+                    <TabsTrigger value="exceptions" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
+                        Exceptions {project.status === 'closed' && '🔒'}
+                    </TabsTrigger>
+                    <TabsTrigger value="analysis" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
+                        Analysis {project.status === 'closed' && '🔒'}
+                    </TabsTrigger>
                     <TabsTrigger value="report" className="text-xs sm:text-sm">Report</TabsTrigger>
                 </TabsList>
 
