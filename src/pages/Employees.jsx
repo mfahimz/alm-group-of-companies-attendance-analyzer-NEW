@@ -78,13 +78,19 @@ export default function Employees() {
     const bulkDeleteMutation = useMutation({
         mutationFn: async (ids) => {
             const results = [];
-            for (const id of ids) {
+            const total = ids.length;
+            
+            setImportProgress({ current: 0, total, status: 'Deleting employees...' });
+            
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
                 try {
                     await base44.entities.Employee.delete(id);
                     results.push(id);
                 } catch (error) {
                     console.error('Failed to delete employee:', id, error);
                 }
+                setImportProgress({ current: i + 1, total, status: `Deleting ${i + 1}/${total}...` });
             }
             return results;
         },
@@ -92,9 +98,11 @@ export default function Employees() {
             queryClient.invalidateQueries(['employees']);
             setSelectedEmployeeIds([]);
             toast.success(`${results.length} employee${results.length > 1 ? 's' : ''} deleted successfully`);
+            setImportProgress(null);
         },
         onError: (error) => {
             toast.error('Failed to delete employees: ' + error.message);
+            setImportProgress(null);
         }
     });
 
@@ -220,13 +228,19 @@ export default function Employees() {
     const importMutation = useMutation({
         mutationFn: async (employeeList) => {
             const results = [];
-            for (const emp of employeeList) {
+            const total = employeeList.length;
+            
+            setImportProgress({ current: 0, total, status: 'Importing employees...' });
+            
+            for (let i = 0; i < employeeList.length; i++) {
+                const emp = employeeList[i];
                 try {
                     const result = await base44.entities.Employee.create(emp);
                     results.push(result);
                 } catch (error) {
                     console.error('Failed to create employee:', emp, error);
                 }
+                setImportProgress({ current: i + 1, total, status: `Importing ${i + 1}/${total}...` });
             }
             return results;
         },
@@ -234,9 +248,11 @@ export default function Employees() {
             queryClient.invalidateQueries(['employees']);
             toast.success(`${results.length} employees imported successfully`);
             setImportFile(null);
+            setImportProgress(null);
         },
         onError: (error) => {
             toast.error('Failed to import employees: ' + error.message);
+            setImportProgress(null);
         }
     });
 
@@ -504,6 +520,28 @@ export default function Employees() {
                     Duplicates Only {totalDuplicates > 0 && `(${totalDuplicates})`}
                 </Button>
             </div>
+
+            {/* Import Progress */}
+            {importProgress && (
+                <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="flex-1">
+                                <p className="font-medium text-indigo-900">{importProgress.status}</p>
+                                <p className="text-sm text-indigo-700 mt-1">
+                                    {importProgress.current} / {importProgress.total} processed
+                                </p>
+                            </div>
+                        </div>
+                        <div className="w-full bg-indigo-200 rounded-full h-2">
+                            <div 
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Duplicate Warning */}
             {totalDuplicates > 0 && !showOnlyDuplicates && (

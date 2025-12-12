@@ -38,6 +38,7 @@ export default function ShiftTimingsTab({ project }) {
     });
     const [selectedShifts, setSelectedShifts] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(null);
     const [formData, setFormData] = useState({
         attendance_id: '',
         am_start: '',
@@ -288,7 +289,22 @@ export default function ShiftTimingsTab({ project }) {
                 shift_block: selectedBlock
             }));
 
-            await base44.entities.ShiftTiming.bulkCreate(shiftRecords);
+            const batchSize = 50;
+            const totalBatches = Math.ceil(shiftRecords.length / batchSize);
+            
+            setUploadProgress({ current: 0, total: totalBatches, status: 'Uploading shift timings...' });
+            
+            for (let i = 0; i < shiftRecords.length; i += batchSize) {
+                const batch = shiftRecords.slice(i, i + batchSize);
+                await base44.entities.ShiftTiming.bulkCreate(batch);
+                
+                const batchNumber = Math.floor(i / batchSize) + 1;
+                setUploadProgress({ 
+                    current: batchNumber, 
+                    total: totalBatches, 
+                    status: `Uploading batch ${batchNumber}/${totalBatches}...` 
+                });
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', project.id]);
@@ -296,9 +312,11 @@ export default function ShiftTimingsTab({ project }) {
             setParsedData([]);
             setFile(null);
             setShowPreviewDialog(false);
+            setUploadProgress(null);
         },
         onError: () => {
             toast.error('Failed to upload shift timings');
+            setUploadProgress(null);
         }
     });
 
@@ -804,6 +822,28 @@ export default function ShiftTimingsTab({ project }) {
 
     return (
         <div className="space-y-6">
+            {/* Upload Progress */}
+            {uploadProgress && (
+                <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="flex-1">
+                                <p className="font-medium text-indigo-900">{uploadProgress.status}</p>
+                                <p className="text-sm text-indigo-700 mt-1">
+                                    {uploadProgress.current} / {uploadProgress.total} batches completed
+                                </p>
+                            </div>
+                        </div>
+                        <div className="w-full bg-indigo-200 rounded-full h-2">
+                            <div 
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%` }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Add Shift Form */}
             {showAddForm && (
                 <Card className="border-0 shadow-sm">

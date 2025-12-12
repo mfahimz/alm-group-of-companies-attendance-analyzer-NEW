@@ -23,6 +23,7 @@ export default function ReportDetailView({ reportRun, project }) {
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+    const [saveProgress, setSaveProgress] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: results = [] } = useQuery({
@@ -533,6 +534,7 @@ export default function ReportDetailView({ reportRun, project }) {
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
+            setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
             const exceptionsToCreate = [];
             
             for (const result of results) {
@@ -608,9 +610,18 @@ export default function ReportDetailView({ reportRun, project }) {
 
             if (exceptionsToCreate.length > 0) {
                 const batchSize = 20;
+                const totalBatches = Math.ceil(exceptionsToCreate.length / batchSize);
+                
                 for (let i = 0; i < exceptionsToCreate.length; i += batchSize) {
                     const batch = exceptionsToCreate.slice(i, i + batchSize);
                     await base44.entities.Exception.bulkCreate(batch);
+                    
+                    const batchNumber = Math.floor(i / batchSize) + 1;
+                    setSaveProgress({ 
+                        current: batchNumber, 
+                        total: totalBatches, 
+                        status: `Saving exceptions ${batchNumber}/${totalBatches}...` 
+                    });
                 }
             }
 
@@ -621,10 +632,12 @@ export default function ReportDetailView({ reportRun, project }) {
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
             setIsSaving(false);
+            setSaveProgress(null);
         },
         onError: (error) => {
             toast.error('Failed to save report: ' + error.message);
             setIsSaving(false);
+            setSaveProgress(null);
         }
     });
 
@@ -975,6 +988,28 @@ export default function ReportDetailView({ reportRun, project }) {
 
     return (
         <div className="space-y-6">
+            {/* Save Progress */}
+            {saveProgress && (
+                <Card className="border-0 shadow-sm bg-green-50 border-green-200">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="flex-1">
+                                <p className="font-medium text-green-900">{saveProgress.status}</p>
+                                <p className="text-sm text-green-700 mt-1">
+                                    {saveProgress.current} / {saveProgress.total} completed
+                                </p>
+                            </div>
+                        </div>
+                        <div className="w-full bg-green-200 rounded-full h-2">
+                            <div 
+                                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${saveProgress.total > 0 ? (saveProgress.current / saveProgress.total) * 100 : 0}%` }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Report Info & Actions */}
             <Card className="border-0 shadow-sm">
                 <CardContent className="p-6">

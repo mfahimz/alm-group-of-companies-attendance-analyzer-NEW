@@ -359,6 +359,28 @@ export default function PunchUploadTab({ project }) {
 
     return (
         <div className="space-y-6">
+            {/* Upload Progress */}
+            {uploadProgress && (
+                <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="flex-1">
+                                <p className="font-medium text-indigo-900">{uploadProgress.status}</p>
+                                <p className="text-sm text-indigo-700 mt-1">
+                                    {uploadProgress.current} / {uploadProgress.total} batches completed
+                                </p>
+                            </div>
+                        </div>
+                        <div className="w-full bg-indigo-200 rounded-full h-2">
+                            <div 
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%` }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Upload Section */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
