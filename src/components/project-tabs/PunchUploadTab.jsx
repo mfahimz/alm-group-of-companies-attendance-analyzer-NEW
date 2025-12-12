@@ -27,7 +27,7 @@ export default function PunchUploadTab({ project }) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [punchToDelete, setPunchToDelete] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(50);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
