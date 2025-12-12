@@ -24,6 +24,14 @@ export default function ProjectDetail() {
         enabled: !!projectId
     });
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const isAdmin = currentUser?.role === 'admin';
+    const isReadOnly = project?.status === 'closed' && !isAdmin;
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -72,17 +80,17 @@ export default function ProjectDetail() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <TabsList className="bg-white border border-slate-200 p-1 flex flex-wrap h-auto gap-1">
                     <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-                    <TabsTrigger value="punches" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
-                        Punches {project.status === 'closed' && '🔒'}
+                    <TabsTrigger value="punches" disabled={isReadOnly} className="text-xs sm:text-sm">
+                        Punches {isReadOnly && '🔒'}
                     </TabsTrigger>
-                    <TabsTrigger value="shifts" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
-                        Shifts {project.status === 'closed' && '🔒'}
+                    <TabsTrigger value="shifts" disabled={isReadOnly} className="text-xs sm:text-sm">
+                        Shifts {isReadOnly && '🔒'}
                     </TabsTrigger>
-                    <TabsTrigger value="exceptions" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
-                        Exceptions {project.status === 'closed' && '🔒'}
+                    <TabsTrigger value="exceptions" disabled={isReadOnly} className="text-xs sm:text-sm">
+                        Exceptions {isReadOnly && '🔒'}
                     </TabsTrigger>
-                    <TabsTrigger value="analysis" disabled={project.status === 'closed'} className="text-xs sm:text-sm">
-                        Analysis {project.status === 'closed' && '🔒'}
+                    <TabsTrigger value="analysis" disabled={isReadOnly} className="text-xs sm:text-sm">
+                        Analysis {isReadOnly && '🔒'}
                     </TabsTrigger>
                     <TabsTrigger value="report" className="text-xs sm:text-sm">Report</TabsTrigger>
                 </TabsList>
