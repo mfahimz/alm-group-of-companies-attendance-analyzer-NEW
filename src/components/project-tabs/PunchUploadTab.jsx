@@ -23,6 +23,8 @@ export default function PunchUploadTab({ project }) {
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showPreviewDialog, setShowPreviewDialog] = useState(false);
     const [editingPunch, setEditingPunch] = useState(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [punchToDelete, setPunchToDelete] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -270,35 +272,46 @@ export default function PunchUploadTab({ project }) {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (id) => base44.entities.Punch.delete(id),
+        mutationFn: async (id) => {
+            await base44.entities.Punch.delete(id);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['punches', project.id]);
+            setPunchToDelete(null);
+            setDeleteDialogOpen(false);
+            setSelectedPunches([]);
             toast.success('Punch deleted');
         },
-        onError: () => {
-            toast.error('Failed to delete punch');
+        onError: (error) => {
+            console.error('Delete punch error:', error);
+            toast.error('Failed to delete punch: ' + (error.message || 'Unknown error'));
         }
     });
 
     const bulkDeleteMutation = useMutation({
         mutationFn: async (ids) => {
-            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const total = ids.length;
+            setUploadProgress({ current: 0, total, status: 'Deleting punch records...' });
+            
             const batchSize = 20;
             for (let i = 0; i < ids.length; i += batchSize) {
                 const batch = ids.slice(i, i + batchSize);
-                await Promise.all(batch.map(id => base44.entities.Punch.delete(id)));
-                if (i + batchSize < ids.length) {
-                    await delay(500);
+                for (const id of batch) {
+                    await base44.entities.Punch.delete(id);
                 }
+                setUploadProgress({ current: i + batch.length, total, status: `Deleting ${i + batch.length}/${total}...` });
             }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['punches', project.id]);
             setSelectedPunches([]);
             toast.success('Punches deleted successfully');
+            setUploadProgress(null);
         },
-        onError: () => {
-            toast.error('Failed to delete punches');
+        onError: (error) => {
+            console.error('Bulk delete error:', error);
+            toast.error('Failed to delete punches: ' + (error.message || 'Unknown error'));
+            setUploadProgress(null);
         }
     });
 

@@ -62,7 +62,9 @@ export default function ExceptionsTab({ project }) {
     const [filter, setFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [importProgress, setImportProgress] = useState(null);
-    const [editedRows, setEditedRows] = useState({});
+    const [uploadProgress, setUploadProgress] = useState(null);
+    const [editedRows, setEditedRows] = useState([]);
+    const [selectedItems, setSelectedItems] = useState([]);
     const [selectedExceptions, setSelectedExceptions] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -99,10 +101,18 @@ export default function ExceptionsTab({ project }) {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (id) => base44.entities.Exception.delete(id),
+        mutationFn: async (id) => {
+            await base44.entities.Exception.delete(id);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['exceptions', project.id]);
+            setSelectedItems([]);
+            setSelectedExceptions([]);
             toast.success('Exception deleted');
+        },
+        onError: (error) => {
+            console.error('Delete exception error:', error);
+            toast.error('Failed to delete exception: ' + (error.message || 'Unknown error'));
         }
     });
 
@@ -245,21 +255,25 @@ export default function ExceptionsTab({ project }) {
                     return;
                 }
 
-                setImportProgress({ current: 0, total: exceptions.length });
+                setUploadProgress({ current: 0, total: exceptions.length, status: 'Importing exceptions...' });
                 
                 const batchSize = 20;
                 for (let i = 0; i < exceptions.length; i += batchSize) {
                     const batch = exceptions.slice(i, i + batchSize);
                     await base44.entities.Exception.bulkCreate(batch);
-                    setImportProgress({ current: Math.min(i + batchSize, exceptions.length), total: exceptions.length });
+                    setUploadProgress({ 
+                        current: Math.min(i + batchSize, exceptions.length), 
+                        total: exceptions.length,
+                        status: `Importing ${Math.min(i + batchSize, exceptions.length)}/${exceptions.length}...`
+                    });
                 }
 
                 queryClient.invalidateQueries(['exceptions', project.id]);
                 toast.success(`Imported ${exceptions.length} exceptions successfully`);
-                setImportProgress(null);
+                setUploadProgress(null);
             } catch (error) {
                 toast.error('Failed to import file: ' + error.message);
-                setImportProgress(null);
+                setUploadProgress(null);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -590,10 +604,10 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                             variant="outline"
                             size="sm"
                             onClick={() => document.getElementById('exception-import').click()}
-                            disabled={importProgress !== null}
+                            disabled={uploadProgress !== null}
                         >
                             <Upload className="w-4 h-4 mr-2" />
-                            {importProgress ? `${importProgress.current}/${importProgress.total}` : 'Import Excel'}
+                            {uploadProgress ? 'Importing...' : 'Import Excel'}
                         </Button>
                         <input
                             id="exception-import"
