@@ -15,23 +15,33 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'project_id is required' }, { status: 400 });
         }
 
-        // Delete punches in batches using service role
+        // Delete punches in parallel batches for much faster deletion
         const punches = await base44.asServiceRole.entities.Punch.filter({ project_id });
         
-        const batchSize = 50;
+        const batchSize = 100;
+        const parallelBatches = 5; // Process 5 batches simultaneously
         let deletedCount = 0;
         
+        // Split into batches
+        const batches = [];
         for (let i = 0; i < punches.length; i += batchSize) {
-            const batch = punches.slice(i, i + batchSize);
+            batches.push(punches.slice(i, i + batchSize));
+        }
+        
+        // Process batches in parallel groups
+        for (let i = 0; i < batches.length; i += parallelBatches) {
+            const parallelGroup = batches.slice(i, i + parallelBatches);
             
-            for (const punch of batch) {
-                try {
-                    await base44.asServiceRole.entities.Punch.delete(punch.id);
-                    deletedCount++;
-                } catch (error) {
-                    console.error('Failed to delete punch:', punch.id, error);
-                }
-            }
+            await Promise.all(parallelGroup.map(async (batch) => {
+                await Promise.all(batch.map(async (punch) => {
+                    try {
+                        await base44.asServiceRole.entities.Punch.delete(punch.id);
+                        deletedCount++;
+                    } catch (error) {
+                        console.error('Failed to delete punch:', punch.id, error);
+                    }
+                }));
+            }));
         }
 
         return Response.json({ 

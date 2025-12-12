@@ -13,8 +13,8 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
 
     const closeProjectMutation = useMutation({
         mutationFn: async () => {
-            // Step 1: Delete all punches
-            setDeleteProgress({ phase: 'Deleting punch records...', percent: 20 });
+            // Step 1: Delete all punches (backend handles this quickly with parallel processing)
+            setDeleteProgress({ phase: 'Deleting punch records in parallel batches...', percent: 40 });
             const deleteResult = await base44.functions.invoke('deleteProjectPunches', {
                 project_id: project.id
             });
@@ -24,7 +24,7 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
             }
 
             // Step 2: Update project status to closed
-            setDeleteProgress({ phase: 'Finalizing project...', percent: 80 });
+            setDeleteProgress({ phase: 'Finalizing project...', percent: 90 });
             await base44.entities.Project.update(project.id, {
                 status: 'closed'
             });
