@@ -11,6 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function Dashboard() {
+    const [showAssistant, setShowAssistant] = useState(false);
+    const [conversationId, setConversationId] = useState(null);
+    const [messages, setMessages] = useState([]);
+    const [inputMessage, setInputMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
     const { data: projects = [] } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list('-created_date')
