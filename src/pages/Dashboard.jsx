@@ -143,6 +143,15 @@ export default function Dashboard() {
                 })}
             </div>
 
+            {/* AI Assistant Button */}
+            <Button
+                onClick={handleOpenAssistant}
+                className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-xl bg-indigo-600 hover:bg-indigo-700 z-50"
+                title="Open Attendance Assistant"
+            >
+                <Bot className="w-6 h-6" />
+            </Button>
+
             {/* Recent Projects */}
             <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 rounded-2xl">
                 <CardHeader className="border-b border-slate-100/80 px-8 py-6">
