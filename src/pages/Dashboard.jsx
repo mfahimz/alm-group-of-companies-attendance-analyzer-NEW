@@ -60,6 +60,39 @@ export default function Dashboard() {
 
     const recentProjects = projects.slice(0, 5);
 
+    const handleOpenAssistant = async () => {
+        setShowAssistant(true);
+        if (!conversationId) {
+            const conversation = await base44.agents.createConversation({
+                agent_name: 'attendance_assistant',
+                metadata: { name: 'Dashboard Chat' }
+            });
+            setConversationId(conversation.id);
+            
+            const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
+                setMessages(data.messages || []);
+            });
+        }
+    };
+
+    const handleSendMessage = async () => {
+        if (!inputMessage.trim() || !conversationId) return;
+        
+        setIsLoading(true);
+        try {
+            const conversation = await base44.agents.getConversation(conversationId);
+            await base44.agents.addMessage(conversation, {
+                role: 'user',
+                content: inputMessage
+            });
+            setInputMessage('');
+        } catch (error) {
+            console.error('Error sending message:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <Breadcrumb items={[{ label: 'Dashboard' }]} />
