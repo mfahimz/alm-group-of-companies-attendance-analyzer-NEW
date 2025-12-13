@@ -195,6 +195,84 @@ export default function Dashboard() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* AI Assistant Dialog */}
+            <Dialog open={showAssistant} onOpenChange={setShowAssistant}>
+                <DialogContent className="max-w-2xl h-[600px] flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-4 border-b">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-indigo-100 p-2 rounded-lg">
+                                    <Bot className="w-5 h-5 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <DialogTitle>Attendance Assistant</DialogTitle>
+                                    <p className="text-xs text-slate-500 mt-0.5">Ask about employee attendance, reports, and more</p>
+                                </div>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        {messages.length === 0 ? (
+                            <div className="text-center text-slate-500 mt-8">
+                                <Bot className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                                <p className="text-sm">Ask me anything about attendance data!</p>
+                                <div className="mt-4 space-y-2 text-xs text-slate-400">
+                                    <p>• "Who has the most absences?"</p>
+                                    <p>• "Create an off exception for employee 123"</p>
+                                    <p>• "Show me late patterns"</p>
+                                </div>
+                            </div>
+                        ) : (
+                            messages.map((msg, idx) => (
+                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] rounded-lg p-3 ${
+                                        msg.role === 'user' 
+                                            ? 'bg-indigo-600 text-white' 
+                                            : 'bg-slate-100 text-slate-900'
+                                    }`}>
+                                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                        {isLoading && (
+                            <div className="flex justify-start">
+                                <div className="bg-slate-100 rounded-lg p-3">
+                                    <div className="flex gap-1">
+                                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
+                                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-100" />
+                                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-200" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Input */}
+                    <div className="p-4 border-t">
+                        <div className="flex gap-2">
+                            <Input
+                                value={inputMessage}
+                                onChange={(e) => setInputMessage(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                                placeholder="Type your message..."
+                                disabled={isLoading}
+                                className="flex-1"
+                            />
+                            <Button 
+                                onClick={handleSendMessage} 
+                                disabled={isLoading || !inputMessage.trim()}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                <Send className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
