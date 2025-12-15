@@ -10,6 +10,7 @@ import Diagnostics from './pages/Diagnostics';
 import ReportDetail from './pages/ReportDetail';
 import AstraImport from './pages/AstraImport';
 import RamadanSchedules from './pages/RamadanSchedules';
+import ActivityLogs from './pages/ActivityLogs';
 import __Layout from './Layout.jsx';
 
 
@@ -26,6 +27,7 @@ export const PAGES = {
     "ReportDetail": ReportDetail,
     "AstraImport": AstraImport,
     "RamadanSchedules": RamadanSchedules,
+    "ActivityLogs": ActivityLogs,
 }
 
 export const pagesConfig = {
