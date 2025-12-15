@@ -15,7 +15,23 @@ export default function Layout({ children, currentPageName }) {
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
+        queryFn: async () => {
+            const user = await base44.auth.me();
+            // Log user activity
+            try {
+                await base44.entities.ActivityLog.create({
+                    user_email: user.email,
+                    user_name: user.full_name,
+                    user_role: user.role,
+                    ip_address: 'N/A',
+                    user_agent: navigator.userAgent,
+                    location: 'UAE'
+                });
+            } catch (e) {
+                // Silent fail
+            }
+            return user;
+        }
     });
 
     const { data: permissions = [] } = useQuery({
@@ -58,6 +74,7 @@ export default function Layout({ children, currentPageName }) {
             icon: Settings,
             items: [
                 { name: 'Users & Permissions', path: 'Users', icon: Shield },
+                { name: 'Activity Logs', path: 'ActivityLogs', icon: Activity },
                 { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
                 { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
                 { name: 'Diagnostics', path: 'Diagnostics', icon: Activity },
