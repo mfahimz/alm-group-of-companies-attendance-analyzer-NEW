@@ -32,9 +32,14 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
         mutationFn: async (data) => {
             const newProject = await base44.entities.Project.create({
                 ...data,
+                company: sourceProject.company,
                 department: sourceProject.department,
                 status: 'draft',
-                use_carried_grace_minutes: sourceProject.use_carried_grace_minutes
+                use_carried_grace_minutes: sourceProject.use_carried_grace_minutes,
+                shift_blocks_count: sourceProject.shift_blocks_count,
+                shift_block_ranges: sourceProject.shift_block_ranges,
+                weekly_off_override: sourceProject.weekly_off_override,
+                custom_employee_ids: sourceProject.custom_employee_ids
             });
 
             // Duplicate related entities
