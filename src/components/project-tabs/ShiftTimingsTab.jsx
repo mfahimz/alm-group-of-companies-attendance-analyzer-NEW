@@ -328,15 +328,15 @@ export default function ShiftTimingsTab({ project }) {
     };
 
     const updateBlockRangeMutation = useMutation({
-        mutationFn: async ({ block, newRange }) => {
-            // Find all shifts in this block
+        mutationFn: async ({ block, newRange, oldRange }) => {
+            // Find all shifts in this block - include those matching old date range
             const blockShifts = shifts.filter(s => {
+                // Direct match by shift_block
                 if (s.shift_block === block) return true;
                 
-                // Also include legacy shifts without shift_block that match old date range
-                if (!s.shift_block && s.effective_from && s.effective_to) {
-                    const oldRange = blockDateRanges[block];
-                    if (oldRange && s.effective_from === oldRange.from && s.effective_to === oldRange.to) {
+                // Legacy shifts without shift_block - match by old date range
+                if (!s.shift_block && s.effective_from && s.effective_to && oldRange) {
+                    if (s.effective_from === oldRange.from && s.effective_to === oldRange.to) {
                         return true;
                     }
                 }
@@ -345,20 +345,25 @@ export default function ShiftTimingsTab({ project }) {
             
             // Update all shifts with new date range
             if (blockShifts.length > 0) {
-                await Promise.all(
-                    blockShifts.map(shift => 
-                        base44.entities.ShiftTiming.update(shift.id, {
-                            effective_from: newRange.from,
-                            effective_to: newRange.to,
-                            shift_block: block
-                        })
-                    )
-                );
+                for (const shift of blockShifts) {
+                    await base44.entities.ShiftTiming.update(shift.id, {
+                        effective_from: newRange.from,
+                        effective_to: newRange.to,
+                        shift_block: block
+                    });
+                }
             }
             
             // Save date ranges to project configuration
+            let currentRanges = {};
+            try {
+                currentRanges = project.shift_block_ranges ? JSON.parse(project.shift_block_ranges) : {};
+            } catch (e) {
+                currentRanges = {};
+            }
+            
             const updatedRanges = {
-                ...blockDateRanges,
+                ...currentRanges,
                 [block]: newRange
             };
             
@@ -371,7 +376,7 @@ export default function ShiftTimingsTab({ project }) {
         onSuccess: (shiftCount) => {
             queryClient.invalidateQueries(['shifts', project.id]);
             queryClient.invalidateQueries(['project', project.id]);
-            toast.success(`Date range updated successfully. ${shiftCount} shift${shiftCount !== 1 ? 's' : ''} updated to new date range.`);
+            toast.success(`Date range updated. ${shiftCount} shift${shiftCount !== 1 ? 's' : ''} updated to new date range.`);
             setEditingBlockRange(null);
         },
         onError: (error) => {
@@ -590,7 +595,27 @@ export default function ShiftTimingsTab({ project }) {
                                         />
                                         <Button
                                             size="sm"
-                                            onClick={() => updateBlockRangeMutation.mutate({ block: blockId, newRange: blockDateRanges[blockId] })}
+                                            onClick={() => {
+                                                // Get the old range from the first shift in this block, or from saved config
+                                                let oldRange = null;
+                                                const firstShift = shifts.find(s => s.shift_block === blockId);
+                                                if (firstShift) {
+                                                    oldRange = { from: firstShift.effective_from, to: firstShift.effective_to };
+                                                } else {
+                                                    // Try to get from project config
+                                                    try {
+                                                        const savedRanges = project.shift_block_ranges ? JSON.parse(project.shift_block_ranges) : {};
+                                                        oldRange = savedRanges[blockId] || null;
+                                                    } catch (e) {
+                                                        oldRange = null;
+                                                    }
+                                                }
+                                                updateBlockRangeMutation.mutate({ 
+                                                    block: blockId, 
+                                                    newRange: blockDateRanges[blockId],
+                                                    oldRange: oldRange
+                                                });
+                                            }}
                                             disabled={updateBlockRangeMutation.isPending}
                                         >
                                             Save
