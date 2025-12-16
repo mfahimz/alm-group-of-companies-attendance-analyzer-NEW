@@ -47,6 +47,7 @@ const TYPE_MAP = {
 
 export default function ExceptionsTab({ project }) {
     const [showForm, setShowForm] = useState(false);
+    const [employeeSearch, setEmployeeSearch] = useState('');
     const [formData, setFormData] = useState({
         attendance_id: '',
         date_from: '',
@@ -312,6 +313,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             details: '',
             include_friday: false
         });
+        setEmployeeSearch('');
     };
 
     const handleSubmit = (e) => {
@@ -432,21 +434,36 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             className="bg-slate-50"
                                         />
                                     ) : (
-                                        <Select
-                                            value={formData.attendance_id}
-                                            onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select employee" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {employees.map(emp => (
-                                                    <SelectItem key={emp.id} value={emp.attendance_id}>
-                                                        {emp.attendance_id} - {emp.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <div className="space-y-2">
+                                            <Input
+                                                placeholder="Search by name or ID..."
+                                                value={employeeSearch}
+                                                onChange={(e) => setEmployeeSearch(e.target.value)}
+                                                className="mb-1"
+                                            />
+                                            <Select
+                                                value={formData.attendance_id}
+                                                onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select employee" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {employees
+                                                        .filter(emp => {
+                                                            if (!employeeSearch) return true;
+                                                            const search = employeeSearch.toLowerCase();
+                                                            return emp.name.toLowerCase().includes(search) || 
+                                                                   emp.attendance_id.toLowerCase().includes(search);
+                                                        })
+                                                        .map(emp => (
+                                                            <SelectItem key={emp.id} value={emp.attendance_id}>
+                                                                {emp.attendance_id} - {emp.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     )}
                                 </div>
                                 <div>
