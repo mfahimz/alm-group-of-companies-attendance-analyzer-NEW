@@ -434,21 +434,25 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                             className="bg-slate-50"
                                         />
                                     ) : (
-                                        <div className="space-y-2">
-                                            <Input
-                                                placeholder="Search by name or ID..."
-                                                value={employeeSearch}
-                                                onChange={(e) => setEmployeeSearch(e.target.value)}
-                                                className="mb-1"
-                                            />
-                                            <Select
-                                                value={formData.attendance_id}
-                                                onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select employee" />
-                                                </SelectTrigger>
-                                                <SelectContent>
+                                        <Select
+                                            value={formData.attendance_id}
+                                            onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Search and select employee..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <div className="p-2">
+                                                    <Input
+                                                        placeholder="Type to search..."
+                                                        value={employeeSearch}
+                                                        onChange={(e) => setEmployeeSearch(e.target.value)}
+                                                        className="mb-2"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onKeyDown={(e) => e.stopPropagation()}
+                                                    />
+                                                </div>
+                                                <div className="max-h-[200px] overflow-y-auto">
                                                     {employees
                                                         .filter(emp => {
                                                             if (!employeeSearch) return true;
@@ -461,9 +465,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                                                 {emp.attendance_id} - {emp.name}
                                                             </SelectItem>
                                                         ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                                </div>
+                                            </SelectContent>
+                                        </Select>
                                     )}
                                 </div>
                                 <div>
