@@ -16,6 +16,7 @@ import EditShiftDialog from './EditShiftDialog';
 import TablePagination from '../ui/TablePagination';
 import BulkEditShiftDialog from '../shifts/BulkEditShiftDialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import TimePicker from '../ui/TimePicker';
 
 export default function ShiftTimingsTab({ project }) {
     const [file, setFile] = useState(null);
@@ -902,18 +903,18 @@ export default function ShiftTimingsTab({ project }) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <Label>Punch In *</Label>
-                                        <Input
+                                        <TimePicker
                                             placeholder="8:00 AM"
                                             value={formData.am_start}
-                                            onChange={(e) => setFormData({ ...formData, am_start: e.target.value })}
+                                            onChange={(value) => setFormData({ ...formData, am_start: value })}
                                         />
                                     </div>
                                     <div>
                                         <Label>Punch Out *</Label>
-                                        <Input
+                                        <TimePicker
                                             placeholder="5:00 PM"
                                             value={formData.pm_end}
-                                            onChange={(e) => setFormData({ ...formData, pm_end: e.target.value })}
+                                            onChange={(value) => setFormData({ ...formData, pm_end: value })}
                                         />
                                     </div>
                                 </div>
@@ -921,34 +922,34 @@ export default function ShiftTimingsTab({ project }) {
                                 <div className="grid grid-cols-4 gap-4">
                                     <div>
                                         <Label>AM Start *</Label>
-                                        <Input
+                                        <TimePicker
                                             placeholder="8:00 AM"
                                             value={formData.am_start}
-                                            onChange={(e) => setFormData({ ...formData, am_start: e.target.value })}
+                                            onChange={(value) => setFormData({ ...formData, am_start: value })}
                                         />
                                     </div>
                                     <div>
                                         <Label>AM End</Label>
-                                        <Input
+                                        <TimePicker
                                             placeholder="12:00 PM"
                                             value={formData.am_end}
-                                            onChange={(e) => setFormData({ ...formData, am_end: e.target.value })}
+                                            onChange={(value) => setFormData({ ...formData, am_end: value })}
                                         />
                                     </div>
                                     <div>
                                         <Label>PM Start</Label>
-                                        <Input
+                                        <TimePicker
                                             placeholder="1:00 PM"
                                             value={formData.pm_start}
-                                            onChange={(e) => setFormData({ ...formData, pm_start: e.target.value })}
+                                            onChange={(value) => setFormData({ ...formData, pm_start: value })}
                                         />
                                     </div>
                                     <div>
                                         <Label>PM End *</Label>
-                                        <Input
+                                        <TimePicker
                                             placeholder="5:00 PM"
                                             value={formData.pm_end}
-                                            onChange={(e) => setFormData({ ...formData, pm_end: e.target.value })}
+                                            onChange={(value) => setFormData({ ...formData, pm_end: value })}
                                         />
                                     </div>
                                 </div>
