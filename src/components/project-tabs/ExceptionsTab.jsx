@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import TablePagination from '../ui/TablePagination';
+import TimePicker from '../ui/TimePicker';
 
 // Map user-friendly names to system type codes
 const TYPE_MAP = {
@@ -520,34 +521,34 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                     <div className="grid grid-cols-4 gap-4">
                                         <div>
                                             <Label className="text-xs">AM Start</Label>
-                                            <Input
+                                            <TimePicker
                                                 placeholder="08:00 AM"
                                                 value={formData.new_am_start}
-                                                onChange={(e) => setFormData({ ...formData, new_am_start: e.target.value })}
+                                                onChange={(value) => setFormData({ ...formData, new_am_start: value })}
                                             />
                                         </div>
                                         <div>
                                             <Label className="text-xs">AM End</Label>
-                                            <Input
+                                            <TimePicker
                                                 placeholder="12:00 PM"
                                                 value={formData.new_am_end}
-                                                onChange={(e) => setFormData({ ...formData, new_am_end: e.target.value })}
+                                                onChange={(value) => setFormData({ ...formData, new_am_end: value })}
                                             />
                                         </div>
                                         <div>
                                             <Label className="text-xs">PM Start</Label>
-                                            <Input
+                                            <TimePicker
                                                 placeholder="01:00 PM"
                                                 value={formData.new_pm_start}
-                                                onChange={(e) => setFormData({ ...formData, new_pm_start: e.target.value })}
+                                                onChange={(value) => setFormData({ ...formData, new_pm_start: value })}
                                             />
                                         </div>
                                         <div>
                                             <Label className="text-xs">PM End</Label>
-                                            <Input
+                                            <TimePicker
                                                 placeholder="05:00 PM"
                                                 value={formData.new_pm_end}
-                                                onChange={(e) => setFormData({ ...formData, new_pm_end: e.target.value })}
+                                                onChange={(value) => setFormData({ ...formData, new_pm_end: value })}
                                             />
                                         </div>
                                     </div>

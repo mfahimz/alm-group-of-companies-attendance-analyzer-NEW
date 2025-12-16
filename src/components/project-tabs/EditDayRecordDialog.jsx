@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import TimePicker from '../ui/TimePicker';
 
 export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult }) {
     const [formData, setFormData] = useState({
@@ -541,11 +542,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             <div className="grid grid-cols-2 gap-3 pt-3 border-t">
                                 <div>
                                     <Label className="text-xs">AM Start</Label>
-                                    <Input
+                                    <TimePicker
                                         value={formData.shiftOverride.am_start}
-                                        onChange={(e) => setFormData({
+                                        onChange={(value) => setFormData({
                                             ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, am_start: e.target.value }
+                                            shiftOverride: { ...formData.shiftOverride, am_start: value }
                                         })}
                                         placeholder="8:00 AM"
                                         className="h-8"
@@ -553,11 +554,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                                 </div>
                                 <div>
                                     <Label className="text-xs">AM End</Label>
-                                    <Input
+                                    <TimePicker
                                         value={formData.shiftOverride.am_end}
-                                        onChange={(e) => setFormData({
+                                        onChange={(value) => setFormData({
                                             ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, am_end: e.target.value }
+                                            shiftOverride: { ...formData.shiftOverride, am_end: value }
                                         })}
                                         placeholder="12:00 PM"
                                         className="h-8"
@@ -565,11 +566,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                                 </div>
                                 <div>
                                     <Label className="text-xs">PM Start</Label>
-                                    <Input
+                                    <TimePicker
                                         value={formData.shiftOverride.pm_start}
-                                        onChange={(e) => setFormData({
+                                        onChange={(value) => setFormData({
                                             ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, pm_start: e.target.value }
+                                            shiftOverride: { ...formData.shiftOverride, pm_start: value }
                                         })}
                                         placeholder="1:00 PM"
                                         className="h-8"
@@ -577,11 +578,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                                 </div>
                                 <div>
                                     <Label className="text-xs">PM End</Label>
-                                    <Input
+                                    <TimePicker
                                         value={formData.shiftOverride.pm_end}
-                                        onChange={(e) => setFormData({
+                                        onChange={(value) => setFormData({
                                             ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, pm_end: e.target.value }
+                                            shiftOverride: { ...formData.shiftOverride, pm_end: value }
                                         })}
                                         placeholder="5:00 PM"
                                         className="h-8"
