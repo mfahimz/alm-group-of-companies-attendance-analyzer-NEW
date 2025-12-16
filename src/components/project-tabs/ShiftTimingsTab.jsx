@@ -329,6 +329,33 @@ export default function ShiftTimingsTab({ project }) {
 
     const updateBlockRangeMutation = useMutation({
         mutationFn: async ({ block, newRange }) => {
+            // Find all shifts in this block
+            const blockShifts = shifts.filter(s => {
+                if (s.shift_block === block) return true;
+                
+                // Also include legacy shifts without shift_block that match old date range
+                if (!s.shift_block && s.effective_from && s.effective_to) {
+                    const oldRange = blockDateRanges[block];
+                    if (oldRange && s.effective_from === oldRange.from && s.effective_to === oldRange.to) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            // Update all shifts with new date range
+            if (blockShifts.length > 0) {
+                await Promise.all(
+                    blockShifts.map(shift => 
+                        base44.entities.ShiftTiming.update(shift.id, {
+                            effective_from: newRange.from,
+                            effective_to: newRange.to,
+                            shift_block: block
+                        })
+                    )
+                );
+            }
+            
             // Save date ranges to project configuration
             const updatedRanges = {
                 ...blockDateRanges,
@@ -339,23 +366,12 @@ export default function ShiftTimingsTab({ project }) {
                 shift_block_ranges: JSON.stringify(updatedRanges)
             });
             
-            // Also update existing shifts in this block if any
-            const blockShifts = shifts.filter(s => s.shift_block === block);
-            if (blockShifts.length > 0) {
-                await Promise.all(
-                    blockShifts.map(shift => 
-                        base44.entities.ShiftTiming.update(shift.id, {
-                            effective_from: newRange.from,
-                            effective_to: newRange.to
-                        })
-                    )
-                );
-            }
+            return blockShifts.length;
         },
-        onSuccess: () => {
+        onSuccess: (shiftCount) => {
             queryClient.invalidateQueries(['shifts', project.id]);
             queryClient.invalidateQueries(['project', project.id]);
-            toast.success('Date range saved successfully');
+            toast.success(`Date range updated successfully. ${shiftCount} shift${shiftCount !== 1 ? 's' : ''} updated to new date range.`);
             setEditingBlockRange(null);
         },
         onError: (error) => {
