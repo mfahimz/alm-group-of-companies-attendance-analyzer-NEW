@@ -1,0 +1,241 @@
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
+import TimePicker from '../ui/TimePicker';
+
+export default function EditExceptionDialog({ open, onClose, exception, projectId }) {
+    const [formData, setFormData] = useState({
+        type: '',
+        date_from: '',
+        date_to: '',
+        details: '',
+        new_am_start: '',
+        new_am_end: '',
+        new_pm_start: '',
+        new_pm_end: '',
+        early_checkout_minutes: '',
+        include_friday: false
+    });
+
+    const queryClient = useQueryClient();
+
+    useEffect(() => {
+        if (exception) {
+            setFormData({
+                type: exception.type || '',
+                date_from: exception.date_from || '',
+                date_to: exception.date_to || '',
+                details: exception.details || '',
+                new_am_start: exception.new_am_start || '',
+                new_am_end: exception.new_am_end || '',
+                new_pm_start: exception.new_pm_start || '',
+                new_pm_end: exception.new_pm_end || '',
+                early_checkout_minutes: exception.early_checkout_minutes || '',
+                include_friday: exception.include_friday || false
+            });
+        }
+    }, [exception]);
+
+    const updateMutation = useMutation({
+        mutationFn: (data) => base44.entities.Exception.update(exception.id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['exceptions', projectId]);
+            toast.success('Exception updated successfully');
+            onClose();
+        },
+        onError: () => {
+            toast.error('Failed to update exception');
+        }
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        // Clean up data based on type
+        const cleanedData = {
+            type: formData.type,
+            date_from: formData.date_from,
+            date_to: formData.date_to,
+            details: formData.details || null
+        };
+
+        if (formData.type === 'SHIFT_OVERRIDE') {
+            cleanedData.new_am_start = formData.new_am_start || null;
+            cleanedData.new_am_end = formData.new_am_end || null;
+            cleanedData.new_pm_start = formData.new_pm_start || null;
+            cleanedData.new_pm_end = formData.new_pm_end || null;
+            cleanedData.include_friday = formData.include_friday || false;
+        }
+
+        if (formData.type === 'MANUAL_EARLY_CHECKOUT' && formData.early_checkout_minutes) {
+            cleanedData.early_checkout_minutes = parseInt(formData.early_checkout_minutes);
+        }
+
+        updateMutation.mutate(cleanedData);
+    };
+
+    if (!exception) return null;
+
+    const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
+    const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
+
+    return (
+        <Dialog open={open} onOpenChange={onClose}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Edit Exception</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Employee ID</Label>
+                            <Input 
+                                value={exception.attendance_id === 'ALL' ? 'All Employees' : exception.attendance_id}
+                                disabled
+                                className="bg-slate-50"
+                            />
+                        </div>
+                        <div>
+                            <Label>Exception Type *</Label>
+                            <Select
+                                value={formData.type}
+                                onValueChange={(value) => setFormData({ ...formData, type: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="OFF">Off / Leave</SelectItem>
+                                    <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
+                                    <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
+                                    <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
+                                    <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
+                                    <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+                                    <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
+                                    <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>From Date *</Label>
+                            <Input
+                                type="date"
+                                value={formData.date_from}
+                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label>To Date *</Label>
+                            <Input
+                                type="date"
+                                value={formData.date_to}
+                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    {needsShiftOverride && (
+                        <div className="space-y-4 border-t pt-4">
+                            <Label className="block">Override Shift Times</Label>
+                            <div className="grid grid-cols-4 gap-4">
+                                <div>
+                                    <Label className="text-xs">AM Start</Label>
+                                    <TimePicker
+                                        placeholder="08:00 AM"
+                                        value={formData.new_am_start}
+                                        onChange={(value) => setFormData({ ...formData, new_am_start: value })}
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">AM End</Label>
+                                    <TimePicker
+                                        placeholder="12:00 PM"
+                                        value={formData.new_am_end}
+                                        onChange={(value) => setFormData({ ...formData, new_am_end: value })}
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">PM Start</Label>
+                                    <TimePicker
+                                        placeholder="01:00 PM"
+                                        value={formData.new_pm_start}
+                                        onChange={(value) => setFormData({ ...formData, new_pm_start: value })}
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">PM End</Label>
+                                    <TimePicker
+                                        placeholder="05:00 PM"
+                                        value={formData.new_pm_end}
+                                        onChange={(value) => setFormData({ ...formData, new_pm_end: value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-3 border rounded-lg bg-slate-50">
+                                <Checkbox
+                                    id="include-friday-edit"
+                                    checked={formData.include_friday}
+                                    onCheckedChange={(checked) => setFormData({ ...formData, include_friday: checked })}
+                                />
+                                <Label htmlFor="include-friday-edit" className="cursor-pointer">
+                                    Include Friday in shift override
+                                </Label>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                {formData.include_friday 
+                                    ? 'This override will apply to all days including Friday' 
+                                    : 'This override will apply to all working days except Friday'}
+                            </p>
+                        </div>
+                    )}
+
+                    {needsEarlyCheckoutMinutes && (
+                        <div className="max-w-xs border-t pt-4">
+                            <Label>Early Checkout Minutes *</Label>
+                            <Input
+                                type="number"
+                                placeholder="e.g. 30"
+                                value={formData.early_checkout_minutes}
+                                onChange={(e) => setFormData({ ...formData, early_checkout_minutes: e.target.value })}
+                                min="1"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Minutes to add to early checkout total</p>
+                        </div>
+                    )}
+
+                    <div className="border-t pt-4">
+                        <Label>Details / Reason</Label>
+                        <Input
+                            value={formData.details}
+                            onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                            placeholder="Optional notes"
+                        />
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                        <Button 
+                            type="submit" 
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                            disabled={updateMutation.isPending}
+                        >
+                            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}

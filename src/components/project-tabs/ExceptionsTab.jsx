@@ -13,6 +13,7 @@ import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye } from 'lucide-
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
+import EditExceptionDialog from '../exceptions/EditExceptionDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import TablePagination from '../ui/TablePagination';
 import TimePicker from '../ui/TimePicker';
@@ -70,6 +71,7 @@ export default function ExceptionsTab({ project }) {
     const [selectedExceptions, setSelectedExceptions] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [viewingException, setViewingException] = useState(null);
+    const [editingException, setEditingException] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const queryClient = useQueryClient();
@@ -808,21 +810,11 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        onClick={() => setViewingException(exception)}
-                                                        title="View details"
+                                                        onClick={() => setEditingException(exception)}
+                                                        title="Edit exception"
                                                     >
-                                                        <Eye className="w-4 h-4 text-indigo-600" />
+                                                        <Edit className="w-4 h-4 text-indigo-600" />
                                                     </Button>
-                                                    {editedRows[exception.id] && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => handleSaveRow(exception.id)}
-                                                            disabled={updateMutation.isPending}
-                                                        >
-                                                            <Save className="w-4 h-4 text-green-600" />
-                                                        </Button>
-                                                    )}
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -916,10 +908,10 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        onClick={() => setViewingException(exception)}
-                                                        title="View details"
+                                                        onClick={() => setEditingException(exception)}
+                                                        title="Edit exception"
                                                     >
-                                                        <Eye className="w-4 h-4 text-indigo-600" />
+                                                        <Edit className="w-4 h-4 text-indigo-600" />
                                                     </Button>
                                                     <Button
                                                         size="sm"
@@ -941,6 +933,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                     </CardContent>
                 </Card>
             )}
+
+            {/* Edit Exception Dialog */}
+            <EditExceptionDialog
+                open={!!editingException}
+                onClose={() => setEditingException(null)}
+                exception={editingException}
+                projectId={project.id}
+            />
 
             {/* Bulk Edit Dialog */}
             <BulkEditExceptionDialog
