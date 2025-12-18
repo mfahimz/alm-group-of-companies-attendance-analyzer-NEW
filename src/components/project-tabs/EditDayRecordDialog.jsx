@@ -16,6 +16,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         details: '',
         lateMinutes: 0,
         earlyCheckoutMinutes: 0,
+        otherMinutes: 0,
         isAbnormal: false,
         shiftOverride: {
             enabled: false,
@@ -184,6 +185,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     details: existingOverride.details || '',
                     lateMinutes: existingOverride.lateMinutes || 0,
                     earlyCheckoutMinutes: existingOverride.earlyCheckoutMinutes || 0,
+                    otherMinutes: existingOverride.otherMinutes || 0,
                     isAbnormal: existingOverride.isAbnormal || false,
                     shiftOverride: {
                         enabled: !!existingOverride.shiftOverride,
@@ -233,6 +235,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     details: '',
                     lateMinutes: lateMinutes,
                     earlyCheckoutMinutes: earlyCheckoutMinutes,
+                    otherMinutes: 0,
                     isAbnormal: dayRecord.abnormal || false,
                     shiftOverride: {
                         enabled: false,
@@ -324,9 +327,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 details: data.details,
                 lateMinutes: data.lateMinutes,
                 earlyCheckoutMinutes: data.earlyCheckoutMinutes,
+                otherMinutes: data.otherMinutes,
                 isAbnormal: data.isAbnormal,
                 originalLateMinutes: existingOverride?.originalLateMinutes ?? data.originalLateMinutes,
                 originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? data.originalEarlyCheckout,
+                originalOtherMinutes: existingOverride?.originalOtherMinutes ?? data.originalOtherMinutes,
                 shiftOverride: data.shiftOverride?.enabled ? {
                     am_start: data.shiftOverride.am_start,
                     am_end: data.shiftOverride.am_end,
@@ -393,6 +398,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         // Parse original values from dayRecord (only if not already edited)
         let originalLateMinutes = existingOverride?.originalLateMinutes;
         let originalEarlyCheckout = existingOverride?.originalEarlyCheckout;
+        let originalOtherMinutes = existingOverride?.originalOtherMinutes;
         
         // If no existing override, calculate from display values
         if (originalLateMinutes === undefined) {
@@ -403,6 +409,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     originalLateMinutes = parseInt(matches[0]) || 0;
                 }
             }
+        }
+        
+        if (originalOtherMinutes === undefined) {
+            originalOtherMinutes = 0;
         }
         
         if (originalEarlyCheckout === undefined) {
@@ -418,7 +428,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         updateDayMutation.mutate({
             ...formData,
             originalLateMinutes,
-            originalEarlyCheckout
+            originalEarlyCheckout,
+            originalOtherMinutes
         });
     };
 
@@ -501,6 +512,22 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         />
                         <p className="text-xs text-slate-500 mt-1">
                             {formData.shiftOverride.enabled ? 'Auto-calculated from shift override' : 'Combined AM + PM early checkout minutes'}
+                        </p>
+                    </div>
+
+                    {/* Other Minutes */}
+                    <div>
+                        <Label htmlFor="otherMinutes">Other Minutes</Label>
+                        <Input
+                            id="otherMinutes"
+                            type="number"
+                            min="0"
+                            value={formData.otherMinutes}
+                            onChange={(e) => setFormData({ ...formData, otherMinutes: parseInt(e.target.value) || 0 })}
+                            placeholder="0"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                            Manually add other late/early minutes not captured by regular calculations.
                         </p>
                     </div>
 
