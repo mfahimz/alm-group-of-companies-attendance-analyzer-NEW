@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -259,6 +260,7 @@ export default function ReportDetailView({ reportRun, project }) {
 
         let totalLateMinutes = 0;
         let totalEarlyCheckout = 0;
+        let totalOtherMinutes = 0; // Added for 'Other Minutes'
         let workingDays = 0;
         let presentDays = 0;
         let fullAbsenceCount = 0;
@@ -377,6 +379,10 @@ export default function ReportDetailView({ reportRun, project }) {
                     if (dayOverride.earlyCheckoutMinutes !== undefined) {
                         totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
                     }
+                    // Added for otherMinutes
+                    if (dayOverride.otherMinutes !== undefined) {
+                        totalOtherMinutes += dayOverride.otherMinutes;
+                    }
                     continue;
                 }
             }
@@ -461,13 +467,14 @@ export default function ReportDetailView({ reportRun, project }) {
         return { 
             totalLateMinutes, 
             totalEarlyCheckout, 
+            totalOtherMinutes, // Included in return object
             workingDays, 
             presentDays, 
             fullAbsenceCount, 
             halfAbsenceCount, 
             sickLeaveCount 
         };
-        };
+    };
 
     const enrichedResults = React.useMemo(() => {
         return results.map(result => {
@@ -485,6 +492,7 @@ export default function ReportDetailView({ reportRun, project }) {
                     sick_leave_count: result.sick_leave_count || 0,
                     late_minutes: result.late_minutes || 0,
                     early_checkout_minutes: result.early_checkout_minutes || 0,
+                    other_minutes: result.other_minutes || 0, // Added
                     isVerified: verifiedEmployees.includes(result.attendance_id)
                 };
             }
@@ -493,6 +501,7 @@ export default function ReportDetailView({ reportRun, project }) {
             const { 
                 totalLateMinutes, 
                 totalEarlyCheckout, 
+                totalOtherMinutes, // Destructured
                 workingDays, 
                 presentDays, 
                 fullAbsenceCount, 
@@ -510,6 +519,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 sick_leave_count: sickLeaveCount,
                 late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout),
+                other_minutes: Math.max(0, totalOtherMinutes), // Added
                 isVerified: verifiedEmployees.includes(result.attendance_id)
             };
         });
@@ -576,7 +586,8 @@ export default function ReportDetailView({ reportRun, project }) {
 
                 const datesByType = {};
                 Object.entries(dayOverrides).forEach(([dateStr, override]) => {
-                    const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
+                    // Added otherMinutes to the key for uniqueness
+                    const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
                     if (!datesByType[key]) {
                         datesByType[key] = { dates: [], data: override, attendance_id: result.attendance_id };
                     }
@@ -618,8 +629,18 @@ export default function ReportDetailView({ reportRun, project }) {
 
                         if (group.data.lateMinutes && group.data.type === 'MANUAL_EARLY_CHECKOUT') {
                             exceptionData.early_checkout_minutes = group.data.lateMinutes + (group.data.earlyCheckoutMinutes || 0);
-                        } else if (group.data.earlyCheckoutMinutes && group.data.type === 'MANUAL_EARLY_CHECKOUT') {
+                        } else if (group.data.earlyCheckoutMinutes) {
                             exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
+                        }
+
+                        // Added for otherMinutes
+                        if (group.data.otherMinutes && group.data.otherMinutes > 0) {
+                            exceptionData.other_minutes = group.data.otherMinutes;
+                            if (!exceptionData.details) {
+                                exceptionData.details = `Added ${group.data.otherMinutes} other minutes`;
+                            } else {
+                                exceptionData.details += ` | +${group.data.otherMinutes} other min`;
+                            }
                         }
 
                         if (group.data.shiftOverride) {
@@ -674,7 +695,8 @@ export default function ReportDetailView({ reportRun, project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'LOP Days', 'Sick Leave', 'Late Minutes', 'Early Checkout Minutes', 'Verified', 'Notes'];
+        // Added 'Other Minutes' to headers
+        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'LOP Days', 'Sick Leave', 'Late Minutes', 'Early Checkout Minutes', 'Other Minutes', 'Verified', 'Notes'];
         const rows = filteredResults.map(r => [
             r.attendance_id,
             r.name,
@@ -684,6 +706,7 @@ export default function ReportDetailView({ reportRun, project }) {
             r.sick_leave_count || 0,
             r.late_minutes,
             r.early_checkout_minutes || 0,
+            r.other_minutes || 0, // Added
             r.isVerified ? 'Yes' : 'No',
             r.notes || ''
         ]);
@@ -901,6 +924,7 @@ export default function ReportDetailView({ reportRun, project }) {
             }
             
             const dayOverride = dayOverrides[dateStr];
+            let currentOtherMinutes = 0; // Initialize other minutes for the day
             if (dayOverride) {
                 if (dayOverride.shiftOverride) {
                     shift = {
@@ -962,6 +986,10 @@ export default function ReportDetailView({ reportRun, project }) {
                 if (dayOverride.earlyCheckoutMinutes !== undefined) {
                     earlyCheckoutInfo = dayOverride.earlyCheckoutMinutes > 0 ? `${dayOverride.earlyCheckoutMinutes} min (edited)` : '-';
                 }
+                // Added for otherMinutes
+                if (dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes > 0) {
+                    currentOtherMinutes = dayOverride.otherMinutes;
+                }
                 if (dayOverride.isAbnormal !== undefined) {
                     isAbnormal = dayOverride.isAbnormal;
                 }
@@ -986,6 +1014,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 lateInfo: lateInfo || '-',
                 lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
+                otherMinutes: currentOtherMinutes, // Included in breakdown object
                 hasOverride: !!dayOverride,
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
@@ -1015,7 +1044,6 @@ export default function ReportDetailView({ reportRun, project }) {
 
     return (
         <div className="space-y-6">
-            {/* Save Progress */}
             {saveProgress && (
                 <Card className="border-0 shadow-sm bg-green-50 border-green-200">
                     <CardContent className="p-4">
@@ -1037,7 +1065,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 </Card>
             )}
 
-            {/* Report Info & Actions */}
             <Card className="border-0 shadow-sm">
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -1077,7 +1104,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 </CardContent>
             </Card>
 
-            {/* Search */}
             <Card className="border-0 shadow-sm">
                 <CardContent className="p-4">
                     <div className="relative max-w-md">
@@ -1092,7 +1118,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 </CardContent>
             </Card>
 
-            {/* Results Table */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <CardTitle>Attendance Report</CardTitle>
@@ -1126,6 +1151,9 @@ export default function ReportDetailView({ reportRun, project }) {
                                     </SortableTableHead>
                                     <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
                                         Early Checkout
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}> {/* Added */}
+                                        Other Minutes
                                     </SortableTableHead>
                                     <TableHead>Grace</TableHead>
                                     <TableHead>Deductible</TableHead>
@@ -1166,6 +1194,11 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 {result.early_checkout_minutes || 0}
                                             </span>
                                         </TableCell>
+                                        <TableCell> {/* Added */}
+                                            <span className={`${result.other_minutes > 0 ? 'text-purple-600 font-medium' : ''}`}>
+                                                {result.other_minutes || 0}
+                                            </span>
+                                        </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2 group">
                                                 <span>{result.grace_minutes ?? 15}</span>
@@ -1181,7 +1214,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                         </TableCell>
                                         <TableCell>
                                             {(() => {
-                                                const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                                                const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0) + (result.other_minutes || 0); // Included other_minutes
                                                 const grace = result.grace_minutes ?? 15;
                                                 const deductible = Math.max(0, total - grace);
                                                 return (
@@ -1221,7 +1254,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 </CardContent>
             </Card>
 
-            {/* Daily Breakdown Dialog */}
             <Dialog open={showBreakdown} onOpenChange={setShowBreakdown}>
                 <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
@@ -1241,6 +1273,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <TableHead>Status</TableHead>
                                     <TableHead>Late Min</TableHead>
                                     <TableHead>Early Min</TableHead>
+                                    <TableHead>Other Min</TableHead> {/* Added */}
                                     <TableHead>Abnormal</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -1318,6 +1351,13 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 <span className="text-slate-400">-</span>
                                             )}
                                         </TableCell>
+                                        <TableCell className="text-xs"> {/* Added */}
+                                            {day.otherMinutes > 0 ? (
+                                                <span className="text-purple-600 font-medium">{day.otherMinutes} min</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </TableCell>
                                         <TableCell>
                                             {day.abnormal && (
                                                 <span className="text-amber-600 font-medium">Yes</span>
@@ -1340,7 +1380,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 </DialogContent>
             </Dialog>
 
-            {/* Edit Day Record Dialog */}
             <EditDayRecordDialog
                 open={!!editingDay}
                 onClose={() => setEditingDay(null)}
@@ -1380,7 +1419,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 </DialogContent>
             </Dialog>
 
-            {/* Save Confirmation Dialog */}
             <Dialog open={showSaveConfirmation} onOpenChange={setShowSaveConfirmation}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>

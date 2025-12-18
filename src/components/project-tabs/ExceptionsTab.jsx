@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -61,7 +62,8 @@ export default function ExceptionsTab({ project }) {
         new_pm_end: '',
         early_checkout_minutes: '',
         details: '',
-        include_friday: false
+        include_friday: false,
+        other_minutes: '' // Added other_minutes to formData
     });
     const [filter, setFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
@@ -246,7 +248,8 @@ export default function ExceptionsTab({ project }) {
                         new_am_end: row.new_am_end || row.am_end || '',
                         new_pm_start: row.new_pm_start || row.pm_start || '',
                         new_pm_end: row.new_pm_end || row.pm_end || '',
-                        early_checkout_minutes: row.early_checkout_minutes ? parseInt(row.early_checkout_minutes) : null
+                        early_checkout_minutes: row.early_checkout_minutes ? parseInt(row.early_checkout_minutes) : null,
+                        other_minutes: row.other_minutes ? parseInt(row.other_minutes) : null // Added other_minutes
                     });
                 });
 
@@ -286,12 +289,12 @@ export default function ExceptionsTab({ project }) {
     };
 
     const downloadTemplate = () => {
-        const template = `attendance_id,name,date_from,date_to,type,details
-544,John Smith,2025-11-10,2025-11-10,Off,Annual leave
-ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
-322,Jane Doe,2025-11-12,2025-11-14,Sick Leave,Medical certificate
-123,Bob Johnson,2025-11-20,2025-11-20,Present,Worked from home
-456,Alice Brown,2025-11-21,2025-11-21,Half Day,Left early`;
+        const template = `attendance_id,name,date_from,date_to,type,details,other_minutes
+544,John Smith,2025-11-10,2025-11-10,Off,Annual leave,0
+ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
+322,Jane Doe,2025-11-12,2025-11-14,Sick Leave,Medical certificate,0
+123,Bob Johnson,2025-11-20,2025-11-20,Present,Worked from home,0
+456,Alice Brown,2025-11-21,2025-11-21,Half Day,Left early,0`;
         
         const blob = new Blob([template], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -314,7 +317,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
             new_pm_end: '',
             early_checkout_minutes: '',
             details: '',
-            include_friday: false
+            include_friday: false,
+            other_minutes: '' // Added other_minutes
         });
         setEmployeeSearch('');
     };
@@ -358,6 +362,13 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
         
         if (submitData.type === 'MANUAL_EARLY_CHECKOUT' && submitData.early_checkout_minutes) {
             cleanedData.early_checkout_minutes = parseInt(submitData.early_checkout_minutes);
+        }
+
+        // Added other_minutes to cleanedData
+        if (submitData.other_minutes && !isNaN(parseInt(submitData.other_minutes))) {
+            cleanedData.other_minutes = parseInt(submitData.other_minutes);
+        } else {
+            cleanedData.other_minutes = null;
         }
         
         createMutation.mutate(cleanedData);
@@ -1038,6 +1049,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                                 </div>
                             )}
 
+                            {/* Added display for other_minutes */}
+                            {viewingException.other_minutes && (
+                                <div className="border-t pt-4">
+                                    <Label className="text-slate-500 text-xs">Other Minutes</Label>
+                                    <p className="font-medium text-slate-900">{viewingException.other_minutes} minutes</p>
+                                </div>
+                            )}
+
                             {viewingException.details && (
                                 <div className="border-t pt-4">
                                     <Label className="text-slate-500 text-xs">Details / Reason</Label>
@@ -1074,6 +1093,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day
                     </div>
                 </DialogContent>
             </Dialog>
-            </div>
-            );
-            }
+        </div>
+    );
+}
