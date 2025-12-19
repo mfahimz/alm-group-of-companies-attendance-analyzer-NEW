@@ -416,12 +416,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
-            // Track allowed minutes from ALLOWED_MINUTES exception (calculateEmployeeTotals)
-            let allowedMinutesForDay = 0;
-            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
-                allowedMinutesForDay = dateException.allowed_minutes || 0;
-            }
-
             // Count based on actual attendance (if no override handled it)
             if (!dayOverride) {
                 if (dateException) {
