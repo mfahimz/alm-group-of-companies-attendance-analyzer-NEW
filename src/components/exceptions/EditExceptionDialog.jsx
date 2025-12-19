@@ -21,6 +21,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
         new_pm_start: '',
         new_pm_end: '',
         early_checkout_minutes: '',
+        allowed_minutes: '',
         include_friday: false
     });
 
@@ -38,6 +39,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 new_pm_start: exception.new_pm_start || '',
                 new_pm_end: exception.new_pm_end || '',
                 early_checkout_minutes: exception.early_checkout_minutes || '',
+                allowed_minutes: exception.allowed_minutes || '',
                 include_friday: exception.include_friday || false
             });
         }
@@ -78,6 +80,10 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.early_checkout_minutes = parseInt(formData.early_checkout_minutes);
         }
 
+        if (formData.type === 'ALLOWED_MINUTES' && formData.allowed_minutes) {
+            cleanedData.allowed_minutes = parseInt(formData.allowed_minutes);
+        }
+
         updateMutation.mutate(cleanedData);
     };
 
@@ -85,6 +91,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
 
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
+    const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
@@ -211,6 +218,20 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                 min="1"
                             />
                             <p className="text-xs text-slate-500 mt-1">Minutes to add to early checkout total</p>
+                        </div>
+                    )}
+
+                    {needsAllowedMinutes && (
+                        <div className="max-w-xs border-t pt-4">
+                            <Label>Allowed Minutes *</Label>
+                            <Input
+                                type="number"
+                                placeholder="e.g. 60"
+                                value={formData.allowed_minutes}
+                                onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
+                                min="1"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Minutes to excuse for late/early</p>
                         </div>
                     )}
 
