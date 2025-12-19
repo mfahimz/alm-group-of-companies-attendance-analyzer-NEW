@@ -120,7 +120,8 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                     <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                     <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                </SelectContent>
+                                    <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
+                                    </SelectContent>
                             </Select>
                         </div>
                     </div>
