@@ -299,11 +299,16 @@ export default function ReportDetailView({ reportRun, project }) {
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
 
-            const dateException = employeeExceptions.find(ex => {
+            // Find all matching exceptions and get the latest one by created_date (calculateEmployeeTotals)
+            const matchingExceptionsCalc = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
                 return currentDate >= exFrom && currentDate <= exTo;
             });
+            
+            const dateException = matchingExceptionsCalc.length > 0
+                ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                : null;
 
             const isShiftEffective = (s) => {
                 if (!s.effective_from || !s.effective_to) return true;
@@ -410,6 +415,12 @@ export default function ReportDetailView({ reportRun, project }) {
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
+
+            // Track allowed minutes from ALLOWED_MINUTES exception (calculateEmployeeTotals)
+            let allowedMinutesForDay = 0;
+            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
+                allowedMinutesForDay = dateException.allowed_minutes || 0;
+            }
 
             // Count based on actual attendance (if no override handled it)
             if (!dayOverride) {
