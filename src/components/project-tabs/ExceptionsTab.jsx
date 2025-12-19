@@ -63,6 +63,7 @@ export default function ExceptionsTab({ project }) {
         new_pm_end: '',
         early_checkout_minutes: '',
         allowed_minutes: '',
+        allowed_minutes_type: 'both',
         details: '',
         include_friday: false,
         other_minutes: '' // Added other_minutes to formData
@@ -328,11 +329,16 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
-        // For PUBLIC_HOLIDAY, attendance_id is not required
-        if (formData.type !== 'PUBLIC_HOLIDAY' && !formData.attendance_id) {
+
+        // For PUBLIC_HOLIDAY and ALLOWED_MINUTES (when set to ALL), attendance_id can be ALL
+        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && !formData.attendance_id) {
             toast.error('Please select an employee');
             return;
+        }
+
+        // For ALLOWED_MINUTES, default to ALL if not selected
+        if (formData.type === 'ALLOWED_MINUTES' && !formData.attendance_id) {
+            formData.attendance_id = 'ALL';
         }
         
         if (formData.type !== 'SINGLE_SHIFT' && (!formData.date_from || !formData.date_to)) {
@@ -373,7 +379,13 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         } else {
             cleanedData.other_minutes = null;
         }
-        
+
+        // Add allowed_minutes and allowed_minutes_type
+        if (submitData.type === 'ALLOWED_MINUTES' && submitData.allowed_minutes) {
+            cleanedData.allowed_minutes = parseInt(submitData.allowed_minutes);
+            cleanedData.allowed_minutes_type = submitData.allowed_minutes_type || 'both';
+        }
+
         createMutation.mutate(cleanedData);
     };
 
@@ -444,13 +456,49 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && '*'}</Label>
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && '*'}</Label>
                                     {formData.type === 'PUBLIC_HOLIDAY' ? (
                                         <Input 
                                             value="All Employees" 
                                             disabled 
                                             className="bg-slate-50"
                                         />
+                                    ) : formData.type === 'ALLOWED_MINUTES' ? (
+                                        <Select
+                                            value={formData.attendance_id || 'ALL'}
+                                            onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select employee or all..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">All Employees</SelectItem>
+                                                <div className="p-2 border-t">
+                                                    <Input
+                                                        placeholder="Type to search..."
+                                                        value={employeeSearch}
+                                                        onChange={(e) => setEmployeeSearch(e.target.value)}
+                                                        className="mb-2"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onKeyDown={(e) => e.stopPropagation()}
+                                                    />
+                                                </div>
+                                                <div className="max-h-[200px] overflow-y-auto">
+                                                    {employees
+                                                        .filter(emp => {
+                                                            if (!employeeSearch) return true;
+                                                            const search = employeeSearch.toLowerCase();
+                                                            return emp.name.toLowerCase().includes(search) || 
+                                                                   emp.attendance_id.toLowerCase().includes(search);
+                                                        })
+                                                        .map(emp => (
+                                                            <SelectItem key={emp.id} value={emp.attendance_id}>
+                                                                {emp.attendance_id} - {emp.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                </div>
+                                            </SelectContent>
+                                        </Select>
                                     ) : (
                                         <Select
                                             value={formData.attendance_id}
@@ -603,16 +651,36 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             )}
 
                             {needsAllowedMinutes && (
-                                <div className="max-w-xs">
-                                    <Label>Allowed Minutes *</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="e.g. 60"
-                                        value={formData.allowed_minutes}
-                                        onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
-                                        min="1"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-1">Minutes to excuse for late/early due to natural calamity or personal reasons</p>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label>Allowed Minutes *</Label>
+                                            <Input
+                                                type="number"
+                                                placeholder="e.g. 60"
+                                                value={formData.allowed_minutes}
+                                                onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
+                                                min="1"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Apply To *</Label>
+                                            <Select
+                                                value={formData.allowed_minutes_type}
+                                                onValueChange={(value) => setFormData({ ...formData, allowed_minutes_type: value })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="late">Late Arrivals Only</SelectItem>
+                                                    <SelectItem value="early">Early Checkouts Only</SelectItem>
+                                                    <SelectItem value="both">Both Late & Early</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-500">Minutes to excuse due to natural calamity or personal reasons</p>
                                 </div>
                             )}
 

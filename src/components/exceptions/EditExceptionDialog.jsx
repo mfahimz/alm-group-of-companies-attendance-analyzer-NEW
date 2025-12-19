@@ -22,6 +22,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
         new_pm_end: '',
         early_checkout_minutes: '',
         allowed_minutes: '',
+        allowed_minutes_type: 'both',
         include_friday: false
     });
 
@@ -40,6 +41,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 new_pm_end: exception.new_pm_end || '',
                 early_checkout_minutes: exception.early_checkout_minutes || '',
                 allowed_minutes: exception.allowed_minutes || '',
+                allowed_minutes_type: exception.allowed_minutes_type || 'both',
                 include_friday: exception.include_friday || false
             });
         }
@@ -82,6 +84,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
 
         if (formData.type === 'ALLOWED_MINUTES' && formData.allowed_minutes) {
             cleanedData.allowed_minutes = parseInt(formData.allowed_minutes);
+            cleanedData.allowed_minutes_type = formData.allowed_minutes_type || 'both';
         }
 
         updateMutation.mutate(cleanedData);
@@ -222,16 +225,36 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                     )}
 
                     {needsAllowedMinutes && (
-                        <div className="max-w-xs border-t pt-4">
-                            <Label>Allowed Minutes *</Label>
-                            <Input
-                                type="number"
-                                placeholder="e.g. 60"
-                                value={formData.allowed_minutes}
-                                onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
-                                min="1"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Minutes to excuse for late/early</p>
+                        <div className="border-t pt-4 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Allowed Minutes *</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="e.g. 60"
+                                        value={formData.allowed_minutes}
+                                        onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
+                                        min="1"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Apply To *</Label>
+                                    <Select
+                                        value={formData.allowed_minutes_type}
+                                        onValueChange={(value) => setFormData({ ...formData, allowed_minutes_type: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="late">Late Arrivals Only</SelectItem>
+                                            <SelectItem value="early">Early Checkouts Only</SelectItem>
+                                            <SelectItem value="both">Both Late & Early</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-500">Minutes to excuse due to natural calamity or personal reasons</p>
                         </div>
                     )}
 
