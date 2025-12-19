@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -45,7 +44,9 @@ const TYPE_MAP = {
     'manual_absent': 'MANUAL_ABSENT',
     'manual_half': 'MANUAL_HALF',
     'manual_early_checkout': 'MANUAL_EARLY_CHECKOUT',
-    'sick_leave': 'SICK_LEAVE'
+    'sick_leave': 'SICK_LEAVE',
+    'allowed minutes': 'ALLOWED_MINUTES',
+    'allowed_minutes': 'ALLOWED_MINUTES'
 };
 
 export default function ExceptionsTab({ project }) {
@@ -61,6 +62,7 @@ export default function ExceptionsTab({ project }) {
         new_pm_start: '',
         new_pm_end: '',
         early_checkout_minutes: '',
+        allowed_minutes: '',
         details: '',
         include_friday: false,
         other_minutes: '' // Added other_minutes to formData
@@ -249,7 +251,8 @@ export default function ExceptionsTab({ project }) {
                         new_pm_start: row.new_pm_start || row.pm_start || '',
                         new_pm_end: row.new_pm_end || row.pm_end || '',
                         early_checkout_minutes: row.early_checkout_minutes ? parseInt(row.early_checkout_minutes) : null,
-                        other_minutes: row.other_minutes ? parseInt(row.other_minutes) : null // Added other_minutes
+                        other_minutes: row.other_minutes ? parseInt(row.other_minutes) : null,
+                        allowed_minutes: row.allowed_minutes ? parseInt(row.allowed_minutes) : null // Added other_minutes
                     });
                 });
 
@@ -400,6 +403,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
+    const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
 
     const paginatedExceptions = filteredExceptions.slice(
         (currentPage - 1) * rowsPerPage,
@@ -502,6 +506,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                             <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                            <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -594,6 +599,20 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                         min="1"
                                     />
                                     <p className="text-xs text-slate-500 mt-1">Minutes to add to early checkout total</p>
+                                </div>
+                            )}
+
+                            {needsAllowedMinutes && (
+                                <div className="max-w-xs">
+                                    <Label>Allowed Minutes *</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="e.g. 60"
+                                        value={formData.allowed_minutes}
+                                        onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
+                                        min="1"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">Minutes to excuse for late/early due to natural calamity or personal reasons</p>
                                 </div>
                             )}
 
@@ -705,6 +724,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                 <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                 <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
                             </SelectContent>
                         </Select>
                         </div>
@@ -789,7 +809,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                         <SelectItem value="MANUAL_HALF">Half Day</SelectItem>
                                                         <SelectItem value="MANUAL_EARLY_CHECKOUT">Early Checkout</SelectItem>
                                                         <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                                    </SelectContent>
+                                                        <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
+                                                        </SelectContent>
                                                 </Select>
                                             </TableCell>
                                             <TableCell className="p-1">
@@ -1054,6 +1075,13 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <div className="border-t pt-4">
                                     <Label className="text-slate-500 text-xs">Other Minutes</Label>
                                     <p className="font-medium text-slate-900">{viewingException.other_minutes} minutes</p>
+                                </div>
+                            )}
+
+                            {viewingException.allowed_minutes && (
+                                <div className="border-t pt-4">
+                                    <Label className="text-slate-500 text-xs">Allowed Minutes (Excused)</Label>
+                                    <p className="font-medium text-slate-900">{viewingException.allowed_minutes} minutes</p>
                                 </div>
                             )}
 

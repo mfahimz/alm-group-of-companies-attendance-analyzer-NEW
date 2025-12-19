@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -441,6 +440,9 @@ export default function ReportDetailView({ reportRun, project }) {
             
             // Calculate times from punches (either with original or overridden shift)
             if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+                
                 for (const match of punchMatchesTotals) {
                     if (!match.matchedTo) continue;
                     
@@ -450,17 +452,33 @@ export default function ReportDetailView({ reportRun, project }) {
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                         if (punchTime > shiftTime) {
                             const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
-                            totalLateMinutes += minutes;
+                            dayLateMinutes += minutes;
                         }
                     }
                     
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                         if (punchTime < shiftTime) {
                             const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
-                            totalEarlyCheckout += minutes;
+                            dayEarlyMinutes += minutes;
                         }
                     }
                 }
+                
+                // Apply allowed minutes - subtract from late/early
+                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
+                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
+                    // Proportionally reduce late and early
+                    if (totalDayMinutes > 0) {
+                        const lateRatio = dayLateMinutes / totalDayMinutes;
+                        const earlyRatio = dayEarlyMinutes / totalDayMinutes;
+                        dayLateMinutes = Math.round(remaining * lateRatio);
+                        dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                    }
+                }
+                
+                totalLateMinutes += dayLateMinutes;
+                totalEarlyCheckout += dayEarlyMinutes;
             }
         }
 
@@ -865,7 +883,16 @@ export default function ReportDetailView({ reportRun, project }) {
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
+            // Track allowed minutes from ALLOWED_MINUTES exception
+            let allowedMinutesForDay = 0;
+            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
+                allowedMinutesForDay = dateException.allowed_minutes || 0;
+            }
+
             if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+                
                 for (const match of punchMatches) {
                     if (!match.matchedTo) continue;
                     
@@ -875,7 +902,7 @@ export default function ReportDetailView({ reportRun, project }) {
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                         if (punchTime > shiftTime) {
                             const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
-                            lateMinutesTotal += minutes;
+                            dayLateMinutes += minutes;
                             const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
                             if (lateInfo) lateInfo += ' | ';
                             lateInfo += `${label}: ${minutes} min late`;
@@ -885,6 +912,7 @@ export default function ReportDetailView({ reportRun, project }) {
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                         if (punchTime < shiftTime) {
                             const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                            dayEarlyMinutes += minutes;
                             if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
                                 earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
                             } else {
@@ -892,6 +920,34 @@ export default function ReportDetailView({ reportRun, project }) {
                             }
                         }
                     }
+                }
+                
+                // Apply allowed minutes - subtract from late/early
+                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
+                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
+                    // Proportionally reduce late and early
+                    if (totalDayMinutes > 0) {
+                        const lateRatio = dayLateMinutes / totalDayMinutes;
+                        const earlyRatio = dayEarlyMinutes / totalDayMinutes;
+                        const adjustedLate = Math.round(remaining * lateRatio);
+                        const adjustedEarly = Math.round(remaining * earlyRatio);
+                        
+                        lateMinutesTotal = adjustedLate;
+                        if (adjustedLate > 0) {
+                            lateInfo = `${adjustedLate} min (after ${allowedMinutesForDay} allowed)`;
+                        } else {
+                            lateInfo = '-';
+                        }
+                        
+                        if (adjustedEarly > 0) {
+                            earlyCheckoutInfo = `${adjustedEarly} min (after ${allowedMinutesForDay} allowed)`;
+                        } else {
+                            earlyCheckoutInfo = '-';
+                        }
+                    }
+                } else {
+                    lateMinutesTotal = dayLateMinutes;
                 }
             }
 
