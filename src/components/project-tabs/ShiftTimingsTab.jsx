@@ -17,7 +17,6 @@ import TablePagination from '../ui/TablePagination';
 import BulkEditShiftDialog from '../shifts/BulkEditShiftDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import TimePicker from '../ui/TimePicker';
-import EmployeeShiftCalendar from '../shifts/EmployeeShiftCalendar';
 
 export default function ShiftTimingsTab({ project }) {
     const [file, setFile] = useState(null);
@@ -41,7 +40,6 @@ export default function ShiftTimingsTab({ project }) {
     const [selectedShifts, setSelectedShifts] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
-    const [viewingEmployee, setViewingEmployee] = useState(null);
     const [formData, setFormData] = useState({
         attendance_id: '',
         am_start: '',
@@ -537,49 +535,20 @@ export default function ShiftTimingsTab({ project }) {
     const renderShiftBlock = (blockId, blockShifts, blockLabel) => {
         const blockRange = blockDateRanges[blockId];
         
-        // Group shifts by employee
-        const employeeShiftMap = new Map();
-        blockShifts.forEach(shift => {
-            if (!employeeShiftMap.has(shift.attendance_id)) {
-                employeeShiftMap.set(shift.attendance_id, []);
-            }
-            employeeShiftMap.get(shift.attendance_id).push(shift);
-        });
-
-        // Convert to array and add employee info
-        const employeeShiftRecords = Array.from(employeeShiftMap.entries()).map(([attendance_id, shifts]) => {
-            const employee = employees.find(e => e.attendance_id === attendance_id);
-            const generalShift = shifts.find(s => !s.date);
-            const fridayShift = shifts.find(s => s.is_friday_shift && !s.date);
-            const specificDateShifts = shifts.filter(s => s.date);
-            
-            return {
-                attendance_id,
-                employee,
-                shifts,
-                generalShift,
-                fridayShift,
-                specificDateShifts,
-                totalShifts: shifts.length
-            };
-        });
-        
-        const filteredRecords = employeeShiftRecords
-            .filter(record => {
+        const filteredShifts = blockShifts
+            .filter(shift => {
+                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
                 const matchesSearch = !searchTerm || 
-                    record.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    record.employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
-                const matchesDept = departmentFilter === 'all' || record.employee?.department === departmentFilter;
+                    shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesDept = departmentFilter === 'all' || employee?.department === departmentFilter;
                 return matchesSearch && matchesDept;
             })
             .sort((a, b) => {
                 let aVal, bVal;
                 if (sort.key === 'name') {
-                    aVal = a.employee?.name || '';
-                    bVal = b.employee?.name || '';
-                } else if (sort.key === 'attendance_id') {
-                    aVal = a.attendance_id;
-                    bVal = b.attendance_id;
+                    aVal = employees.find(e => e.attendance_id === a.attendance_id)?.name || '';
+                    bVal = employees.find(e => e.attendance_id === b.attendance_id)?.name || '';
                 } else {
                     aVal = a[sort.key];
                     bVal = b[sort.key];
@@ -591,15 +560,10 @@ export default function ShiftTimingsTab({ project }) {
                 return 0;
             });
 
-        const paginatedRecords = filteredRecords.slice(
+        const paginatedShifts = filteredShifts.slice(
             (currentPage - 1) * rowsPerPage,
             currentPage * rowsPerPage
         );
-
-        // Get employee shifts for the selected employee
-        const getEmployeeShifts = (attendance_id) => {
-            return blockShifts.filter(s => s.attendance_id === attendance_id);
-        };
 
         return (
             <Card className="border-0 shadow-sm">
@@ -722,15 +686,25 @@ export default function ShiftTimingsTab({ project }) {
                 </CardHeader>
                 <CardContent className="pt-4">
                     <div className="space-y-4">
-                        {employeeShiftRecords.length === 0 ? (
+                        {blockShifts.length === 0 ? (
                             <p className="text-slate-500 text-center py-8">No shifts uploaded to this block yet</p>
                         ) : (
                             <>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <p className="text-sm text-slate-600">
-                                            {employeeShiftRecords.length} employee{employeeShiftRecords.length !== 1 ? 's' : ''} with shifts
+                                            {filteredShifts.length !== blockShifts.length && `${filteredShifts.length} of ${blockShifts.length} shown`}
                                         </p>
+                                        {selectedShifts.length > 0 && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => setShowBulkEdit(true)}
+                                                className="bg-indigo-600 hover:bg-indigo-700"
+                                            >
+                                                <Edit className="w-4 h-4 mr-2" />
+                                                Bulk Edit ({selectedShifts.length})
+                                            </Button>
+                                        )}
                                     </div>
                                     <div className="flex gap-3">
                                         <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
@@ -760,6 +734,18 @@ export default function ShiftTimingsTab({ project }) {
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
+                                                <TableHead className="w-12">
+                                                    <Checkbox
+                                                        checked={selectedShifts.length === filteredShifts.length && filteredShifts.length > 0}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setSelectedShifts(filteredShifts.map(s => s));
+                                                            } else {
+                                                                setSelectedShifts([]);
+                                                            }
+                                                        }}
+                                                    />
+                                                </TableHead>
                                                 <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                                     Attendance ID
                                                 </SortableTableHead>
@@ -767,64 +753,106 @@ export default function ShiftTimingsTab({ project }) {
                                                     Employee Name
                                                 </SortableTableHead>
                                                 <TableHead>Department</TableHead>
-                                                <TableHead>General Shift</TableHead>
-                                                <TableHead>Friday Shift</TableHead>
-                                                <TableHead>Specific Dates</TableHead>
+                                                {project.company === 'Naser Mohsin Auto Parts' && (
+                                                    <TableHead>Weekly Off</TableHead>
+                                                )}
+                                                <TableHead>Shift Type</TableHead>
+                                                <TableHead>Shift Times</TableHead>
+                                                <TableHead>Applicable Days</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {paginatedRecords.map((record) => (
-                                                <TableRow key={record.attendance_id}>
-                                                    <TableCell className="font-medium">{record.attendance_id}</TableCell>
-                                                    <TableCell>{record.employee?.name || '-'}</TableCell>
-                                                    <TableCell>{record.employee?.department || '-'}</TableCell>
-                                                    <TableCell>
-                                                        {record.generalShift ? (
-                                                            <span className="text-xs">
-                                                                {formatTime(record.generalShift.am_start)}-{formatTime(record.generalShift.pm_end)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-slate-400">-</span>
+                                            {paginatedShifts.map((shift) => {
+                                                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                                                return (
+                                                    <TableRow key={shift.id}>
+                                                        <TableCell>
+                                                            <Checkbox
+                                                                checked={selectedShifts.some(s => s.id === shift.id)}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setSelectedShifts([...selectedShifts, shift]);
+                                                                    } else {
+                                                                        setSelectedShifts(selectedShifts.filter(s => s.id !== shift.id));
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="font-medium">{shift.attendance_id}</TableCell>
+                                                        <TableCell>{employee?.name || '-'}</TableCell>
+                                                        <TableCell>{employee?.department || '-'}</TableCell>
+                                                        {project.company === 'Naser Mohsin Auto Parts' && (
+                                                            <TableCell>{employee?.weekly_off || 'Sunday'}</TableCell>
                                                         )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {record.fridayShift ? (
-                                                            <span className="text-xs">
-                                                                {formatTime(record.fridayShift.am_start)}-{formatTime(record.fridayShift.pm_end)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-slate-400">-</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {record.specificDateShifts.length > 0 ? (
-                                                            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
-                                                                {record.specificDateShifts.length} days
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-slate-400">-</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => setViewingEmployee(record)}
-                                                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                                                        >
-                                                            <Eye className="w-4 h-4 mr-1" />
-                                                            View Calendar
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                                        <TableCell>
+                                                            {shift.is_single_shift ? (
+                                                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Single Shift</span>
+                                                            ) : (
+                                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Regular</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {shift.is_single_shift ? (
+                                                                <span>{formatTime(shift.am_start)} → {formatTime(shift.pm_end)}</span>
+                                                            ) : (
+                                                                <span>{formatTime(shift.am_start)}-{formatTime(shift.am_end)} / {formatTime(shift.pm_start)}-{formatTime(shift.pm_end)}</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {(() => {
+                                                                if (shift.date) return new Date(shift.date).toLocaleDateString('en-GB');
+                                                                if (!shift.applicable_days) return 'All days';
+
+                                                                // Try to parse as JSON array (Naser Mohsin format)
+                                                                try {
+                                                                    const daysArray = JSON.parse(shift.applicable_days);
+                                                                    if (Array.isArray(daysArray)) {
+                                                                        return daysArray.join(', ');
+                                                                    }
+                                                                } catch {
+                                                                    // Not JSON, return as string
+                                                                }
+
+                                                                return shift.applicable_days;
+                                                            })()}
+                                                            {shift.is_friday_shift && (
+                                                                <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
+                                                                    Friday
+                                                                </span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex gap-1 justify-end">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => setEditingShift(shift)}
+                                                                >
+                                                                    <Edit className="w-4 h-4 text-indigo-600" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => {
+                                                                        if (window.confirm('Delete this shift record?')) {
+                                                                            deleteMutation.mutate(shift.id);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
                                 </div>
-                                {filteredRecords.length > 0 && (
+                                {filteredShifts.length > 0 && (
                                     <TablePagination
-                                        totalItems={filteredRecords.length}
+                                        totalItems={filteredShifts.length}
                                         currentPage={currentPage}
                                         rowsPerPage={rowsPerPage}
                                         onPageChange={setCurrentPage}
@@ -1108,19 +1136,6 @@ export default function ShiftTimingsTab({ project }) {
                 projectId={project.id}
                 company={project.company}
             />
-
-            {/* Employee Shift Calendar */}
-            {viewingEmployee && (
-                <EmployeeShiftCalendar
-                    open={!!viewingEmployee}
-                    onClose={() => setViewingEmployee(null)}
-                    employee={viewingEmployee.employee}
-                    project={project}
-                    shifts={viewingEmployee.shifts}
-                    blockId={selectedBlock}
-                    blockRange={blockDateRanges[selectedBlock]}
-                />
-            )}
 
             {/* Preview Dialog */}
             <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
