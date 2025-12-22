@@ -23,6 +23,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     const [showNewSubDeptDialog, setShowNewSubDeptDialog] = useState(false);
     const [newDeptName, setNewDeptName] = useState('');
     const [newSubDeptName, setNewSubDeptName] = useState('');
+    const [generatingHrmsId, setGeneratingHrmsId] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
@@ -44,17 +45,38 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 active: employee.active ?? true
             });
         } else {
-            setFormData({
-                hrms_id: '',
-                attendance_id: '',
-                name: '',
-                company: '',
-                department: '',
-                weekly_off: 'Sunday',
-                active: true
-            });
+            // Auto-generate HRMS ID for new employees
+            const generateHrmsId = async () => {
+                setGeneratingHrmsId(true);
+                try {
+                    const { data } = await base44.functions.invoke('generateHrmsId', {});
+                    setFormData({
+                        hrms_id: data.hrms_id,
+                        attendance_id: '',
+                        name: '',
+                        company: '',
+                        department: '',
+                        weekly_off: 'Sunday',
+                        active: true
+                    });
+                } catch (error) {
+                    toast.error('Failed to generate HRMS ID');
+                    setFormData({
+                        hrms_id: '',
+                        attendance_id: '',
+                        name: '',
+                        company: '',
+                        department: '',
+                        weekly_off: 'Sunday',
+                        active: true
+                    });
+                } finally {
+                    setGeneratingHrmsId(false);
+                }
+            };
+            generateHrmsId();
         }
-    }, [employee]);
+    }, [employee, open]);
 
     const { data: existingEmployees = [] } = useQuery({
         queryKey: ['employees'],
@@ -205,8 +227,11 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                             id="hrms_id"
                             value={formData.hrms_id}
                             onChange={(e) => setFormData({ ...formData, hrms_id: e.target.value })}
-                            placeholder="e.g. H001"
+                            placeholder="Auto-generated"
+                            disabled={!employee && generatingHrmsId}
+                            className={!employee ? 'bg-slate-50' : ''}
                         />
+                        {!employee && <p className="text-xs text-slate-500 mt-1">Auto-generated unique ID</p>}
                     </div>
 
                     <div>

@@ -239,6 +239,11 @@ export default function Employees() {
             for (let i = 0; i < employeeList.length; i++) {
                 const emp = employeeList[i];
                 try {
+                    // Generate HRMS ID if not provided
+                    if (!emp.hrms_id) {
+                        const { data } = await base44.functions.invoke('generateHrmsId', {});
+                        emp.hrms_id = data.hrms_id;
+                    }
                     const result = await base44.entities.Employee.create(emp);
                     results.push(result);
                 } catch (error) {

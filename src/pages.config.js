@@ -1,33 +1,35 @@
-import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
-import ProjectDetail from './pages/ProjectDetail';
-import Employees from './pages/Employees';
-import RulesSettings from './pages/RulesSettings';
-import Users from './pages/Users';
-import UserProfile from './pages/UserProfile';
-import Documentation from './pages/Documentation';
-import Diagnostics from './pages/Diagnostics';
-import ReportDetail from './pages/ReportDetail';
-import AstraImport from './pages/AstraImport';
-import RamadanSchedules from './pages/RamadanSchedules';
 import ActivityLogs from './pages/ActivityLogs';
+import AstraImport from './pages/AstraImport';
+import Dashboard from './pages/Dashboard';
+import Diagnostics from './pages/Diagnostics';
+import Documentation from './pages/Documentation';
+import Employees from './pages/Employees';
+import Home from './pages/Home';
+import ProjectDetail from './pages/ProjectDetail';
+import Projects from './pages/Projects';
+import RamadanSchedules from './pages/RamadanSchedules';
+import ReportDetail from './pages/ReportDetail';
+import RulesSettings from './pages/RulesSettings';
+import UserProfile from './pages/UserProfile';
+import Users from './pages/Users';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Dashboard": Dashboard,
-    "Projects": Projects,
-    "ProjectDetail": ProjectDetail,
-    "Employees": Employees,
-    "RulesSettings": RulesSettings,
-    "Users": Users,
-    "UserProfile": UserProfile,
-    "Documentation": Documentation,
-    "Diagnostics": Diagnostics,
-    "ReportDetail": ReportDetail,
-    "AstraImport": AstraImport,
-    "RamadanSchedules": RamadanSchedules,
     "ActivityLogs": ActivityLogs,
+    "AstraImport": AstraImport,
+    "Dashboard": Dashboard,
+    "Diagnostics": Diagnostics,
+    "Documentation": Documentation,
+    "Employees": Employees,
+    "Home": Home,
+    "ProjectDetail": ProjectDetail,
+    "Projects": Projects,
+    "RamadanSchedules": RamadanSchedules,
+    "ReportDetail": ReportDetail,
+    "RulesSettings": RulesSettings,
+    "UserProfile": UserProfile,
+    "Users": Users,
 }
 
 export const pagesConfig = {
