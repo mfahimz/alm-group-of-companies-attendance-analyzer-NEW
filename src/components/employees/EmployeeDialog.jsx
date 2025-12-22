@@ -198,15 +198,6 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             return;
         }
 
-        // Check for duplicate attendance_id
-        const duplicateAttendance = existingEmployees.find(
-            emp => emp.attendance_id === formData.attendance_id && emp.id !== employee?.id
-        );
-        if (duplicateAttendance) {
-            toast.error('Attendance ID already exists');
-            return;
-        }
-
         if (employee) {
             updateMutation.mutate({ id: employee.id, data: formData });
         } else {
