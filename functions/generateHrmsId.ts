@@ -20,9 +20,9 @@ Deno.serve(async (req) => {
         const maxAttempts = 100;
 
         do {
-            // Generate format: HRM followed by number between 1000-1999
+            // Generate format: number between 1000-1999
             const randomNum = Math.floor(1000 + Math.random() * 1000);
-            hrmsId = `HRM${randomNum}`;
+            hrmsId = `${randomNum}`;
             attempts++;
 
             if (attempts >= maxAttempts) {
