@@ -134,31 +134,23 @@ export default function Employees() {
         }
     });
 
-    // Detect duplicates
-    const duplicateAttendanceIds = new Set();
-    const duplicateNames = new Set();
-    const attendanceIdCounts = {};
-    const nameCounts = {};
+    // Detect duplicates (HRMS ID only)
+    const duplicateHrmsIds = new Set();
+    const hrmsIdCounts = {};
     
     employees.forEach(emp => {
-        const aid = emp.attendance_id?.toLowerCase();
-        const name = emp.name?.toLowerCase();
-        
-        attendanceIdCounts[aid] = (attendanceIdCounts[aid] || 0) + 1;
-        nameCounts[name] = (nameCounts[name] || 0) + 1;
+        const hrmsId = emp.hrms_id?.toLowerCase();
+        if (hrmsId) {
+            hrmsIdCounts[hrmsId] = (hrmsIdCounts[hrmsId] || 0) + 1;
+        }
     });
     
-    Object.keys(attendanceIdCounts).forEach(aid => {
-        if (attendanceIdCounts[aid] > 1) duplicateAttendanceIds.add(aid);
-    });
-    
-    Object.keys(nameCounts).forEach(name => {
-        if (nameCounts[name] > 1) duplicateNames.add(name);
+    Object.keys(hrmsIdCounts).forEach(hrmsId => {
+        if (hrmsIdCounts[hrmsId] > 1) duplicateHrmsIds.add(hrmsId);
     });
 
     const isDuplicate = (emp) => {
-        return duplicateAttendanceIds.has(emp.attendance_id?.toLowerCase()) || 
-               duplicateNames.has(emp.name?.toLowerCase());
+        return emp.hrms_id && duplicateHrmsIds.has(emp.hrms_id?.toLowerCase());
     };
 
     const filteredEmployees = employees
@@ -559,7 +551,7 @@ export default function Employees() {
                     <div>
                         <p className="font-medium text-amber-900">Duplicate Entries Detected</p>
                         <p className="text-sm text-amber-700 mt-1">
-                            Found {totalDuplicates} employee{totalDuplicates > 1 ? 's' : ''} with duplicate attendance IDs or names.{' '}
+                            Found {totalDuplicates} employee{totalDuplicates > 1 ? 's' : ''} with duplicate HRMS IDs.{' '}
                             <button 
                                 onClick={() => setShowOnlyDuplicates(true)}
                                 className="underline font-medium hover:text-amber-900"
@@ -623,23 +615,18 @@ export default function Employees() {
                                                 />
                                             </TableCell>
                                             <TableCell className="font-medium text-slate-600">
-                                                {employee.hrms_id || '-'}
+                                               <div className="flex items-center gap-2">
+                                                   {employee.hrms_id || '-'}
+                                                   {employee.hrms_id && duplicateHrmsIds.has(employee.hrms_id?.toLowerCase()) && (
+                                                       <AlertCircle className="w-4 h-4 text-amber-600" title="Duplicate HRMS ID" />
+                                                   )}
+                                               </div>
                                             </TableCell>
                                             <TableCell className="font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    {employee.attendance_id}
-                                                    {duplicateAttendanceIds.has(employee.attendance_id?.toLowerCase()) && (
-                                                        <AlertCircle className="w-4 h-4 text-amber-600" title="Duplicate attendance ID" />
-                                                    )}
-                                                </div>
+                                                {employee.attendance_id}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    {employee.name}
-                                                    {duplicateNames.has(employee.name?.toLowerCase()) && (
-                                                        <AlertCircle className="w-4 h-4 text-amber-600" title="Duplicate name" />
-                                                    )}
-                                                </div>
+                                                {employee.name}
                                             </TableCell>
                                             <TableCell className="text-slate-600">{employee.company || '-'}</TableCell>
                                             <TableCell className="text-slate-600">{employee.department || '-'}</TableCell>
