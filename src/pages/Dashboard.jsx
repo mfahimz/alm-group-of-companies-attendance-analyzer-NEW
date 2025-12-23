@@ -49,7 +49,15 @@ export default function Dashboard() {
         }
     ];
 
-    const recentProjects = projects.slice(0, 5);
+    // Group projects by company
+    const projectsByCompany = projects.reduce((acc, project) => {
+        const company = project.company || 'Uncategorized';
+        if (!acc[company]) acc[company] = [];
+        acc[company].push(project);
+        return acc;
+    }, {});
+
+    const companies = Object.keys(projectsByCompany).sort();
 
     return (
         <div className="space-y-8">
@@ -101,49 +109,59 @@ export default function Dashboard() {
                 })}
             </div>
 
-            {/* Recent Projects */}
-            <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 rounded-2xl">
-                <CardHeader className="border-b border-slate-100/80 px-8 py-6">
-                    <div className="flex items-center gap-2">
-                        <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
-                        <CardTitle className="text-lg text-slate-900 font-bold">Recent Projects</CardTitle>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {recentProjects.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500">
+            {/* Projects by Company */}
+            {projects.length === 0 ? (
+                <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 rounded-2xl">
+                    <CardContent className="p-8">
+                        <div className="text-center text-slate-500">
                             No projects yet. Create your first project to get started.
                         </div>
-                    ) : (
-                        <div className="divide-y divide-slate-100">
-                            {recentProjects.map((project) => (
-                                <Link
-                                    key={project.id}
-                                    to={createPageUrl(`ProjectDetail?id=${project.id}`)}
-                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 hover:bg-slate-50 transition-colors gap-2 group"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{project.name}</p>
-                                        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                                            {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
-                                        </p>
-                                    </div>
-                                    <div className="flex-shrink-0">
-                                        <span className={`
-                                            px-2.5 py-1 rounded-full text-xs font-medium
-                                            ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
-                                            ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
-                                            ${project.status === 'locked' ? 'bg-slate-100 text-slate-600' : ''}
-                                        `}>
-                                            {project.status}
-                                        </span>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="space-y-6">
+                    {companies.map((company) => (
+                        <Card key={company} className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 rounded-2xl">
+                            <CardHeader className="border-b border-slate-100/80 px-8 py-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
+                                    <CardTitle className="text-lg text-slate-900 font-bold">{company}</CardTitle>
+                                    <span className="text-sm text-slate-500 ml-2">({projectsByCompany[company].length} projects)</span>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="divide-y divide-slate-100">
+                                    {projectsByCompany[company].map((project) => (
+                                        <Link
+                                            key={project.id}
+                                            to={createPageUrl(`ProjectDetail?id=${project.id}`)}
+                                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 hover:bg-slate-50 transition-colors gap-2 group"
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{project.name}</p>
+                                                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                                                    {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
+                                                </p>
+                                            </div>
+                                            <div className="flex-shrink-0">
+                                                <span className={`
+                                                    px-2.5 py-1 rounded-full text-xs font-medium
+                                                    ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
+                                                    ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
+                                                    ${project.status === 'locked' ? 'bg-slate-100 text-slate-600' : ''}
+                                                    ${project.status === 'closed' ? 'bg-slate-100 text-slate-600' : ''}
+                                                `}>
+                                                    {project.status}
+                                                </span>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
