@@ -133,8 +133,19 @@ export default function PunchUploadTab({ project }) {
                     let timestamp_raw = '';
                     let punch_date = '';
                     
+                    // Al Maraghi Automotive format: ID, name, timestamp (3 columns)
+                    if (project.company === 'Al Maraghi Automotive' && values.length >= 3) {
+                        timestamp_raw = values[2].trim();
+                        
+                        // Extract date from timestamp (M/D/YYYY or MM/DD/YYYY HH:MM AM/PM)
+                        const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                        if (dateMatch) {
+                            const [, month, day, year] = dateMatch;
+                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
+                    }
                     // Naser Mohsin Auto Parts format: ID, FirstName, Date, Time (4 columns)
-                    if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
+                    else if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
                         let dateStr = values[2].trim();
                         let timeStr = values[3].trim();
                         
@@ -416,7 +427,16 @@ export default function PunchUploadTab({ project }) {
                             accept=".csv"
                             onChange={handleFileChange}
                         />
-                        {project.company === 'Naser Mohsin Auto Parts' ? (
+                        {project.company === 'Al Maraghi Automotive' ? (
+                            <>
+                                <p className="text-sm text-slate-500 mt-2">
+                                    CSV format: attendance_id, name, timestamp
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Timestamp format: M/D/YYYY H:MM:SS AM/PM (e.g., 11/1/2025 8:28:22 AM)
+                                </p>
+                            </>
+                        ) : project.company === 'Naser Mohsin Auto Parts' ? (
                             <>
                                 <p className="text-sm text-slate-500 mt-2">
                                     CSV format: attendance_id, first_name, date, time
