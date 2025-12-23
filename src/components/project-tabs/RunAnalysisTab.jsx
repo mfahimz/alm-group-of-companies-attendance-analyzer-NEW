@@ -46,7 +46,23 @@ export default function RunAnalysisTab({ project }) {
         }
     });
 
-    const uniqueEmployeeIds = [...new Set(punches.map(p => p.attendance_id))];
+    // Get unique employee IDs from punches
+    const uniqueEmployeeIdsFromPunches = [...new Set(punches.map(p => p.attendance_id))];
+    
+    // Filter based on custom_employee_ids if specified
+    let uniqueEmployeeIds = uniqueEmployeeIdsFromPunches;
+    if (project.custom_employee_ids) {
+        const customHrmsIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(Boolean);
+        // Convert HRMS IDs to attendance IDs
+        const customAttendanceIds = employees
+            .filter(e => customHrmsIds.includes(e.hrms_id))
+            .map(e => e.attendance_id);
+        
+        // Only include employees that are in both punch data AND custom selection
+        uniqueEmployeeIds = uniqueEmployeeIdsFromPunches.filter(id => 
+            customAttendanceIds.includes(id)
+        );
+    }
 
     const updateProjectMutation = useMutation({
         mutationFn: (status) => base44.entities.Project.update(project.id, { status }),
