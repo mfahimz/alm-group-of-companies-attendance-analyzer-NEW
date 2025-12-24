@@ -49,6 +49,7 @@ export default function Layout({ children, currentPageName }) {
     });
 
     const isAdmin = currentUser?.role === 'admin';
+    const canAccessAllCompanies = isAdmin || currentUser?.can_access_all_companies;
 
     const hasPageAccess = (pageName) => {
         if (!currentUser) return false;

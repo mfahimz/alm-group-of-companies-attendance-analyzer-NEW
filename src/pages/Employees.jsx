@@ -60,10 +60,18 @@ export default function Employees() {
         }
     }, [currentUser, permissions, navigate]);
 
-    const { data: employees = [], isLoading } = useQuery({
+    const { data: allEmployees = [], isLoading } = useQuery({
         queryKey: ['employees'],
         queryFn: () => base44.entities.Employee.list('-created_date')
     });
+
+    // Filter employees based on user access
+    const employees = React.useMemo(() => {
+        if (!currentUser) return [];
+        const canAccessAll = isAdmin || currentUser.can_access_all_companies;
+        if (canAccessAll) return allEmployees;
+        return allEmployees.filter(e => e.company === currentUser.company);
+    }, [allEmployees, currentUser, isAdmin]);
 
     const deleteMutation = useMutation({
         mutationFn: async (id) => {

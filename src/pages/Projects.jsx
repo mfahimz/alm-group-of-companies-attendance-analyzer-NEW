@@ -50,10 +50,18 @@ export default function Projects() {
         }
     }, [currentUser, permissions, navigate]);
 
-    const { data: projects = [], isLoading } = useQuery({
+    const { data: allProjects = [], isLoading } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list('-created_date')
     });
+
+    // Filter projects based on user access
+    const projects = React.useMemo(() => {
+        if (!currentUser) return [];
+        const canAccessAll = isAdmin || currentUser.can_access_all_companies;
+        if (canAccessAll) return allProjects;
+        return allProjects.filter(p => p.company === currentUser.company);
+    }, [allProjects, currentUser, isAdmin]);
 
     const checkOverlap = (start, end, excludeId = null) => {
         const startDate = new Date(start);
