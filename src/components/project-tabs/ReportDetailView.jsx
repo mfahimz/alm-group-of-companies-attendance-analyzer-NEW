@@ -326,8 +326,8 @@ export default function ReportDetailView({ reportRun, project }) {
 
             const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw);
-                    const timeB = parseTime(b.timestamp_raw);
+                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
 
@@ -852,8 +852,8 @@ export default function ReportDetailView({ reportRun, project }) {
 
             const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw);
-                    const timeB = parseTime(b.timestamp_raw);
+                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
 
