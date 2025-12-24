@@ -8,15 +8,35 @@ import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function Dashboard() {
-    const { data: projects = [] } = useQuery({
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const { data: allProjects = [] } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list('-created_date')
     });
 
-    const { data: employees = [] } = useQuery({
+    const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees'],
         queryFn: () => base44.entities.Employee.list()
     });
+
+    // Filter data based on user access
+    const projects = React.useMemo(() => {
+        if (!currentUser) return [];
+        const canAccessAll = currentUser.role === 'admin' || currentUser.can_access_all_companies;
+        if (canAccessAll) return allProjects;
+        return allProjects.filter(p => p.company === currentUser.company);
+    }, [allProjects, currentUser]);
+
+    const employees = React.useMemo(() => {
+        if (!currentUser) return [];
+        const canAccessAll = currentUser.role === 'admin' || currentUser.can_access_all_companies;
+        if (canAccessAll) return allEmployees;
+        return allEmployees.filter(e => e.company === currentUser.company);
+    }, [allEmployees, currentUser]);
 
     const stats = [
         {
