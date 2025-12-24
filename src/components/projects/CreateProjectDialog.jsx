@@ -14,6 +14,11 @@ import { createPageUrl } from '../../utils';
 import EmployeeSelectionDialog from './EmployeeSelectionDialog';
 
 export default function CreateProjectDialog({ open, onClose }) {
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
     const [formData, setFormData] = useState({
         name: '',
         company: '',
@@ -31,6 +36,13 @@ export default function CreateProjectDialog({ open, onClose }) {
     const [ramadanDateRange, setRamadanDateRange] = useState({ from: '', to: '' });
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+
+    // Pre-fill company if user has a specific company assigned
+    React.useEffect(() => {
+        if (open && currentUser && currentUser.company && !currentUser.can_access_all_companies && currentUser.role !== 'admin') {
+            setFormData(prev => ({ ...prev, company: currentUser.company }));
+        }
+    }, [open, currentUser]);
 
     const { data: projects = [] } = useQuery({
         queryKey: ['projects'],
@@ -163,6 +175,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                         <Select
                             value={formData.company}
                             onValueChange={(value) => setFormData({ ...formData, company: value })}
+                            disabled={currentUser && currentUser.company && !currentUser.can_access_all_companies && currentUser.role !== 'admin'}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select company" />
@@ -174,6 +187,9 @@ export default function CreateProjectDialog({ open, onClose }) {
                                 <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
                             </SelectContent>
                         </Select>
+                        {currentUser && currentUser.company && !currentUser.can_access_all_companies && currentUser.role !== 'admin' && (
+                            <p className="text-xs text-slate-500 mt-1">Company is locked to your assigned company</p>
+                        )}
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
