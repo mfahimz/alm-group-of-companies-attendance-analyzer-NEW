@@ -31,7 +31,6 @@ export default function Users() {
     const [sort, setSort] = useState({ key: 'full_name', direction: 'asc' });
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [emailDomains, setEmailDomains] = useState('');
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -69,18 +68,6 @@ export default function Users() {
         queryKey: ['pagePermissions'],
         queryFn: () => base44.entities.PagePermission.list()
     });
-
-    const { data: systemSettings = [] } = useQuery({
-        queryKey: ['systemSettings'],
-        queryFn: () => base44.entities.SystemSettings.list()
-    });
-
-    useEffect(() => {
-        const setting = systemSettings.find(s => s.setting_key === 'allowed_email_domains');
-        if (setting) {
-            setEmailDomains(setting.setting_value || '');
-        }
-    }, [systemSettings]);
 
     const updateUserMutation = useMutation({
         mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
@@ -169,32 +156,6 @@ export default function Users() {
         return permission.allowed_roles.split(',').map(r => r.trim()).includes(role);
     };
 
-    const saveEmailDomainsMutation = useMutation({
-        mutationFn: async (domains) => {
-            const setting = systemSettings.find(s => s.setting_key === 'allowed_email_domains');
-            if (setting) {
-                return base44.entities.SystemSettings.update(setting.id, { setting_value: domains });
-            } else {
-                return base44.entities.SystemSettings.create({
-                    setting_key: 'allowed_email_domains',
-                    setting_value: domains,
-                    description: 'Comma-separated list of allowed email domains for user registration'
-                });
-            }
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['systemSettings']);
-            toast.success('Email domain settings saved');
-        },
-        onError: () => {
-            toast.error('Failed to save settings');
-        }
-    });
-
-    const handleSaveEmailDomains = () => {
-        saveEmailDomainsMutation.mutate(emailDomains);
-    };
-
     const filteredUsers = users
         .filter(user =>
             user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -240,7 +201,6 @@ export default function Users() {
                 <TabsList className="bg-white border border-slate-200 p-1">
                     <TabsTrigger value="users">Users & Roles</TabsTrigger>
                     <TabsTrigger value="permissions">Page Permissions</TabsTrigger>
-                    <TabsTrigger value="settings">Email Settings</TabsTrigger>
                 </TabsList>
 
                 {/* Users Tab */}
@@ -457,54 +417,6 @@ export default function Users() {
                                 <li>Green = User role can access, Purple = Admin role can access</li>
                                 <li>Each page must have at least one role with access</li>
                                 <li>Changes take effect immediately</li>
-                            </ul>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                {/* Email Settings Tab */}
-                <TabsContent value="settings" className="space-y-6">
-                    <Card className="border-0 shadow-sm">
-                        <CardHeader>
-                            <CardTitle>Email Domain Restrictions</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Allowed Email Domains
-                                </label>
-                                <Input
-                                    placeholder="e.g., @company.com, @almaraghiautomotive.com"
-                                    value={emailDomains}
-                                    onChange={(e) => setEmailDomains(e.target.value)}
-                                    className="mb-2"
-                                />
-                                <p className="text-xs text-slate-500">
-                                    Enter comma-separated email domains (including @). Leave empty to allow all domains.
-                                </p>
-                            </div>
-
-                            <Button 
-                                onClick={handleSaveEmailDomains}
-                                disabled={saveEmailDomainsMutation.isPending}
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                            >
-                                {saveEmailDomainsMutation.isPending ? 'Saving...' : 'Save Settings'}
-                            </Button>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-0 shadow-sm bg-blue-50 border-blue-200">
-                        <CardContent className="p-6 space-y-3">
-                            <p className="text-sm text-blue-900">
-                                <strong>How it works:</strong>
-                            </p>
-                            <ul className="text-sm text-blue-900 space-y-1 list-disc list-inside">
-                                <li>Only users with emails from these domains can be invited to the system</li>
-                                <li>Enter domains with @ symbol (e.g., @company.com)</li>
-                                <li>Separate multiple domains with commas</li>
-                                <li>Leave empty to allow any email domain</li>
-                                <li>This setting applies to all new user invitations</li>
                             </ul>
                         </CardContent>
                     </Card>
