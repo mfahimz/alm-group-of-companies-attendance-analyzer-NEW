@@ -31,6 +31,8 @@ export default function Users() {
     const [sort, setSort] = useState({ key: 'full_name', direction: 'asc' });
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [emailDomains, setEmailDomains] = useState('');
+    const [syncing, setSyncing] = useState(false);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -69,6 +71,18 @@ export default function Users() {
         queryFn: () => base44.entities.PagePermission.list()
     });
 
+    const { data: systemSettings = [] } = useQuery({
+        queryKey: ['systemSettings'],
+        queryFn: () => base44.entities.SystemSettings.list()
+    });
+
+    useEffect(() => {
+        const setting = systemSettings.find(s => s.setting_key === 'allowed_email_domains');
+        if (setting) {
+            setEmailDomains(setting.setting_value || '');
+        }
+    }, [systemSettings]);
+
     const updateUserMutation = useMutation({
         mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
         onSuccess: () => {
@@ -106,30 +120,52 @@ export default function Users() {
         }
     });
 
-    const initializePermissionsMutation = useMutation({
+    const syncPagesMutation = useMutation({
         mutationFn: async () => {
-            const results = [];
-            for (const page of DEFAULT_PAGES) {
-                const existing = pagePermissions.find(p => p.page_name === page.page_name);
-                if (!existing) {
-                    const result = await base44.entities.PagePermission.create(page);
-                    results.push(result);
-                }
-            }
-            return results;
+            setSyncing(true);
+            const { data } = await base44.functions.invoke('syncPagePermissions', {});
+            return data;
         },
-        onSuccess: (results) => {
+        onSuccess: (result) => {
             queryClient.invalidateQueries(['pagePermissions']);
-            if (results.length > 0) {
-                toast.success(`Initialized ${results.length} page permissions`);
+            setSyncing(false);
+            if (result.created > 0) {
+                toast.success(`Synced ${result.total} pages (${result.created} new)`);
             } else {
-                toast.info('All pages already configured');
+                toast.success('All pages are up to date');
             }
         },
-        onError: () => {
-            toast.error('Failed to initialize permissions');
+        onError: (error) => {
+            setSyncing(false);
+            toast.error('Failed to sync pages: ' + error.message);
         }
     });
+
+    const saveEmailDomainsMutation = useMutation({
+        mutationFn: async (domains) => {
+            const setting = systemSettings.find(s => s.setting_key === 'allowed_email_domains');
+            if (setting) {
+                return base44.entities.SystemSettings.update(setting.id, { setting_value: domains });
+            } else {
+                return base44.entities.SystemSettings.create({
+                    setting_key: 'allowed_email_domains',
+                    setting_value: domains,
+                    description: 'Comma-separated list of allowed email domains for user registration'
+                });
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['systemSettings']);
+            toast.success('Email domain settings saved');
+        },
+        onError: () => {
+            toast.error('Failed to save settings');
+        }
+    });
+
+    const handleSaveEmailDomains = () => {
+        saveEmailDomainsMutation.mutate(emailDomains);
+    };
 
     const togglePageRole = (permission, role) => {
         const roles = permission.allowed_roles.split(',').map(r => r.trim());
@@ -201,6 +237,7 @@ export default function Users() {
                 <TabsList className="bg-white border border-slate-200 p-1">
                     <TabsTrigger value="users">Users & Roles</TabsTrigger>
                     <TabsTrigger value="permissions">Page Permissions</TabsTrigger>
+                    <TabsTrigger value="settings">Email Settings</TabsTrigger>
                 </TabsList>
 
                 {/* Users Tab */}
@@ -316,12 +353,12 @@ export default function Users() {
                     <div className="flex items-center justify-between">
                         <p className="text-slate-600">Control which roles can access each page</p>
                         <Button
-                            onClick={() => initializePermissionsMutation.mutate()}
-                            disabled={initializePermissionsMutation.isPending}
-                            variant="outline"
+                            onClick={() => syncPagesMutation.mutate()}
+                            disabled={syncing}
+                            className="bg-indigo-600 hover:bg-indigo-700"
                         >
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Initialize Defaults
+                            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                            {syncing ? 'Syncing...' : 'Sync All Pages'}
                         </Button>
                     </div>
 
@@ -329,11 +366,25 @@ export default function Users() {
                         <Card className="border-0 shadow-sm bg-amber-50 border-amber-200">
                             <CardContent className="p-6">
                                 <p className="text-amber-900">
-                                    No page permissions configured yet. Click "Initialize Defaults" to set up default permissions for all pages.
+                                    No page permissions configured yet. Click "Sync All Pages" to automatically detect and configure all pages in the application.
                                 </p>
                             </CardContent>
                         </Card>
                     )}
+
+                    <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
+                        <CardContent className="p-6 space-y-3">
+                            <p className="text-sm text-indigo-900">
+                                <strong>🔄 Automatic Page Detection:</strong>
+                            </p>
+                            <ul className="text-sm text-indigo-900 space-y-1 list-disc list-inside">
+                                <li>Click "Sync All Pages" to automatically detect all pages in the system</li>
+                                <li>New pages are automatically added with admin-only access by default</li>
+                                <li>Existing page permissions are preserved during sync</li>
+                                <li>Run this sync whenever you create new pages to ensure proper access control</li>
+                            </ul>
+                        </CardContent>
+                    </Card>
 
                     <Card className="border-0 shadow-sm">
                         <CardHeader>
@@ -417,6 +468,54 @@ export default function Users() {
                                 <li>Green = User role can access, Purple = Admin role can access</li>
                                 <li>Each page must have at least one role with access</li>
                                 <li>Changes take effect immediately</li>
+                            </ul>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Email Settings Tab */}
+                <TabsContent value="settings" className="space-y-6">
+                    <Card className="border-0 shadow-sm">
+                        <CardHeader>
+                            <CardTitle>Email Domain Restrictions</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Allowed Email Domains
+                                </label>
+                                <Input
+                                    placeholder="e.g., @company.com, @almaraghiautomotive.com"
+                                    value={emailDomains}
+                                    onChange={(e) => setEmailDomains(e.target.value)}
+                                    className="mb-2"
+                                />
+                                <p className="text-xs text-slate-500">
+                                    Enter comma-separated email domains (including @). Leave empty to allow all domains.
+                                </p>
+                            </div>
+
+                            <Button 
+                                onClick={handleSaveEmailDomains}
+                                disabled={saveEmailDomainsMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                {saveEmailDomainsMutation.isPending ? 'Saving...' : 'Save Settings'}
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-0 shadow-sm bg-blue-50 border-blue-200">
+                        <CardContent className="p-6 space-y-3">
+                            <p className="text-sm text-blue-900">
+                                <strong>How it works:</strong>
+                            </p>
+                            <ul className="text-sm text-blue-900 space-y-1 list-disc list-inside">
+                                <li>Only users with emails from these domains can be invited to the system</li>
+                                <li>Enter domains with @ symbol (e.g., @company.com)</li>
+                                <li>Separate multiple domains with commas</li>
+                                <li>Leave empty to allow any email domain</li>
+                                <li>This setting applies to all new user invitations</li>
                             </ul>
                         </CardContent>
                     </Card>
