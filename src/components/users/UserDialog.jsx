@@ -1,33 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 export default function UserDialog({ open, onClose, user }) {
     const [formData, setFormData] = useState({
         full_name: '',
         email: '',
-        role: 'user'
+        role: 'user',
+        company: '',
+        can_access_all_companies: false
     });
     const queryClient = useQueryClient();
+
+    const { data: systemSettings = [] } = useQuery({
+        queryKey: ['systemSettings'],
+        queryFn: () => base44.entities.SystemSettings.list(),
+        enabled: open
+    });
 
     useEffect(() => {
         if (user) {
             setFormData({
                 full_name: user.full_name || '',
                 email: user.email || '',
-                role: user.role || 'user'
+                role: user.role || 'user',
+                company: user.company || '',
+                can_access_all_companies: user.can_access_all_companies || false
             });
         } else {
             setFormData({
                 full_name: '',
                 email: '',
-                role: 'user'
+                role: 'user',
+                company: '',
+                can_access_all_companies: false
             });
         }
     }, [user]);
@@ -50,6 +63,24 @@ export default function UserDialog({ open, onClose, user }) {
 
         if (!formData.full_name || !formData.email) {
             toast.error('Please fill in all required fields');
+            return;
+        }
+
+        // Validate email domain
+        const allowedDomainsSetting = systemSettings.find(s => s.setting_key === 'allowed_email_domains');
+        if (allowedDomainsSetting && allowedDomainsSetting.setting_value) {
+            const domains = allowedDomainsSetting.setting_value.split(',').map(d => d.trim().toLowerCase());
+            const userDomain = '@' + formData.email.split('@')[1]?.toLowerCase();
+            
+            if (!domains.some(d => userDomain === d.toLowerCase())) {
+                toast.error(`Email domain not allowed. Allowed domains: ${allowedDomainsSetting.setting_value}`);
+                return;
+            }
+        }
+
+        // Validate company assignment for non-admin users
+        if (formData.role !== 'admin' && !formData.can_access_all_companies && !formData.company) {
+            toast.error('Please assign a company to this user or enable "Access All Companies"');
             return;
         }
 
@@ -106,6 +137,48 @@ export default function UserDialog({ open, onClose, user }) {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {formData.role !== 'admin' && (
+                            <>
+                                <div>
+                                    <Label htmlFor="company">Assigned Company</Label>
+                                    <Select
+                                        value={formData.company}
+                                        onValueChange={(value) => setFormData({ ...formData, company: value })}
+                                        disabled={formData.can_access_all_companies}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select company" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value={null}>No company assigned</SelectItem>
+                                            <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                                            <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                                            <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                                            <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        User will only see data from this company
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="access_all"
+                                        checked={formData.can_access_all_companies}
+                                        onCheckedChange={(checked) => setFormData({ 
+                                            ...formData, 
+                                            can_access_all_companies: checked,
+                                            company: checked ? '' : formData.company
+                                        })}
+                                    />
+                                    <Label htmlFor="access_all" className="font-normal">
+                                        Can access all companies (Manager role)
+                                    </Label>
+                                </div>
+                            </>
+                        )}
 
                         <div className="flex justify-end gap-3 pt-4">
                             <Button type="button" variant="outline" onClick={onClose}>
