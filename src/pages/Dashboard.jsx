@@ -38,6 +38,8 @@ export default function Dashboard() {
         return allEmployees.filter(e => e.company === currentUser.company);
     }, [allEmployees, currentUser]);
 
+    const isAdmin = currentUser?.role === 'admin';
+
     const stats = [
         {
             label: 'Total Projects',
@@ -60,13 +62,13 @@ export default function Dashboard() {
             color: 'bg-green-500',
             bgColor: 'bg-green-50'
         },
-        {
+        ...(isAdmin ? [{
             label: 'Active Employees',
             value: employees.filter(e => e.active === true).length,
             icon: Users,
             color: 'bg-blue-500',
             bgColor: 'bg-blue-50'
-        }
+        }] : [])
     ];
 
     // Group projects by company
