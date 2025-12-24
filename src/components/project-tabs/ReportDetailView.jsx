@@ -78,10 +78,29 @@ export default function ReportDetailView({ reportRun, project }) {
         return `${hours}:${minutes} ${period}`;
     };
 
-    const parseTime = (timeStr) => {
+    const parseTime = (timeStr, includeSeconds = false) => {
         try {
             if (!timeStr || timeStr === '—') return null;
 
+            // For Al Maraghi Automotive: Match with seconds (HH:MM:SS AM/PM)
+            if (includeSeconds) {
+                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = parseInt(timeMatch[3]);
+                    const period = timeMatch[4].toUpperCase();
+
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
+                }
+            }
+
+            // Standard format without seconds
             let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
@@ -100,9 +119,10 @@ export default function ReportDetailView({ reportRun, project }) {
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
+                const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
 
                 const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
+                date.setHours(hours, minutes, seconds, 0);
                 return date;
             }
 
@@ -115,9 +135,12 @@ export default function ReportDetailView({ reportRun, project }) {
     const matchPunchesToShiftPoints = (dayPunches, shift) => {
         if (!shift || dayPunches.length === 0) return [];
         
+        // Enable seconds parsing for Al Maraghi Automotive
+        const includeSeconds = project.company === 'Al Maraghi Automotive';
+        
         const punchesWithTime = dayPunches.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw)
+            time: parseTime(p.timestamp_raw, includeSeconds)
         })).filter(p => p.time).sort((a, b) => a.time - b.time);
         
         if (punchesWithTime.length === 0) return [];
@@ -188,9 +211,12 @@ export default function ReportDetailView({ reportRun, project }) {
     const detectPartialDay = (dayPunches, shift) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
         
+        // Enable seconds parsing for Al Maraghi Automotive
+        const includeSeconds = project.company === 'Al Maraghi Automotive';
+        
         const punchesWithTime = dayPunches.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw)
+            time: parseTime(p.timestamp_raw, includeSeconds)
         })).filter(p => p.time).sort((a, b) => a.time - b.time);
         
         if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
@@ -219,9 +245,12 @@ export default function ReportDetailView({ reportRun, project }) {
     const filterMultiplePunches = (punchList, shift) => {
         if (punchList.length <= 1) return punchList;
 
+        // Enable seconds parsing for Al Maraghi Automotive
+        const includeSeconds = project.company === 'Al Maraghi Automotive';
+
         const punchesWithTime = punchList.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw)
+            time: parseTime(p.timestamp_raw, includeSeconds)
         })).filter(p => p.time);
 
         if (punchesWithTime.length === 0) return punchList;
@@ -249,6 +278,9 @@ export default function ReportDetailView({ reportRun, project }) {
         const employeeExceptions = exceptions.filter(e => e.attendance_id === result.attendance_id || e.attendance_id === 'ALL');
 
         const employee = employees.find(e => e.attendance_id === result.attendance_id);
+        
+        // Enable seconds parsing for Al Maraghi Automotive
+        const includeSeconds = project.company === 'Al Maraghi Automotive';
 
         let dayOverrides = {};
         if (result.day_overrides) {
@@ -793,6 +825,9 @@ export default function ReportDetailView({ reportRun, project }) {
         const employeeExceptions = exceptions.filter(e => e.attendance_id === currentResult.attendance_id || e.attendance_id === 'ALL');
 
         const employee = employees.find(e => e.attendance_id === currentResult.attendance_id);
+        
+        // Enable seconds parsing for Al Maraghi Automotive
+        const includeSeconds = project.company === 'Al Maraghi Automotive';
 
         const dayNameToNumber = {
             'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -1063,6 +1098,12 @@ export default function ReportDetailView({ reportRun, project }) {
             }
 
             const extractTime = (ts) => {
+                // For Al Maraghi Automotive: Handle seconds in timestamp (HH:MM:SS AM/PM)
+                if (project.company === 'Al Maraghi Automotive') {
+                    const matchWithSeconds = ts.match(/(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))/i);
+                    if (matchWithSeconds) return matchWithSeconds[1];
+                }
+                // Standard format without seconds
                 const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
                 return match ? match[1] : ts;
             };
@@ -1355,11 +1396,17 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 {day.punchMatches && day.punchMatches.length > 0 ? (
                                                     <div className="space-y-0.5">
                                                         {day.punchMatches.map((match, matchIdx) => {
-                                                            const extractTime = (ts) => {
-                                                                const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
-                                                                return match ? match[1] : ts;
-                                                            };
-                                                            return (
+                                                           const extractTime = (ts) => {
+                                                               // For Al Maraghi Automotive: Handle seconds in timestamp (HH:MM:SS AM/PM)
+                                                               if (project.company === 'Al Maraghi Automotive') {
+                                                                   const matchWithSeconds = ts.match(/(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))/i);
+                                                                   if (matchWithSeconds) return matchWithSeconds[1];
+                                                               }
+                                                               // Standard format without seconds
+                                                               const timeMatch = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+                                                               return timeMatch ? timeMatch[1] : ts;
+                                                           };
+                                                           return (
                                                                 <div key={matchIdx} className="flex items-center gap-1">
                                                                     <span className={match.matchedTo ? (match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') : 'text-red-600 font-bold'}>
                                                                         {extractTime(match.punch.timestamp_raw)}
