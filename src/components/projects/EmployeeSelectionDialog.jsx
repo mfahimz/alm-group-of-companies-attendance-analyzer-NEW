@@ -10,8 +10,8 @@ import { Users, Search } from 'lucide-react';
 
 export default function EmployeeSelectionDialog({ open, onOpenChange, company, onConfirm, initialIds = '' }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
-    const [additionalIds, setAdditionalIds] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [searchAllCompanies, setSearchAllCompanies] = useState(false);
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees'],
@@ -20,6 +20,7 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
     });
 
     const companyEmployees = employees.filter(e => e.company === company && e.active);
+    const allActiveEmployees = employees.filter(e => e.active);
 
     useEffect(() => {
         if (open && company) {
@@ -35,7 +36,9 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
         }
     }, [open, company, initialIds]);
 
-    const filteredEmployees = companyEmployees.filter(e =>
+    const employeesToSearch = searchAllCompanies ? allActiveEmployees : companyEmployees;
+    
+    const filteredEmployees = employeesToSearch.filter(e =>
         e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.hrms_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.attendance_id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -61,15 +64,7 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
     };
 
     const handleConfirm = () => {
-        const finalIds = new Set([...selectedIds]);
-        
-        // Add additional HRMS IDs
-        if (additionalIds.trim()) {
-            const additional = additionalIds.split(',').map(id => id.trim()).filter(Boolean);
-            additional.forEach(id => finalIds.add(id));
-        }
-
-        onConfirm(Array.from(finalIds).join(', '));
+        onConfirm(Array.from(selectedIds).join(', '));
         onOpenChange(false);
     };
 
@@ -85,26 +80,39 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
 
                 <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
                     {/* Search and Actions */}
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input
-                                placeholder="Search by name, HRMS ID, or Attendance ID..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9"
-                            />
+                    <div className="space-y-2">
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                    placeholder="Search by name, HRMS ID, or Attendance ID..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <Button variant="outline" size="sm" onClick={selectAll}>
+                                Select All
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={deselectAll}>
+                                Deselect All
+                            </Button>
                         </div>
-                        <Button variant="outline" size="sm" onClick={selectAll}>
-                            Select All
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={deselectAll}>
-                            Deselect All
-                        </Button>
+                        
+                        <div className="flex items-center gap-2">
+                            <Checkbox 
+                                id="search-all"
+                                checked={searchAllCompanies}
+                                onCheckedChange={setSearchAllCompanies}
+                            />
+                            <Label htmlFor="search-all" className="text-sm font-normal cursor-pointer">
+                                Search employees from all companies
+                            </Label>
+                        </div>
                     </div>
 
                     <div className="text-sm text-slate-600">
-                        {selectedIds.size} of {companyEmployees.length} employees selected
+                        {selectedIds.size} employee{selectedIds.size !== 1 ? 's' : ''} selected
                     </div>
 
                     {/* Employee List */}
@@ -112,43 +120,42 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
                         <div className="divide-y">
                             {filteredEmployees.length === 0 ? (
                                 <div className="p-8 text-center text-slate-500">
-                                    {companyEmployees.length === 0 ? 'No employees found for this company' : 'No matching employees'}
+                                    {employeesToSearch.length === 0 ? 'No employees found' : 'No matching employees'}
                                 </div>
                             ) : (
-                                filteredEmployees.map((employee) => (
-                                    <div
-                                        key={employee.id}
-                                        className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer"
-                                        onClick={() => toggleEmployee(employee.hrms_id)}
-                                    >
-                                        <Checkbox
-                                            checked={selectedIds.has(employee.hrms_id)}
-                                            onCheckedChange={() => toggleEmployee(employee.hrms_id)}
-                                        />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-slate-900 truncate">{employee.name}</p>
-                                            <p className="text-sm text-slate-500">
-                                                HRMS: {employee.hrms_id} | Attendance: {employee.attendance_id}
-                                                {employee.department && ` | ${employee.department}`}
-                                            </p>
+                                filteredEmployees.map((employee) => {
+                                    const isFromDifferentCompany = employee.company !== company;
+                                    return (
+                                        <div
+                                            key={employee.id}
+                                            className={`flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer ${
+                                                isFromDifferentCompany ? 'bg-amber-50/50' : ''
+                                            }`}
+                                            onClick={() => toggleEmployee(employee.hrms_id)}
+                                        >
+                                            <Checkbox
+                                                checked={selectedIds.has(employee.hrms_id)}
+                                                onCheckedChange={() => toggleEmployee(employee.hrms_id)}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-medium text-slate-900 truncate">{employee.name}</p>
+                                                    {isFromDifferentCompany && (
+                                                        <span className="px-2 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded">
+                                                            {employee.company}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-slate-500">
+                                                    HRMS: {employee.hrms_id} | Attendance: {employee.attendance_id}
+                                                    {employee.department && ` | ${employee.department}`}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
-                    </div>
-
-                    {/* Additional IDs Input */}
-                    <div>
-                        <Label>Add Additional HRMS IDs (comma-separated)</Label>
-                        <Input
-                            value={additionalIds}
-                            onChange={(e) => setAdditionalIds(e.target.value)}
-                            placeholder="e.g., 999, 888, 777"
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                            Add HRMS IDs that are not in the company's employee list
-                        </p>
                     </div>
 
                     {/* Actions */}
