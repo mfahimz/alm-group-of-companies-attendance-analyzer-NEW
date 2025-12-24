@@ -72,10 +72,29 @@ export default function RunAnalysisTab({ project }) {
         }
     });
 
-    const parseTime = (timeStr) => {
+    const parseTime = (timeStr, includeSeconds = false) => {
         try {
             if (!timeStr || timeStr === '—') return null;
             
+            // For Al Maraghi Automotive: Match with seconds (HH:MM:SS AM/PM)
+            if (includeSeconds) {
+                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = parseInt(timeMatch[3]);
+                    const period = timeMatch[4].toUpperCase();
+                    
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                    
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
+                }
+            }
+            
+            // Standard format: HH:MM AM/PM (without seconds)
             let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
@@ -90,13 +109,15 @@ export default function RunAnalysisTab({ project }) {
                 return date;
             }
             
+            // 24-hour format with optional seconds
             timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
+                const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
                 
                 const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
+                date.setHours(hours, minutes, seconds, 0);
                 return date;
             }
             
@@ -106,12 +127,12 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
-    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+    const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds = false) => {
         if (!shift || dayPunches.length === 0) return [];
         
         const punchesWithTime = dayPunches.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw)
+            time: parseTime(p.timestamp_raw, includeSeconds)
         })).filter(p => p.time).sort((a, b) => a.time - b.time);
         
         if (punchesWithTime.length === 0) return [];
@@ -181,12 +202,12 @@ export default function RunAnalysisTab({ project }) {
         return matches;
     };
 
-    const detectPartialDay = (dayPunches, shift) => {
+    const detectPartialDay = (dayPunches, shift, includeSeconds = false) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
         
         const punchesWithTime = dayPunches.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw)
+            time: parseTime(p.timestamp_raw, includeSeconds)
         })).filter(p => p.time).sort((a, b) => a.time - b.time);
         
         if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
@@ -212,12 +233,12 @@ export default function RunAnalysisTab({ project }) {
         return { isPartial: false, reason: null };
     };
 
-    const filterMultiplePunches = (punchList, shift) => {
+    const filterMultiplePunches = (punchList, shift, includeSeconds = false) => {
         if (punchList.length <= 1) return punchList;
 
         const punchesWithTime = punchList.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw)
+            time: parseTime(p.timestamp_raw, includeSeconds)
         })).filter(p => p.time);
 
         if (punchesWithTime.length === 0) return punchList;
@@ -249,6 +270,9 @@ export default function RunAnalysisTab({ project }) {
         
         // Get employee to determine weekly off day
         const employee = employees.find(e => e.attendance_id === attendance_id);
+        
+        // Enable seconds parsing for Al Maraghi Automotive only
+        const includeSeconds = project.company === 'Al Maraghi Automotive';
 
         let working_days = 0;
         let present_days = 0;
@@ -368,17 +392,17 @@ export default function RunAnalysisTab({ project }) {
             const dayPunches = employeePunches
                 .filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw);
-                    const timeB = parseTime(b.timestamp_raw);
+                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
 
-            let filteredPunches = filterMultiplePunches(dayPunches, shift);
+            let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
             
             let punchMatches = [];
             let hasUnmatchedPunch = false;
             if (shift && filteredPunches.length > 0) {
-                punchMatches = matchPunchesToShiftPoints(filteredPunches, shift);
+                punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds);
                 hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
             }
             
@@ -388,7 +412,7 @@ export default function RunAnalysisTab({ project }) {
                                    shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(filteredPunches, shift);
+            const partialDayResult = detectPartialDay(filteredPunches, shift, includeSeconds);
 
             if (filteredPunches.length > 0) {
                 if (partialDayResult.isPartial) {

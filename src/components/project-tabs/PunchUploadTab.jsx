@@ -134,10 +134,11 @@ export default function PunchUploadTab({ project }) {
                     let punch_date = '';
                     
                     // Al Maraghi Automotive format: ID, name, timestamp (3 columns)
+                    // Supports: M/D/YYYY H:MM:SS AM/PM format with seconds
                     if (project.company === 'Al Maraghi Automotive' && values.length >= 3) {
                         timestamp_raw = values[2].trim();
-                        
-                        // Extract date from timestamp (M/D/YYYY or MM/DD/YYYY HH:MM AM/PM)
+
+                        // Extract date from timestamp (M/D/YYYY or MM/DD/YYYY HH:MM:SS AM/PM)
                         const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
                         if (dateMatch) {
                             const [, month, day, year] = dateMatch;
