@@ -289,12 +289,17 @@ export default function RunAnalysisTab({ project }) {
 
             working_days++;
 
-            const dateException = employeeExceptions.find(ex => {
+            // Find all matching exceptions and get the latest one by created_date
+            const matchingExceptions = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
                 return currentDate >= exFrom && currentDate <= exTo && 
                        (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
             });
+            
+            const dateException = matchingExceptions.length > 0
+                ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                : null;
 
             if (dateException) {
                 if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
@@ -407,11 +412,20 @@ export default function RunAnalysisTab({ project }) {
                 full_absence_count++;
             }
 
+            // Track allowed minutes from ALLOWED_MINUTES exception
+            let allowedMinutesForDay = 0;
+            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
+                allowedMinutesForDay = dateException.allowed_minutes || 0;
+            }
+
             const shouldSkipTimeCalculation = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
             if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+                
                 for (const match of punchMatches) {
                     if (!match.matchedTo) continue;
                     
@@ -421,17 +435,33 @@ export default function RunAnalysisTab({ project }) {
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                         if (punchTime > shiftTime) {
                             const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
-                            late_minutes += minutes;
+                            dayLateMinutes += minutes;
                         }
                     }
                     
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                         if (punchTime < shiftTime) {
                             const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
-                            early_checkout_minutes += minutes;
+                            dayEarlyMinutes += minutes;
                         }
                     }
                 }
+                
+                // Apply allowed minutes - subtract from late/early
+                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
+                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
+                    // Proportionally reduce late and early
+                    if (totalDayMinutes > 0) {
+                        const lateRatio = dayLateMinutes / totalDayMinutes;
+                        const earlyRatio = dayEarlyMinutes / totalDayMinutes;
+                        dayLateMinutes = Math.round(remaining * lateRatio);
+                        dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                    }
+                }
+                
+                late_minutes += dayLateMinutes;
+                early_checkout_minutes += dayEarlyMinutes;
             }
 
             const expectedPunches = isSingleShift ? 2 : 4;
@@ -492,6 +522,11 @@ export default function RunAnalysisTab({ project }) {
         if (punches.length === 0) {
             toast.error('No punch data available. Please upload punches first.');
             return;
+        }
+
+        if (shifts.length === 0) {
+            const proceed = window.confirm('⚠️ No shift timings found. Analysis will proceed but may produce incorrect results. Continue anyway?');
+            if (!proceed) return;
         }
 
         setIsAnalyzing(true);
