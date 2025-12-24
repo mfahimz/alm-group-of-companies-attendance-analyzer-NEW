@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
 Deno.serve(async (req) => {
@@ -20,8 +20,18 @@ Deno.serve(async (req) => {
 
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+        
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            return Response.json({ error: 'No sheets found in the workbook' }, { status: 400 });
+        }
+        
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
+        
+        if (!worksheet['!ref']) {
+            return Response.json({ error: 'Empty worksheet' }, { status: 400 });
+        }
+        
         const range = XLSX.utils.decode_range(worksheet['!ref']);
 
         // Generate batch ID
