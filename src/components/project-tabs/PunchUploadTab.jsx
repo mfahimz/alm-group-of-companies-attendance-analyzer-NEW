@@ -579,7 +579,7 @@ export default function PunchUploadTab({ project }) {
                                             <SortableTableHead sortKey="timestamp_raw" currentSort={sort} onSort={setSort}>
                                                 Time
                                             </SortableTableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            {!isUser && <TableHead className="text-right">Actions</TableHead>}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>

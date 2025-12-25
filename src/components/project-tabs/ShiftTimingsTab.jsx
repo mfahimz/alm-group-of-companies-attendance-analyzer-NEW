@@ -780,7 +780,7 @@ export default function ShiftTimingsTab({ project }) {
                                                 <TableHead>Shift Type</TableHead>
                                                 <TableHead>Shift Times</TableHead>
                                                 <TableHead>Applicable Days</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
+                                                {!isUser && <TableHead className="text-right">Actions</TableHead>}
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
