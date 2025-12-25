@@ -331,9 +331,9 @@ export default function Users() {
                                                     variant="outline"
                                                     onClick={() => handleToggleRole(user)}
                                                     disabled={updateUserMutation.isPending}
-                                                    title={`Change role to ${user.role === 'admin' ? 'user' : 'admin'}`}
+                                                    title="Toggle role (Admin → Supervisor → User → Admin)"
                                                 >
-                                                    {user.role === 'admin' ? <UserIcon className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                                                    <Shield className="w-4 h-4" />
                                                 </Button>
                                             </div>
                                         </TableCell>
