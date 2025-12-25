@@ -133,7 +133,7 @@ export default function AuditTrail() {
         });
 
         return filtered;
-    }, [auditLogs, searchTerm, actionFilter, entityFilter, userFilter, sortKey, sortDirection]);
+    }, [allLogs, searchTerm, actionFilter, entityFilter, userFilter, sortKey, sortDirection]);
 
     // Paginate
     const paginatedLogs = useMemo(() => {
