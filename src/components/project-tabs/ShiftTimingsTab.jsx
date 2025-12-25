@@ -464,79 +464,97 @@ export default function ShiftTimingsTab({ project }) {
         createShiftMutation.mutate(formData);
     };
 
-    const exportShiftsToCSV = () => {
+    const exportShiftsToCSV = async () => {
         if (shifts.length === 0) {
             toast.error('No shift data to export');
             return;
         }
 
-        const headers = ['Attendance ID', 'Employee Name', 'Department', 'Shift Type', 'Applicable Days', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Block', 'Effective From', 'Effective To'];
-        const rows = shifts.map(shift => {
-            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
-            return [
-                shift.attendance_id,
-                employee?.name || '-',
-                employee?.department || '-',
-                shift.is_single_shift ? 'Single Shift' : 'Regular',
-                shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days'),
-                shift.am_start || '-',
-                shift.am_end || '-',
-                shift.pm_start || '-',
-                shift.pm_end || '-',
-                shift.shift_block === 'block2' ? 'Block 2' : 'Block 1',
-                shift.effective_from ? new Date(shift.effective_from).toLocaleDateString('en-GB') : '-',
-                shift.effective_to ? new Date(shift.effective_to).toLocaleDateString('en-GB') : '-'
-            ];
-        });
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            
+            const data = shifts.map(shift => {
+                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                return {
+                    'Attendance ID': shift.attendance_id,
+                    'Employee Name': employee?.name || '-',
+                    'Department': employee?.department || '-',
+                    'Weekly Off': employee?.weekly_off || 'Sunday',
+                    'Shift Type': shift.is_single_shift ? 'Single Shift' : 'Regular',
+                    'Applicable Days': shift.applicable_days ? 
+                        ((() => {
+                            try {
+                                const daysArray = JSON.parse(shift.applicable_days);
+                                return Array.isArray(daysArray) ? daysArray.join(', ') : shift.applicable_days;
+                            } catch { return shift.applicable_days; }
+                        })()) : 
+                        (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days'),
+                    'AM Start': shift.am_start || '-',
+                    'AM End': shift.am_end || '-',
+                    'PM Start': shift.pm_start || '-',
+                    'PM End': shift.pm_end || '-',
+                    'Block': shift.shift_block === 'block2' ? 'Block 2' : 'Block 1',
+                    'Effective From': shift.effective_from ? new Date(shift.effective_from).toLocaleDateString('en-GB') : '-',
+                    'Effective To': shift.effective_to ? new Date(shift.effective_to).toLocaleDateString('en-GB') : '-'
+                };
+            });
 
-        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${project.name}_shift_timings.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
-        toast.success('Shift timings exported');
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Shift Timings');
+            
+            XLSX.writeFile(workbook, `${project.name}_shift_timings.xlsx`);
+            toast.success('Shift timings exported to Excel');
+        } catch (error) {
+            toast.error('Failed to export');
+            console.error(error);
+        }
     };
 
-    const exportBlockShiftsToCSV = (blockId, blockShifts) => {
+    const exportBlockShiftsToCSV = async (blockId, blockShifts) => {
         if (blockShifts.length === 0) {
             toast.error('No shifts in this block to export');
             return;
         }
 
-        const headers = ['Attendance ID', 'Employee Name', 'Department', 'Shift Type', 'Applicable Days', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Effective From', 'Effective To'];
-        const rows = blockShifts.map(shift => {
-            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
-            return [
-                shift.attendance_id,
-                employee?.name || '-',
-                employee?.department || '-',
-                shift.is_single_shift ? 'Single Shift' : 'Regular',
-                shift.applicable_days || (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days'),
-                shift.am_start || '-',
-                shift.am_end || '-',
-                shift.pm_start || '-',
-                shift.pm_end || '-',
-                shift.effective_from ? new Date(shift.effective_from).toLocaleDateString('en-GB') : '-',
-                shift.effective_to ? new Date(shift.effective_to).toLocaleDateString('en-GB') : '-'
-            ];
-        });
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            
+            const data = blockShifts.map(shift => {
+                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                return {
+                    'Attendance ID': shift.attendance_id,
+                    'Employee Name': employee?.name || '-',
+                    'Department': employee?.department || '-',
+                    'Weekly Off': employee?.weekly_off || 'Sunday',
+                    'Shift Type': shift.is_single_shift ? 'Single Shift' : 'Regular',
+                    'Applicable Days': shift.applicable_days ? 
+                        ((() => {
+                            try {
+                                const daysArray = JSON.parse(shift.applicable_days);
+                                return Array.isArray(daysArray) ? daysArray.join(', ') : shift.applicable_days;
+                            } catch { return shift.applicable_days; }
+                        })()) : 
+                        (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days'),
+                    'AM Start': shift.am_start || '-',
+                    'AM End': shift.am_end || '-',
+                    'PM Start': shift.pm_start || '-',
+                    'PM End': shift.pm_end || '-',
+                    'Effective From': shift.effective_from ? new Date(shift.effective_from).toLocaleDateString('en-GB') : '-',
+                    'Effective To': shift.effective_to ? new Date(shift.effective_to).toLocaleDateString('en-GB') : '-'
+                };
+            });
 
-        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${project.name}_${blockId}_shifts.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
-        toast.success(`${blockId.replace('block', 'Block ')} shifts exported`);
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, blockId.replace('block', 'Block '));
+            
+            XLSX.writeFile(workbook, `${project.name}_${blockId}_shifts.xlsx`);
+            toast.success(`${blockId.replace('block', 'Block ')} shifts exported to Excel`);
+        } catch (error) {
+            toast.error('Failed to export');
+            console.error(error);
+        }
     };
 
     const renderShiftBlock = (blockId, blockShifts, blockLabel) => {
