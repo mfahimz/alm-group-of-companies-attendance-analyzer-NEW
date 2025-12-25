@@ -13,6 +13,7 @@ export default function RunAnalysisTab({ project }) {
     const [progress, setProgress] = useState(null);
     const [dateFrom, setDateFrom] = useState(project.date_from);
     const [dateTo, setDateTo] = useState(project.date_to);
+    const [reportName, setReportName] = useState('');
     const queryClient = useQueryClient();
 
     const { data: punches = [] } = useQuery({
@@ -25,10 +26,18 @@ export default function RunAnalysisTab({ project }) {
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id })
     });
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
     });
+
+    // Check for pending exceptions
+    const hasPendingExceptions = exceptions.some(e => e.approval_status === 'pending');
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
@@ -561,6 +570,7 @@ export default function RunAnalysisTab({ project }) {
 
             const reportRun = await base44.entities.ReportRun.create({
                 project_id: project.id,
+                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
                 date_from: dateFrom,
                 date_to: dateTo,
                 employee_count: uniqueEmployeeIds.length
@@ -684,6 +694,18 @@ export default function RunAnalysisTab({ project }) {
                     </div>
 
                     <div className="space-y-4">
+                        <div>
+                            <Label>Report Name (Optional)</Label>
+                            <Input
+                                placeholder="e.g., December 2024 - Final"
+                                value={reportName}
+                                onChange={(e) => setReportName(e.target.value)}
+                                disabled={isAnalyzing}
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Give this report a name for easy identification
+                            </p>
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <Label>From Date</Label>
@@ -733,10 +755,25 @@ export default function RunAnalysisTab({ project }) {
                         )}
                     </div>
 
+                    {hasPendingExceptions && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-amber-900">Pending Exception Approvals</p>
+                                    <p className="text-sm text-amber-700 mt-1">
+                                        There are {exceptions.filter(e => e.approval_status === 'pending').length} exception(s) awaiting approval. 
+                                        Analysis cannot run until all exceptions are approved or rejected.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div>
                         <Button
                             onClick={runAnalysis}
-                            disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo}
+                            disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo || hasPendingExceptions}
                             className="bg-indigo-600 hover:bg-indigo-700"
                             size="lg"
                         >
@@ -744,7 +781,10 @@ export default function RunAnalysisTab({ project }) {
                             {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
                         </Button>
                         <p className="text-sm text-slate-500 mt-2">
-                            Select a date range and run analysis to generate attendance report for that period.
+                            {hasPendingExceptions 
+                                ? 'Analysis is blocked until all exceptions are approved.'
+                                : 'Select a date range and run analysis to generate attendance report for that period.'
+                            }
                         </p>
                     </div>
                 </CardContent>
