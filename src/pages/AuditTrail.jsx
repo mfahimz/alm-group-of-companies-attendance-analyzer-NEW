@@ -420,14 +420,21 @@ export default function AuditTrail() {
                                     <p className="text-xs text-slate-500">Company</p>
                                     <p className="text-sm font-medium">{selectedLog.company || '-'}</p>
                                 </div>
-                            </div>
+                                </div>
 
-                            {selectedLog.details && (
+                                {selectedLog.user_agent && (
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-1">User Agent</p>
+                                    <div className="bg-slate-50 rounded-lg p-3 text-xs break-all">{selectedLog.user_agent}</div>
+                                </div>
+                                )}
+
+                                {selectedLog.details && (
                                 <div>
                                     <p className="text-xs text-slate-500 mb-1">Details</p>
                                     <div className="bg-slate-50 rounded-lg p-3 text-sm">{selectedLog.details}</div>
                                 </div>
-                            )}
+                                )}
 
                             {selectedLog.old_data && (
                                 <div>
