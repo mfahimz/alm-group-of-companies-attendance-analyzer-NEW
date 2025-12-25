@@ -12,6 +12,7 @@ import ReportDetail from './pages/ReportDetail';
 import RulesSettings from './pages/RulesSettings';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import AuditTrail from './pages/AuditTrail';
 import __Layout from './Layout.jsx';
 
 
@@ -30,6 +31,7 @@ export const PAGES = {
     "RulesSettings": RulesSettings,
     "UserProfile": UserProfile,
     "Users": Users,
+    "AuditTrail": AuditTrail,
 }
 
 export const pagesConfig = {
