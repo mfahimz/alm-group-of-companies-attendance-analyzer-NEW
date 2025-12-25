@@ -71,7 +71,8 @@ export default function AuditTrail() {
         'ACCESS': <Eye className="w-4 h-4 text-slate-600" />,
         'EXPORT': <Download className="w-4 h-4 text-purple-600" />,
         'IMPORT': <Upload className="w-4 h-4 text-indigo-600" />,
-        'ANALYZE': <FileText className="w-4 h-4 text-amber-600" />
+        'ANALYZE': <FileText className="w-4 h-4 text-amber-600" />,
+        'LOGIN': <LogIn className="w-4 h-4 text-cyan-600" />
     };
 
     const actionColors = {
@@ -81,7 +82,8 @@ export default function AuditTrail() {
         'ACCESS': 'bg-slate-100 text-slate-800',
         'EXPORT': 'bg-purple-100 text-purple-800',
         'IMPORT': 'bg-indigo-100 text-indigo-800',
-        'ANALYZE': 'bg-amber-100 text-amber-800'
+        'ANALYZE': 'bg-amber-100 text-amber-800',
+        'LOGIN': 'bg-cyan-100 text-cyan-800'
     };
 
     // Extract unique values for filters
