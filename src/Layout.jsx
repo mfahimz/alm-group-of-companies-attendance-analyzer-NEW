@@ -150,19 +150,8 @@ export default function Layout({ children, currentPageName }) {
     if (!currentUser.company && currentUser.role !== 'admin') {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="max-w-md text-center p-6">
-                    <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-4">
-                        <p className="font-semibold">Company Not Assigned</p>
-                        <p className="text-sm mt-2">Your account does not have a company assigned. Please contact your administrator to assign a company to your account.</p>
-                    </div>
-                    <Button
-                        variant="outline"
-                        onClick={() => base44.auth.logout()}
-                        className="mt-4"
-                    >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Logout
-                    </Button>
+                <div className="text-slate-600 text-center">
+                    No company is assigned. Wait for the administrator to assign a company.
                 </div>
             </div>
         );
