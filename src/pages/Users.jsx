@@ -16,12 +16,12 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
 
 const DEFAULT_PAGES = [
-    { page_name: 'Dashboard', description: 'Main dashboard and overview', allowed_roles: 'admin,user' },
-    { page_name: 'Projects', description: 'Manage attendance projects', allowed_roles: 'admin' },
-    { page_name: 'Employees', description: 'Manage employee master list', allowed_roles: 'admin' },
+    { page_name: 'Dashboard', description: 'Main dashboard and overview', allowed_roles: 'admin,supervisor,user' },
+    { page_name: 'Projects', description: 'Manage attendance projects', allowed_roles: 'admin,supervisor' },
+    { page_name: 'Employees', description: 'Manage employee master list', allowed_roles: 'admin,supervisor' },
     { page_name: 'Users', description: 'Manage system users and roles', allowed_roles: 'admin' },
     { page_name: 'RulesSettings', description: 'Configure attendance rules', allowed_roles: 'admin' },
-    { page_name: 'UserProfile', description: 'View user profile', allowed_roles: 'user' }
+    { page_name: 'UserProfile', description: 'View user profile', allowed_roles: 'admin,supervisor,user' }
 ];
 
 export default function Users() {
@@ -299,10 +299,12 @@ export default function Users() {
                                         <TableCell>
                                             <span className={`
                                                 px-2 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1
-                                                ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}
+                                                ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 
+                                                  user.role === 'supervisor' ? 'bg-blue-100 text-blue-700' : 
+                                                  'bg-slate-100 text-slate-700'}
                                             `}>
                                                 {user.role === 'admin' ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                                                {user.role === 'admin' ? 'Admin' : 'User'}
+                                                {user.role === 'admin' ? 'Admin' : user.role === 'supervisor' ? 'Supervisor' : 'User'}
                                             </span>
                                         </TableCell>
                                         <TableCell>{new Date(user.created_date).toLocaleDateString('en-GB')}</TableCell>
@@ -399,8 +401,9 @@ export default function Users() {
                                         <TableRow>
                                             <TableHead>Page Name</TableHead>
                                             <TableHead>Description</TableHead>
-                                            <TableHead className="text-center">Admin Access</TableHead>
-                                            <TableHead className="text-center">User Access</TableHead>
+                                            <TableHead className="text-center">Admin</TableHead>
+                                            <TableHead className="text-center">Supervisor</TableHead>
+                                            <TableHead className="text-center">User</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -417,6 +420,27 @@ export default function Users() {
                                                         className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}
                                                     >
                                                         {hasPageRole(permission, 'admin') ? (
+                                                            <>
+                                                                <Shield className="w-4 h-4 mr-2" />
+                                                                Allowed
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Lock className="w-4 h-4 mr-2" />
+                                                                Denied
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Button
+                                                        size="sm"
+                                                        variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'}
+                                                        onClick={() => togglePageRole(permission, 'supervisor')}
+                                                        disabled={updatePermissionMutation.isPending}
+                                                        className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                                                    >
+                                                        {hasPageRole(permission, 'supervisor') ? (
                                                             <>
                                                                 <Shield className="w-4 h-4 mr-2" />
                                                                 Allowed
@@ -465,7 +489,7 @@ export default function Users() {
                             </p>
                             <ul className="text-sm text-blue-900 space-y-1 list-disc list-inside">
                                 <li>Click a button to toggle access for that role</li>
-                                <li>Green = User role can access, Purple = Admin role can access</li>
+                                <li>Purple = Admin, Blue = Supervisor, Green = User access</li>
                                 <li>Each page must have at least one role with access</li>
                                 <li>Changes take effect immediately</li>
                             </ul>
