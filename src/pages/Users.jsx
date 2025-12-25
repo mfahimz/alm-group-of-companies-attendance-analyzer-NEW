@@ -50,10 +50,11 @@ export default function Users() {
 
     useEffect(() => {
         if (currentUser && permissions.length > 0) {
+            const userRole = currentUser.extended_role || currentUser.role || 'user';
             const permission = permissions.find(p => p.page_name === 'Users');
             if (permission) {
                 const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-                if (!allowedRoles.includes(currentUser.role)) {
+                if (!allowedRoles.includes(userRole)) {
                     toast.error('Access denied.');
                     navigate(createPageUrl('Dashboard'));
                 }
@@ -100,10 +101,11 @@ export default function Users() {
     };
 
     const handleToggleRole = (user) => {
+        const currentRole = user.extended_role || user.role || 'user';
         let newRole;
-        if (user.role === 'admin') {
+        if (currentRole === 'admin') {
             newRole = 'supervisor';
-        } else if (user.role === 'supervisor') {
+        } else if (currentRole === 'supervisor') {
             newRole = 'user';
         } else {
             newRole = 'admin';
@@ -112,7 +114,7 @@ export default function Users() {
         if (window.confirm(`Change ${user.full_name}'s role to ${newRole}?`)) {
             updateUserMutation.mutate({
                 id: user.id,
-                data: { role: newRole }
+                data: { extended_role: newRole }
             });
         }
     };
@@ -305,15 +307,20 @@ export default function Users() {
                                         <TableCell className="font-medium">{user.full_name}</TableCell>
                                         <TableCell>{user.email}</TableCell>
                                         <TableCell>
-                                            <span className={`
-                                                px-2 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1
-                                                ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 
-                                                  user.role === 'supervisor' ? 'bg-blue-100 text-blue-700' : 
-                                                  'bg-slate-100 text-slate-700'}
-                                            `}>
-                                                {user.role === 'admin' ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                                                {user.role === 'admin' ? 'Admin' : user.role === 'supervisor' ? 'Supervisor' : 'User'}
-                                            </span>
+                                            {(() => {
+                                                const displayRole = user.extended_role || user.role || 'user';
+                                                return (
+                                                    <span className={`
+                                                        px-2 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1
+                                                        ${displayRole === 'admin' ? 'bg-purple-100 text-purple-700' : 
+                                                          displayRole === 'supervisor' ? 'bg-blue-100 text-blue-700' : 
+                                                          'bg-slate-100 text-slate-700'}
+                                                    `}>
+                                                        {displayRole === 'admin' ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                                                        {displayRole === 'admin' ? 'Admin' : displayRole === 'supervisor' ? 'Supervisor' : 'User'}
+                                                    </span>
+                                                );
+                                            })()}
                                         </TableCell>
                                         <TableCell>{new Date(user.created_date).toLocaleDateString('en-GB')}</TableCell>
                                         <TableCell className="text-right">
