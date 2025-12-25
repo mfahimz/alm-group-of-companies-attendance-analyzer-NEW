@@ -109,7 +109,8 @@ export default function Layout({ children, currentPageName }) {
                 { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
                 { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
                 { name: 'Diagnostics', path: 'Diagnostics', icon: Activity },
-                { name: 'Documentation', path: 'Documentation', icon: Book }
+                { name: 'Documentation', path: 'Documentation', icon: Book },
+                { name: 'Training Guide', path: 'Training', icon: Book }
             ]
         }] : []),
         {
