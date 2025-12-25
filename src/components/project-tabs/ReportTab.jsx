@@ -17,7 +17,7 @@ export default function ReportTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
-    const isUser = currentUser?.role === 'user';
+    const isAdmin = currentUser?.role === 'admin';
 
     const { data: allReportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
@@ -122,6 +122,16 @@ export default function ReportTab({ project }) {
                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
                                                         </Link>
+                                                        {isAdmin && (
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="ghost"
+                                                                onClick={() => handleDeleteReport(run.id)}
+                                                                disabled={deleteReportMutation.isPending}
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-red-600" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
