@@ -42,15 +42,27 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
                 custom_employee_ids: sourceProject.custom_employee_ids
             });
 
-            // Duplicate shift timings only
+            // Duplicate shift timings only, adjusting dates to fit new project range
             const shifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProject.id });
 
             if (shifts.length > 0) {
+                // Calculate date offset
+                const oldStart = new Date(sourceProject.date_from);
+                const newStart = new Date(data.date_from);
+                const dayOffset = Math.round((newStart - oldStart) / (1000 * 60 * 60 * 24));
+
+                const adjustDate = (dateStr) => {
+                    if (!dateStr) return null;
+                    const date = new Date(dateStr);
+                    date.setDate(date.getDate() + dayOffset);
+                    return date.toISOString().split('T')[0];
+                };
+
                 await base44.entities.ShiftTiming.bulkCreate(
                     shifts.map(s => ({
                         project_id: newProject.id,
                         attendance_id: s.attendance_id,
-                        date: s.date,
+                        date: adjustDate(s.date),
                         is_friday_shift: s.is_friday_shift,
                         is_single_shift: s.is_single_shift,
                         applicable_days: s.applicable_days,
@@ -58,8 +70,8 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
                         am_end: s.am_end,
                         pm_start: s.pm_start,
                         pm_end: s.pm_end,
-                        effective_from: s.effective_from,
-                        effective_to: s.effective_to,
+                        effective_from: adjustDate(s.effective_from),
+                        effective_to: adjustDate(s.effective_to),
                         shift_block: s.shift_block
                     }))
                 );
