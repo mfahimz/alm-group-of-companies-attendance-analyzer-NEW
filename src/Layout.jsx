@@ -1,7 +1,23 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { BarChart3, FolderKanban, Users, Settings, LayoutDashboard, Shield, User as UserIcon, LogOut, Menu, X, ChevronDown, Book, Activity, Calendar, FileSpreadsheet } from 'lucide-react';
+import { 
+    BarChart3, 
+    FolderKanban, 
+    Users, 
+    Settings, 
+    LayoutDashboard, 
+    Shield, 
+    User as UserIcon, 
+    LogOut, 
+    Menu, 
+    X, 
+    ChevronDown, 
+    Book, 
+    Activity, 
+    Calendar, 
+    FileSpreadsheet 
+} from 'lucide-react';
 import { Toaster } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
