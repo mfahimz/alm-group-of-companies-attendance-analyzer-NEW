@@ -93,7 +93,7 @@ export default function Layout({ children, currentPageName }) {
             items: [
                 { name: 'Projects', path: 'Projects', icon: FolderKanban },
                 { name: 'Employees', path: 'Employees', icon: Users },
-                { name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 },
+                ...(isAdmin || isSupervisor ? [{ name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 }] : []),
                 ...(isAdmin || isSupervisor ? [{ name: 'Exception Approvals', path: 'ExceptionApprovals', icon: Shield }] : []),
                 ...(isAdmin ? [{ name: 'Astra Import', path: 'AstraImport', icon: FileSpreadsheet }] : [])
             ]
