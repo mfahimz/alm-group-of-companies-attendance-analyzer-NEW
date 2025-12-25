@@ -100,7 +100,15 @@ export default function Users() {
     };
 
     const handleToggleRole = (user) => {
-        const newRole = user.role === 'admin' ? 'user' : 'admin';
+        let newRole;
+        if (user.role === 'admin') {
+            newRole = 'supervisor';
+        } else if (user.role === 'supervisor') {
+            newRole = 'user';
+        } else {
+            newRole = 'admin';
+        }
+        
         if (window.confirm(`Change ${user.full_name}'s role to ${newRole}?`)) {
             updateUserMutation.mutate({
                 id: user.id,
