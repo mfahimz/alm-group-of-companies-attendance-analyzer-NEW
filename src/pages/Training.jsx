@@ -2,21 +2,265 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Users, FolderKanban, Clock, AlertCircle, BarChart3, Building2, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BookOpen, Users, FolderKanban, Clock, AlertCircle, BarChart3, Building2, CheckCircle, Download, FileText } from 'lucide-react';
 import Breadcrumb from '../components/ui/Breadcrumb';
+import { jsPDF } from 'jspdf';
+import { toast } from 'sonner';
 
 export default function Training() {
+    const [exporting, setExporting] = useState(false);
+
+    const exportToPDF = async () => {
+        setExporting(true);
+        try {
+            const pdf = new jsPDF();
+            let yPos = 20;
+            const pageHeight = pdf.internal.pageSize.height;
+            const margin = 20;
+            const lineHeight = 7;
+
+            const addText = (text, fontSize = 10, isBold = false) => {
+                if (yPos > pageHeight - margin) {
+                    pdf.addPage();
+                    yPos = margin;
+                }
+                pdf.setFontSize(fontSize);
+                pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+                const lines = pdf.splitTextToSize(text, 170);
+                pdf.text(lines, margin, yPos);
+                yPos += lines.length * lineHeight;
+            };
+
+            // Title
+            addText('ALM Attendance Management System', 18, true);
+            addText('Complete Training Guide', 14, true);
+            yPos += 10;
+
+            // Overview
+            addText('SYSTEM OVERVIEW', 14, true);
+            yPos += 5;
+            addText('ALM Attendance is a comprehensive attendance management system designed to track, analyze, and report on employee attendance across multiple companies. The system processes punch data, applies shift rules, manages exceptions, and generates detailed attendance reports.');
+            yPos += 5;
+
+            // User Roles
+            addText('USER ROLES & PERMISSIONS', 14, true);
+            yPos += 5;
+            addText('Administrator (Admin):', 12, true);
+            addText('Full system access with all privileges including project management, system settings, user management, and audit trails.');
+            yPos += 3;
+            addText('Supervisor:', 12, true);
+            addText('Access to all companies but no system settings. Can manage projects, approve exceptions, and view analytics.');
+            yPos += 3;
+            addText('Regular User:', 12, true);
+            addText('Company-specific read-only access with ability to create exception requests that require approval.');
+            yPos += 5;
+
+            // Workflow
+            addText('COMPLETE WORKFLOW', 14, true);
+            yPos += 5;
+            addText('1. Create or Import Employees - Add employees with HRMS ID and Attendance ID');
+            addText('2. Create a Project - Set company, date range, and employee selection');
+            addText('3. Upload Punch Data - Import CSV/Excel with punch timestamps');
+            addText('4. Configure Shift Timings - Set AM/PM shifts or single shift patterns');
+            addText('5. Add Exceptions - Include leaves, holidays, and special cases');
+            addText('6. Run Analysis - Process all data and generate attendance reports');
+            addText('7. Review Report - View results and make adjustments');
+            addText('8. Save & Finalize - Save modifications for project closure');
+            addText('9. Close Project - Admin finalizes and prevents further changes');
+            yPos += 5;
+
+            // Company Configurations
+            addText('COMPANY-SPECIFIC CONFIGURATIONS', 14, true);
+            yPos += 5;
+            
+            addText('Al Maraghi Auto Repairs:', 12, true);
+            addText('- Timestamp: DD/MM/YYYY HH:mm AM/PM');
+            addText('- AM Shift: 08:00 AM - 12:00 PM | PM Shift: 01:00 PM - 05:00 PM');
+            addText('- Friday: Half day (AM only) | Weekly Off: Sunday | Grace: 15 min');
+            yPos += 3;
+
+            addText('Al Maraghi Automotive:', 12, true);
+            addText('- Similar to Auto Repairs with standard configuration');
+            yPos += 3;
+
+            addText('Naser Mohsin Auto Parts:', 12, true);
+            addText('- Standard configuration across the board');
+            yPos += 3;
+
+            addText('Astra Auto Parts:', 12, true);
+            addText('- Timestamp: YYYY-MM-DD HH:mm:ss (Astra system format)');
+            addText('- Uses dedicated Astra Import page for data processing');
+            yPos += 5;
+
+            // Exception Types
+            addText('EXCEPTION TYPES', 14, true);
+            yPos += 5;
+            addText('Off/Leave, Public Holiday, Sick Leave, Manual Present/Absent, Manual Half Day, Shift Override, Early Checkout, Allowed Minutes');
+
+            pdf.save('ALM_Attendance_Training_Guide.pdf');
+            toast.success('PDF exported successfully');
+        } catch (error) {
+            toast.error('Failed to export PDF');
+            console.error(error);
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const exportToExcel = async () => {
+        setExporting(true);
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            
+            const workbook = XLSX.utils.book_new();
+
+            // Overview Sheet
+            const overviewData = [
+                ['ALM Attendance Management System - Training Guide'],
+                [],
+                ['System Overview'],
+                ['ALM Attendance is a comprehensive attendance management system designed to track, analyze, and report on employee attendance across multiple companies.'],
+                [],
+                ['Key Features'],
+                ['- Project Management for specific date ranges'],
+                ['- Employee Database with HRMS and Attendance IDs'],
+                ['- Shift Management with multiple blocks support'],
+                ['- Exception Handling for leaves and special cases'],
+                ['- Advanced Analytics with detailed reports'],
+                ['- Approval Workflow for exception requests'],
+                [],
+                ['Supported Companies'],
+                ['Al Maraghi Auto Repairs'],
+                ['Al Maraghi Automotive'],
+                ['Naser Mohsin Auto Parts'],
+                ['Astra Auto Parts']
+            ];
+            const overviewSheet = XLSX.utils.aoa_to_sheet(overviewData);
+            XLSX.utils.book_append_sheet(workbook, overviewSheet, 'Overview');
+
+            // Roles Sheet
+            const rolesData = [
+                ['User Roles & Permissions'],
+                [],
+                ['Role', 'Description', 'Key Permissions'],
+                ['Admin', 'Full system access', 'All projects, system settings, user management, audit trails'],
+                ['Supervisor', 'All companies access', 'All projects, exception approvals, analytics (no system settings)'],
+                ['User', 'Company-specific access', 'View only, create exception requests (pending approval)']
+            ];
+            const rolesSheet = XLSX.utils.aoa_to_sheet(rolesData);
+            XLSX.utils.book_append_sheet(workbook, rolesSheet, 'Roles');
+
+            // Workflow Sheet
+            const workflowData = [
+                ['Complete Workflow'],
+                [],
+                ['Step', 'Action', 'Description'],
+                ['1', 'Create Employees', 'Add employees with HRMS ID and Attendance ID'],
+                ['2', 'Create Project', 'Set company, date range, employee selection'],
+                ['3', 'Upload Punches', 'Import CSV/Excel with punch timestamps'],
+                ['4', 'Configure Shifts', 'Set AM/PM shifts or single shift patterns'],
+                ['5', 'Add Exceptions', 'Include leaves, holidays, special cases'],
+                ['6', 'Run Analysis', 'Process data and generate reports'],
+                ['7', 'Review Report', 'View results and make adjustments'],
+                ['8', 'Save & Finalize', 'Save modifications'],
+                ['9', 'Close Project', 'Admin finalizes project']
+            ];
+            const workflowSheet = XLSX.utils.aoa_to_sheet(workflowData);
+            XLSX.utils.book_append_sheet(workbook, workflowSheet, 'Workflow');
+
+            // Companies Sheet
+            const companiesData = [
+                ['Company Configurations'],
+                [],
+                ['Company', 'Timestamp Format', 'AM Shift', 'PM Shift', 'Friday', 'Weekly Off', 'Grace Minutes', 'Special Notes'],
+                ['Al Maraghi Auto Repairs', 'DD/MM/YYYY HH:mm AM/PM', '08:00 AM - 12:00 PM', '01:00 PM - 05:00 PM', 'Half day (AM only)', 'Sunday', '15', 'Ramadan schedules supported'],
+                ['Al Maraghi Automotive', 'DD/MM/YYYY HH:mm AM/PM', '08:00 AM - 12:00 PM', '01:00 PM - 05:00 PM', 'Half day (AM only)', 'Sunday', '15', 'Standard configuration'],
+                ['Naser Mohsin Auto Parts', 'DD/MM/YYYY HH:mm AM/PM', '08:00 AM - 12:00 PM', '01:00 PM - 05:00 PM', 'Half day (AM only)', 'Sunday', '15', 'Standard configuration'],
+                ['Astra Auto Parts', 'YYYY-MM-DD HH:mm:ss', '08:00 AM - 12:00 PM', '01:00 PM - 05:00 PM', 'Half day (AM only)', 'Sunday', '15', 'Uses Astra Import page']
+            ];
+            const companiesSheet = XLSX.utils.aoa_to_sheet(companiesData);
+            XLSX.utils.book_append_sheet(workbook, companiesSheet, 'Companies');
+
+            // Exceptions Sheet
+            const exceptionsData = [
+                ['Exception Types'],
+                [],
+                ['Type', 'Description'],
+                ['Off / Leave', 'Employee is on leave (annual, casual, etc.)'],
+                ['Public Holiday', 'Company-wide holiday (applies to ALL employees)'],
+                ['Sick Leave', 'Medical leave with certificate'],
+                ['Manual Present', 'Mark employee as present even if no punch data'],
+                ['Manual Absent', 'Mark employee as absent'],
+                ['Manual Half Day', 'Mark as half day attendance'],
+                ['Shift Override', 'Temporary change to shift timings for specific dates'],
+                ['Early Checkout', 'Add extra early checkout minutes (e.g., left 30 mins early with permission)'],
+                ['Allowed Minutes', 'Excuse late/early minutes due to natural calamity or personal reasons']
+            ];
+            const exceptionsSheet = XLSX.utils.aoa_to_sheet(exceptionsData);
+            XLSX.utils.book_append_sheet(workbook, exceptionsSheet, 'Exception Types');
+
+            // FAQ Sheet
+            const faqData = [
+                ['Frequently Asked Questions'],
+                [],
+                ['Question', 'Answer'],
+                ['Can I delete a project after analysis?', 'Yes, admins can delete projects anytime (removes all data permanently)'],
+                ['Wrong attendance ID in punches?', 'System shows warnings. Delete and re-upload or add missing employee'],
+                ['Edit report after saving?', 'Yes, reports can be reopened, modified, and saved again'],
+                ['Employee changed shifts mid-project?', 'Use multiple shift blocks or add Shift Override exception'],
+                ['Locked vs Closed status?', 'Locked can be unlocked by admin. Closed is permanent.'],
+                ['Can users create exceptions?', 'Yes, but marked as Pending and require approval'],
+                ['How are grace minutes applied?', 'Automatically deducted from total late/early minutes'],
+                ['Supported file formats?', 'CSV, Excel (.xlsx, .xls) - download templates for format'],
+                ['Can supervisors close projects?', 'No, only admins can close projects'],
+                ['Employee has no shift timing?', 'Analysis will flag this. Must define shifts before analysis']
+            ];
+            const faqSheet = XLSX.utils.aoa_to_sheet(faqData);
+            XLSX.utils.book_append_sheet(workbook, faqSheet, 'FAQ');
+
+            XLSX.writeFile(workbook, 'ALM_Attendance_Training_Guide.xlsx');
+            toast.success('Excel exported successfully');
+        } catch (error) {
+            toast.error('Failed to export Excel');
+            console.error(error);
+        } finally {
+            setExporting(false);
+        }
+    };
     return (
         <div className="space-y-6">
             <Breadcrumb items={[{ label: 'Training Guide' }]} />
             
-            <div className="flex items-center gap-3 mb-6">
-                <div className="bg-indigo-100 p-3 rounded-xl">
-                    <BookOpen className="w-8 h-8 text-indigo-600" />
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="bg-indigo-100 p-3 rounded-xl">
+                        <BookOpen className="w-8 h-8 text-indigo-600" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900">Training Guide</h1>
+                        <p className="text-slate-600 mt-1">Complete guide to the ALM Attendance Management System</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Training Guide</h1>
-                    <p className="text-slate-600 mt-1">Complete guide to the ALM Attendance Management System</p>
+                <div className="flex gap-2">
+                    <Button
+                        onClick={exportToPDF}
+                        disabled={exporting}
+                        variant="outline"
+                        className="gap-2"
+                    >
+                        <FileText className="w-4 h-4" />
+                        Export PDF
+                    </Button>
+                    <Button
+                        onClick={exportToExcel}
+                        disabled={exporting}
+                        variant="outline"
+                        className="gap-2"
+                    >
+                        <Download className="w-4 h-4" />
+                        Export Excel
+                    </Button>
                 </div>
             </div>
 
