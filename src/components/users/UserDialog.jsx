@@ -13,7 +13,7 @@ export default function UserDialog({ open, onClose, user }) {
     const [formData, setFormData] = useState({
         full_name: '',
         email: '',
-        role: 'user',
+        extended_role: 'user',
         company: ''
     });
     const queryClient = useQueryClient();
@@ -29,14 +29,14 @@ export default function UserDialog({ open, onClose, user }) {
             setFormData({
                 full_name: user.full_name || '',
                 email: user.email || '',
-                role: user.role || 'user',
+                extended_role: user.extended_role || user.role || 'user',
                 company: user.company || ''
             });
         } else {
             setFormData({
                 full_name: '',
                 email: '',
-                role: 'user',
+                extended_role: 'user',
                 company: ''
             });
         }
@@ -77,7 +77,7 @@ export default function UserDialog({ open, onClose, user }) {
         }
 
         // Validate company assignment for user role only
-        if (formData.role === 'user' && !formData.company) {
+        if (formData.extended_role === 'user' && !formData.company) {
             toast.error('Please assign a company to this user');
             return;
         }
@@ -85,13 +85,13 @@ export default function UserDialog({ open, onClose, user }) {
         // Only submit fields that should be updated
         const dataToSubmit = {
             full_name: formData.full_name,
-            role: formData.role
+            extended_role: formData.extended_role
         };
         
         // Only include company field based on role
-        if (formData.role === 'user') {
+        if (formData.extended_role === 'user') {
             dataToSubmit.company = formData.company;
-        } else if (formData.role === 'admin' || formData.role === 'supervisor') {
+        } else if (formData.extended_role === 'admin' || formData.extended_role === 'supervisor') {
             dataToSubmit.company = null;
         }
 
@@ -137,8 +137,8 @@ export default function UserDialog({ open, onClose, user }) {
                         <div>
                             <Label htmlFor="role">Role *</Label>
                             <Select
-                                value={formData.role}
-                                onValueChange={(value) => setFormData({ ...formData, role: value })}
+                                value={formData.extended_role}
+                                onValueChange={(value) => setFormData({ ...formData, extended_role: value })}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select role" />
@@ -150,13 +150,13 @@ export default function UserDialog({ open, onClose, user }) {
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-slate-500 mt-1">
-                                {formData.role === 'admin' && 'Full system access'}
-                                {formData.role === 'supervisor' && 'All projects & employees, no system settings'}
-                                {formData.role === 'user' && 'Company-specific access only'}
+                                {formData.extended_role === 'admin' && 'Full system access'}
+                                {formData.extended_role === 'supervisor' && 'All projects & employees, no system settings'}
+                                {formData.extended_role === 'user' && 'Company-specific access only'}
                             </p>
                         </div>
 
-                        {formData.role === 'user' && (
+                        {formData.extended_role === 'user' && (
                             <div>
                                 <Label htmlFor="company">Assigned Company *</Label>
                                 <Select

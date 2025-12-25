@@ -65,8 +65,9 @@ export default function Layout({ children, currentPageName }) {
         enabled: !!currentUser
     });
 
-    const isAdmin = currentUser?.role === 'admin';
-    const isSupervisor = currentUser?.role === 'supervisor';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
     const canAccessAllCompanies = isAdmin || isSupervisor;
 
     const hasPageAccess = (pageName) => {
@@ -74,7 +75,7 @@ export default function Layout({ children, currentPageName }) {
         const permission = permissions.find(p => p.page_name === pageName);
         if (!permission) return true; // If no permission configured, allow by default
         const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-        return allowedRoles.includes(currentUser.role);
+        return allowedRoles.includes(userRole);
     };
 
     const menuGroups = [
