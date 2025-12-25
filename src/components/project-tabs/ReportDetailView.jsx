@@ -1485,18 +1485,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 <span className="text-amber-600 font-medium">Yes</span>
                                             )}
                                         </TableCell>
-                                        {!isUser && (
-                                            <TableCell className="text-right">
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => setEditingDay(day)}
-                                                >
-                                                    <Edit className="w-4 h-4 text-indigo-600" />
-                                                </Button>
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
+                                        </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
