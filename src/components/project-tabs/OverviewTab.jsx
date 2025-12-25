@@ -170,22 +170,41 @@ export default function OverviewTab({ project }) {
 
     const deleteMutation = useMutation({
         mutationFn: async () => {
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const batchSize = 20;
+            
+            // Helper to delete in batches with delay
+            const deleteBatch = async (items, entityType) => {
+                for (let i = 0; i < items.length; i += batchSize) {
+                    const batch = items.slice(i, i + batchSize);
+                    await Promise.all(batch.map(item => entityType.delete(item.id)));
+                    if (i + batchSize < items.length) {
+                        await delay(500); // Wait between batches
+                    }
+                }
+            };
+            
             // Delete all ReportRuns first
             const reportRuns = await base44.entities.ReportRun.filter({ project_id: project.id });
-            await Promise.all(reportRuns.map(item => base44.entities.ReportRun.delete(item.id)));
+            await deleteBatch(reportRuns, base44.entities.ReportRun);
+            await delay(500);
             
             // Delete all related data
             const punchItems = await base44.entities.Punch.filter({ project_id: project.id });
-            await Promise.all(punchItems.map(item => base44.entities.Punch.delete(item.id)));
+            await deleteBatch(punchItems, base44.entities.Punch);
+            await delay(500);
             
             const exceptionItems = await base44.entities.Exception.filter({ project_id: project.id });
-            await Promise.all(exceptionItems.map(item => base44.entities.Exception.delete(item.id)));
+            await deleteBatch(exceptionItems, base44.entities.Exception);
+            await delay(500);
             
             const resultItems = await base44.entities.AnalysisResult.filter({ project_id: project.id });
-            await Promise.all(resultItems.map(item => base44.entities.AnalysisResult.delete(item.id)));
+            await deleteBatch(resultItems, base44.entities.AnalysisResult);
+            await delay(500);
             
             const shiftItems = await base44.entities.ShiftTiming.filter({ project_id: project.id });
-            await Promise.all(shiftItems.map(item => base44.entities.ShiftTiming.delete(item.id)));
+            await deleteBatch(shiftItems, base44.entities.ShiftTiming);
+            await delay(500);
             
             // Finally delete the project
             await base44.entities.Project.delete(project.id);
