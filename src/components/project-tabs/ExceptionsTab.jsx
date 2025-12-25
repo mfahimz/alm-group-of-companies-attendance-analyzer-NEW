@@ -99,15 +99,17 @@ export default function ExceptionsTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isUser = userRole === 'user';
+
     const { data: allUsers = [] } = useQuery({
         queryKey: ['users'],
         queryFn: () => base44.entities.User.list(),
-        enabled: !!currentUser && currentUser.role === 'user'
+        enabled: !!currentUser && isUser
     });
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
-            const isUser = currentUser?.role === 'user';
             const exceptionData = {
                 ...data,
                 project_id: project.id,
@@ -118,9 +120,10 @@ export default function ExceptionsTab({ project }) {
             
             // Send email to admins and supervisors if user created the exception
             if (isUser) {
-                const adminsAndSupervisors = allUsers.filter(u => 
-                    u.role === 'admin' || u.role === 'supervisor'
-                );
+                const adminsAndSupervisors = allUsers.filter(u => {
+                    const uRole = u.extended_role || u.role;
+                    return uRole === 'admin' || uRole === 'supervisor';
+                });
                 
                 for (const user of adminsAndSupervisors) {
                     try {
@@ -153,7 +156,6 @@ Thank you.
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries(['exceptions', project.id]);
-            const isUser = currentUser?.role === 'user';
             toast.success(isUser ? 'Exception submitted for approval' : 'Exception added successfully');
             setShowForm(false);
             resetForm();
@@ -768,7 +770,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                     <div className="flex items-center justify-between">
                         <CardTitle>Exceptions</CardTitle>
                         <div className="flex gap-2">
-                        {currentUser?.role !== 'user' && (
+                        {!isUser && (
                             <>
                                 <Button
                                     variant="outline"
@@ -863,7 +865,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        {currentUser?.role !== 'user' && (
+                                        {!isUser && (
                                             <TableHead className="w-12">
                                                 <Checkbox
                                                     checked={selectedExceptions.length === filteredExceptions.length && filteredExceptions.length > 0}
@@ -897,7 +899,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <TableBody>
                                     {paginatedExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
-                                            {currentUser?.role !== 'user' && (
+                                            {!isUser && (
                                                 <TableCell className="p-1">
                                                     <Checkbox
                                                         checked={selectedExceptions.some(e => e.id === exception.id)}
