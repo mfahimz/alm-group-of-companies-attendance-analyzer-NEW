@@ -82,13 +82,21 @@ export default function UserDialog({ open, onClose, user }) {
             return;
         }
 
-        // Clear company for admin and supervisor roles
-        const dataToSubmit = { ...formData };
-        if (formData.role === 'admin' || formData.role === 'supervisor') {
-            dataToSubmit.company = '';
+        // Only submit fields that should be updated
+        const dataToSubmit = {
+            full_name: formData.full_name,
+            role: formData.role
+        };
+        
+        // Only include company field based on role
+        if (formData.role === 'user') {
+            dataToSubmit.company = formData.company;
+        } else if (formData.role === 'admin' || formData.role === 'supervisor') {
+            dataToSubmit.company = null;
         }
 
         if (user) {
+            console.log('Updating user with data:', dataToSubmit);
             updateMutation.mutate({ id: user.id, data: dataToSubmit });
         } else {
             toast.info('To add new users, please use the invite feature in your admin dashboard');
