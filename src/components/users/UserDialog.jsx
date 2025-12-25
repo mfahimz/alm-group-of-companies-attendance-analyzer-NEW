@@ -78,9 +78,9 @@ export default function UserDialog({ open, onClose, user }) {
             }
         }
 
-        // Validate company assignment for non-admin users
-        if (formData.role !== 'admin' && !formData.can_access_all_companies && !formData.company) {
-            toast.error('Please assign a company to this user or enable "Access All Companies"');
+        // Validate company assignment for user role only
+        if (formData.role === 'user' && !formData.company) {
+            toast.error('Please assign a company to this user');
             return;
         }
 
@@ -133,12 +133,18 @@ export default function UserDialog({ open, onClose, user }) {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="user">User</SelectItem>
+                                    <SelectItem value="supervisor">Supervisor</SelectItem>
                                     <SelectItem value="admin">Admin</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <p className="text-xs text-slate-500 mt-1">
+                                {formData.role === 'admin' && 'Full system access'}
+                                {formData.role === 'supervisor' && 'All projects & employees, no system settings'}
+                                {formData.role === 'user' && 'Company-specific access only'}
+                            </p>
                         </div>
 
-                        {formData.role !== 'admin' && (
+                        {formData.role === 'user' && (
                             <>
                                 <div>
                                     <Label htmlFor="company">Assigned Company</Label>

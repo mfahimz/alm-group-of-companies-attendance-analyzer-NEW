@@ -65,13 +65,15 @@ export default function Employees() {
         queryFn: () => base44.entities.Employee.list('-created_date')
     });
 
+    const isAdmin = currentUser?.role === 'admin';
+
     // Filter employees based on user access
     const employees = React.useMemo(() => {
         if (!currentUser) return [];
-        const canAccessAll = isAdmin || currentUser.can_access_all_companies;
+        const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
         if (canAccessAll) return allEmployees;
         return allEmployees.filter(e => e.company === currentUser.company);
-    }, [allEmployees, currentUser, isAdmin]);
+    }, [allEmployees, currentUser]);
 
     const deleteMutation = useMutation({
         mutationFn: async (id) => {

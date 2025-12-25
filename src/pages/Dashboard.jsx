@@ -26,14 +26,14 @@ export default function Dashboard() {
     // Filter data based on user access
     const projects = React.useMemo(() => {
         if (!currentUser) return [];
-        const canAccessAll = currentUser.role === 'admin' || currentUser.can_access_all_companies;
+        const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
         if (canAccessAll) return allProjects;
         return allProjects.filter(p => p.company === currentUser.company);
     }, [allProjects, currentUser]);
 
     const employees = React.useMemo(() => {
         if (!currentUser) return [];
-        const canAccessAll = currentUser.role === 'admin' || currentUser.can_access_all_companies;
+        const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
         if (canAccessAll) return allEmployees;
         return allEmployees.filter(e => e.company === currentUser.company);
     }, [allEmployees, currentUser]);
