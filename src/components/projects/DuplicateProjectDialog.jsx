@@ -42,21 +42,8 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
                 custom_employee_ids: sourceProject.custom_employee_ids
             });
 
-            // Duplicate related entities
-            const punches = await base44.entities.Punch.filter({ project_id: sourceProject.id });
+            // Duplicate shift timings only
             const shifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProject.id });
-            const exceptions = await base44.entities.Exception.filter({ project_id: sourceProject.id });
-
-            if (punches.length > 0) {
-                await base44.entities.Punch.bulkCreate(
-                    punches.map(p => ({
-                        project_id: newProject.id,
-                        attendance_id: p.attendance_id,
-                        timestamp_raw: p.timestamp_raw,
-                        punch_date: p.punch_date
-                    }))
-                );
-            }
 
             if (shifts.length > 0) {
                 await base44.entities.ShiftTiming.bulkCreate(
@@ -72,24 +59,8 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
                         pm_start: s.pm_start,
                         pm_end: s.pm_end,
                         effective_from: s.effective_from,
-                        effective_to: s.effective_to
-                    }))
-                );
-            }
-
-            if (exceptions.length > 0) {
-                await base44.entities.Exception.bulkCreate(
-                    exceptions.map(e => ({
-                        project_id: newProject.id,
-                        attendance_id: e.attendance_id,
-                        date_from: e.date_from,
-                        date_to: e.date_to,
-                        type: e.type,
-                        new_am_start: e.new_am_start,
-                        new_am_end: e.new_am_end,
-                        new_pm_start: e.new_pm_start,
-                        new_pm_end: e.new_pm_end,
-                        details: e.details
+                        effective_to: s.effective_to,
+                        shift_block: s.shift_block
                     }))
                 );
             }
