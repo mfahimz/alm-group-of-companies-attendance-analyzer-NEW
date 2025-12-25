@@ -228,6 +228,7 @@ export default function Training() {
             setExporting(false);
         }
     };
+
     return (
         <div className="space-y-6">
             <Breadcrumb items={[{ label: 'Training Guide' }]} />
