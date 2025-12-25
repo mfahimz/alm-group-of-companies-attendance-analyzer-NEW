@@ -14,8 +14,7 @@ export default function UserDialog({ open, onClose, user }) {
         full_name: '',
         email: '',
         role: 'user',
-        company: '',
-        can_access_all_companies: false
+        company: ''
     });
     const queryClient = useQueryClient();
 
@@ -31,16 +30,14 @@ export default function UserDialog({ open, onClose, user }) {
                 full_name: user.full_name || '',
                 email: user.email || '',
                 role: user.role || 'user',
-                company: user.company || '',
-                can_access_all_companies: user.can_access_all_companies || false
+                company: user.company || ''
             });
         } else {
             setFormData({
                 full_name: '',
                 email: '',
                 role: 'user',
-                company: '',
-                can_access_all_companies: false
+                company: ''
             });
         }
     }, [user]);
@@ -84,8 +81,14 @@ export default function UserDialog({ open, onClose, user }) {
             return;
         }
 
+        // Clear company for admin and supervisor roles
+        const dataToSubmit = { ...formData };
+        if (formData.role === 'admin' || formData.role === 'supervisor') {
+            dataToSubmit.company = '';
+        }
+
         if (user) {
-            updateMutation.mutate({ id: user.id, data: formData });
+            updateMutation.mutate({ id: user.id, data: dataToSubmit });
         } else {
             toast.info('To add new users, please use the invite feature in your admin dashboard');
             onClose();
@@ -145,45 +148,26 @@ export default function UserDialog({ open, onClose, user }) {
                         </div>
 
                         {formData.role === 'user' && (
-                            <>
-                                <div>
-                                    <Label htmlFor="company">Assigned Company</Label>
-                                    <Select
-                                        value={formData.company}
-                                        onValueChange={(value) => setFormData({ ...formData, company: value })}
-                                        disabled={formData.can_access_all_companies}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select company" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={null}>No company assigned</SelectItem>
-                                            <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
-                                            <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
-                                            <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
-                                            <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        User will only see data from this company
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="access_all"
-                                        checked={formData.can_access_all_companies}
-                                        onCheckedChange={(checked) => setFormData({ 
-                                            ...formData, 
-                                            can_access_all_companies: checked,
-                                            company: checked ? '' : formData.company
-                                        })}
-                                    />
-                                    <Label htmlFor="access_all" className="font-normal">
-                                        Can access all companies (Manager role)
-                                    </Label>
-                                </div>
-                            </>
+                            <div>
+                                <Label htmlFor="company">Assigned Company *</Label>
+                                <Select
+                                    value={formData.company}
+                                    onValueChange={(value) => setFormData({ ...formData, company: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select company" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                                        <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                                        <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                                        <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    User will only see data from this company
+                                </p>
+                            </div>
                         )}
 
                         <div className="flex justify-end gap-3 pt-4">
