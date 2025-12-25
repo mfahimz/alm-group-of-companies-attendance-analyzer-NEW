@@ -88,23 +88,23 @@ export default function AuditTrail() {
 
     // Extract unique values for filters
     const uniqueActions = useMemo(() => {
-        const actions = new Set(auditLogs.map(log => log.action));
+        const actions = new Set(allLogs.map(log => log.action));
         return Array.from(actions).sort();
-    }, [auditLogs]);
+    }, [allLogs]);
 
     const uniqueEntities = useMemo(() => {
-        const entities = new Set(auditLogs.map(log => log.entity_type));
+        const entities = new Set(allLogs.map(log => log.entity_type));
         return Array.from(entities).sort();
-    }, [auditLogs]);
+    }, [allLogs]);
 
     const uniqueUsers = useMemo(() => {
-        const users = new Set(auditLogs.map(log => log.user_email));
+        const users = new Set(allLogs.map(log => log.user_email));
         return Array.from(users).sort();
-    }, [auditLogs]);
+    }, [allLogs]);
 
     // Filter and sort logs
     const filteredLogs = useMemo(() => {
-        let filtered = auditLogs.filter(log => {
+        let filtered = allLogs.filter(log => {
             const matchesSearch = 
                 log.entity_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 log.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
