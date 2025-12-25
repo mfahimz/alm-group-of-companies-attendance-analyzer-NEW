@@ -26,6 +26,13 @@ export default function ReportDetailView({ reportRun, project }) {
     const [saveProgress, setSaveProgress] = useState(null);
     const queryClient = useQueryClient();
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const isUser = currentUser?.role === 'user';
+
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id })
@@ -1197,7 +1204,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                <Download className="w-4 h-4 mr-2" />
                                Export
                            </Button>
-                           {project.status !== 'closed' && (
+                           {project.status !== 'closed' && !isUser && (
                                <Button
                                    onClick={() => setShowSaveConfirmation(true)}
                                    disabled={isSaving}
@@ -1310,14 +1317,16 @@ export default function ReportDetailView({ reportRun, project }) {
                                         <TableCell>
                                             <div className="flex items-center gap-2 group">
                                                 <span>{result.grace_minutes ?? 15}</span>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={() => setEditingGraceMinutes(result)}
-                                                >
-                                                    <Edit className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
-                                                </Button>
+                                                {!isUser && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => setEditingGraceMinutes(result)}
+                                                    >
+                                                        <Edit className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -1341,7 +1350,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                             {result.notes || '-'}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {project.status === 'closed' ? (
+                                            {project.status === 'closed' || !currentUser ? (
                                                 <span className="text-xs text-slate-400">—</span>
                                             ) : (
                                                 <Button
@@ -1477,15 +1486,17 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 <span className="text-amber-600 font-medium">Yes</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => setEditingDay(day)}
-                                            >
-                                                <Edit className="w-4 h-4 text-indigo-600" />
-                                            </Button>
-                                        </TableCell>
+                                        {!isUser && (
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => setEditingDay(day)}
+                                                >
+                                                    <Edit className="w-4 h-4 text-indigo-600" />
+                                                </Button>
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))}
                             </TableBody>
