@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, AlertCircle, CheckCircle, FileText, Trash2, Edit, Eye, Upload, Download } from 'lucide-react';
+import { Search, Filter, AlertCircle, CheckCircle, FileText, Trash2, Edit, Eye, Upload, Download, LogIn } from 'lucide-react';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import TablePagination from '../components/ui/TablePagination';
@@ -27,11 +27,42 @@ export default function AuditTrail() {
         queryFn: () => base44.auth.me()
     });
 
-    const { data: auditLogs = [], isLoading } = useQuery({
+    const { data: auditLogs = [], isLoading: auditLoading } = useQuery({
         queryKey: ['auditLogs'],
         queryFn: () => base44.entities.AuditLog.list('-created_date', 1000),
-        refetchInterval: 30000 // Refresh every 30 seconds
+        refetchInterval: 30000
     });
+
+    const { data: activityLogs = [], isLoading: activityLoading } = useQuery({
+        queryKey: ['activityLogs'],
+        queryFn: () => base44.entities.ActivityLog.list('-created_date', 1000),
+        refetchInterval: 30000
+    });
+
+    // Merge both log types into unified format
+    const allLogs = useMemo(() => {
+        const unified = [
+            ...auditLogs,
+            ...activityLogs.map(log => ({
+                id: log.id,
+                created_date: log.created_date,
+                action: 'LOGIN',
+                entity_type: 'System',
+                entity_name: 'User Login',
+                user_email: log.user_email,
+                user_name: log.user_name,
+                user_role: log.user_role,
+                ip_address: log.ip_address,
+                details: `Login from ${log.location || 'Unknown location'}`,
+                success: true,
+                user_agent: log.user_agent,
+                location: log.location
+            }))
+        ];
+        return unified.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    }, [auditLogs, activityLogs]);
+
+    const isLoading = auditLoading || activityLoading;
 
     const actionIcons = {
         'CREATE': <CheckCircle className="w-4 h-4 text-green-600" />,
