@@ -86,7 +86,6 @@ export default function Layout({ children, currentPageName }) {
             items: [
                 { name: 'Users & Permissions', path: 'Users', icon: Shield },
                 { name: 'IP Access Control', path: 'IPManagement', icon: Shield },
-                { name: 'Activity Logs', path: 'ActivityLogs', icon: Activity },
                 { name: 'Audit Trail', path: 'AuditTrail', icon: FileSpreadsheet },
                 { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
                 { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
