@@ -1357,7 +1357,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                                     size="sm"
                                                     variant="ghost"
                                                     onClick={() => showDailyBreakdown(result)}
-                                                    title="View daily breakdown (read-only)"
+                                                    title="View daily breakdown"
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                 </Button>
@@ -1392,10 +1392,11 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <TableHead>Early Min</TableHead>
                                     <TableHead>Other Min</TableHead> {/* Added */}
                                     <TableHead>Abnormal</TableHead>
-                                    </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                    {getDailyBreakdown.map((day, idx) => (
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {getDailyBreakdown.map((day, idx) => (
                                     <TableRow key={idx} className={`${day.hasUnmatchedPunch ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
@@ -1485,7 +1486,18 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 <span className="text-amber-600 font-medium">Yes</span>
                                             )}
                                         </TableCell>
-                                        </TableRow>
+                                        {!isUser && (
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => setEditingDay(day)}
+                                                >
+                                                    <Edit className="w-4 h-4 text-indigo-600" />
+                                                </Button>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
@@ -1493,7 +1505,17 @@ export default function ReportDetailView({ reportRun, project }) {
                 </DialogContent>
             </Dialog>
 
-
+            <EditDayRecordDialog
+                open={!!editingDay}
+                onClose={() => setEditingDay(null)}
+                onSave={() => {
+                    queryClient.invalidateQueries(['results', reportRun.id]);
+                }}
+                dayRecord={editingDay}
+                project={project}
+                attendanceId={selectedEmployee?.attendance_id}
+                analysisResult={selectedEmployee}
+            />
 
             <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && setEditingGraceMinutes(null)}>
                 <DialogContent>
