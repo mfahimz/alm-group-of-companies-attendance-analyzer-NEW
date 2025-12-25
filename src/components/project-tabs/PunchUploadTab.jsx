@@ -30,6 +30,13 @@ export default function PunchUploadTab({ project }) {
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const queryClient = useQueryClient();
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const isUser = currentUser?.role === 'user';
+
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
@@ -422,6 +429,12 @@ export default function PunchUploadTab({ project }) {
                     <CardTitle>Upload Punch Data</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {isUser ? (
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                            <p className="text-sm text-slate-600">Punch uploads are restricted to administrators and supervisors.</p>
+                        </div>
+                    ) : (
+                        <>
                     <div>
                         <Input
                             type="file"
@@ -488,6 +501,8 @@ export default function PunchUploadTab({ project }) {
                             </Button>
                         </div>
                     )}
+                        </>
+                    )}
                 </CardContent>
             </Card>
 
@@ -507,7 +522,7 @@ export default function PunchUploadTab({ project }) {
                                     {enrichedPunches.length !== punches.length && ` (${enrichedPunches.length} shown)`}
                                 </p>
                                 <div className="flex gap-3">
-                                    {selectedPunches.length > 0 && (
+                                    {selectedPunches.length > 0 && !isUser && (
                                         <Button 
                                             onClick={handleBulkDelete}
                                             variant="destructive"
@@ -546,13 +561,15 @@ export default function PunchUploadTab({ project }) {
                             <div className="overflow-auto">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-12">
-                                                <Checkbox
-                                                    checked={selectedPunches.length === paginatedPunches.length && paginatedPunches.length > 0}
-                                                    onCheckedChange={toggleSelectAll}
-                                                />
-                                            </TableHead>
+                                       <TableRow>
+                                           {!isUser && (
+                                               <TableHead className="w-12">
+                                                   <Checkbox
+                                                       checked={selectedPunches.length === paginatedPunches.length && paginatedPunches.length > 0}
+                                                       onCheckedChange={toggleSelectAll}
+                                                   />
+                                               </TableHead>
+                                           )}
                                             <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                                 Employee ID
                                             </SortableTableHead>
@@ -566,14 +583,16 @@ export default function PunchUploadTab({ project }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {paginatedPunches.map((punch) => (
-                                            <TableRow key={punch.id}>
-                                                <TableCell>
-                                                    <Checkbox
-                                                        checked={selectedPunches.includes(punch.id)}
-                                                        onCheckedChange={() => toggleSelectPunch(punch.id)}
-                                                    />
-                                                </TableCell>
+                                       {paginatedPunches.map((punch) => (
+                                           <TableRow key={punch.id}>
+                                               {!isUser && (
+                                                   <TableCell>
+                                                       <Checkbox
+                                                           checked={selectedPunches.includes(punch.id)}
+                                                           onCheckedChange={() => toggleSelectPunch(punch.id)}
+                                                       />
+                                                   </TableCell>
+                                               )}
                                                 <TableCell className="font-medium">
                                                     {editingPunch?.id === punch.id ? (
                                                         <Input
@@ -602,65 +621,23 @@ export default function PunchUploadTab({ project }) {
                                                         punch.timestamp_raw
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex gap-1 justify-end">
-                                                        {editingPunch?.id === punch.id ? (
-                                                            <>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => {
-                                                                        const dateMatch = editingPunch.timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                                                                        let punch_date = editingPunch.punch_date;
-                                                                        if (dateMatch) {
-                                                                            const [, day, month, year] = dateMatch;
-                                                                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                                                                        }
-                                                                        updatePunchMutation.mutate({
-                                                                            id: editingPunch.id,
-                                                                            data: { 
-                                                                                attendance_id: editingPunch.attendance_id,
-                                                                                timestamp_raw: editingPunch.timestamp_raw, 
-                                                                                punch_date 
-                                                                            }
-                                                                        });
-                                                                    }}
-                                                                    className="text-green-600"
-                                                                >
-                                                                    Save
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => setEditingPunch(null)}
-                                                                >
-                                                                    Cancel
-                                                                </Button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => setEditingPunch(punch)}
-                                                                >
-                                                                    <Edit className="w-4 h-4 text-indigo-600" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => {
-                                                                        if (window.confirm('Delete this punch record?')) {
-                                                                            deleteMutation.mutate(punch.id);
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                                                </Button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
+                                                {!isUser && (
+                                                    <TableCell className="text-right">
+                                                        <div className="flex gap-1 justify-end">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => {
+                                                                    if (window.confirm('Delete this punch record?')) {
+                                                                        deleteMutation.mutate(punch.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-red-600" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                )}
                                             </TableRow>
                                         ))}
                                     </TableBody>
