@@ -45,13 +45,13 @@ export default function Projects() {
             const permission = permissions.find(p => p.page_name === 'Projects');
             if (permission) {
                 const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-                if (!allowedRoles.includes(currentUser.role)) {
+                if (!allowedRoles.includes(userRole)) {
                     toast.error('Access denied.');
                     navigate(createPageUrl('Dashboard'));
                 }
             }
         }
-    }, [currentUser, permissions, navigate]);
+    }, [currentUser, permissions, navigate, userRole]);
 
     const { data: allProjects = [], isLoading } = useQuery({
         queryKey: ['projects'],
@@ -61,10 +61,10 @@ export default function Projects() {
     // Filter projects based on user access
     const projects = React.useMemo(() => {
         if (!currentUser) return [];
-        const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
+        const canAccessAll = isAdminOrSupervisor;
         if (canAccessAll) return allProjects;
         return allProjects.filter(p => p.company === currentUser.company);
-    }, [allProjects, currentUser, isAdmin]);
+    }, [allProjects, currentUser, isAdminOrSupervisor]);
 
     const checkOverlap = (start, end, excludeId = null) => {
         const startDate = new Date(start);
@@ -125,7 +125,7 @@ export default function Projects() {
                     <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
                 </div>
                 <div className="flex gap-2">
-                    {selectedProjects.length > 0 && isAdmin && (
+                    {selectedProjects.length > 0 && isAdminOrSupervisor && (
                         <Button
                             onClick={() => setShowBulkEdit(true)}
                             variant="outline"
@@ -179,7 +179,7 @@ export default function Projects() {
                                 'bg-slate-300'
                             }`} />
                             <CardContent className="p-6 relative">
-                                {isAdmin && (
+                                {isAdminOrSupervisor && (
                                     <div className="absolute top-4 right-4 z-10">
                                         <Checkbox
                                             checked={selectedProjects.some(p => p.id === project.id)}
@@ -238,7 +238,7 @@ export default function Projects() {
                                     </div>
                                 </Link>
                                 
-                                {isAdmin && (
+                                {isAdminOrSupervisor && (
                                     <div className="mt-6 pt-4 border-t border-slate-100 flex gap-2">
                                         <Button
                                             size="sm"
