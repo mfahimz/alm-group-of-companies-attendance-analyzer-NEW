@@ -146,8 +146,8 @@ export default function Layout({ children, currentPageName }) {
         );
     }
 
-    // Check if user has a company assigned
-    if (!currentUser.company && currentUser.role !== 'admin') {
+    // Check if user has a company assigned (not required for admin/supervisor)
+    if (!currentUser.company && userRole === 'user') {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-slate-600 text-center">
