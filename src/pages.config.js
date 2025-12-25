@@ -14,9 +14,9 @@ import RamadanSchedules from './pages/RamadanSchedules';
 import ReportDetail from './pages/ReportDetail';
 import Reports from './pages/Reports';
 import RulesSettings from './pages/RulesSettings';
+import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import Training from './pages/Training';
 import __Layout from './Layout.jsx';
 
 
@@ -37,9 +37,9 @@ export const PAGES = {
     "ReportDetail": ReportDetail,
     "Reports": Reports,
     "RulesSettings": RulesSettings,
+    "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "Training": Training,
 }
 
 export const pagesConfig = {
