@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export default function IPAccessControl({ children }) {
     const [currentIP, setCurrentIP] = useState(null);
-    const [checking, setChecking] = useState(true);
+    const [checking, setChecking] = useState(false);
     const [blocked, setBlocked] = useState(false);
 
     const { data: currentUser } = useQuery({
@@ -21,6 +21,10 @@ export default function IPAccessControl({ children }) {
     });
 
     useEffect(() => {
+        if (!currentUser || settings.length === 0) {
+            return;
+        }
+
         const checkIP = async () => {
             // Find IP whitelist setting
             const ipWhitelistSetting = settings.find(s => s.setting_key === 'ip_whitelist');
@@ -40,6 +44,9 @@ export default function IPAccessControl({ children }) {
                 setChecking(false);
                 return;
             }
+
+            // Only show checking if we actually need to verify
+            setChecking(true);
 
             try {
                 // Get current IP only if whitelist is configured
