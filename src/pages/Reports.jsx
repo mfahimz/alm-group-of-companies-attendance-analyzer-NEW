@@ -12,7 +12,7 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
 
 export default function Reports() {
-    const [selectedProject, setSelectedProject] = useState('all');
+    const [selectedCompany, setSelectedCompany] = useState('all');
     const [selectedEmployee, setSelectedEmployee] = useState('all');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
@@ -57,12 +57,19 @@ export default function Reports() {
         return allEmployees.filter(e => e.company === currentUser.company);
     }, [allEmployees, currentUser]);
 
+    // Get unique companies
+    const companies = React.useMemo(() => {
+        const companySet = new Set(allProjects.map(p => p.company).filter(Boolean));
+        return Array.from(companySet).sort();
+    }, [allProjects]);
+
     // Filter data based on selections
     const filteredExceptions = React.useMemo(() => {
         let filtered = allExceptions;
 
-        if (selectedProject !== 'all') {
-            filtered = filtered.filter(e => e.project_id === selectedProject);
+        if (selectedCompany !== 'all') {
+            const companyProjectIds = allProjects.filter(p => p.company === selectedCompany).map(p => p.id);
+            filtered = filtered.filter(e => companyProjectIds.includes(e.project_id));
         }
 
         if (selectedEmployee !== 'all') {
@@ -78,13 +85,14 @@ export default function Reports() {
         }
 
         return filtered;
-    }, [allExceptions, selectedProject, selectedEmployee, dateFrom, dateTo]);
+    }, [allExceptions, selectedCompany, selectedEmployee, dateFrom, dateTo, allProjects]);
 
     const filteredAnalysisResults = React.useMemo(() => {
         let filtered = allAnalysisResults;
 
-        if (selectedProject !== 'all') {
-            filtered = filtered.filter(r => r.project_id === selectedProject);
+        if (selectedCompany !== 'all') {
+            const companyProjectIds = allProjects.filter(p => p.company === selectedCompany).map(p => p.id);
+            filtered = filtered.filter(r => companyProjectIds.includes(r.project_id));
         }
 
         if (selectedEmployee !== 'all') {
@@ -92,7 +100,7 @@ export default function Reports() {
         }
 
         return filtered;
-    }, [allAnalysisResults, selectedProject, selectedEmployee]);
+    }, [allAnalysisResults, selectedCompany, selectedEmployee, allProjects]);
 
     // Calculate Exception Metrics
     const exceptionMetrics = React.useMemo(() => {
@@ -190,15 +198,15 @@ export default function Reports() {
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                            <label className="text-sm font-medium text-slate-700 mb-2 block">Project</label>
-                            <Select value={selectedProject} onValueChange={setSelectedProject}>
+                            <label className="text-sm font-medium text-slate-700 mb-2 block">Company</label>
+                            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Projects</SelectItem>
-                                    {projects.map(p => (
-                                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                    <SelectItem value="all">All Companies</SelectItem>
+                                    {companies.map(c => (
+                                        <SelectItem key={c} value={c}>{c}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -232,7 +240,7 @@ export default function Reports() {
                         <Button
                             variant="outline"
                             onClick={() => {
-                                setSelectedProject('all');
+                                setSelectedCompany('all');
                                 setSelectedEmployee('all');
                                 setDateFrom('');
                                 setDateTo('');
