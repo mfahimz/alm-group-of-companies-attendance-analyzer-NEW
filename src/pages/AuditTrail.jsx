@@ -385,9 +385,17 @@ export default function AuditTrail() {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <p className="text-xs text-slate-500">Timestamp</p>
+                                    <p className="text-xs text-slate-500">Timestamp (UAE)</p>
                                     <p className="text-sm font-medium">
-                                        {new Date(selectedLog.created_date).toLocaleString('en-GB')}
+                                        {new Date(selectedLog.created_date).toLocaleString('en-GB', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            second: '2-digit',
+                                            timeZone: 'Asia/Dubai'
+                                        })}
                                     </p>
                                 </div>
                                 <div>
