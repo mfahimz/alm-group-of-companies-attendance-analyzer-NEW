@@ -56,7 +56,8 @@ export default function ShiftTimingsTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
-    const isUser = currentUser?.role === 'user';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isUser = userRole === 'user';
 
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';

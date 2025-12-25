@@ -35,7 +35,8 @@ export default function PunchUploadTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
-    const isUser = currentUser?.role === 'user';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isUser = userRole === 'user';
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],

@@ -30,8 +30,11 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
-    
-    const isAdmin = currentUser?.role === 'admin';
+
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const isAdminOrSupervisor = isAdmin || isSupervisor;
 
     useEffect(() => {
         if (employee) {
@@ -287,7 +290,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                                     {departments.map(dept => (
                                         <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                                     ))}
-                                    {isAdmin && (
+                                    {isAdminOrSupervisor && (
                                         <>
                                             <SelectItem value="__create_new__" className="text-indigo-600 font-medium">
                                                 + Create New Department

@@ -31,7 +31,8 @@ export default function ReportDetailView({ reportRun, project }) {
         queryFn: () => base44.auth.me()
     });
 
-    const isUser = currentUser?.role === 'user';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isUser = userRole === 'user';
 
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
