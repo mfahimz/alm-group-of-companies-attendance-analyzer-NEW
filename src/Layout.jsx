@@ -50,7 +50,8 @@ export default function Layout({ children, currentPageName }) {
     });
 
     const isAdmin = currentUser?.role === 'admin';
-    const canAccessAllCompanies = isAdmin || currentUser?.can_access_all_companies;
+    const isSupervisor = currentUser?.role === 'supervisor';
+    const canAccessAllCompanies = isAdmin || isSupervisor;
 
     const hasPageAccess = (pageName) => {
         if (!currentUser) return false;
@@ -76,10 +77,10 @@ export default function Layout({ children, currentPageName }) {
             items: [
                 { name: 'Projects', path: 'Projects', icon: FolderKanban },
                 { name: 'Employees', path: 'Employees', icon: Users },
-                { name: 'Astra Import', path: 'AstraImport', icon: FileSpreadsheet }
+                ...(isAdmin ? [{ name: 'Astra Import', path: 'AstraImport', icon: FileSpreadsheet }] : [])
             ]
         },
-        {
+        ...(isAdmin ? [{
             id: 'settings',
             name: 'System Settings',
             icon: Settings,
@@ -92,7 +93,7 @@ export default function Layout({ children, currentPageName }) {
                 { name: 'Diagnostics', path: 'Diagnostics', icon: Activity },
                 { name: 'Documentation', path: 'Documentation', icon: Book }
             ]
-        },
+        }] : []),
         {
             id: 'profile',
             name: 'User',
@@ -273,9 +274,11 @@ export default function Layout({ children, currentPageName }) {
                                         </p>
                                         <span className={cn(
                                             "inline-block px-2 py-0.5 rounded text-[10px] font-medium tracking-wider uppercase",
-                                            isAdmin ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-slate-50 text-slate-600 border border-slate-100'
+                                            isAdmin ? 'bg-purple-50 text-purple-700 border border-purple-100' : 
+                                            isSupervisor ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                            'bg-slate-50 text-slate-600 border border-slate-100'
                                         )}>
-                                            {isAdmin ? 'Admin' : 'User'}
+                                            {isAdmin ? 'Admin' : isSupervisor ? 'Supervisor' : 'User'}
                                         </span>
                                     </div>
                                 </div>
