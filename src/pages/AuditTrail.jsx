@@ -167,8 +167,8 @@ export default function AuditTrail() {
             <Breadcrumb items={[{ label: 'Audit Trail' }]} />
             
             <div>
-                <h1 className="text-3xl font-bold text-slate-900">Audit Trail</h1>
-                <p className="text-slate-600 mt-2">Comprehensive log of all system actions for security and accountability</p>
+                <h1 className="text-3xl font-bold text-slate-900">Audit Trail & Activity Logs</h1>
+                <p className="text-slate-600 mt-2">Comprehensive log of all system actions and user logins for security and accountability</p>
             </div>
 
             {/* Stats */}
@@ -176,7 +176,7 @@ export default function AuditTrail() {
                 <Card className="border-0 shadow-md">
                     <CardContent className="p-4">
                         <p className="text-sm text-slate-600">Total Events</p>
-                        <p className="text-2xl font-bold text-slate-900">{auditLogs.length}</p>
+                        <p className="text-2xl font-bold text-slate-900">{allLogs.length}</p>
                     </CardContent>
                 </Card>
                 <Card className="border-0 shadow-md">
@@ -189,7 +189,7 @@ export default function AuditTrail() {
                     <CardContent className="p-4">
                         <p className="text-sm text-green-600">Successful</p>
                         <p className="text-2xl font-bold text-green-900">
-                            {auditLogs.filter(log => log.success !== false).length}
+                            {allLogs.filter(log => log.success !== false).length}
                         </p>
                     </CardContent>
                 </Card>
@@ -197,7 +197,7 @@ export default function AuditTrail() {
                     <CardContent className="p-4">
                         <p className="text-sm text-red-600">Failed</p>
                         <p className="text-2xl font-bold text-red-900">
-                            {auditLogs.filter(log => log.success === false).length}
+                            {allLogs.filter(log => log.success === false).length}
                         </p>
                     </CardContent>
                 </Card>
