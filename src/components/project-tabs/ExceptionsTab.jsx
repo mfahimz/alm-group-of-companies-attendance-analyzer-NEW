@@ -768,30 +768,34 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                     <div className="flex items-center justify-between">
                         <CardTitle>Exceptions</CardTitle>
                         <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={downloadTemplate}
-                        >
-                            <Download className="w-4 h-4 mr-2" />
-                            Template
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => document.getElementById('exception-import').click()}
-                            disabled={uploadProgress !== null}
-                        >
-                            <Upload className="w-4 h-4 mr-2" />
-                            {uploadProgress ? 'Importing...' : 'Import Excel'}
-                        </Button>
-                        <input
-                            id="exception-import"
-                            type="file"
-                            accept=".xlsx,.xls,.csv"
-                            onChange={handleFileImport}
-                            className="hidden"
-                        />
+                        {currentUser?.role !== 'user' && (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={downloadTemplate}
+                                >
+                                    <Download className="w-4 h-4 mr-2" />
+                                    Template
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => document.getElementById('exception-import').click()}
+                                    disabled={uploadProgress !== null}
+                                >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    {uploadProgress ? 'Importing...' : 'Import Excel'}
+                                </Button>
+                                <input
+                                    id="exception-import"
+                                    type="file"
+                                    accept=".xlsx,.xls,.csv"
+                                    onChange={handleFileImport}
+                                    className="hidden"
+                                />
+                            </>
+                        )}
                         {!showForm && (
                             <Button 
                                 onClick={() => setShowForm(true)}
@@ -809,7 +813,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                     {/* Filters */}
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex gap-4 flex-1">
-                            {selectedExceptions.length > 0 && (
+                            {selectedExceptions.length > 0 && currentUser?.role !== 'user' && (
                                 <Button
                                     size="sm"
                                     onClick={() => setShowBulkEdit(true)}
@@ -859,18 +863,20 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="w-12">
-                                            <Checkbox
-                                                checked={selectedExceptions.length === filteredExceptions.length && filteredExceptions.length > 0}
-                                                onCheckedChange={(checked) => {
-                                                    if (checked) {
-                                                        setSelectedExceptions(filteredExceptions);
-                                                    } else {
-                                                        setSelectedExceptions([]);
-                                                    }
-                                                }}
-                                            />
-                                        </TableHead>
+                                        {currentUser?.role !== 'user' && (
+                                            <TableHead className="w-12">
+                                                <Checkbox
+                                                    checked={selectedExceptions.length === filteredExceptions.length && filteredExceptions.length > 0}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            setSelectedExceptions(filteredExceptions);
+                                                        } else {
+                                                            setSelectedExceptions([]);
+                                                        }
+                                                    }}
+                                                />
+                                            </TableHead>
+                                        )}
                                         <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                             ID
                                         </SortableTableHead>
@@ -891,18 +897,20 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <TableBody>
                                     {paginatedExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
-                                            <TableCell className="p-1">
-                                                <Checkbox
-                                                    checked={selectedExceptions.some(e => e.id === exception.id)}
-                                                    onCheckedChange={(checked) => {
-                                                        if (checked) {
-                                                            setSelectedExceptions([...selectedExceptions, exception]);
-                                                        } else {
-                                                            setSelectedExceptions(selectedExceptions.filter(e => e.id !== exception.id));
-                                                        }
-                                                    }}
-                                                />
-                                            </TableCell>
+                                            {currentUser?.role !== 'user' && (
+                                                <TableCell className="p-1">
+                                                    <Checkbox
+                                                        checked={selectedExceptions.some(e => e.id === exception.id)}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setSelectedExceptions([...selectedExceptions, exception]);
+                                                            } else {
+                                                                setSelectedExceptions(selectedExceptions.filter(e => e.id !== exception.id));
+                                                            }
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                            )}
                                             <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
                                                     {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
@@ -914,59 +922,37 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 </span>
                                             </TableCell>
                                             <TableCell className="p-1">
-                                                <Select
-                                                    value={getFieldValue(exception, 'type')}
-                                                    onValueChange={(value) => handleCellChange(exception.id, 'type', value)}
-                                                >
-                                                    <SelectTrigger className="h-8 w-36">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="OFF">Off / Leave</SelectItem>
-                                                        <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
-                                                        <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
-                                                        <SelectItem value="MANUAL_PRESENT">Present</SelectItem>
-                                                        <SelectItem value="MANUAL_ABSENT">Absent</SelectItem>
-                                                        <SelectItem value="MANUAL_HALF">Half Day</SelectItem>
-                                                        <SelectItem value="MANUAL_EARLY_CHECKOUT">Early Checkout</SelectItem>
-                                                        <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                                        <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
-                                                        </SelectContent>
-                                                </Select>
+                                                <div className="text-sm">
+                                                    {exception.type.replace(/_/g, ' ')}
+                                                    {exception.approval_status === 'pending' && (
+                                                        <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Pending</span>
+                                                    )}
+                                                    {exception.approval_status === 'approved' && (
+                                                        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">Approved</span>
+                                                    )}
+                                                    {exception.approval_status === 'rejected' && (
+                                                        <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">Rejected</span>
+                                                    )}
+                                                </div>
                                             </TableCell>
-                                            <TableCell className="p-1">
-                                                <Input
-                                                    type="date"
-                                                    value={getFieldValue(exception, 'date_from')}
-                                                    onChange={(e) => handleCellChange(exception.id, 'date_from', e.target.value)}
-                                                    className="h-8 w-36"
-                                                />
+                                            <TableCell className="p-1 text-sm">
+                                                {new Date(exception.date_from).toLocaleDateString()}
                                             </TableCell>
-                                            <TableCell className="p-1">
-                                                <Input
-                                                    type="date"
-                                                    value={getFieldValue(exception, 'date_to')}
-                                                    onChange={(e) => handleCellChange(exception.id, 'date_to', e.target.value)}
-                                                    className="h-8 w-36"
-                                                />
+                                            <TableCell className="p-1 text-sm">
+                                                {new Date(exception.date_to).toLocaleDateString()}
                                             </TableCell>
-                                            <TableCell className="p-1">
-                                                <Input
-                                                    value={getFieldValue(exception, 'details') || ''}
-                                                    onChange={(e) => handleCellChange(exception.id, 'details', e.target.value)}
-                                                    placeholder="Notes..."
-                                                    className="h-8 w-40"
-                                                />
+                                            <TableCell className="p-1 text-sm max-w-xs truncate">
+                                                {exception.details || '-'}
                                             </TableCell>
                                             <TableCell className="text-right p-1">
                                                 <div className="flex gap-1 justify-end">
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        onClick={() => setEditingException(exception)}
-                                                        title="Edit exception"
+                                                        onClick={() => setViewingException(exception)}
+                                                        title="View exception"
                                                     >
-                                                        <Edit className="w-4 h-4 text-indigo-600" />
+                                                        <Eye className="w-4 h-4 text-indigo-600" />
                                                     </Button>
                                                     <Button
                                                         size="sm"
