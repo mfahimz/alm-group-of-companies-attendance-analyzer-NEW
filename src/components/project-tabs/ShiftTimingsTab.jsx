@@ -1066,12 +1066,6 @@ export default function ShiftTimingsTab({ project }) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {isUser ? (
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                            <p className="text-sm text-slate-600">Shift management is restricted to administrators and supervisors.</p>
-                        </div>
-                    ) : (
-                        <>
                     <div>
                         <Label>Select Block to Upload To *</Label>
                         <Select value={selectedBlock} onValueChange={setSelectedBlock}>
@@ -1138,8 +1132,6 @@ export default function ShiftTimingsTab({ project }) {
                                 Preview & Edit
                             </Button>
                         </div>
-                    )}
-                        </>
                     )}
                 </CardContent>
             </Card>

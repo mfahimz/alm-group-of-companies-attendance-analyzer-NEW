@@ -429,12 +429,6 @@ export default function PunchUploadTab({ project }) {
                     <CardTitle>Upload Punch Data</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {isUser ? (
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                            <p className="text-sm text-slate-600">Punch uploads are restricted to administrators and supervisors.</p>
-                        </div>
-                    ) : (
-                        <>
                     <div>
                         <Input
                             type="file"
@@ -500,8 +494,6 @@ export default function PunchUploadTab({ project }) {
                                 Preview & Edit
                             </Button>
                         </div>
-                    )}
-                        </>
                     )}
                 </CardContent>
             </Card>
