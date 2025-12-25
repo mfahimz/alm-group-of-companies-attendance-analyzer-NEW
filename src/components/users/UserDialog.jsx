@@ -50,8 +50,9 @@ export default function UserDialog({ open, onClose, user }) {
             toast.success('User updated successfully');
             onClose();
         },
-        onError: () => {
-            toast.error('Failed to update user');
+        onError: (error) => {
+            console.error('Update error:', error);
+            toast.error('Failed to update user: ' + (error.message || 'Unknown error'));
         }
     });
 
