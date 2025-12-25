@@ -7,7 +7,6 @@ import Documentation from './pages/Documentation';
 import Employees from './pages/Employees';
 import ExceptionApprovals from './pages/ExceptionApprovals';
 import Home from './pages/Home';
-import IPManagement from './pages/IPManagement';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
 import RamadanSchedules from './pages/RamadanSchedules';
@@ -30,7 +29,6 @@ export const PAGES = {
     "Employees": Employees,
     "ExceptionApprovals": ExceptionApprovals,
     "Home": Home,
-    "IPManagement": IPManagement,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
     "RamadanSchedules": RamadanSchedules,

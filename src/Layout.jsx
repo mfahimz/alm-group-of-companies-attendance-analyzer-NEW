@@ -23,7 +23,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import IPAccessControl from '../components/security/IPAccessControl';
+
 
 export default function Layout({ children, currentPageName }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -104,7 +104,6 @@ export default function Layout({ children, currentPageName }) {
             icon: Settings,
             items: [
                 { name: 'Users & Permissions', path: 'Users', icon: Shield },
-                { name: 'IP Access Control', path: 'IPManagement', icon: Shield },
                 { name: 'Audit Trail', path: 'AuditTrail', icon: FileSpreadsheet },
                 { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
                 { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
@@ -158,7 +157,6 @@ export default function Layout({ children, currentPageName }) {
     }
 
     return (
-        <IPAccessControl>
         <div className="h-screen overflow-hidden bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
             {/* Mobile Sidebar Backdrop */}
             {sidebarOpen && (
@@ -354,6 +352,5 @@ export default function Layout({ children, currentPageName }) {
             {/* Toast Notifications */}
             <Toaster position="top-right" richColors />
             </div>
-            </IPAccessControl>
             );
             }
