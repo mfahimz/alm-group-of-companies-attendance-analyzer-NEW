@@ -22,30 +22,30 @@ export default function IPAccessControl({ children }) {
 
     useEffect(() => {
         const checkIP = async () => {
+            // Find IP whitelist setting
+            const ipWhitelistSetting = settings.find(s => s.setting_key === 'ip_whitelist');
+            
+            if (!ipWhitelistSetting || !ipWhitelistSetting.setting_value) {
+                // No whitelist configured - allow all immediately
+                setBlocked(false);
+                setChecking(false);
+                return;
+            }
+
+            const allowedIPs = ipWhitelistSetting.setting_value.split(',').map(ip => ip.trim()).filter(Boolean);
+            
+            // If whitelist is empty, allow all immediately
+            if (allowedIPs.length === 0) {
+                setBlocked(false);
+                setChecking(false);
+                return;
+            }
+
             try {
-                // Get current IP
+                // Get current IP only if whitelist is configured
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const { ip } = await ipResponse.json();
                 setCurrentIP(ip);
-
-                // Find IP whitelist setting
-                const ipWhitelistSetting = settings.find(s => s.setting_key === 'ip_whitelist');
-                
-                if (!ipWhitelistSetting || !ipWhitelistSetting.setting_value) {
-                    // No whitelist configured - allow all
-                    setBlocked(false);
-                    setChecking(false);
-                    return;
-                }
-
-                const allowedIPs = ipWhitelistSetting.setting_value.split(',').map(ip => ip.trim()).filter(Boolean);
-                
-                // If whitelist is empty, allow all
-                if (allowedIPs.length === 0) {
-                    setBlocked(false);
-                    setChecking(false);
-                    return;
-                }
 
                 // Check if current IP is in whitelist (supports wildcards)
                 const isAllowed = allowedIPs.some(allowedIP => {
