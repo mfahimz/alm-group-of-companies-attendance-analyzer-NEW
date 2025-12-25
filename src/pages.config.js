@@ -14,6 +14,7 @@ import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import AuditTrail from './pages/AuditTrail';
 import IPManagement from './pages/IPManagement';
+import ExceptionApprovals from './pages/ExceptionApprovals';
 import __Layout from './Layout.jsx';
 
 
@@ -34,6 +35,7 @@ export const PAGES = {
     "Users": Users,
     "AuditTrail": AuditTrail,
     "IPManagement": IPManagement,
+    "ExceptionApprovals": ExceptionApprovals,
 }
 
 export const pagesConfig = {
