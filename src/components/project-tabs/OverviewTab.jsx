@@ -389,53 +389,52 @@ export default function OverviewTab({ project }) {
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-3">
                     {!isUser && (
-                        <>
-                            <Button
-                                onClick={() => lockMutation.mutate()}
-                                disabled={project.status === 'locked' || project.status === 'closed' || lockMutation.isPending}
-                                variant="outline"
-                            >
-                                <Lock className="w-4 h-4 mr-2" />
-                                {project.status === 'locked' ? 'Locked' : 'Lock Project'}
-                            </Button>
-                            
-                            {isAdmin && project.status === 'analyzed' && (
-                                <Button
-                                    onClick={() => {
-                                        if (window.confirm('This will finalize the project and update employee grace minutes. Continue?')) {
-                                            closeMutation.mutate();
-                                        }
-                                    }}
-                                    disabled={closeMutation.isPending}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                                >
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Close & Finalize
-                                </Button>
-                            )}
+                    <>
+                        <Button
+                            onClick={() => lockMutation.mutate()}
+                            disabled={project.status === 'locked' || project.status === 'closed' || lockMutation.isPending}
+                            variant="outline"
+                        >
+                            <Lock className="w-4 h-4 mr-2" />
+                            {project.status === 'locked' ? 'Locked' : 'Lock Project'}
+                        </Button>
 
-                            {isAdmin && (
-                                <>
-                                    <Button
-                                        onClick={() => duplicateMutation.mutate()}
-                                        disabled={duplicateMutation.isPending}
-                                        variant="outline"
-                                    >
-                                        <Copy className="w-4 h-4 mr-2" />
-                                        Duplicate Project
-                                    </Button>
-                                    <Button
-                                        onClick={handleDelete}
-                                        disabled={deleteMutation.isPending}
-                                        variant="outline"
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete Project
-                                    </Button>
-                                </>
-                            )}
-                        </>
+                        {isAdmin && project.status === 'analyzed' && (
+                            <Button
+                                onClick={() => {
+                                    if (window.confirm('This will finalize the project and update employee grace minutes. Continue?')) {
+                                        closeMutation.mutate();
+                                    }
+                                }}
+                                disabled={closeMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Close & Finalize
+                            </Button>
+                        )}
+
+                        <Button
+                            onClick={() => duplicateMutation.mutate()}
+                            disabled={duplicateMutation.isPending}
+                            variant="outline"
+                        >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Duplicate Project
+                        </Button>
+
+                        {isAdmin && (
+                            <Button
+                                onClick={handleDelete}
+                                disabled={deleteMutation.isPending}
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Project
+                            </Button>
+                        )}
+                    </>
                     )}
                     {isUser && (
                         <p className="text-sm text-slate-500">View-only mode. Contact an administrator to modify this project.</p>
