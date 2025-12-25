@@ -12,6 +12,13 @@ import { toast } from 'sonner';
 export default function ReportTab({ project }) {
     const queryClient = useQueryClient();
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const isUser = currentUser?.role === 'user';
+
     const { data: allReportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
         queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date')
@@ -65,6 +72,7 @@ export default function ReportTab({ project }) {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead>Report Name</TableHead>
                                         <TableHead>Generated On</TableHead>
                                         <TableHead>Period</TableHead>
                                         <TableHead>Employees</TableHead>
@@ -80,6 +88,9 @@ export default function ReportTab({ project }) {
                                         return (
                                             <TableRow key={run.id}>
                                                 <TableCell className="font-medium">
+                                                    {run.report_name || 'Unnamed Report'}
+                                                </TableCell>
+                                                <TableCell>
                                                     {new Date(run.created_date).toLocaleString('en-US', {
                                                         day: '2-digit',
                                                         month: '2-digit',
@@ -111,14 +122,6 @@ export default function ReportTab({ project }) {
                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
                                                         </Link>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => handleDeleteReport(run.id)}
-                                                            disabled={deleteReportMutation.isPending}
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-red-600" />
-                                                        </Button>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
