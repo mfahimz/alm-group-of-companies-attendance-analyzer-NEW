@@ -94,14 +94,67 @@ export default function ExceptionsTab({ project }) {
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const { data: allUsers = [] } = useQuery({
+        queryKey: ['users'],
+        queryFn: () => base44.entities.User.list(),
+        enabled: !!currentUser && currentUser.role === 'user'
+    });
+
     const createMutation = useMutation({
-        mutationFn: (data) => base44.entities.Exception.create({
-            ...data,
-            project_id: project.id
-        }),
-        onSuccess: () => {
+        mutationFn: async (data) => {
+            const isUser = currentUser?.role === 'user';
+            const exceptionData = {
+                ...data,
+                project_id: project.id,
+                approval_status: isUser ? 'pending' : 'approved'
+            };
+            
+            const newException = await base44.entities.Exception.create(exceptionData);
+            
+            // Send email to admins and supervisors if user created the exception
+            if (isUser) {
+                const adminsAndSupervisors = allUsers.filter(u => 
+                    u.role === 'admin' || u.role === 'supervisor'
+                );
+                
+                for (const user of adminsAndSupervisors) {
+                    try {
+                        await base44.integrations.Core.SendEmail({
+                            to: user.email,
+                            subject: `New Exception Request Pending Approval - ${project.name}`,
+                            body: `
+Hello ${user.full_name},
+
+A new exception has been created and requires your approval.
+
+Created by: ${currentUser.full_name} (${currentUser.email})
+Project: ${project.name}
+Exception Type: ${data.type}
+Date Range: ${data.date_from} to ${data.date_to}
+${data.details ? `Details: ${data.details}` : ''}
+
+Please log in to the system to review and approve/reject this exception.
+
+Thank you.
+                            `
+                        });
+                    } catch (e) {
+                        console.error('Failed to send email:', e);
+                    }
+                }
+            }
+            
+            return newException;
+        },
+        onSuccess: (data) => {
             queryClient.invalidateQueries(['exceptions', project.id]);
-            toast.success('Exception added successfully');
+            const isUser = currentUser?.role === 'user';
+            toast.success(isUser ? 'Exception submitted for approval' : 'Exception added successfully');
             setShowForm(false);
             resetForm();
         },
