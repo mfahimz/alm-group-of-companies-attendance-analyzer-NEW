@@ -17,7 +17,10 @@ export default function ReportTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
-    const isAdmin = currentUser?.role === 'admin';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const isAdminOrSupervisor = isAdmin || isSupervisor;
 
     const { data: allReportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],

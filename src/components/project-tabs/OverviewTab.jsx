@@ -46,8 +46,11 @@ export default function OverviewTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
-    const isAdmin = currentUser?.role === 'admin';
-    const isUser = currentUser?.role === 'user';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const isAdminOrSupervisor = isAdmin || isSupervisor;
+    const isUser = userRole === 'user';
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
@@ -418,7 +421,7 @@ export default function OverviewTab({ project }) {
                             {project.status === 'locked' ? 'Locked' : 'Lock Project'}
                         </Button>
 
-                        {isAdmin && project.status === 'analyzed' && (
+                        {isAdminOrSupervisor && project.status === 'analyzed' && (
                             <Button
                                 onClick={() => {
                                     if (window.confirm('This will finalize the project and update employee grace minutes. Continue?')) {

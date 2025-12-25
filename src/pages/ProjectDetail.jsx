@@ -29,8 +29,11 @@ export default function ProjectDetail() {
         queryFn: () => base44.auth.me()
     });
 
-    const isAdmin = currentUser?.role === 'admin';
-    const isReadOnly = project?.status === 'closed' && !isAdmin;
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const isAdminOrSupervisor = isAdmin || isSupervisor;
+    const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
 
     if (isLoading) {
         return (

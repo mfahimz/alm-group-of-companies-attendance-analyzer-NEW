@@ -38,7 +38,10 @@ export default function Dashboard() {
         return allEmployees.filter(e => e.company === currentUser.company);
     }, [allEmployees, currentUser]);
 
-    const isAdmin = currentUser?.role === 'admin';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const isAdminOrSupervisor = isAdmin || isSupervisor;
 
     const stats = [
         {

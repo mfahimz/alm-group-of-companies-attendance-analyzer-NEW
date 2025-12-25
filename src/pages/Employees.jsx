@@ -65,7 +65,10 @@ export default function Employees() {
         queryFn: () => base44.entities.Employee.list('-created_date')
     });
 
-    const isAdmin = currentUser?.role === 'admin';
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const isAdminOrSupervisor = isAdmin || isSupervisor;
 
     // Filter employees based on user access
     const employees = React.useMemo(() => {
