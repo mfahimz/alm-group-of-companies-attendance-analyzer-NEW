@@ -13,6 +13,7 @@ import RulesSettings from './pages/RulesSettings';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import AuditTrail from './pages/AuditTrail';
+import IPManagement from './pages/IPManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -32,6 +33,7 @@ export const PAGES = {
     "UserProfile": UserProfile,
     "Users": Users,
     "AuditTrail": AuditTrail,
+    "IPManagement": IPManagement,
 }
 
 export const pagesConfig = {
