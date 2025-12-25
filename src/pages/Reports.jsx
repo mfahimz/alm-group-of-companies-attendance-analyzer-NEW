@@ -53,9 +53,15 @@ export default function Reports() {
     const employees = React.useMemo(() => {
         if (!currentUser) return [];
         const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
-        if (canAccessAll) return allEmployees;
-        return allEmployees.filter(e => e.company === currentUser.company);
-    }, [allEmployees, currentUser]);
+        let filtered = canAccessAll ? allEmployees : allEmployees.filter(e => e.company === currentUser.company);
+        
+        // Further filter by selected company if not "all"
+        if (selectedCompany !== 'all') {
+            filtered = filtered.filter(e => e.company === selectedCompany);
+        }
+        
+        return filtered;
+    }, [allEmployees, currentUser, selectedCompany]);
 
     // Get unique companies
     const companies = React.useMemo(() => {
@@ -199,7 +205,10 @@ export default function Reports() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
                             <label className="text-sm font-medium text-slate-700 mb-2 block">Company</label>
-                            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                            <Select value={selectedCompany} onValueChange={(value) => {
+                                setSelectedCompany(value);
+                                setSelectedEmployee('all'); // Reset employee filter when company changes
+                            }}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
