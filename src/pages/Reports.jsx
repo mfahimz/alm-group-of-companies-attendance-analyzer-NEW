@@ -45,14 +45,16 @@ export default function Reports() {
     // Filter data based on user access
     const projects = React.useMemo(() => {
         if (!currentUser) return [];
-        const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
+        const userRole = currentUser.extended_role || currentUser.role || 'user';
+        const canAccessAll = userRole === 'admin' || userRole === 'supervisor';
         if (canAccessAll) return allProjects;
         return allProjects.filter(p => p.company === currentUser.company);
     }, [allProjects, currentUser]);
 
     const employees = React.useMemo(() => {
         if (!currentUser) return [];
-        const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
+        const userRole = currentUser.extended_role || currentUser.role || 'user';
+        const canAccessAll = userRole === 'admin' || userRole === 'supervisor';
         let filtered = canAccessAll ? allEmployees : allEmployees.filter(e => e.company === currentUser.company);
         
         // Further filter by selected company if not "all"
