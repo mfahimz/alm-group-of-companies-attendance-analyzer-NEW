@@ -319,27 +319,30 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     attendance_id: attendanceId,
                     date_from: dateStr,
                     date_to: dateStr,
-                    type: data.type,
+                    type: data.shiftOverride?.enabled ? 'SHIFT_OVERRIDE' : data.type,
                     details: data.details || 'User-requested edit from report',
                     approval_status: 'pending',
                     use_in_analysis: false
                 };
 
-                // Add late/early minutes if applicable
-                if (data.type === 'MANUAL_EARLY_CHECKOUT' || data.earlyCheckoutMinutes > 0) {
-                    exceptionData.early_checkout_minutes = data.earlyCheckoutMinutes;
-                }
-                if (data.otherMinutes > 0) {
-                    exceptionData.other_minutes = data.otherMinutes;
-                }
-
                 // Add shift override if enabled
                 if (data.shiftOverride?.enabled) {
-                    exceptionData.type = 'SHIFT_OVERRIDE';
                     exceptionData.new_am_start = data.shiftOverride.am_start;
                     exceptionData.new_am_end = data.shiftOverride.am_end;
                     exceptionData.new_pm_start = data.shiftOverride.pm_start;
                     exceptionData.new_pm_end = data.shiftOverride.pm_end;
+                } else {
+                    // For manual edits without shift override, add time adjustments
+                    // Combine late and early into early_checkout_minutes field for exception
+                    const totalAdjustment = (data.lateMinutes || 0) + (data.earlyCheckoutMinutes || 0);
+                    if (totalAdjustment > 0) {
+                        exceptionData.early_checkout_minutes = totalAdjustment;
+                    }
+                }
+
+                // Always add other minutes if present
+                if (data.otherMinutes > 0) {
+                    exceptionData.other_minutes = data.otherMinutes;
                 }
 
                 return await base44.entities.Exception.create(exceptionData);
