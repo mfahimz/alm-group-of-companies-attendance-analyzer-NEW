@@ -28,6 +28,14 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     });
     const queryClient = useQueryClient();
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isUser = userRole === 'user';
+
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project?.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
@@ -304,13 +312,45 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${month}-${day}`;
 
-            // Fetch the latest analysis result to avoid stale data
+            // For regular users, create a pending exception instead of directly updating
+            if (isUser) {
+                const exceptionData = {
+                    project_id: project.id,
+                    attendance_id: attendanceId,
+                    date_from: dateStr,
+                    date_to: dateStr,
+                    type: data.type,
+                    details: data.details || 'User-requested edit from report',
+                    approval_status: 'pending',
+                    use_in_analysis: false
+                };
+
+                // Add late/early minutes if applicable
+                if (data.type === 'MANUAL_EARLY_CHECKOUT' || data.earlyCheckoutMinutes > 0) {
+                    exceptionData.early_checkout_minutes = data.earlyCheckoutMinutes;
+                }
+                if (data.otherMinutes > 0) {
+                    exceptionData.other_minutes = data.otherMinutes;
+                }
+
+                // Add shift override if enabled
+                if (data.shiftOverride?.enabled) {
+                    exceptionData.type = 'SHIFT_OVERRIDE';
+                    exceptionData.new_am_start = data.shiftOverride.am_start;
+                    exceptionData.new_am_end = data.shiftOverride.am_end;
+                    exceptionData.new_pm_start = data.shiftOverride.pm_start;
+                    exceptionData.new_pm_end = data.shiftOverride.pm_end;
+                }
+
+                return await base44.entities.Exception.create(exceptionData);
+            }
+
+            // For admin/supervisor, update directly
             const latestResults = await base44.entities.AnalysisResult.filter({ 
                 id: analysisResult.id 
             });
             const latestResult = latestResults[0] || analysisResult;
 
-            // Get existing overrides or create new object
             let overrides = {};
             if (latestResult.day_overrides) {
                 try {
@@ -320,7 +360,6 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 }
             }
 
-            // Store original values for delta calculation (preserve from first edit)
             const existingOverride = overrides[dateStr];
             overrides[dateStr] = {
                 type: data.type,
@@ -340,10 +379,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 } : null
             };
 
-            // Recalculate only abnormal dates
             const updatedTotals = recalculateTotals(latestResult, overrides);
 
-            // Update the analysis result with new overrides and recalculated totals
             return await base44.entities.AnalysisResult.update(analysisResult.id, {
                 day_overrides: JSON.stringify(overrides),
                 ...updatedTotals
@@ -351,13 +388,18 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries(['results', project.id]);
+            await queryClient.invalidateQueries(['exceptions', project.id]);
             await queryClient.refetchQueries(['results', project.id]);
-            toast.success('Day record updated for this report');
+            if (isUser) {
+                toast.success('Edit request submitted for approval');
+            } else {
+                toast.success('Day record updated for this report');
+            }
             if (onSave) onSave();
             onClose();
         },
         onError: () => {
-            toast.error('Failed to update day record');
+            toast.error(isUser ? 'Failed to submit edit request' : 'Failed to update day record');
         }
     });
 
@@ -442,8 +484,19 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Day Record: {dayRecord.date}</DialogTitle>
-                    <p className="text-sm text-slate-500 mt-1">Changes apply only to this specific report</p>
+                    <p className="text-sm text-slate-500 mt-1">
+                        {isUser 
+                            ? 'Your changes will be submitted for admin/supervisor approval' 
+                            : 'Changes apply only to this specific report'}
+                    </p>
                 </DialogHeader>
+                {isUser && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                        <p className="text-sm text-amber-800">
+                            ⚠️ Your edit request will be sent to administrators for approval and will not take effect until approved.
+                        </p>
+                    </div>
+                )}
                 <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                     <div>
                         <Label>Status Override</Label>
@@ -631,7 +684,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
                     <div className="flex gap-3 pt-4 border-t">
                         <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={updateDayMutation.isPending}>
-                            {updateDayMutation.isPending ? 'Saving...' : 'Save Changes'}
+                            {updateDayMutation.isPending ? (isUser ? 'Submitting...' : 'Saving...') : (isUser ? 'Submit for Approval' : 'Save Changes')}
                         </Button>
                         <Button type="button" variant="outline" onClick={onClose}>
                             Cancel
