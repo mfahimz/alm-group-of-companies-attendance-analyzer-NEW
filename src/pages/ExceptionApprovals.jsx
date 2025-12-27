@@ -21,20 +21,33 @@ export default function ExceptionApprovals() {
         queryFn: () => base44.auth.me()
     });
 
+    const { data: projects = [] } = useQuery({
+        queryKey: ['projects'],
+        queryFn: () => base44.entities.Project.list(),
+        enabled: !!currentUser
+    });
+
     const { data: exceptions = [], isLoading } = useQuery({
         queryKey: ['pendingExceptions'],
         queryFn: async () => {
             const all = await base44.entities.Exception.list('-created_date');
-            // Admin and supervisor can see all pending exceptions
-            return all.filter(e => e.approval_status === 'pending');
+            const pending = all.filter(e => e.approval_status === 'pending');
+            
+            // Filter by company for supervisors
+            const userRole = currentUser?.extended_role || currentUser?.role;
+            if (userRole === 'supervisor' && currentUser?.company) {
+                // Filter exceptions by company
+                return pending.filter(exc => {
+                    const project = projects.find(p => p.id === exc.project_id);
+                    return project?.company === currentUser.company;
+                });
+            }
+            
+            // Admins see all
+            return pending;
         },
         refetchInterval: 30000,
-        enabled: !!currentUser
-    });
-
-    const { data: projects = [] } = useQuery({
-        queryKey: ['projects'],
-        queryFn: () => base44.entities.Project.list()
+        enabled: !!currentUser && projects.length > 0
     });
 
     const { data: employees = [] } = useQuery({
