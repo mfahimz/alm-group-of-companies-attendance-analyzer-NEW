@@ -691,6 +691,10 @@ export default function ReportDetailView({ reportRun, project }) {
                     ranges.push(currentRange);
 
                     for (const range of ranges) {
+                        // Determine if this edit needs approval
+                        const employee = employees.find(e => e.attendance_id === group.attendance_id);
+                        const needsApproval = isCurrentUserRegular && employee?.company === currentUser?.company;
+
                         const exceptionData = {
                             project_id: project.id,
                             attendance_id: group.attendance_id,
@@ -700,8 +704,8 @@ export default function ReportDetailView({ reportRun, project }) {
                             details: `Report edit: ${group.data.details || 'Manual adjustment from report'}`,
                             created_from_report: true,
                             report_run_id: reportRun.id,
-                            use_in_analysis: isOwnRecord ? false : true,
-                            approval_status: isOwnRecord ? 'pending' : 'approved'
+                            use_in_analysis: needsApproval ? false : true,
+                            approval_status: needsApproval ? 'pending' : 'approved'
                         };
 
                         if (group.data.lateMinutes && group.data.type === 'MANUAL_EARLY_CHECKOUT') {
@@ -1213,7 +1217,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                <Download className="w-4 h-4 mr-2" />
                                Export
                            </Button>
-                           {project.status !== 'closed' && !isUser && (
+                           {project.status !== 'closed' && (
                                <Button
                                    onClick={() => setShowSaveConfirmation(true)}
                                    disabled={isSaving}
@@ -1564,7 +1568,11 @@ export default function ReportDetailView({ reportRun, project }) {
                             <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
                             <ul className="text-sm text-amber-700 space-y-1">
                                 <li>• All manual edits in daily breakdowns will be converted to exceptions</li>
-                                <li>• These exceptions will be used in future analysis runs</li>
+                                {isUser ? (
+                                    <li>• Your edits will be marked as pending and require admin/supervisor approval</li>
+                                ) : (
+                                    <li>• Admin/supervisor edits will be automatically approved and used in future analysis</li>
+                                )}
                                 <li>• Verification status will be saved for all marked employees</li>
                                 <li>• This action cannot be easily undone</li>
                             </ul>
