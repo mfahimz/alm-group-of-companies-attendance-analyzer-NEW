@@ -341,22 +341,25 @@ export default function RunAnalysisTab({ project }) {
                     continue;
                 } else if (dateException.type === 'MANUAL_PRESENT') {
                     present_days++;
-                    continue;
+                    // Still check for manual time adjustments even for MANUAL_PRESENT
                 } else if (dateException.type === 'MANUAL_ABSENT') {
                     full_absence_count++;
                     continue;
                 } else if (dateException.type === 'MANUAL_HALF') {
                     present_days++;
                     half_absence_count++;
-                    continue;
+                    // Still check for manual time adjustments even for MANUAL_HALF
                 } else if (dateException.type === 'SICK_LEAVE') {
                     working_days--;
                     sick_leave_count++;
                     continue;
                 }
 
-                // Apply manual time adjustments from exception fields
-                if (dateException.type === 'MANUAL_EARLY_CHECKOUT' || dateException.type === 'MANUAL_LATE') {
+                // Apply manual time adjustments from exception fields (check all types except OFF/PUBLIC_HOLIDAY/ABSENT/SICK_LEAVE)
+                if (dateException.type !== 'OFF' && 
+                    dateException.type !== 'PUBLIC_HOLIDAY' && 
+                    dateException.type !== 'MANUAL_ABSENT' && 
+                    dateException.type !== 'SICK_LEAVE') {
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
                         late_minutes += dateException.late_minutes;
                     }
