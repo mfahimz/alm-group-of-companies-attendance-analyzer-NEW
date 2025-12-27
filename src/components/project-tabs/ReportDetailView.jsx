@@ -518,6 +518,24 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
             
+            // Apply manual time adjustments from exception fields (for all types except OFF/PUBLIC_HOLIDAY/ABSENT/SICK_LEAVE)
+            if (dateException && !dayOverride) {
+                if (dateException.type !== 'OFF' && 
+                    dateException.type !== 'PUBLIC_HOLIDAY' && 
+                    dateException.type !== 'MANUAL_ABSENT' && 
+                    dateException.type !== 'SICK_LEAVE') {
+                    if (dateException.late_minutes && dateException.late_minutes > 0) {
+                        totalLateMinutes += dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
+                        totalEarlyCheckout += dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                        totalOtherMinutes += dateException.other_minutes;
+                    }
+                }
+            }
+            
             // Calculate times from punches (either with original or overridden shift)
             if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
                 let dayLateMinutes = 0;
