@@ -353,17 +353,21 @@ export default function RunAnalysisTab({ project }) {
                     working_days--;
                     sick_leave_count++;
                     continue;
-                } else if (dateException.type === 'MANUAL_EARLY_CHECKOUT') {
-                    early_checkout_minutes += dateException.early_checkout_minutes || 0;
-                } else if (dateException.type === 'MANUAL_LATE') {
-                    late_minutes += dateException.late_minutes || 0;
-                }
                 }
 
-                // Apply other_minutes from exception if present (tracked separately from late/early)
-                if (dateException && dateException.other_minutes && dateException.other_minutes > 0) {
-                other_minutes += dateException.other_minutes;
+                // Apply manual time adjustments from exception fields
+                if (dateException.type === 'MANUAL_EARLY_CHECKOUT' || dateException.type === 'MANUAL_LATE') {
+                    if (dateException.late_minutes && dateException.late_minutes > 0) {
+                        late_minutes += dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
+                        early_checkout_minutes += dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                        other_minutes += dateException.other_minutes;
+                    }
                 }
+            }
 
             const isShiftEffective = (s) => {
                 if (!s.effective_from || !s.effective_to) return true;
