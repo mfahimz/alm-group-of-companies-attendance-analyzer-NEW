@@ -398,6 +398,18 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
                 }
+                
+                // If no applicable_days match found, fall back to is_friday_shift logic
+                if (!shift) {
+                    if (dayOfWeek === 5) {
+                        shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
+                        if (!shift) {
+                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        }
+                    } else {
+                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                    }
+                }
             }
 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
