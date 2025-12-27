@@ -218,27 +218,31 @@ export default function ShiftTimingsTab({ project }) {
                     const pm_start = normalizeTime(values[5]);
                     const pm_end = normalizeTime(values[6]);
 
-                    let applicableDays = values[8] || '';
+                    let applicableDays = values[8] ? values[8].trim() : '';
                     let applicableDaysArray = [];
+                    let is_friday_shift = false;
 
-                    // For Naser Mohsin Auto Parts, set default applicable days
+                    // For Naser Mohsin Auto Parts, parse and set applicable days
                     if (project.company === 'Naser Mohsin Auto Parts') {
-                        const isFridayShift = applicableDays.toLowerCase().includes('friday');
-                        if (isFridayShift) {
+                        // Check if it's a Friday shift from the applicable_days column
+                        if (applicableDays && applicableDays.toLowerCase().includes('friday')) {
+                            is_friday_shift = true;
                             applicableDaysArray = ['Friday'];
                         } else {
-                            // Default: All days except Sunday and Friday
+                            // Default: All days except Sunday and Friday (working days)
+                            is_friday_shift = false;
                             applicableDaysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
                         }
                         applicableDays = JSON.stringify(applicableDaysArray);
+                    } else {
+                        // For other companies, keep original logic
+                        is_friday_shift = applicableDays ? applicableDays.toLowerCase().includes('friday') : false;
                     }
 
                     const employeeExists = employees.some(e => e.attendance_id === attendance_id);
                     if (!employeeExists) {
                         newWarnings.push(`Unknown employee: ${attendance_id}`);
                     }
-
-                    const is_friday_shift = applicableDays.toLowerCase().includes('friday');
 
                     // Validate times
                     const timeValidations = {
