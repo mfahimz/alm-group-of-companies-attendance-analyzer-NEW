@@ -73,7 +73,8 @@ Deno.serve(async (req) => {
             success: true,
             message: `Migration complete: ${updatedCount} exceptions updated`,
             updated_count: updatedCount,
-            total_exceptions: exceptions.length
+            total_exceptions: exceptions.length,
+            debug_info: debugInfo
         });
         
     } catch (error) {
