@@ -378,7 +378,7 @@ export default function RunAnalysisTab({ project }) {
             let shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
 
             if (!shift) {
-                // Try to find a general shift that applies to this day
+                // Try to find a general shift that applies to this day by checking applicable_days
                 const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
                 
                 for (const s of applicableShifts) {
@@ -388,7 +388,7 @@ export default function RunAnalysisTab({ project }) {
                             const applicableDaysArray = JSON.parse(s.applicable_days);
                             if (Array.isArray(applicableDaysArray) && applicableDaysArray.length > 0) {
                                 // Check if current day is in the applicable days list
-                                if (applicableDaysArray.some(day => day.toLowerCase() === currentDayName.toLowerCase())) {
+                                if (applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
                                     shift = s;
                                     break;
                                 }
@@ -396,18 +396,6 @@ export default function RunAnalysisTab({ project }) {
                         } catch (e) {
                             // If parsing fails, continue to next shift
                         }
-                    }
-                }
-                
-                // If no applicable_days match found, fall back to old logic
-                if (!shift) {
-                    if (dayOfWeek === 5) {
-                        shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
-                        if (!shift) {
-                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
-                        }
-                    } else {
-                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                     }
                 }
             }
