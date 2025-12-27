@@ -643,6 +643,9 @@ export default function ReportDetailView({ reportRun, project }) {
             
             const exceptionsToCreate = [];
             
+            // Determine if current user made any edits that need approval
+            const isCurrentUserRegular = userRole === 'user';
+            
             for (const result of results) {
                 if (!result.day_overrides) continue;
                 
@@ -652,6 +655,10 @@ export default function ReportDetailView({ reportRun, project }) {
                 } catch (e) {
                     continue;
                 }
+
+                // Check if this result's employee belongs to the current user
+                const employee = employees.find(e => e.attendance_id === result.attendance_id);
+                const isOwnRecord = isCurrentUserRegular && currentUser && employee?.company === currentUser.company;
 
                 const datesByType = {};
                 Object.entries(dayOverrides).forEach(([dateStr, override]) => {
@@ -693,7 +700,8 @@ export default function ReportDetailView({ reportRun, project }) {
                             details: `Report edit: ${group.data.details || 'Manual adjustment from report'}`,
                             created_from_report: true,
                             report_run_id: reportRun.id,
-                            use_in_analysis: true
+                            use_in_analysis: isOwnRecord ? false : true,
+                            approval_status: isOwnRecord ? 'pending' : 'approved'
                         };
 
                         if (group.data.lateMinutes && group.data.type === 'MANUAL_EARLY_CHECKOUT') {

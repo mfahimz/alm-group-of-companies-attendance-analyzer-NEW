@@ -312,43 +312,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${month}-${day}`;
 
-            // For regular users, create a pending exception instead of directly updating
-            if (isUser) {
-                const exceptionData = {
-                    project_id: project.id,
-                    attendance_id: attendanceId,
-                    date_from: dateStr,
-                    date_to: dateStr,
-                    type: data.shiftOverride?.enabled ? 'SHIFT_OVERRIDE' : data.type,
-                    details: data.details || 'User-requested edit from report',
-                    approval_status: 'pending',
-                    use_in_analysis: false
-                };
-
-                // Add shift override if enabled
-                if (data.shiftOverride?.enabled) {
-                    exceptionData.new_am_start = data.shiftOverride.am_start;
-                    exceptionData.new_am_end = data.shiftOverride.am_end;
-                    exceptionData.new_pm_start = data.shiftOverride.pm_start;
-                    exceptionData.new_pm_end = data.shiftOverride.pm_end;
-                } else {
-                    // For manual edits without shift override, add time adjustments
-                    // Combine late and early into early_checkout_minutes field for exception
-                    const totalAdjustment = (data.lateMinutes || 0) + (data.earlyCheckoutMinutes || 0);
-                    if (totalAdjustment > 0) {
-                        exceptionData.early_checkout_minutes = totalAdjustment;
-                    }
-                }
-
-                // Always add other minutes if present
-                if (data.otherMinutes > 0) {
-                    exceptionData.other_minutes = data.otherMinutes;
-                }
-
-                return await base44.entities.Exception.create(exceptionData);
-            }
-
-            // For admin/supervisor, update directly
+            // Both users and admins store edits in day_overrides
+            // Exceptions are only created when "Save Report" is clicked
             const latestResults = await base44.entities.AnalysisResult.filter({ 
                 id: analysisResult.id 
             });
@@ -391,18 +356,13 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries(['results', project.id]);
-            await queryClient.invalidateQueries(['exceptions', project.id]);
             await queryClient.refetchQueries(['results', project.id]);
-            if (isUser) {
-                toast.success('Edit request submitted for approval');
-            } else {
-                toast.success('Day record updated for this report');
-            }
+            toast.success(isUser ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');
             if (onSave) onSave();
             onClose();
         },
         onError: () => {
-            toast.error(isUser ? 'Failed to submit edit request' : 'Failed to update day record');
+            toast.error('Failed to update day record');
         }
     });
 
@@ -496,7 +456,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 {isUser && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
                         <p className="text-sm text-amber-800">
-                            ⚠️ Your edit request will be sent to administrators for approval and will not take effect until approved.
+                            ⚠️ Your edits will be saved to this report and submitted for admin/supervisor approval when you click "Save Report".
                         </p>
                     </div>
                 )}
@@ -687,7 +647,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
                     <div className="flex gap-3 pt-4 border-t">
                         <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={updateDayMutation.isPending}>
-                            {updateDayMutation.isPending ? (isUser ? 'Submitting...' : 'Saving...') : (isUser ? 'Submit for Approval' : 'Save Changes')}
+                            {updateDayMutation.isPending ? 'Saving...' : 'Save Changes'}
                         </Button>
                         <Button type="button" variant="outline" onClick={onClose}>
                             Cancel
