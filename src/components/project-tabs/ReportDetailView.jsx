@@ -728,13 +728,35 @@ export default function ReportDetailView({ reportRun, project }) {
                         const employee = employees.find(e => e.attendance_id === group.attendance_id);
                         const needsApproval = isCurrentUserRegular && employee?.company === currentUser?.company;
 
+                        // Build detailed description
+                        const detailsParts = [];
+                        if (group.data.lateMinutes > 0) {
+                            detailsParts.push(`+${group.data.lateMinutes} late min`);
+                        }
+                        if (group.data.earlyCheckoutMinutes > 0) {
+                            detailsParts.push(`+${group.data.earlyCheckoutMinutes} early min`);
+                        }
+                        if (group.data.otherMinutes > 0) {
+                            detailsParts.push(`+${group.data.otherMinutes} other min`);
+                        }
+                        if (group.data.shiftOverride) {
+                            detailsParts.push('shift override');
+                        }
+                        if (group.data.details) {
+                            detailsParts.push(group.data.details);
+                        }
+
+                        const detailsText = detailsParts.length > 0 
+                            ? `Report edit: ${detailsParts.join(' | ')}`
+                            : 'Report edit: Manual adjustment from report';
+
                         const exceptionData = {
                             project_id: project.id,
                             attendance_id: group.attendance_id,
                             date_from: range.start,
                             date_to: range.end,
                             type: group.data.type,
-                            details: `Report edit: ${group.data.details || 'Manual adjustment from report'}`,
+                            details: detailsText,
                             created_from_report: true,
                             report_run_id: reportRun.id,
                             use_in_analysis: needsApproval ? false : true,
