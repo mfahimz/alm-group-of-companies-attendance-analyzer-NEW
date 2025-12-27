@@ -29,8 +29,18 @@ Deno.serve(async (req) => {
         
         let updatedCount = 0;
         const updates = [];
+        const debugInfo = [];
         
         for (const exception of exceptions) {
+            // Collect debug info
+            debugInfo.push({
+                id: exception.id,
+                type: exception.type,
+                details: exception.details,
+                current_other_minutes: exception.other_minutes,
+                attendance_id: exception.attendance_id
+            });
+            
             // Skip if already has other_minutes set
             if (exception.other_minutes && exception.other_minutes > 0) {
                 continue;
