@@ -804,7 +804,7 @@ export default function ReportDetailView({ reportRun, project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Sick Leaves', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Deductible'];
+        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Sick Leaves', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'Deductible'];
         const rows = filteredResults.map(r => {
             const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
             const grace = r.grace_minutes ?? 15;
@@ -818,6 +818,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 r.full_absence_count,
                 r.late_minutes,
                 r.early_checkout_minutes || 0,
+                r.other_minutes || 0,
                 deductible
             ];
         });
