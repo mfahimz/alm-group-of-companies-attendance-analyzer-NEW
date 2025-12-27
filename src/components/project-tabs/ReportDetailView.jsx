@@ -737,20 +737,23 @@ export default function ReportDetailView({ reportRun, project }) {
                             approval_status: needsApproval ? 'pending' : 'approved'
                         };
 
-                        if (group.data.lateMinutes && group.data.type === 'MANUAL_EARLY_CHECKOUT') {
-                            exceptionData.early_checkout_minutes = group.data.lateMinutes + (group.data.earlyCheckoutMinutes || 0);
-                        } else if (group.data.earlyCheckoutMinutes) {
-                            exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
+                        // Store late minutes
+                        if (group.data.lateMinutes && group.data.lateMinutes > 0) {
+                            exceptionData.late_minutes = group.data.lateMinutes;
+                            exceptionData.type = 'MANUAL_LATE';
                         }
 
-                        // Added for otherMinutes
+                        // Store early checkout minutes
+                        if (group.data.earlyCheckoutMinutes && group.data.earlyCheckoutMinutes > 0) {
+                            exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
+                            if (exceptionData.type !== 'MANUAL_LATE') {
+                                exceptionData.type = 'MANUAL_EARLY_CHECKOUT';
+                            }
+                        }
+
+                        // Store other minutes
                         if (group.data.otherMinutes && group.data.otherMinutes > 0) {
                             exceptionData.other_minutes = group.data.otherMinutes;
-                            if (!exceptionData.details) {
-                                exceptionData.details = `Added ${group.data.otherMinutes} other minutes`;
-                            } else {
-                                exceptionData.details += ` | +${group.data.otherMinutes} other min`;
-                            }
                         }
 
                         if (group.data.shiftOverride) {

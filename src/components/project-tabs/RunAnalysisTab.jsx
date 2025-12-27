@@ -354,6 +354,13 @@ export default function RunAnalysisTab({ project }) {
                     continue;
                 } else if (dateException.type === 'MANUAL_EARLY_CHECKOUT') {
                     early_checkout_minutes += dateException.early_checkout_minutes || 0;
+                } else if (dateException.type === 'MANUAL_LATE') {
+                    late_minutes += dateException.late_minutes || 0;
+                }
+
+                // Apply other_minutes from exception if present
+                if (dateException.other_minutes && dateException.other_minutes > 0) {
+                    // other_minutes are tracked separately, not added to late/early
                 }
             }
 
@@ -481,7 +488,7 @@ export default function RunAnalysisTab({ project }) {
             }
 
             const shouldSkipTimeCalculation = dateException && [
-                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_LATE', 'MANUAL_EARLY_CHECKOUT'
             ].includes(dateException.type);
 
             if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
