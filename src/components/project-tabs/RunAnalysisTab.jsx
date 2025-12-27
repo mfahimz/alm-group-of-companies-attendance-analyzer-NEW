@@ -290,6 +290,7 @@ export default function RunAnalysisTab({ project }) {
         let sick_leave_count = 0;
         let late_minutes = 0;
         let early_checkout_minutes = 0;
+        let other_minutes = 0;
         const abnormal_dates_list = [];
         const auto_resolutions = [];
 
@@ -357,12 +358,12 @@ export default function RunAnalysisTab({ project }) {
                 } else if (dateException.type === 'MANUAL_LATE') {
                     late_minutes += dateException.late_minutes || 0;
                 }
-
-                // Apply other_minutes from exception if present
-                if (dateException.other_minutes && dateException.other_minutes > 0) {
-                    // other_minutes are tracked separately, not added to late/early
                 }
-            }
+
+                // Apply other_minutes from exception if present (tracked separately from late/early)
+                if (dateException && dateException.other_minutes && dateException.other_minutes > 0) {
+                other_minutes += dateException.other_minutes;
+                }
 
             const isShiftEffective = (s) => {
                 if (!s.effective_from || !s.effective_to) return true;
@@ -575,6 +576,7 @@ export default function RunAnalysisTab({ project }) {
             sick_leave_count,
             late_minutes,
             early_checkout_minutes,
+            other_minutes,
             grace_minutes: baseGrace + carriedGrace,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
             notes: abnormalDatesFormatted,
@@ -636,6 +638,7 @@ export default function RunAnalysisTab({ project }) {
                     sick_leave_count: result.sick_leave_count,
                     late_minutes: result.late_minutes,
                     early_checkout_minutes: result.early_checkout_minutes,
+                    other_minutes: result.other_minutes,
                     grace_minutes: result.grace_minutes,
                     abnormal_dates: result.abnormal_dates,
                     notes: result.notes,

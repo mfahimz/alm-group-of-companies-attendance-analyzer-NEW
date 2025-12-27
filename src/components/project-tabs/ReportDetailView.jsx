@@ -691,10 +691,14 @@ export default function ReportDetailView({ reportRun, project }) {
 
                 const datesByType = {};
                 Object.entries(dayOverrides).forEach(([dateStr, override]) => {
-                    // Added otherMinutes to the key for uniqueness
+                    // Group by type, minutes, and shift override to create separate exceptions
                     const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
                     if (!datesByType[key]) {
-                        datesByType[key] = { dates: [], data: override, attendance_id: result.attendance_id };
+                        datesByType[key] = { 
+                            dates: [], 
+                            data: override, 
+                            attendance_id: result.attendance_id 
+                        };
                     }
                     datesByType[key].dates.push(dateStr);
                 });
