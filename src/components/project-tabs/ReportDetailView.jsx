@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditDayRecordDialog from './EditDayRecordDialog';
+import * as XLSX from 'xlsx';
 
 export default function ReportDetailView({ reportRun, project }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -823,16 +824,11 @@ export default function ReportDetailView({ reportRun, project }) {
             ];
         });
 
-        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${reportRun.date_from}_to_${reportRun.date_to}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
+        const data = [headers, ...rows];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Report');
+        XLSX.writeFile(wb, `report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
         toast.success('Report exported');
     };
 
