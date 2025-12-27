@@ -804,21 +804,23 @@ export default function ReportDetailView({ reportRun, project }) {
             return;
         }
 
-        // Added 'Other Minutes' to headers
-        const headers = ['Attendance ID', 'Name', 'Working Days', 'Present Days', 'LOP Days', 'Sick Leave', 'Late Minutes', 'Early Checkout Minutes', 'Other Minutes', 'Verified', 'Notes'];
-        const rows = filteredResults.map(r => [
-            r.attendance_id,
-            r.name,
-            r.working_days,
-            r.present_days,
-            r.full_absence_count,
-            r.sick_leave_count || 0,
-            r.late_minutes,
-            r.early_checkout_minutes || 0,
-            r.other_minutes || 0, // Added
-            r.isVerified ? 'Yes' : 'No',
-            r.notes || ''
-        ]);
+        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Sick Leaves', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Deductible'];
+        const rows = filteredResults.map(r => {
+            const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
+            const grace = r.grace_minutes ?? 15;
+            const deductible = Math.max(0, total - grace);
+
+            return [
+                r.attendance_id,
+                r.name,
+                r.working_days,
+                r.sick_leave_count || 0,
+                r.full_absence_count,
+                r.late_minutes,
+                r.early_checkout_minutes || 0,
+                deductible
+            ];
+        });
 
         const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
