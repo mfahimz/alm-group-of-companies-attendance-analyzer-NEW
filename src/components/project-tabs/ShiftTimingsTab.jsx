@@ -222,21 +222,20 @@ export default function ShiftTimingsTab({ project }) {
                     let applicableDaysArray = [];
                     let is_friday_shift = false;
 
-                    // For Naser Mohsin Auto Parts, parse and set applicable days
-                    if (project.company === 'Naser Mohsin Auto Parts') {
-                        // Check if it's a Friday shift from the applicable_days column
-                        if (applicableDays && applicableDays.toLowerCase().includes('friday')) {
-                            is_friday_shift = true;
-                            applicableDaysArray = ['Friday'];
-                        } else {
-                            // Default: All days except Sunday and Friday (working days)
-                            is_friday_shift = false;
-                            applicableDaysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
-                        }
+                    // Parse comma-separated day names from CSV
+                    if (applicableDays) {
+                        // Split by comma and clean up each day name
+                        applicableDaysArray = applicableDays.split(',').map(day => day.trim()).filter(day => day.length > 0);
+                        
+                        // Check if it's a Friday-only shift or if Friday is in the list
+                        const hasFriday = applicableDaysArray.some(day => day.toLowerCase() === 'friday');
+                        is_friday_shift = hasFriday && applicableDaysArray.length === 1;
+                        
+                        // Store as JSON array
                         applicableDays = JSON.stringify(applicableDaysArray);
                     } else {
-                        // For other companies, keep original logic
-                        is_friday_shift = applicableDays ? applicableDays.toLowerCase().includes('friday') : false;
+                        // Default: empty applicable days
+                        applicableDays = '';
                     }
 
                     const employeeExists = employees.some(e => e.attendance_id === attendance_id);
