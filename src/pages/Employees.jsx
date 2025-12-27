@@ -51,8 +51,9 @@ export default function Employees() {
         if (currentUser && permissions.length > 0) {
             const permission = permissions.find(p => p.page_name === 'Employees');
             if (permission) {
+                const userRole = currentUser.extended_role || currentUser.role;
                 const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-                if (!allowedRoles.includes(currentUser.role)) {
+                if (!allowedRoles.includes(userRole)) {
                     toast.error('Access denied.');
                     navigate(createPageUrl('Dashboard'));
                 }
