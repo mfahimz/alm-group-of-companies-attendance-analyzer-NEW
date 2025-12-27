@@ -1164,7 +1164,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 if (dayOverride.earlyCheckoutMinutes !== undefined) {
                     earlyCheckoutInfo = dayOverride.earlyCheckoutMinutes > 0 ? `${dayOverride.earlyCheckoutMinutes} min (edited)` : '-';
                 }
-                // Added for otherMinutes
+                // Added for otherMinutes - keep separate from late/early calculations
                 if (dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes > 0) {
                     currentOtherMinutes = dayOverride.otherMinutes;
                 }
@@ -1400,7 +1400,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                         </TableCell>
                                         <TableCell>
                                             {(() => {
-                                                const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0) + (result.other_minutes || 0); // Included other_minutes
+                                                const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
                                                 const grace = result.grace_minutes ?? 15;
                                                 const deductible = Math.max(0, total - grace);
                                                 return (
