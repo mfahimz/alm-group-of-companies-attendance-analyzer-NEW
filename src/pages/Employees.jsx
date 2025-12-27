@@ -73,7 +73,9 @@ export default function Employees() {
     // Filter employees based on user access
     const employees = React.useMemo(() => {
         if (!currentUser) return [];
-        const canAccessAll = currentUser.role === 'admin' || currentUser.role === 'supervisor';
+        // Admin and supervisor can access all employees
+        const userRole = currentUser.extended_role || currentUser.role;
+        const canAccessAll = userRole === 'admin' || userRole === 'supervisor';
         if (canAccessAll) return allEmployees;
         return allEmployees.filter(e => e.company === currentUser.company);
     }, [allEmployees, currentUser]);

@@ -25,9 +25,11 @@ export default function ExceptionApprovals() {
         queryKey: ['pendingExceptions'],
         queryFn: async () => {
             const all = await base44.entities.Exception.list('-created_date');
+            // Admin and supervisor can see all pending exceptions
             return all.filter(e => e.approval_status === 'pending');
         },
-        refetchInterval: 30000
+        refetchInterval: 30000,
+        enabled: !!currentUser
     });
 
     const { data: projects = [] } = useQuery({
@@ -137,7 +139,8 @@ export default function ExceptionApprovals() {
         ALLOWED_MINUTES: 'Allowed Minutes'
     };
 
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor')) {
+    const userRole = currentUser?.extended_role || currentUser?.role;
+    if (!currentUser || (userRole !== 'admin' && userRole !== 'supervisor')) {
         return (
             <div className="flex items-center justify-center h-screen">
                 <div className="text-center">
