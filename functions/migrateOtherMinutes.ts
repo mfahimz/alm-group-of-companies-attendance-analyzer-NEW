@@ -10,8 +10,22 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized - Admin only' }, { status: 403 });
         }
 
-        // Fetch all exceptions
-        const exceptions = await base44.asServiceRole.entities.Exception.list();
+        // Find the specific project
+        const projects = await base44.asServiceRole.entities.Project.filter({ 
+            name: 'December - Al Maraghi Abu Dhabi',
+            company: 'Al Maraghi Auto Repairs'
+        });
+        
+        if (projects.length === 0) {
+            return Response.json({ error: 'Project not found' }, { status: 404 });
+        }
+        
+        const projectId = projects[0].id;
+
+        // Fetch exceptions only for this project
+        const exceptions = await base44.asServiceRole.entities.Exception.filter({ 
+            project_id: projectId 
+        });
         
         let updatedCount = 0;
         const updates = [];
