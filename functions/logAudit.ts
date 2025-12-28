@@ -35,6 +35,9 @@ Deno.serve(async (req) => {
             ipAddress = ipData.ip;
         } catch {}
 
+        // Get extended role if available
+        const userRole = user.extended_role || user.role;
+        
         // Create audit log entry
         await base44.asServiceRole.entities.AuditLog.create({
             action,
@@ -45,7 +48,7 @@ Deno.serve(async (req) => {
             new_data: new_data ? JSON.stringify(new_data) : null,
             user_email: user.email,
             user_name: user.full_name,
-            user_role: user.role,
+            user_role: userRole,
             ip_address: ipAddress,
             details: details || null,
             company: company || null,

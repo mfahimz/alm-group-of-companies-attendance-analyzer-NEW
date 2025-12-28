@@ -173,7 +173,35 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     });
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => base44.entities.Employee.update(id, data),
+        mutationFn: async ({ id, data, oldData }) => {
+            await base44.entities.Employee.update(id, data);
+            
+            // Log the update to audit trail
+            const changes = [];
+            if (oldData.company !== data.company) changes.push(`Company: ${oldData.company} → ${data.company}`);
+            if (oldData.department !== data.department) changes.push(`Department: ${oldData.department} → ${data.department}`);
+            if (oldData.active !== data.active) changes.push(`Status: ${oldData.active ? 'Active' : 'Inactive'} → ${data.active ? 'Active' : 'Inactive'}`);
+            if (oldData.name !== data.name) changes.push(`Name: ${oldData.name} → ${data.name}`);
+            if (oldData.attendance_id !== data.attendance_id) changes.push(`Attendance ID: ${oldData.attendance_id} → ${data.attendance_id}`);
+            if (oldData.weekly_off !== data.weekly_off) changes.push(`Weekly Off: ${oldData.weekly_off} → ${data.weekly_off}`);
+            
+            if (changes.length > 0) {
+                try {
+                    await base44.functions.invoke('logAudit', {
+                        action: 'UPDATE',
+                        entity_type: 'Employee',
+                        entity_id: id,
+                        entity_name: data.name,
+                        old_data: oldData,
+                        new_data: data,
+                        details: `Modified fields: ${changes.join(', ')}`,
+                        company: data.company
+                    });
+                } catch (e) {
+                    console.error('Failed to log audit:', e);
+                }
+            }
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['employees']);
             toast.success('Employee updated successfully');
@@ -202,7 +230,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         }
 
         if (employee) {
-            updateMutation.mutate({ id: employee.id, data: formData });
+            updateMutation.mutate({ id: employee.id, data: formData, oldData: employee });
         } else {
             createMutation.mutate(formData);
         }
