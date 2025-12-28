@@ -349,10 +349,51 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
             const updatedTotals = recalculateTotals(latestResult, overrides);
 
-            return await base44.entities.AnalysisResult.update(analysisResult.id, {
+            await base44.entities.AnalysisResult.update(analysisResult.id, {
                 day_overrides: JSON.stringify(overrides),
                 ...updatedTotals
             });
+
+            // Log the edit to audit trail
+            const changes = [];
+            if (data.type) changes.push(`Status: ${data.type}`);
+            if (data.lateMinutes !== data.originalLateMinutes) {
+                changes.push(`Late Minutes: ${data.originalLateMinutes || 0} → ${data.lateMinutes}`);
+            }
+            if (data.earlyCheckoutMinutes !== data.originalEarlyCheckout) {
+                changes.push(`Early Checkout: ${data.originalEarlyCheckout || 0} → ${data.earlyCheckoutMinutes}`);
+            }
+            if (data.otherMinutes > 0) {
+                changes.push(`Other Minutes: ${data.otherMinutes}`);
+            }
+            if (data.shiftOverride?.enabled) {
+                changes.push('Shift Override Applied');
+            }
+            
+            try {
+                await base44.functions.invoke('logAudit', {
+                    action: 'UPDATE',
+                    entity_type: 'DailyBreakdown',
+                    entity_id: analysisResult.id,
+                    entity_name: `${attendanceId} - ${dayRecord.date}`,
+                    old_data: {
+                        lateMinutes: data.originalLateMinutes || 0,
+                        earlyCheckoutMinutes: data.originalEarlyCheckout || 0,
+                        otherMinutes: data.originalOtherMinutes || 0
+                    },
+                    new_data: {
+                        type: data.type,
+                        lateMinutes: data.lateMinutes,
+                        earlyCheckoutMinutes: data.earlyCheckoutMinutes,
+                        otherMinutes: data.otherMinutes,
+                        shiftOverride: data.shiftOverride?.enabled ? data.shiftOverride : null
+                    },
+                    details: `Daily breakdown edited: ${changes.join(', ')}`,
+                    company: project.company
+                });
+            } catch (e) {
+                console.error('Failed to log audit:', e);
+            }
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries(['results', project.id]);
