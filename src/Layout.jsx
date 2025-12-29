@@ -13,6 +13,7 @@ import {
     Menu, 
     X, 
     ChevronDown, 
+    ChevronRight, 
     Book, 
     Activity, 
     Calendar, 
