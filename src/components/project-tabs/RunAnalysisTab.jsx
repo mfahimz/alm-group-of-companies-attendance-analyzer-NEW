@@ -292,6 +292,7 @@ export default function RunAnalysisTab({ project }) {
         let early_checkout_minutes = 0;
         let other_minutes = 0;
         const abnormal_dates_list = [];
+        const critical_abnormal_dates = []; // RED - only critical issues
         const auto_resolutions = [];
 
         const startDate = new Date(dateFrom);
@@ -545,14 +546,57 @@ export default function RunAnalysisTab({ project }) {
             
             // Mark as abnormal if any punch couldn't be matched or needed extended matching
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
-            if (hasUnmatchedPunch || hasExtendedMatch) {
+            if (hasUnmatchedPunch) {
                 abnormal_dates_list.push(dateStr);
+                critical_abnormal_dates.push(dateStr); // RED - unmatched punch is critical
+            }
+            if (hasExtendedMatch) {
+                abnormal_dates_list.push(dateStr);
+                // Extended match is warning (YELLOW), not critical
             }
             if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
                 abnormal_dates_list.push(dateStr);
+                critical_abnormal_dates.push(dateStr); // RED - missing punches are critical
             }
             if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
                 abnormal_dates_list.push(dateStr);
+                // Extra punches are warning (YELLOW), not critical
+            }
+            
+            // Detect extremely late punches (beyond extended match window)
+            if (shift && filteredPunches.length > 0) {
+                for (const punch of filteredPunches) {
+                    const punchTime = parseTime(punch.timestamp_raw, includeSeconds);
+                    if (!punchTime) continue;
+                    
+                    // Check against shift start times
+                    const amStartTime = parseTime(shift.am_start);
+                    const pmStartTime = parseTime(shift.pm_start);
+                    
+                    if (amStartTime) {
+                        const latenessMinutes = (punchTime - amStartTime) / (1000 * 60);
+                        if (latenessMinutes > 120 && latenessMinutes < 480) { // Between 2-8 hours late
+                            critical_abnormal_dates.push(dateStr);
+                            auto_resolutions.push({
+                                date: dateStr,
+                                type: 'EXTREME_LATENESS',
+                                details: `Punch at ${Math.round(latenessMinutes)} minutes (${Math.floor(latenessMinutes/60)}h ${Math.round(latenessMinutes%60)}m) past AM start`
+                            });
+                        }
+                    }
+                    
+                    if (pmStartTime) {
+                        const latenessMinutes = (punchTime - pmStartTime) / (1000 * 60);
+                        if (latenessMinutes > 120 && latenessMinutes < 480) { // Between 2-8 hours late
+                            critical_abnormal_dates.push(dateStr);
+                            auto_resolutions.push({
+                                date: dateStr,
+                                type: 'EXTREME_LATENESS',
+                                details: `Punch at ${Math.round(latenessMinutes)} minutes (${Math.floor(latenessMinutes/60)}h ${Math.round(latenessMinutes%60)}m) past PM start`
+                            });
+                        }
+                    }
+                }
             }
 
             const dateFormatted = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
@@ -565,7 +609,8 @@ export default function RunAnalysisTab({ project }) {
             }
         }
 
-        const abnormalDatesFormatted = [...new Set(abnormal_dates_list)].map(d => new Date(d).toLocaleDateString()).join(', ');
+        // Only include critical (RED) abnormalities in notes
+        const criticalDatesFormatted = [...new Set(critical_abnormal_dates)].map(d => new Date(d).toLocaleDateString()).join(', ');
         const autoResolutionNotes = auto_resolutions.length > 0 
             ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
             : '';
@@ -586,7 +631,7 @@ export default function RunAnalysisTab({ project }) {
             other_minutes,
             grace_minutes: baseGrace + carriedGrace,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
-            notes: abnormalDatesFormatted,
+            notes: criticalDatesFormatted, // Only RED (critical) exceptions
             auto_resolutions: autoResolutionNotes
         };
     };
