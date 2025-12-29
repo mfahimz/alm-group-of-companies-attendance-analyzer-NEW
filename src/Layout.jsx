@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 export default function Layout({ children, currentPageName }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [expandedGroup, setExpandedGroup] = useState('dashboard');
+    const [expandedGroups, setExpandedGroups] = useState(new Set(['dashboard', 'projects']));
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -134,8 +134,28 @@ export default function Layout({ children, currentPageName }) {
     }, [currentUser, permissions]);
 
     const toggleGroup = (groupId) => {
-        setExpandedGroup(expandedGroup === groupId ? null : groupId);
+        setExpandedGroups(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(groupId)) {
+                newSet.delete(groupId);
+            } else {
+                newSet.add(groupId);
+            }
+            return newSet;
+        });
     };
+    
+    // Auto-expand category if current page is in it
+    React.useEffect(() => {
+        if (currentPageName) {
+            filteredMenuGroups.forEach(group => {
+                const isCurrentPageInGroup = group.items.some(item => item.path === currentPageName);
+                if (isCurrentPageInGroup) {
+                    setExpandedGroups(prev => new Set([...prev, group.id]));
+                }
+            });
+        }
+    }, [currentPageName, filteredMenuGroups]);
 
     // Don't render sidebar until user is loaded
     if (!currentUser) {
@@ -200,8 +220,8 @@ export default function Layout({ children, currentPageName }) {
                     <nav className={cn("flex-1 overflow-y-auto py-6 space-y-2", sidebarCollapsed ? "px-2" : "px-4")}>
                         {filteredMenuGroups.map((group) => {
                             const GroupIcon = group.icon;
-                            const isExpanded = expandedGroup === group.id;
-                            
+                            const isExpanded = expandedGroups.has(group.id);
+
                             return (
                                 <div key={group.id}>
                                     {group.items.length === 1 ? (
@@ -218,34 +238,34 @@ export default function Layout({ children, currentPageName }) {
                                             onClick={() => setSidebarOpen(false)}
                                             title={sidebarCollapsed ? group.items[0].name : undefined}
                                         >
-                                            <GroupIcon className={cn("w-5 h-5 flex-shrink-0 transition-colors", currentPageName === group.items[0].path ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600")} />
+                                            <GroupIcon className={cn("w-5 h-5 flex-shrink-0 transition-colors", currentPageName === group.items[0].path ? "text-indigo-600" : "text-slate-400")} />
                                             {!sidebarCollapsed && <span>{group.items[0].name}</span>}
                                         </Link>
                                     ) : (
-                                        // Multiple items - render as group
+                                        // Multiple items - render as collapsible group
                                         <div className="mx-2">
                                             <button
                                                 onClick={() => toggleGroup(group.id)}
                                                 className={cn(
                                                     "w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                                                     sidebarCollapsed ? "justify-center px-2" : "justify-between",
-                                                    "text-slate-600 hover:bg-slate-50/80 hover:text-slate-900"
+                                                    "text-slate-700 hover:bg-gray-100 hover:text-slate-900"
                                                 )}
                                                 title={sidebarCollapsed ? group.name : undefined}
                                             >
                                                 <div className={cn("flex items-center", sidebarCollapsed ? "" : "space-x-3")}>
-                                                    <GroupIcon className="w-5 h-5 flex-shrink-0 text-slate-400" />
+                                                    <GroupIcon className="w-5 h-5 flex-shrink-0 text-slate-500" />
                                                     {!sidebarCollapsed && <span>{group.name}</span>}
                                                 </div>
                                                 {!sidebarCollapsed && (
-                                                    <ChevronDown className={cn(
+                                                    <ChevronRight className={cn(
                                                         "w-4 h-4 transition-transform text-slate-400",
-                                                        isExpanded && "rotate-180"
+                                                        isExpanded && "rotate-90"
                                                     )} />
                                                 )}
                                             </button>
                                             {isExpanded && !sidebarCollapsed && (
-                                                <div className="mt-1 ml-4 space-y-1 pl-2 border-l border-slate-100">
+                                                <div className="mt-1 ml-4 pl-4 border-l-2 border-gray-200 space-y-1">
                                                     {group.items.map((item) => {
                                                         const Icon = item.icon;
                                                         return (
@@ -253,14 +273,14 @@ export default function Layout({ children, currentPageName }) {
                                                                 key={item.path}
                                                                 to={createPageUrl(item.path)}
                                                                 className={cn(
-                                                                    "flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-200",
+                                                                    "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
                                                                     currentPageName === item.path
-                                                                        ? "bg-indigo-50/50 text-indigo-700 font-medium"
-                                                                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-50/50"
+                                                                        ? "bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-500"
+                                                                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                                                                 )}
                                                                 onClick={() => setSidebarOpen(false)}
                                                             >
-                                                                <Icon className={cn("w-4 h-4", currentPageName === item.path ? "text-indigo-500" : "text-slate-400")} />
+                                                                <Icon className={cn("w-4 h-4", currentPageName === item.path ? "text-indigo-600" : "text-slate-400")} />
                                                                 <span>{item.name}</span>
                                                             </Link>
                                                         );
