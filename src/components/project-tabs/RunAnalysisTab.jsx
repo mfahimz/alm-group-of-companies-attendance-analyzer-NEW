@@ -356,18 +356,11 @@ export default function RunAnalysisTab({ project }) {
                     continue;
                 }
 
-                // Apply manual time adjustments from exception fields
+                // Apply manual time adjustments from exception fields (will check present status later)
                 if (dateException.type !== 'OFF' && 
                     dateException.type !== 'PUBLIC_HOLIDAY' && 
                     dateException.type !== 'MANUAL_ABSENT' && 
                     dateException.type !== 'SICK_LEAVE') {
-                    // Manual late/early exceptions should mark day as present
-                    if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
-                        if (filteredPunches.length === 0) {
-                            present_days++;
-                        }
-                    }
-                    
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
                         late_minutes += dateException.late_minutes;
                     }
@@ -474,6 +467,13 @@ export default function RunAnalysisTab({ project }) {
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
             const partialDayResult = detectPartialDay(filteredPunches, shift, includeSeconds);
+
+            // Handle manual late/early exceptions marking day as present
+            if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
+                if (filteredPunches.length === 0) {
+                    present_days++;
+                }
+            }
 
             if (filteredPunches.length > 0) {
                 if (partialDayResult.isPartial) {
