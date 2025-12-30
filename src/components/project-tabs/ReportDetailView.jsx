@@ -1095,6 +1095,35 @@ export default function ReportDetailView({ reportRun, project }) {
             let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
             
+            // Initialize time tracking variables BEFORE any usage
+            let currentOtherMinutes = 0;
+            let exceptionLateMinutes = 0;
+            let exceptionEarlyMinutes = 0;
+
+            // Capture exception minutes for this specific date
+            if (dateException && !dayOverrides[dateStr]) {
+                if (dateException.type !== 'OFF' && 
+                    dateException.type !== 'PUBLIC_HOLIDAY' && 
+                    dateException.type !== 'MANUAL_ABSENT' && 
+                    dateException.type !== 'SICK_LEAVE') {
+                    if (dateException.late_minutes && dateException.late_minutes > 0) {
+                        exceptionLateMinutes = dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
+                        exceptionEarlyMinutes = dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                        currentOtherMinutes = dateException.other_minutes;
+                    }
+                }
+            }
+
+            // Track allowed minutes from ALLOWED_MINUTES exception
+            let allowedMinutesForDay = 0;
+            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
+                allowedMinutesForDay = dateException.allowed_minutes || 0;
+            }
+            
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
@@ -1199,35 +1228,6 @@ export default function ReportDetailView({ reportRun, project }) {
             }
             
             const dayOverride = dayOverrides[dateStr];
-            
-            // Initialize time tracking variables BEFORE any usage
-            let currentOtherMinutes = 0;
-            let exceptionLateMinutes = 0;
-            let exceptionEarlyMinutes = 0;
-
-            // Capture exception minutes for this specific date
-            if (dateException && !dayOverride) {
-                if (dateException.type !== 'OFF' && 
-                    dateException.type !== 'PUBLIC_HOLIDAY' && 
-                    dateException.type !== 'MANUAL_ABSENT' && 
-                    dateException.type !== 'SICK_LEAVE') {
-                    if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        exceptionLateMinutes = dateException.late_minutes;
-                    }
-                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        exceptionEarlyMinutes = dateException.early_checkout_minutes;
-                    }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        currentOtherMinutes = dateException.other_minutes;
-                    }
-                }
-            }
-
-            // Track allowed minutes from ALLOWED_MINUTES exception
-            let allowedMinutesForDay = 0;
-            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
-                allowedMinutesForDay = dateException.allowed_minutes || 0;
-            }
 
             if (dayOverride) {
                 if (dayOverride.shiftOverride) {
