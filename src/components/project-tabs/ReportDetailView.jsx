@@ -1062,6 +1062,9 @@ export default function ReportDetailView({ reportRun, project }) {
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
+            
+            // Check if exception has manual minutes - skip punch calculation if it does
+            const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0;
 
             // Track allowed minutes from ALLOWED_MINUTES exception
             let allowedMinutesForDay = 0;
@@ -1069,7 +1072,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 allowedMinutesForDay = dateException.allowed_minutes || 0;
             }
 
-            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
+            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc && !hasExceptionMinutes) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
                 
@@ -1269,18 +1272,13 @@ export default function ReportDetailView({ reportRun, project }) {
                 return match ? match[1] : ts;
             };
 
-            // Add exception minutes to calculated values for display
-            if (exceptionLateMinutes > 0) {
-                lateMinutesTotal += exceptionLateMinutes;
-                lateInfo = exceptionLateMinutes > 0 ? `${exceptionLateMinutes} min (from exception)` : '-';
+            // If exception has manual minutes, use them exclusively (not added to calculations)
+            if (exceptionLateMinutes > 0 && !dayOverride) {
+                lateMinutesTotal = exceptionLateMinutes;
+                lateInfo = `${exceptionLateMinutes} min (from exception)`;
             }
-            if (exceptionEarlyMinutes > 0) {
-                if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
-                    const existingMinutes = parseInt(earlyCheckoutInfo);
-                    earlyCheckoutInfo = `${existingMinutes + exceptionEarlyMinutes} min`;
-                } else {
-                    earlyCheckoutInfo = `${exceptionEarlyMinutes} min (from exception)`;
-                }
+            if (exceptionEarlyMinutes > 0 && !dayOverride) {
+                earlyCheckoutInfo = `${exceptionEarlyMinutes} min (from exception)`;
             }
 
             breakdown.push({
