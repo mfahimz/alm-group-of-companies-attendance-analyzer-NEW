@@ -491,7 +491,8 @@ export default function RunAnalysisTab({ project }) {
                 dateException.type === 'MANUAL_LATE' || 
                 dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
                 (dateException.late_minutes && dateException.late_minutes > 0) ||
-                (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0)
+                (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) ||
+                (dateException.other_minutes && dateException.other_minutes > 0)
             );
             
             const shouldSkipTimeCalculation = dateException && [
@@ -507,7 +508,9 @@ export default function RunAnalysisTab({ project }) {
                 if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
                     early_checkout_minutes += dateException.early_checkout_minutes;
                 }
-                // Do NOT add other_minutes - exclude it from totals
+                if (dateException.other_minutes && dateException.other_minutes > 0) {
+                    other_minutes += dateException.other_minutes;
+                }
             } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
