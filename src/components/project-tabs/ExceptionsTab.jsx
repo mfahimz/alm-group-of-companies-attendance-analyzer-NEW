@@ -69,6 +69,7 @@ export default function ExceptionsTab({ project }) {
         other_minutes: '' // Added other_minutes to formData
     });
     const [filter, setFilter] = useState({ search: '', type: 'all' });
+    const [reportFilter, setReportFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
     const [editedRows, setEditedRows] = useState({});
@@ -443,6 +444,30 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 
         createMutation.mutate(cleanedData);
     };
+
+    const filteredReportExceptions = reportExceptions
+        .filter(ex => {
+            if (reportFilter.search) {
+                const searchLower = reportFilter.search.toLowerCase();
+                const matchesId = ex.attendance_id.toLowerCase().includes(searchLower);
+                const employee = employees.find(e => e.attendance_id === ex.attendance_id);
+                const matchesName = employee?.name.toLowerCase().includes(searchLower);
+                if (!matchesId && !matchesName) return false;
+            }
+            if (reportFilter.type && reportFilter.type !== 'all' && ex.type !== reportFilter.type) return false;
+            return true;
+        })
+        .sort((a, b) => {
+            let aVal = a[sort.key];
+            let bVal = b[sort.key];
+            
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
     const filteredExceptions = exceptions
         .filter(ex => {
@@ -990,12 +1015,42 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             {reportExceptions.length > 0 && (
                 <Card className="border-0 shadow-sm bg-purple-50/50 ring-1 ring-purple-200">
                     <CardHeader>
-                        <CardTitle className="text-purple-900">Report-Generated Exceptions</CardTitle>
+                        <CardTitle className="text-purple-900">Report-Generated Exceptions ({reportExceptions.length})</CardTitle>
                         <p className="text-sm text-purple-700 mt-1">
                             These exceptions were automatically created from saved reports
                         </p>
                     </CardHeader>
                     <CardContent>
+                        {/* Search and Filters for Report Exceptions */}
+                        <div className="flex gap-4 mb-4">
+                            <div className="relative flex-1 max-w-xs">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                    placeholder="Search by ID or name..."
+                                    value={reportFilter.search}
+                                    onChange={(e) => setReportFilter({ ...reportFilter, search: e.target.value })}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <Select
+                                value={reportFilter.type}
+                                onValueChange={(value) => setReportFilter({ ...reportFilter, type: value })}
+                            >
+                                <SelectTrigger className="max-w-xs">
+                                    <SelectValue placeholder="All types" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All types</SelectItem>
+                                    <SelectItem value="MANUAL_LATE">Manual Late</SelectItem>
+                                    <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
+                                    <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
+                                    <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
+                                    <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
+                                    <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+                                    <SelectItem value="OFF">Off / Leave</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
@@ -1011,7 +1066,13 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {reportExceptions.map((exception) => (
+                                    {filteredReportExceptions.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                                                No report exceptions found
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : filteredReportExceptions.map((exception) => (
                                         <TableRow key={exception.id}>
                                             <TableCell className="p-1">
                                                 <Checkbox
@@ -1031,10 +1092,23 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             </TableCell>
                                             <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
-                                                    {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id)?.name || '—')}
+                                                   {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id)?.name || '—')}
                                                 </span>
-                                            </TableCell>
-                                            <TableCell className="p-1 text-sm">{exception.type}</TableCell>
+                                                </TableCell>
+                                                <TableCell className="p-1">
+                                                <div className="flex flex-col gap-1">
+                                                   <span className="text-sm">{exception.type.replace(/_/g, ' ')}</span>
+                                                   {exception.late_minutes > 0 && (
+                                                       <span className="text-xs text-orange-600">Late: {exception.late_minutes}m</span>
+                                                   )}
+                                                   {exception.early_checkout_minutes > 0 && (
+                                                       <span className="text-xs text-blue-600">Early: {exception.early_checkout_minutes}m</span>
+                                                   )}
+                                                   {exception.other_minutes > 0 && (
+                                                       <span className="text-xs text-purple-600">Other: {exception.other_minutes}m</span>
+                                                   )}
+                                                </div>
+                                                </TableCell>
                                             <TableCell className="p-1 text-sm">
                                                 {new Date(exception.date_from).toLocaleDateString()}
                                             </TableCell>
