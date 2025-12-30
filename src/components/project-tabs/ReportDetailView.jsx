@@ -828,7 +828,7 @@ export default function ReportDetailView({ reportRun, project }) {
                             details: detailsText,
                             created_from_report: true,
                             report_run_id: reportRun.id,
-                            use_in_analysis: needsApproval ? false : true,
+                            use_in_analysis: true,
                             approval_status: needsApproval ? 'pending' : 'approved'
                         };
 
