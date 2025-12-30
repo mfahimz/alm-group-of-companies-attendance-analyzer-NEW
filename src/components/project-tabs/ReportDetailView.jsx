@@ -727,6 +727,18 @@ export default function ReportDetailView({ reportRun, project }) {
                 last_saved_report_id: reportRun.id
             });
             
+            // Delete existing report-generated exceptions for this report to prevent duplicates
+            const existingReportExceptions = exceptions.filter(e => 
+                e.created_from_report && e.report_run_id === reportRun.id
+            );
+            
+            if (existingReportExceptions.length > 0) {
+                setSaveProgress({ current: 0, total: 100, status: 'Removing old exceptions...' });
+                for (const ex of existingReportExceptions) {
+                    await base44.entities.Exception.delete(ex.id);
+                }
+            }
+            
             const exceptionsToCreate = [];
             
             // Determine if current user made any edits that need approval
