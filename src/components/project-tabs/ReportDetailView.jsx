@@ -1079,15 +1079,36 @@ export default function ReportDetailView({ reportRun, project }) {
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
-            
-            // Check if exception has manual minutes - skip punch calculation if it does
-            const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0;
 
             // Track allowed minutes from ALLOWED_MINUTES exception
             let allowedMinutesForDay = 0;
             if (dateException && dateException.type === 'ALLOWED_MINUTES') {
                 allowedMinutesForDay = dateException.allowed_minutes || 0;
             }
+
+            // Capture exception minutes for this specific date
+            let exceptionLateMinutes = 0;
+            let exceptionEarlyMinutes = 0;
+
+            if (dateException && !dayOverride) {
+                if (dateException.type !== 'OFF' && 
+                    dateException.type !== 'PUBLIC_HOLIDAY' && 
+                    dateException.type !== 'MANUAL_ABSENT' && 
+                    dateException.type !== 'SICK_LEAVE') {
+                    if (dateException.late_minutes && dateException.late_minutes > 0) {
+                        exceptionLateMinutes = dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
+                        exceptionEarlyMinutes = dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                        currentOtherMinutes = dateException.other_minutes;
+                    }
+                }
+            }
+
+            // Check if exception has manual minutes - skip punch calculation if it does
+            const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
 
             if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc && !hasExceptionMinutes) {
                 let dayLateMinutes = 0;
@@ -1187,26 +1208,6 @@ export default function ReportDetailView({ reportRun, project }) {
             
             const dayOverride = dayOverrides[dateStr];
             let currentOtherMinutes = 0; // Initialize other minutes for the day
-            let exceptionLateMinutes = 0;
-            let exceptionEarlyMinutes = 0;
-
-            // Capture exception minutes for this specific date
-            if (dateException && !dayOverride) {
-                if (dateException.type !== 'OFF' && 
-                    dateException.type !== 'PUBLIC_HOLIDAY' && 
-                    dateException.type !== 'MANUAL_ABSENT' && 
-                    dateException.type !== 'SICK_LEAVE') {
-                    if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        exceptionLateMinutes = dateException.late_minutes;
-                    }
-                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        exceptionEarlyMinutes = dateException.early_checkout_minutes;
-                    }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        currentOtherMinutes = dateException.other_minutes;
-                    }
-                }
-            }
 
             if (dayOverride) {
                 if (dayOverride.shiftOverride) {
