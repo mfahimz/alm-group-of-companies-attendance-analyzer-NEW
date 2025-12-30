@@ -287,7 +287,7 @@ export default function ReportDetailView({ reportRun, project }) {
         const employeeExceptions = exceptions.filter(e => 
             (e.attendance_id === result.attendance_id || e.attendance_id === 'ALL') &&
             e.use_in_analysis !== false &&
-            e.approval_status !== 'rejected'
+            e.approval_status === 'approved'
         );
 
         const employee = employees.find(e => e.attendance_id === result.attendance_id);
