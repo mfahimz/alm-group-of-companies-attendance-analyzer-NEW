@@ -348,9 +348,12 @@ export default function ReportDetailView({ reportRun, project }) {
             const matchingExceptionsCalc = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo;
+                return currentDate >= exFrom && currentDate <= exTo &&
+                       (ex.attendance_id === result.attendance_id || ex.attendance_id === 'ALL') &&
+                       ex.use_in_analysis !== false &&
+                       ex.approval_status === 'approved';
             });
-            
+
             const dateException = matchingExceptionsCalc.length > 0
                 ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
                 : null;
@@ -536,19 +539,20 @@ export default function ReportDetailView({ reportRun, project }) {
                     dateException.type !== 'MANUAL_ABSENT' && 
                     dateException.type !== 'SICK_LEAVE') {
                     // Manual late/early exceptions should mark day as present
-                    if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
-                        if (dayPunches.length === 0) {
-                            presentDays++;
-                        }
+                    if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && dayPunches.length === 0) {
+                        presentDays++;
                     }
 
+                    // Apply ALL manual time fields from exception
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
                         totalLateMinutes += dateException.late_minutes;
                     }
                     if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
                         totalEarlyCheckout += dateException.early_checkout_minutes;
                     }
-                    // DO NOT add other_minutes to totals
+                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                        totalOtherMinutes += dateException.other_minutes;
+                    }
                 }
             }
             
@@ -797,31 +801,28 @@ export default function ReportDetailView({ reportRun, project }) {
                             approval_status: needsApproval ? 'pending' : 'approved'
                         };
 
-                        // Store late minutes
+                        // Store ALL time adjustment fields
                         if (group.data.lateMinutes && group.data.lateMinutes > 0) {
                             exceptionData.late_minutes = group.data.lateMinutes;
-                            exceptionData.type = 'MANUAL_LATE';
                         }
-
-                        // Store early checkout minutes
                         if (group.data.earlyCheckoutMinutes && group.data.earlyCheckoutMinutes > 0) {
                             exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
-                            if (exceptionData.type !== 'MANUAL_LATE') {
-                                exceptionData.type = 'MANUAL_EARLY_CHECKOUT';
-                            }
                         }
-
-                        // Store other minutes
                         if (group.data.otherMinutes && group.data.otherMinutes > 0) {
                             exceptionData.other_minutes = group.data.otherMinutes;
                         }
 
+                        // Determine type based on what's present
                         if (group.data.shiftOverride) {
                             exceptionData.type = 'SHIFT_OVERRIDE';
                             exceptionData.new_am_start = group.data.shiftOverride.am_start;
                             exceptionData.new_am_end = group.data.shiftOverride.am_end;
                             exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
                             exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
+                        } else if (exceptionData.late_minutes > 0) {
+                            exceptionData.type = 'MANUAL_LATE';
+                        } else if (exceptionData.early_checkout_minutes > 0) {
+                            exceptionData.type = 'MANUAL_EARLY_CHECKOUT';
                         }
 
                         exceptionsToCreate.push(exceptionData);
@@ -971,11 +972,19 @@ export default function ReportDetailView({ reportRun, project }) {
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
 
-            const dateException = employeeExceptions.find(ex => {
+            // Find all matching exceptions and get the latest one by created_date (getDailyBreakdown)
+            const matchingExceptionsDaily = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo;
+                return currentDate >= exFrom && currentDate <= exTo &&
+                       (ex.attendance_id === currentResult.attendance_id || ex.attendance_id === 'ALL') &&
+                       ex.use_in_analysis !== false &&
+                       ex.approval_status === 'approved';
             });
+
+            const dateException = matchingExceptionsDaily.length > 0
+                ? matchingExceptionsDaily.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                : null;
 
             const isShiftEffective = (s) => {
                 if (!s.effective_from || !s.effective_to) return true;
