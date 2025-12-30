@@ -427,13 +427,25 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
 
+            const dayOverride = dayOverrides[dateStr];
+
+            // Apply shift override BEFORE any calculations
+            if (dayOverride?.shiftOverride) {
+                shift = {
+                    am_start: dayOverride.shiftOverride.am_start,
+                    am_end: dayOverride.shiftOverride.am_end,
+                    pm_start: dayOverride.shiftOverride.pm_start,
+                    pm_end: dayOverride.shiftOverride.pm_end
+                };
+            }
+
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
             const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
                                    shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
                                    shift.am_end !== '—' && shift.pm_start !== '—' &&
                                    shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
-            
+
             const partialDayResult = detectPartialDay(dayPunches, shift);
 
             // Track allowed minutes from ALLOWED_MINUTES exception
@@ -442,8 +454,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 allowedMinutesForDay = dateException.allowed_minutes || 0;
             }
 
-            const dayOverride = dayOverrides[dateStr];
-            
             // Initialize time tracking variables
             let currentOtherMinutes = 0;
             let exceptionLateMinutes = 0;
@@ -481,29 +491,16 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
 
                 // If there's a manual override (no shift change), use those values directly and skip calculation
-                if (!dayOverride.shiftOverride) {
-                    if (dayOverride.lateMinutes !== undefined) {
-                        totalLateMinutes += dayOverride.lateMinutes;
-                    }
+                if (!dayOverride.shiftOverride && dayOverride.lateMinutes !== undefined) {
+                    totalLateMinutes += dayOverride.lateMinutes;
                     if (dayOverride.earlyCheckoutMinutes !== undefined) {
                         totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
                     }
-                    // Added for otherMinutes
                     if (dayOverride.otherMinutes !== undefined) {
                         totalOtherMinutes += dayOverride.otherMinutes;
                     }
                     continue;
                 }
-            }
-            
-            // If there's a shift override, apply it
-            if (dayOverride?.shiftOverride) {
-                shift = {
-                    am_start: dayOverride.shiftOverride.am_start,
-                    am_end: dayOverride.shiftOverride.am_end,
-                    pm_start: dayOverride.shiftOverride.pm_start,
-                    pm_end: dayOverride.shiftOverride.pm_end
-                };
             }
 
             let punchMatchesTotals = [];
