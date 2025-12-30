@@ -443,6 +443,29 @@ export default function ReportDetailView({ reportRun, project }) {
             }
 
             const dayOverride = dayOverrides[dateStr];
+            
+            // Initialize time tracking variables
+            let currentOtherMinutes = 0;
+            let exceptionLateMinutes = 0;
+            let exceptionEarlyMinutes = 0;
+
+            // Capture exception minutes for this specific date
+            if (dateException && !dayOverride) {
+                if (dateException.type !== 'OFF' && 
+                    dateException.type !== 'PUBLIC_HOLIDAY' && 
+                    dateException.type !== 'MANUAL_ABSENT' && 
+                    dateException.type !== 'SICK_LEAVE') {
+                    if (dateException.late_minutes && dateException.late_minutes > 0) {
+                        exceptionLateMinutes = dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
+                        exceptionEarlyMinutes = dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                        currentOtherMinutes = dateException.other_minutes;
+                    }
+                }
+            }
 
             // Handle day override status changes
             if (dayOverride) {
@@ -526,11 +549,7 @@ export default function ReportDetailView({ reportRun, project }) {
             }
             
             // Check if exception has manual time values - if so, skip punch calculation for this day
-            const hasManualExceptionMinutes = dateException && !dayOverride && (
-                (dateException.late_minutes && dateException.late_minutes > 0) ||
-                (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) ||
-                (dateException.other_minutes && dateException.other_minutes > 0)
-            );
+            const hasManualExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
 
             // Apply manual time adjustments from exception fields (exclusive - don't recalculate from punches)
             if (hasManualExceptionMinutes) {
@@ -543,15 +562,15 @@ export default function ReportDetailView({ reportRun, project }) {
                         presentDays++;
                     }
 
-                    // Apply ALL manual time fields from exception
-                    if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        totalLateMinutes += dateException.late_minutes;
+                    // Apply ALL manual time fields from exception (already stored in variables)
+                    if (exceptionLateMinutes > 0) {
+                        totalLateMinutes += exceptionLateMinutes;
                     }
-                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        totalEarlyCheckout += dateException.early_checkout_minutes;
+                    if (exceptionEarlyMinutes > 0) {
+                        totalEarlyCheckout += exceptionEarlyMinutes;
                     }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        totalOtherMinutes += dateException.other_minutes;
+                    if (currentOtherMinutes > 0) {
+                        totalOtherMinutes += currentOtherMinutes;
                     }
                 }
             }
