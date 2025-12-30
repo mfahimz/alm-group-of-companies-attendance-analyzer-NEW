@@ -518,12 +518,20 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
             
-            // Apply manual time adjustments from exception fields (for all types except OFF/PUBLIC_HOLIDAY/ABSENT/SICK_LEAVE)
+            // Apply manual time adjustments from exception fields
+            // Track which date these came from for daily breakdown
             if (dateException && !dayOverride) {
                 if (dateException.type !== 'OFF' && 
                     dateException.type !== 'PUBLIC_HOLIDAY' && 
                     dateException.type !== 'MANUAL_ABSENT' && 
                     dateException.type !== 'SICK_LEAVE') {
+                    // Manual late/early exceptions should mark day as present
+                    if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
+                        if (dayPunches.length === 0) {
+                            presentDays++;
+                        }
+                    }
+
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
                         totalLateMinutes += dateException.late_minutes;
                     }
@@ -1127,6 +1135,12 @@ export default function ReportDetailView({ reportRun, project }) {
                 else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
                 else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
                 else if (dateException.type === 'SICK_LEAVE') status = 'Sick Leave';
+                else if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
+                    // Manual late/early should show as present
+                    status = dayPunches.length > 0 ? 'Present' : 'Present (Manual)';
+                } else if (dayPunches.length > 0) {
+                    status = 'Present';
+                }
             } else if (dayPunches.length > 0) {
                 if (partialDayResult.isPartial) {
                     status = 'Half Day (Partial)';
@@ -1149,6 +1163,27 @@ export default function ReportDetailView({ reportRun, project }) {
             
             const dayOverride = dayOverrides[dateStr];
             let currentOtherMinutes = 0; // Initialize other minutes for the day
+            let exceptionLateMinutes = 0;
+            let exceptionEarlyMinutes = 0;
+
+            // Capture exception minutes for this specific date
+            if (dateException && !dayOverride) {
+                if (dateException.type !== 'OFF' && 
+                    dateException.type !== 'PUBLIC_HOLIDAY' && 
+                    dateException.type !== 'MANUAL_ABSENT' && 
+                    dateException.type !== 'SICK_LEAVE') {
+                    if (dateException.late_minutes && dateException.late_minutes > 0) {
+                        exceptionLateMinutes = dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
+                        exceptionEarlyMinutes = dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                        currentOtherMinutes = dateException.other_minutes;
+                    }
+                }
+            }
+
             if (dayOverride) {
                 if (dayOverride.shiftOverride) {
                     shift = {
@@ -1229,6 +1264,20 @@ export default function ReportDetailView({ reportRun, project }) {
                 const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
                 return match ? match[1] : ts;
             };
+
+            // Add exception minutes to calculated values for display
+            if (exceptionLateMinutes > 0) {
+                lateMinutesTotal += exceptionLateMinutes;
+                lateInfo = exceptionLateMinutes > 0 ? `${exceptionLateMinutes} min (from exception)` : '-';
+            }
+            if (exceptionEarlyMinutes > 0) {
+                if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
+                    const existingMinutes = parseInt(earlyCheckoutInfo);
+                    earlyCheckoutInfo = `${existingMinutes + exceptionEarlyMinutes} min`;
+                } else {
+                    earlyCheckoutInfo = `${exceptionEarlyMinutes} min (from exception)`;
+                }
+            }
 
             breakdown.push({
                 date: formatDate(dateStr),

@@ -356,11 +356,18 @@ export default function RunAnalysisTab({ project }) {
                     continue;
                 }
 
-                // Apply manual time adjustments from exception fields (check all types except OFF/PUBLIC_HOLIDAY/ABSENT/SICK_LEAVE)
+                // Apply manual time adjustments from exception fields
                 if (dateException.type !== 'OFF' && 
                     dateException.type !== 'PUBLIC_HOLIDAY' && 
                     dateException.type !== 'MANUAL_ABSENT' && 
                     dateException.type !== 'SICK_LEAVE') {
+                    // Manual late/early exceptions should mark day as present
+                    if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
+                        if (filteredPunches.length === 0) {
+                            present_days++;
+                        }
+                    }
+                    
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
                         late_minutes += dateException.late_minutes;
                     }
