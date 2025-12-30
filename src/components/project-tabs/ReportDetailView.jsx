@@ -284,7 +284,11 @@ export default function ReportDetailView({ reportRun, project }) {
             p.punch_date <= dateTo
         );
         const employeeShifts = shifts.filter(s => s.attendance_id === result.attendance_id);
-        const employeeExceptions = exceptions.filter(e => e.attendance_id === result.attendance_id || e.attendance_id === 'ALL');
+        const employeeExceptions = exceptions.filter(e => 
+            (e.attendance_id === result.attendance_id || e.attendance_id === 'ALL') &&
+            e.use_in_analysis !== false &&
+            e.approval_status !== 'rejected'
+        );
 
         const employee = employees.find(e => e.attendance_id === result.attendance_id);
         
@@ -928,7 +932,11 @@ export default function ReportDetailView({ reportRun, project }) {
             p.punch_date <= reportRun.date_to
         );
         const employeeShifts = shifts.filter(s => s.attendance_id === currentResult.attendance_id);
-        const employeeExceptions = exceptions.filter(e => e.attendance_id === currentResult.attendance_id || e.attendance_id === 'ALL');
+        const employeeExceptions = exceptions.filter(e => 
+            (e.attendance_id === currentResult.attendance_id || e.attendance_id === 'ALL') &&
+            e.use_in_analysis !== false &&
+            e.approval_status !== 'rejected'
+        );
 
         const employee = employees.find(e => e.attendance_id === currentResult.attendance_id);
         

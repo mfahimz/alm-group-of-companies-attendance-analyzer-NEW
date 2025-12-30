@@ -274,7 +274,8 @@ export default function RunAnalysisTab({ project }) {
         const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
         const employeeExceptions = exceptions.filter(e => 
             (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
-            e.use_in_analysis !== false
+            e.use_in_analysis !== false &&
+            e.approval_status !== 'rejected'
         );
         
         // Get employee to determine weekly off day
