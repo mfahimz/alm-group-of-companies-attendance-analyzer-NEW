@@ -518,9 +518,15 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
             
-            // Apply manual time adjustments from exception fields
-            // Track which date these came from for daily breakdown
-            if (dateException && !dayOverride) {
+            // Check if exception has manual time values - if so, skip punch calculation for this day
+            const hasManualExceptionMinutes = dateException && !dayOverride && (
+                (dateException.late_minutes && dateException.late_minutes > 0) ||
+                (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) ||
+                (dateException.other_minutes && dateException.other_minutes > 0)
+            );
+
+            // Apply manual time adjustments from exception fields (exclusive - don't recalculate from punches)
+            if (hasManualExceptionMinutes) {
                 if (dateException.type !== 'OFF' && 
                     dateException.type !== 'PUBLIC_HOLIDAY' && 
                     dateException.type !== 'MANUAL_ABSENT' && 
@@ -538,14 +544,12 @@ export default function ReportDetailView({ reportRun, project }) {
                     if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
                         totalEarlyCheckout += dateException.early_checkout_minutes;
                     }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        totalOtherMinutes += dateException.other_minutes;
-                    }
+                    // DO NOT add other_minutes to totals
                 }
             }
             
-            // Calculate times from punches (either with original or overridden shift)
-            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
+            // Calculate times from punches ONLY if no manual exception minutes exist
+            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc && !hasManualExceptionMinutes) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
                 
