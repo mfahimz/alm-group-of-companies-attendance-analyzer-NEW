@@ -48,6 +48,12 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         enabled: !!dayRecord && !!project?.id
     });
 
+    const { data: exceptions = [] } = useQuery({
+        queryKey: ['exceptions', project?.id],
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        enabled: !!dayRecord && !!project?.id
+    });
+
     const parseTime = (timeStr) => {
         try {
             if (!timeStr || timeStr === '—') return null;
@@ -204,26 +210,52 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     }
                 });
             } else {
-                // Default initialization from calculated values
-                let lateMinutes = 0;
-                if (dayRecord.lateInfo && dayRecord.lateInfo !== '-') {
-                    const matches = dayRecord.lateInfo.match(/(\d+)\s*min/g);
-                    if (matches) {
-                        lateMinutes = matches.reduce((sum, match) => {
-                            const num = parseInt(match.match(/\d+/)[0]);
-                            return sum + num;
-                        }, 0);
-                    }
-                }
+                // Check if there's an exception for this date
+                const [day, month, year] = dayRecord.date.split('/');
+                const dateStr = `${year}-${month}-${day}`;
+                const currentDateObj = new Date(dateStr);
+                
+                const dateException = exceptions.find(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return currentDateObj >= exFrom && currentDateObj <= exTo &&
+                           (ex.attendance_id === attendanceId || ex.attendance_id === 'ALL');
+                });
 
+                // If exception has manual time values, use those exclusively
+                let lateMinutes = 0;
                 let earlyCheckoutMinutes = 0;
-                if (dayRecord.earlyCheckoutInfo && dayRecord.earlyCheckoutInfo !== '-') {
-                    const matches = dayRecord.earlyCheckoutInfo.match(/(\d+)\s*min/g);
-                    if (matches) {
-                        earlyCheckoutMinutes = matches.reduce((sum, match) => {
-                            const num = parseInt(match.match(/\d+/)[0]);
-                            return sum + num;
-                        }, 0);
+                let otherMinutes = 0;
+
+                if (dateException && (dateException.late_minutes > 0 || dateException.early_checkout_minutes > 0 || dateException.other_minutes > 0)) {
+                    // Use exception values directly
+                    lateMinutes = dateException.late_minutes || 0;
+                    earlyCheckoutMinutes = dateException.early_checkout_minutes || 0;
+                    otherMinutes = dateException.other_minutes || 0;
+                } else {
+                    // Parse from display values
+                    if (dayRecord.lateInfo && dayRecord.lateInfo !== '-') {
+                        const matches = dayRecord.lateInfo.match(/(\d+)\s*min/g);
+                        if (matches) {
+                            lateMinutes = matches.reduce((sum, match) => {
+                                const num = parseInt(match.match(/\d+/)[0]);
+                                return sum + num;
+                            }, 0);
+                        }
+                    }
+
+                    if (dayRecord.earlyCheckoutInfo && dayRecord.earlyCheckoutInfo !== '-') {
+                        const matches = dayRecord.earlyCheckoutInfo.match(/(\d+)\s*min/g);
+                        if (matches) {
+                            earlyCheckoutMinutes = matches.reduce((sum, match) => {
+                                const num = parseInt(match.match(/\d+/)[0]);
+                                return sum + num;
+                            }, 0);
+                        }
+                    }
+
+                    if (dayRecord.otherMinutes && dayRecord.otherMinutes > 0) {
+                        otherMinutes = dayRecord.otherMinutes;
                     }
                 }
 
@@ -243,7 +275,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     details: '',
                     lateMinutes: lateMinutes,
                     earlyCheckoutMinutes: earlyCheckoutMinutes,
-                    otherMinutes: 0,
+                    otherMinutes: otherMinutes,
                     isAbnormal: dayRecord.abnormal || false,
                     shiftOverride: {
                         enabled: false,
@@ -255,7 +287,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 });
             }
         }
-        }, [dayRecord, open, analysisResult]);
+        }, [dayRecord, open, analysisResult, exceptions, attendanceId]);
 
         // Auto-calculate late and early checkout when shift override changes
         React.useEffect(() => {
