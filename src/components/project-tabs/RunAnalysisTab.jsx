@@ -342,34 +342,16 @@ export default function RunAnalysisTab({ project }) {
                     continue;
                 } else if (dateException.type === 'MANUAL_PRESENT') {
                     present_days++;
-                    // Still check for manual time adjustments even for MANUAL_PRESENT
                 } else if (dateException.type === 'MANUAL_ABSENT') {
                     full_absence_count++;
                     continue;
                 } else if (dateException.type === 'MANUAL_HALF') {
                     present_days++;
                     half_absence_count++;
-                    // Still check for manual time adjustments even for MANUAL_HALF
                 } else if (dateException.type === 'SICK_LEAVE') {
                     working_days--;
                     sick_leave_count++;
                     continue;
-                }
-
-                // Apply manual time adjustments from exception fields (will check present status later)
-                if (dateException.type !== 'OFF' && 
-                    dateException.type !== 'PUBLIC_HOLIDAY' && 
-                    dateException.type !== 'MANUAL_ABSENT' && 
-                    dateException.type !== 'SICK_LEAVE') {
-                    if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        late_minutes += dateException.late_minutes;
-                    }
-                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        early_checkout_minutes += dateException.early_checkout_minutes;
-                    }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        other_minutes += dateException.other_minutes;
-                    }
                 }
             }
 
@@ -503,11 +485,29 @@ export default function RunAnalysisTab({ project }) {
                 allowedMinutesForDay = dateException.allowed_minutes || 0;
             }
 
+            // Skip time calculation if there's an exception that handles attendance status OR has manual time values
+            const hasManualTimeException = dateException && (
+                dateException.type === 'MANUAL_LATE' || 
+                dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                (dateException.late_minutes && dateException.late_minutes > 0) ||
+                (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0)
+            );
+            
             const shouldSkipTimeCalculation = dateException && [
-                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_LATE', 'MANUAL_EARLY_CHECKOUT'
+                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
-            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
+            // Use manual exception minutes if present, otherwise calculate from punches
+            if (hasManualTimeException) {
+                // Use ONLY the exception minutes, don't recalculate from punches
+                if (dateException.late_minutes && dateException.late_minutes > 0) {
+                    late_minutes += dateException.late_minutes;
+                }
+                if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
+                    early_checkout_minutes += dateException.early_checkout_minutes;
+                }
+                // Do NOT add other_minutes - exclude it from totals
+            } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
                 
