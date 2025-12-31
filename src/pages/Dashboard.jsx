@@ -91,48 +91,33 @@ export default function Dashboard() {
     const companies = Object.keys(projectsByCompany).sort();
 
     return (
-        <div className="space-y-8">
-            <Breadcrumb items={[{ label: 'Dashboard' }]} />
+        <div className="space-y-6">
+            {/* Header */}
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Dashboard</h1>
-                <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Overview of attendance analysis system</p>
+                <h1 className="text-3xl font-bold text-slate-900">
+                    Welcome back, {currentUser?.full_name || 'User'}
+                </h1>
+                <p className="text-slate-600 mt-1">Here's what's happening with your attendance system</p>
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map((stat) => {
                     const Icon = stat.icon;
-                    
-                    // Enhanced styling for stats cards
-                    let gradientBg = 'bg-white';
-                    let iconBg = stat.bgColor;
-                    let iconColor = stat.color.replace('bg-', 'text-');
-                    
-                    if (stat.color.includes('indigo')) {
-                        gradientBg = 'bg-gradient-to-br from-indigo-50/50 to-white';
-                        iconBg = 'bg-indigo-100 text-indigo-600';
-                    } else if (stat.color.includes('amber')) {
-                        gradientBg = 'bg-gradient-to-br from-amber-50/50 to-white';
-                        iconBg = 'bg-amber-100 text-amber-600';
-                    } else if (stat.color.includes('green')) {
-                        gradientBg = 'bg-gradient-to-br from-green-50/50 to-white';
-                        iconBg = 'bg-green-100 text-green-600';
-                    } else if (stat.color.includes('blue')) {
-                        gradientBg = 'bg-gradient-to-br from-blue-50/50 to-white';
-                        iconBg = 'bg-blue-100 text-blue-600';
-                    }
-
                     return (
-                        <Card key={stat.label} className={`border-0 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 ${gradientBg}`}>
+                        <Card key={stat.label} className="border-0 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden group">
                             <CardContent className="p-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-slate-500 font-medium uppercase tracking-wider text-[11px]">{stat.label}</p>
-                                        <p className="text-3xl font-bold text-slate-900 mt-1 tracking-tight">{stat.value}</p>
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className={`${stat.color} text-white p-2 rounded-lg`}>
+                                                <Icon className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <p className="text-3xl font-bold text-slate-900 mb-1">{stat.value}</p>
+                                        <p className="text-sm text-slate-600">{stat.label}</p>
                                     </div>
-                                    <div className={`${iconBg} p-3.5 rounded-2xl shadow-sm`}>
-                                        <Icon className="w-6 h-6" />
-                                    </div>
+                                    <TrendingUp className="w-4 h-4 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                             </CardContent>
                         </Card>
@@ -140,43 +125,59 @@ export default function Dashboard() {
                 })}
             </div>
 
-            {/* Projects by Company */}
-            {projects.length === 0 ? (
-                <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 rounded-2xl">
-                    <CardContent className="p-8">
-                        <div className="text-center text-slate-500">
-                            No projects yet. Create your first project to get started.
-                        </div>
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="space-y-6">
-                    {companies.map((company) => (
-                        <Card key={company} className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 rounded-2xl">
-                            <CardHeader className="border-b border-slate-100/80 px-8 py-6">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
-                                    <CardTitle className="text-lg text-slate-900 font-bold">{company}</CardTitle>
-                                    <span className="text-sm text-slate-500 ml-2">({projectsByCompany[company].length} projects)</span>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="divide-y divide-slate-100">
-                                    {projectsByCompany[company].map((project) => (
-                                        <Link
-                                            key={project.id}
-                                            to={createPageUrl(`ProjectDetail?id=${project.id}`)}
-                                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 hover:bg-slate-50 transition-colors gap-2 group"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{project.name}</p>
-                                                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                                                    {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
-                                                </p>
-                                            </div>
-                                            <div className="flex-shrink-0">
+            {/* Pending Approvals Alert */}
+            <PendingApprovals userRole={userRole} />
+
+            {/* Two Column Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column - 2/3 width */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Projects by Company */}
+                    {projects.length === 0 ? (
+                        <Card className="border-0 shadow-lg">
+                            <CardContent className="p-12 text-center">
+                                <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                                <h3 className="text-lg font-semibold text-slate-900 mb-2">No projects yet</h3>
+                                <p className="text-slate-600 mb-4">Create your first project to get started</p>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-slate-900">Your Projects</h2>
+                                <Link 
+                                    to={createPageUrl('Projects')}
+                                    className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                >
+                                    View all →
+                                </Link>
+                            </div>
+                            {companies.slice(0, 2).map((company) => (
+                                <Card key={company} className="border-0 shadow-md">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-5 w-1 bg-indigo-500 rounded-full"></div>
+                                            <CardTitle className="text-base font-bold">{company}</CardTitle>
+                                            <span className="text-sm text-slate-500">({projectsByCompany[company].length})</span>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-1">
+                                        {projectsByCompany[company].slice(0, 4).map((project) => (
+                                            <Link
+                                                key={project.id}
+                                                to={createPageUrl(`ProjectDetail?id=${project.id}`)}
+                                                className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors group"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-slate-900 group-hover:text-indigo-600 truncate text-sm">
+                                                        {project.name}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
+                                                    </p>
+                                                </div>
                                                 <span className={`
-                                                    px-2.5 py-1 rounded-full text-xs font-medium
+                                                    px-2 py-1 rounded-md text-xs font-medium ml-2 whitespace-nowrap
                                                     ${project.status === 'draft' ? 'bg-amber-100 text-amber-700' : ''}
                                                     ${project.status === 'analyzed' ? 'bg-green-100 text-green-700' : ''}
                                                     ${project.status === 'locked' ? 'bg-slate-100 text-slate-600' : ''}
@@ -184,15 +185,32 @@ export default function Dashboard() {
                                                 `}>
                                                     {project.status}
                                                 </span>
+                                            </Link>
+                                        ))}
+                                        {projectsByCompany[company].length > 4 && (
+                                            <div className="text-center pt-2">
+                                                <Link 
+                                                    to={createPageUrl('Projects')}
+                                                    className="text-xs text-slate-500 hover:text-indigo-600"
+                                                >
+                                                    +{projectsByCompany[company].length - 4} more projects
+                                                </Link>
                                             </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
                 </div>
-            )}
+
+                {/* Right Column - 1/3 width */}
+                <div className="space-y-6">
+                    <QuickActions userRole={userRole} />
+                    <ProjectStatusChart projects={projects} />
+                    <RecentActivity />
+                </div>
+            </div>
         </div>
     );
 }
