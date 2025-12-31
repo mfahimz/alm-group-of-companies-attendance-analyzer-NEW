@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Copy, Trash2, Edit } from 'lucide-react';
+import { Plus, Search, Copy, Trash2, Edit, Calendar, FolderKanban, TrendingUp, Clock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
@@ -117,12 +117,14 @@ export default function Projects() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in duration-500">
             <Breadcrumb items={[{ label: 'Projects' }]} />
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Projects</h1>
-                    <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
+                <div className="animate-in slide-in-from-left-4 duration-700">
+                    <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
+                        Projects
+                    </h1>
+                    <p className="text-slate-600 mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
                 </div>
                 <div className="flex gap-2">
                     {selectedProjects.length > 0 && isAdminOrSupervisor && (
@@ -146,37 +148,55 @@ export default function Projects() {
             </div>
 
             {/* Search */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <div className="relative animate-in slide-in-from-top-4 duration-700 delay-100">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
-                    placeholder="Search projects..."
+                    placeholder="Search projects by name or department..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
+                    className="pl-12 h-12 bg-white/80 backdrop-blur-sm border-0 shadow-lg ring-1 ring-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all"
                 />
             </div>
 
             {/* Projects Grid */}
             {isLoading ? (
-                <div className="text-center py-12 text-slate-500">Loading projects...</div>
+                <div className="text-center py-12">
+                    <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
+                    <p className="text-slate-500 mt-4">Loading projects...</p>
+                </div>
             ) : filteredProjects.length === 0 ? (
-                <Card className="border-2 border-dashed border-slate-200 bg-white/50 shadow-sm rounded-2xl">
-                    <CardContent className="p-12 text-center">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <FolderKanban className="w-8 h-8 text-slate-400" />
+                <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-slate-50 rounded-3xl overflow-hidden">
+                    <CardContent className="p-16 text-center">
+                        <div className="relative mb-6">
+                            <div className="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl flex items-center justify-center mx-auto animate-pulse">
+                                <FolderKanban className="w-12 h-12 text-indigo-600" />
+                            </div>
+                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-400 rounded-full animate-bounce"></div>
                         </div>
-                        <h3 className="text-lg font-semibold text-slate-900 mb-1">No projects yet</h3>
-                        <p className="text-slate-500">Create your first project to get started.</p>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-2">No projects yet</h3>
+                        <p className="text-slate-600 mb-6">Create your first project to start tracking attendance</p>
+                        <Button 
+                            onClick={() => setShowCreateDialog(true)}
+                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create First Project
+                        </Button>
                     </CardContent>
                 </Card>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProjects.map((project) => (
-                        <Card key={project.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 h-full group rounded-2xl overflow-hidden ring-1 ring-slate-900/5">
-                            <div className={`h-2 w-full ${
-                                project.status === 'draft' ? 'bg-amber-400' :
-                                project.status === 'analyzed' ? 'bg-green-500' :
-                                'bg-slate-300'
+                    {filteredProjects.map((project, idx) => (
+                        <Card 
+                            key={project.id} 
+                            className="border-0 bg-white shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 h-full group rounded-3xl overflow-hidden ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95"
+                            style={{ animationDelay: `${idx * 75}ms` }}
+                        >
+                            <div className={`h-1.5 w-full bg-gradient-to-r ${
+                                project.status === 'draft' ? 'from-amber-400 to-amber-500' :
+                                project.status === 'analyzed' ? 'from-green-400 to-green-600' :
+                                project.status === 'locked' ? 'from-slate-400 to-slate-500' :
+                                'from-red-400 to-red-500'
                             }`} />
                             <CardContent className="p-6 relative">
                                 {isAdminOrSupervisor && (
@@ -194,44 +214,53 @@ export default function Projects() {
                                         />
                                     </div>
                                 )}
-                                <Link to={createPageUrl(`ProjectDetail?id=${project.id}`)}>
-                                    <div className="flex items-start justify-between mb-4">
-                                        <h3 className="font-bold text-slate-900 text-lg group-hover:text-indigo-600 transition-colors leading-tight">{project.name}</h3>
-                                        <span className={`
-                                            px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
-                                            ${project.status === 'draft' ? 'bg-amber-50 text-amber-600 ring-1 ring-amber-100' : ''}
-                                            ${project.status === 'analyzed' ? 'bg-green-50 text-green-600 ring-1 ring-green-100' : ''}
-                                            ${project.status === 'locked' ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' : ''}
-                                        `}>
-                                            {project.status}
-                                        </span>
+                                <Link to={createPageUrl(`ProjectDetail?id=${project.id}`)} className="block">
+                                    <div className="flex items-start justify-between mb-5">
+                                        <div className="flex-1 min-w-0 pr-3">
+                                            <h3 className="font-bold text-slate-900 text-xl group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-indigo-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300 leading-tight mb-1">
+                                                {project.name}
+                                            </h3>
+                                            <p className="text-sm text-slate-500 font-medium">{project.company}</p>
+                                        </div>
+                                        <div className="relative">
+                                            <span className={`
+                                                px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm
+                                                ${project.status === 'draft' ? 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 ring-1 ring-amber-200' : ''}
+                                                ${project.status === 'analyzed' ? 'bg-gradient-to-r from-green-50 to-green-100 text-green-700 ring-1 ring-green-200' : ''}
+                                                ${project.status === 'locked' ? 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-600 ring-1 ring-slate-300' : ''}
+                                                ${project.status === 'closed' ? 'bg-gradient-to-r from-red-50 to-red-100 text-red-700 ring-1 ring-red-200' : ''}
+                                            `}>
+                                                {project.status}
+                                            </span>
+                                        </div>
                                     </div>
                                     
                                     <div className="space-y-3 text-sm">
-                                        <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
-                                            <span className="text-slate-500 text-xs font-medium uppercase tracking-wide">Period</span>
-                                            <span className="font-semibold text-slate-700">
-                                                {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
-                                            </span>
+                                        <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100">
+                                            <Calendar className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs text-slate-600 font-medium mb-0.5">Period</p>
+                                                <p className="font-bold text-slate-900 text-xs">
+                                                    {new Date(project.date_from).toLocaleDateString('en-GB')} → {new Date(project.date_to).toLocaleDateString('en-GB')}
+                                                </p>
+                                            </div>
                                         </div>
                                         
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="p-2 rounded-lg bg-slate-50">
-                                                <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-1">Dept</p>
-                                                <p className="font-semibold text-slate-700 truncate">{project.department || 'All'}</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 group-hover:bg-white transition-colors">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <FolderKanban className="w-3 h-3 text-slate-400" />
+                                                    <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Department</p>
+                                                </div>
+                                                <p className="font-bold text-slate-900 text-sm truncate">{project.department || 'All'}</p>
                                             </div>
-                                            <div className="p-2 rounded-lg bg-slate-50">
-                                                <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-1">Created</p>
-                                                <p className="font-semibold text-slate-700 truncate">
-                                                    {new Date(project.created_date).toLocaleString('en-US', {
-                                                        day: '2-digit',
-                                                        month: '2-digit',
-                                                        year: 'numeric',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                        timeZone: 'Asia/Dubai'
-                                                    })}
+                                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 group-hover:bg-white transition-colors">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Clock className="w-3 h-3 text-slate-400" />
+                                                    <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Created</p>
+                                                </div>
+                                                <p className="font-bold text-slate-900 text-[11px]">
+                                                    {new Date(project.created_date).toLocaleDateString('en-GB')}
                                                 </p>
                                             </div>
                                         </div>
@@ -243,7 +272,7 @@ export default function Projects() {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
+                                            className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 rounded-xl font-semibold transition-all"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 handleDuplicateClick(project);
@@ -255,7 +284,7 @@ export default function Projects() {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-2"
+                                            className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-3 rounded-xl transition-all"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 if (window.confirm('Delete this project? This action cannot be undone.')) {
