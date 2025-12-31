@@ -2,7 +2,8 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FolderKanban, Users, AlertCircle, CheckCircle, TrendingUp, Calendar } from 'lucide-react';
+import { FolderKanban, Users, AlertCircle, CheckCircle, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
+import { SkeletonStat, SkeletonCard } from '../components/ui/SkeletonLoader';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -11,19 +12,21 @@ import PendingApprovals from '../components/dashboard/PendingApprovals';
 import ProjectStatusChart from '../components/dashboard/ProjectStatusChart';
 
 export default function Dashboard() {
-    const { data: currentUser } = useQuery({
+    const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
 
-    const { data: allProjects = [] } = useQuery({
+    const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
         queryKey: ['projects'],
-        queryFn: () => base44.entities.Project.list('-created_date')
+        queryFn: () => base44.entities.Project.list('-created_date'),
+        enabled: !!currentUser
     });
 
-    const { data: allEmployees = [] } = useQuery({
+    const { data: allEmployees = [], isLoading: employeesLoading } = useQuery({
         queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list()
+        queryFn: () => base44.entities.Employee.list(),
+        enabled: !!currentUser
     });
 
     // Filter data based on user access
