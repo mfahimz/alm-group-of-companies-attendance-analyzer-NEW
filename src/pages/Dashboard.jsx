@@ -7,7 +7,6 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import QuickActions from '../components/dashboard/QuickActions';
-import RecentActivity from '../components/dashboard/RecentActivity';
 import PendingApprovals from '../components/dashboard/PendingApprovals';
 import ProjectStatusChart from '../components/dashboard/ProjectStatusChart';
 
@@ -208,7 +207,6 @@ export default function Dashboard() {
                 <div className="space-y-6">
                     <QuickActions userRole={userRole} />
                     <ProjectStatusChart projects={projects} />
-                    <RecentActivity />
                 </div>
             </div>
         </div>
