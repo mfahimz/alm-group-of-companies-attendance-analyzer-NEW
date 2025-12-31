@@ -2,10 +2,14 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FolderKanban, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import { FolderKanban, Users, AlertCircle, CheckCircle, TrendingUp, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
+import QuickActions from '../components/dashboard/QuickActions';
+import RecentActivity from '../components/dashboard/RecentActivity';
+import PendingApprovals from '../components/dashboard/PendingApprovals';
+import ProjectStatusChart from '../components/dashboard/ProjectStatusChart';
 
 export default function Dashboard() {
     const { data: currentUser } = useQuery({
