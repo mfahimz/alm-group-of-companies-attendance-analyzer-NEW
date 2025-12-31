@@ -46,23 +46,24 @@ export default function QuickActions({ userRole }) {
     if (actions.length === 0) return null;
 
     return (
-        <Card className="border-0 shadow-lg">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
+                <CardTitle className="text-lg font-bold">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3">
-                {actions.map((action) => {
+                {actions.map((action, idx) => {
                     const Icon = action.icon;
                     return (
                         <Link
                             key={action.label}
                             to={createPageUrl(action.href)}
-                            className="group"
+                            className="group animate-in fade-in zoom-in-50"
+                            style={{ animationDelay: `${idx * 75}ms` }}
                         >
-                            <div className={`${action.color} text-white rounded-xl p-4 transition-all duration-200 group-hover:scale-105 group-hover:shadow-lg`}>
-                                <Icon className="w-5 h-5 mb-2" />
-                                <p className="font-semibold text-sm">{action.label}</p>
-                                <p className="text-xs opacity-90 mt-0.5">{action.description}</p>
+                            <div className={`${action.color} text-white rounded-xl p-4 transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl group-hover:rotate-1`}>
+                                <Icon className="w-5 h-5 mb-2 group-hover:scale-110 transition-transform" />
+                                <p className="font-bold text-sm">{action.label}</p>
+                                <p className="text-xs opacity-90 mt-1">{action.description}</p>
                             </div>
                         </Link>
                     );

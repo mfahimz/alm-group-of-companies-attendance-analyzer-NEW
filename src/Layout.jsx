@@ -20,6 +20,7 @@ import {
     FileSpreadsheet 
 } from 'lucide-react';
 import { Toaster } from 'sonner';
+import NotificationCenter from './components/ui/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -351,21 +352,28 @@ export default function Layout({ children, currentPageName }) {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
                 {/* Mobile Header */}
-                <header className="lg:hidden flex-shrink-0 z-30 bg-white border-b border-slate-200 px-4 h-16 flex items-center">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-slate-500"
-                        onClick={() => setSidebarOpen(true)}
-                    >
-                        <Menu className="w-6 h-6" />
-                    </Button>
-                    <span className="ml-4 text-lg font-semibold text-slate-900">Attendance</span>
+                <header className="lg:hidden flex-shrink-0 z-30 bg-white border-b border-slate-200 px-4 h-16 flex items-center justify-between">
+                    <div className="flex items-center">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-slate-500"
+                            onClick={() => setSidebarOpen(true)}
+                        >
+                            <Menu className="w-6 h-6" />
+                        </Button>
+                        <span className="ml-4 text-lg font-semibold text-slate-900">Attendance</span>
+                    </div>
+                    <NotificationCenter />
                 </header>
 
                 {/* Page Content */}
                 <main className="flex-1 overflow-y-auto p-6 lg:p-8 min-h-0">
                     <div className="max-w-7xl mx-auto">
+                        {/* Desktop Notification */}
+                        <div className="hidden lg:flex justify-end mb-4">
+                            <NotificationCenter />
+                        </div>
                         {children}
                     </div>
                 </main>
