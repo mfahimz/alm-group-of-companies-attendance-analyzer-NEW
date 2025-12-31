@@ -4,13 +4,13 @@
 
 @layer base {
   :root {
-    /* Brand Colors */
-    --primary: 220 90% 56%;        /* Indigo-600 */
-    --primary-hover: 220 90% 50%;  /* Indigo-700 */
-    --primary-light: 220 95% 95%;  /* Indigo-50 */
+    /* Brand Colors - More Vibrant */
+    --primary: 262 83% 58%;        /* Purple-600 */
+    --primary-hover: 262 83% 52%;  /* Purple-700 */
+    --primary-light: 262 100% 97%; /* Purple-50 */
     
-    --secondary: 270 95% 75%;      /* Purple-400 */
-    --accent: 45 93% 47%;          /* Amber-500 */
+    --secondary: 280 87% 65%;      /* Fuchsia-500 */
+    --accent: 31 100% 60%;         /* Orange-500 */
     
     /* Semantic Colors */
     --success: 142 76% 36%;        /* Green-600 */
@@ -22,19 +22,19 @@
     --info: 217 91% 60%;           /* Blue-500 */
     --info-light: 214 95% 93%;     /* Blue-50 */
     
-    /* Neutral Colors */
-    --background: 0 0% 100%;
+    /* Neutral Colors - Warmer Tones */
+    --background: 240 20% 99%;     /* Slight warm tint */
     --foreground: 222 47% 11%;     /* Slate-900 */
     
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     
-    --muted: 210 40% 96%;          /* Slate-50 */
+    --muted: 240 10% 96%;          /* Warmer muted */
     --muted-foreground: 215 16% 47%; /* Slate-600 */
     
-    --border: 214 32% 91%;         /* Slate-200 */
-    --input: 214 32% 91%;
-    --ring: 220 90% 56%;
+    --border: 220 13% 91%;         /* Slightly purple tint */
+    --input: 220 13% 91%;
+    --ring: 262 83% 58%;
     
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
