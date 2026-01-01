@@ -17,7 +17,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         company: '',
         department: '',
         weekly_off: 'Sunday',
-        active: true
+        active: true,
+        carried_grace_minutes: 0
     });
     const [showNewDeptDialog, setShowNewDeptDialog] = useState(false);
     const [showNewSubDeptDialog, setShowNewSubDeptDialog] = useState(false);
@@ -45,7 +46,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 company: employee.company || '',
                 department: employee.department || '',
                 weekly_off: employee.weekly_off || 'Sunday',
-                active: employee.active ?? true
+                active: employee.active ?? true,
+                carried_grace_minutes: employee.carried_grace_minutes || 0
             });
         } else {
             // Auto-generate HRMS ID for new employees
@@ -60,7 +62,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         company: '',
                         department: '',
                         weekly_off: 'Sunday',
-                        active: true
+                        active: true,
+                        carried_grace_minutes: 0
                     });
                 } catch (error) {
                     toast.error('Failed to generate HRMS ID');
@@ -71,7 +74,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         company: '',
                         department: '',
                         weekly_off: 'Sunday',
-                        active: true
+                        active: true,
+                        carried_grace_minutes: 0
                     });
                 } finally {
                     setGeneratingHrmsId(false);
@@ -357,6 +361,19 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                                 <SelectItem value="Saturday">Saturday</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="carried_grace">Carried Grace Minutes</Label>
+                        <Input
+                            id="carried_grace"
+                            type="number"
+                            value={formData.carried_grace_minutes || 0}
+                            onChange={(e) => setFormData({ ...formData, carried_grace_minutes: parseInt(e.target.value) || 0 })}
+                            placeholder="0"
+                            min="0"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Unused grace minutes carried from previous projects</p>
                     </div>
 
                     <div className="flex items-center justify-between">
