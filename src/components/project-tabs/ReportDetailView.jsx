@@ -851,6 +851,8 @@ export default function ReportDetailView({ reportRun, project }) {
                             exceptionData.type = 'MANUAL_LATE';
                         } else if (exceptionData.early_checkout_minutes > 0) {
                             exceptionData.type = 'MANUAL_EARLY_CHECKOUT';
+                        } else if (exceptionData.other_minutes > 0) {
+                            exceptionData.type = 'MANUAL_OTHER_MINUTES';
                         }
 
                         exceptionsToCreate.push(exceptionData);

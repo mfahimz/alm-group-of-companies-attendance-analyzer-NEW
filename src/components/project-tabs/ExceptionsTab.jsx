@@ -1013,6 +1013,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     <SelectItem value="all">All types</SelectItem>
                                     <SelectItem value="MANUAL_LATE">Manual Late</SelectItem>
                                     <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
+                                    <SelectItem value="MANUAL_OTHER_MINUTES">Manual Other Minutes</SelectItem>
                                     <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                     <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
