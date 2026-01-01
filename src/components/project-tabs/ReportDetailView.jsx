@@ -6,13 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Save } from 'lucide-react';
+import { Download, Search, Eye, Edit, Save, Filter } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import * as XLSX from 'xlsx';
+import { CheckCircle } from 'lucide-react';
 
 export default function ReportDetailView({ reportRun, project }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +27,7 @@ export default function ReportDetailView({ reportRun, project }) {
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
+    const [riskFilter, setRiskFilter] = useState('all');
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
@@ -679,10 +682,27 @@ export default function ReportDetailView({ reportRun, project }) {
 
     const filteredResults = React.useMemo(() => {
         return enrichedResults
-            .filter(result =>
-                result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                result.name.toLowerCase().includes(searchTerm.toLowerCase())
-            )
+            .filter(result => {
+                const matchesSearch = result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    result.name.toLowerCase().includes(searchTerm.toLowerCase());
+                
+                if (!matchesSearch) return false;
+                
+                // Risk-based filtering
+                if (riskFilter === 'high-risk') {
+                    const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                    const hasHighAbsence = result.full_absence_count > 2;
+                    const hasHighMinutes = total > 120;
+                    return hasHighAbsence || hasHighMinutes;
+                } else if (riskFilter === 'clean') {
+                    const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                    return result.full_absence_count === 0 && total === 0;
+                } else if (riskFilter === 'unverified') {
+                    return !result.isVerified;
+                }
+                
+                return true;
+            })
             .sort((a, b) => {
                 let aVal = a[sort.key];
                 let bVal = b[sort.key];
@@ -712,6 +732,20 @@ export default function ReportDetailView({ reportRun, project }) {
         
         setVerifiedEmployees(newVerified);
         updateVerificationMutation.mutate(newVerified);
+    };
+
+    const verifyAllClean = () => {
+        const cleanEmployees = enrichedResults
+            .filter(r => {
+                const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
+                return r.full_absence_count === 0 && total === 0;
+            })
+            .map(r => r.attendance_id);
+        
+        const newVerified = [...new Set([...verifiedEmployees, ...cleanEmployees])];
+        setVerifiedEmployees(newVerified);
+        updateVerificationMutation.mutate(newVerified);
+        toast.success(`${cleanEmployees.length} employees verified`);
     };
 
     const saveReportMutation = useMutation({
@@ -1436,14 +1470,36 @@ export default function ReportDetailView({ reportRun, project }) {
 
             <Card className="border-0 shadow-sm">
                 <CardContent className="p-4">
-                    <div className="relative max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                            placeholder="Search by ID or name..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                        />
+                    <div className="flex gap-3 items-center">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Search by ID or name..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                        <Select value={riskFilter} onValueChange={setRiskFilter}>
+                            <SelectTrigger className="w-48">
+                                <Filter className="w-4 h-4 mr-2" />
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Employees</SelectItem>
+                                <SelectItem value="high-risk">High Risk (>2 LOP or >120 min)</SelectItem>
+                                <SelectItem value="clean">Clean Records (0 issues)</SelectItem>
+                                <SelectItem value="unverified">Unverified Only</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button
+                            onClick={verifyAllClean}
+                            variant="outline"
+                            size="sm"
+                        >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Verify All Clean
+                        </Button>
                     </div>
                 </CardContent>
             </Card>

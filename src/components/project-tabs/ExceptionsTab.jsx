@@ -105,10 +105,17 @@ export default function ExceptionsTab({ project }) {
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
+            // Auto-approval rules: exceptions under 30 min auto-approve
+            let approvalStatus = 'approved';
+            if (isUser) {
+                const totalMinutes = (data.late_minutes || 0) + (data.early_checkout_minutes || 0) + (data.other_minutes || 0);
+                approvalStatus = totalMinutes <= 30 ? 'approved' : 'pending';
+            }
+            
             const exceptionData = {
                 ...data,
                 project_id: project.id,
-                approval_status: isUser ? 'pending' : 'approved'
+                approval_status: approvalStatus
             };
             
             const newException = await base44.entities.Exception.create(exceptionData);
@@ -146,15 +153,17 @@ Thank you.
                     }
                 }
             }
-            
+
             return newException;
-        },
-        onSuccess: (data) => {
+            },
+            onSuccess: (data, variables) => {
             queryClient.invalidateQueries(['exceptions', project.id]);
-            toast.success(isUser ? 'Exception submitted for approval' : 'Exception added successfully');
+            const totalMinutes = (variables.late_minutes || 0) + (variables.early_checkout_minutes || 0) + (variables.other_minutes || 0);
+            const autoApproved = isUser && totalMinutes <= 30;
+            toast.success(autoApproved ? 'Exception auto-approved (≤30 min)' : isUser ? 'Exception submitted for approval' : 'Exception added successfully');
             setShowForm(false);
             resetForm();
-        },
+            },
         onError: (error) => {
             toast.error('Failed to add exception: ' + (error.message || 'Unknown error'));
         }

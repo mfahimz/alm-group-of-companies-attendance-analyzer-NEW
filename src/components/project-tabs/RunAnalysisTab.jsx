@@ -890,7 +890,85 @@ export default function RunAnalysisTab({ project }) {
                         </p>
                     </div>
                 </CardContent>
-            </Card>
-        </div>
-    );
-}
+                </Card>
+                </div>
+
+                {/* Data Quality Check Dialog */}
+                <Dialog open={showQualityCheck} onOpenChange={setShowQualityCheck}>
+                <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Data Quality Check</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    {dataQualityIssues.length === 0 ? (
+                        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                            <div>
+                                <p className="font-medium text-green-900">All checks passed!</p>
+                                <p className="text-sm text-green-700">Your data is ready for analysis.</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {dataQualityIssues.map((issue, idx) => (
+                                <div 
+                                    key={idx}
+                                    className={`flex items-start gap-3 p-4 rounded-lg border ${
+                                        issue.type === 'error' ? 'bg-red-50 border-red-200' :
+                                        issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                                        'bg-blue-50 border-blue-200'
+                                    }`}
+                                >
+                                    {issue.type === 'error' && <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
+                                    {issue.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />}
+                                    {issue.type === 'info' && <Info className="w-5 h-5 text-blue-600 mt-0.5" />}
+                                    <div className="flex-1">
+                                        <p className={`font-medium ${
+                                            issue.type === 'error' ? 'text-red-900' :
+                                            issue.type === 'warning' ? 'text-amber-900' :
+                                            'text-blue-900'
+                                        }`}>
+                                            {issue.title}
+                                        </p>
+                                        <p className={`text-sm mt-1 ${
+                                            issue.type === 'error' ? 'text-red-700' :
+                                            issue.type === 'warning' ? 'text-amber-700' :
+                                            'text-blue-700'
+                                        }`}>
+                                            {issue.details}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {dataQualityIssues.some(i => i.type === 'error') && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                            <p className="text-sm text-slate-700">
+                                <strong>Action Required:</strong> Please fix the errors above before running analysis. 
+                                Go to the Shifts tab to add missing shift timings.
+                            </p>
+                        </div>
+                    )}
+                </div>
+                <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setShowQualityCheck(false)}>
+                        Close
+                    </Button>
+                    {!dataQualityIssues.some(i => i.type === 'error') && (
+                        <Button 
+                            onClick={() => {
+                                setShowQualityCheck(false);
+                                handleAnalyze();
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            Proceed with Analysis
+                        </Button>
+                    )}
+                </div>
+                </DialogContent>
+                </Dialog>
+                );
+                }

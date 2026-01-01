@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye, Copy } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SortableTableHead from '../ui/SortableTableHead';
@@ -40,6 +40,8 @@ export default function ShiftTimingsTab({ project }) {
     const [selectedShifts, setSelectedShifts] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
+    const [showCopyDialog, setShowCopyDialog] = useState(false);
+    const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '' });
     const [formData, setFormData] = useState({
         attendance_id: '',
         am_start: '',
@@ -80,6 +82,12 @@ export default function ShiftTimingsTab({ project }) {
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id })
+    });
+
+    const { data: allProjects = [] } = useQuery({
+        queryKey: ['projects'],
+        queryFn: () => base44.entities.Project.list(),
+        enabled: showCopyDialog
     });
 
     // Load date ranges from project configuration
@@ -428,6 +436,58 @@ export default function ShiftTimingsTab({ project }) {
         }
     });
 
+    const copyShiftsMutation = useMutation({
+        mutationFn: async ({ sourceType, sourceBlockId, sourceProjectId, targetBlockId }) => {
+            let sourceShifts = [];
+            
+            if (sourceType === 'block') {
+                // Copy from another block in the same project
+                sourceShifts = shifts.filter(s => s.shift_block === sourceBlockId);
+            } else if (sourceType === 'project') {
+                // Copy from another project
+                const otherProjectShifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProjectId });
+                sourceShifts = otherProjectShifts;
+            }
+            
+            if (sourceShifts.length === 0) {
+                throw new Error('No shifts found in source');
+            }
+            
+            const targetRange = blockDateRanges[targetBlockId];
+            const newShifts = sourceShifts.map(shift => ({
+                project_id: project.id,
+                attendance_id: shift.attendance_id,
+                date: shift.date,
+                is_friday_shift: shift.is_friday_shift,
+                applicable_days: shift.applicable_days,
+                is_single_shift: shift.is_single_shift,
+                am_start: shift.am_start,
+                am_end: shift.am_end,
+                pm_start: shift.pm_start,
+                pm_end: shift.pm_end,
+                effective_from: targetRange.from,
+                effective_to: targetRange.to,
+                shift_block: targetBlockId
+            }));
+            
+            const batchSize = 50;
+            for (let i = 0; i < newShifts.length; i += batchSize) {
+                const batch = newShifts.slice(i, i + batchSize);
+                await base44.entities.ShiftTiming.bulkCreate(batch);
+            }
+            
+            return newShifts.length;
+        },
+        onSuccess: (count) => {
+            queryClient.invalidateQueries(['shifts', project.id]);
+            toast.success(`${count} shifts copied successfully`);
+            setShowCopyDialog(false);
+        },
+        onError: (error) => {
+            toast.error('Failed to copy shifts: ' + error.message);
+        }
+    });
+
     const createShiftMutation = useMutation({
         mutationFn: (data) => base44.entities.ShiftTiming.create({
             ...data,
@@ -676,6 +736,17 @@ export default function ShiftTimingsTab({ project }) {
                         </div>
                         {editingBlockRange !== blockId && !isUser && (
                             <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setCopySource({ ...copySource, type: 'block', targetBlockId: blockId });
+                                        setShowCopyDialog(true);
+                                    }}
+                                >
+                                    <Copy className="w-4 h-4 mr-2" />
+                                    Copy Shifts
+                                </Button>
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -1316,6 +1387,102 @@ export default function ShiftTimingsTab({ project }) {
                                 Cancel
                             </Button>
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Copy Shifts Dialog */}
+            <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Copy Shifts to {copySource.targetBlockId === 'block1' ? 'Block 1' : 'Block 2'}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label>Copy From</Label>
+                            <Select
+                                value={copySource.type}
+                                onValueChange={(value) => setCopySource({ ...copySource, type: value })}
+                            >
+                                <SelectTrigger className="mt-2">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="block">Another Block in This Project</SelectItem>
+                                    <SelectItem value="project">Another Project</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {copySource.type === 'block' && (
+                            <div>
+                                <Label>Source Block</Label>
+                                <Select
+                                    value={copySource.blockId}
+                                    onValueChange={(value) => setCopySource({ ...copySource, blockId: value })}
+                                >
+                                    <SelectTrigger className="mt-2">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Array.from({ length: blocksCount }, (_, i) => i + 1).map(num => {
+                                            const blockId = `block${num}`;
+                                            const range = blockDateRanges[blockId];
+                                            const count = (shiftsByBlock[blockId] || []).length;
+                                            return (
+                                                <SelectItem key={blockId} value={blockId}>
+                                                    Block {num} ({count} shifts)
+                                                </SelectItem>
+                                            );
+                                        })}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {copySource.type === 'project' && (
+                            <div>
+                                <Label>Source Project</Label>
+                                <Select
+                                    value={copySource.projectId}
+                                    onValueChange={(value) => setCopySource({ ...copySource, projectId: value })}
+                                >
+                                    <SelectTrigger className="mt-2">
+                                        <SelectValue placeholder="Select project..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allProjects
+                                            .filter(p => p.id !== project.id && p.company === project.company)
+                                            .map(p => (
+                                                <SelectItem key={p.id} value={p.id}>
+                                                    {p.name} ({new Date(p.date_from).toLocaleDateString()})
+                                                </SelectItem>
+                                            ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p className="text-sm text-amber-800">
+                                ⚠️ This will copy all shifts from the source to {copySource.targetBlockId === 'block1' ? 'Block 1' : 'Block 2'} with the current date range.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setShowCopyDialog(false)}>Cancel</Button>
+                        <Button
+                            onClick={() => copyShiftsMutation.mutate({
+                                sourceType: copySource.type,
+                                sourceBlockId: copySource.blockId,
+                                sourceProjectId: copySource.projectId,
+                                targetBlockId: copySource.targetBlockId
+                            })}
+                            disabled={copyShiftsMutation.isPending || (copySource.type === 'project' && !copySource.projectId)}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            {copyShiftsMutation.isPending ? 'Copying...' : 'Copy Shifts'}
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>

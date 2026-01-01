@@ -44,6 +44,24 @@ export default function CreateProjectDialog({ open, onClose }) {
         }
     }, [open, currentUser]);
 
+    // Smart defaults: Use previous project's settings as defaults
+    React.useEffect(() => {
+        if (open && projects.length > 0) {
+            const sortedProjects = [...projects].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+            const lastProject = sortedProjects[0];
+            
+            if (lastProject) {
+                setFormData(prev => ({
+                    ...prev,
+                    company: prev.company || lastProject.company,
+                    department: lastProject.department || '',
+                    use_carried_grace_minutes: lastProject.use_carried_grace_minutes || false,
+                    weekly_off_override: lastProject.weekly_off_override || ''
+                }));
+            }
+        }
+    }, [open, projects]);
+
     const { data: projects = [] } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list(),
