@@ -50,7 +50,7 @@ export default function ExceptionsTab({ project }) {
         attendance_id: '',
         date_from: '',
         date_to: '',
-        type: 'OFF',
+        type: 'PUBLIC_HOLIDAY',
         new_am_start: '',
         new_am_end: '',
         new_pm_start: '',
