@@ -44,6 +44,18 @@ export default function CreateProjectDialog({ open, onClose }) {
         }
     }, [open, currentUser]);
 
+    const { data: projects = [] } = useQuery({
+        queryKey: ['projects'],
+        queryFn: () => base44.entities.Project.list(),
+        enabled: open
+    });
+
+    const { data: ramadanSchedules = [] } = useQuery({
+        queryKey: ['ramadanSchedules', formData.company],
+        queryFn: () => base44.entities.RamadanSchedule.filter({ company: formData.company, active: true }),
+        enabled: open && !!formData.company
+    });
+
     // Smart defaults: Use previous project's settings as defaults
     React.useEffect(() => {
         if (open && projects.length > 0) {
@@ -61,18 +73,6 @@ export default function CreateProjectDialog({ open, onClose }) {
             }
         }
     }, [open, projects]);
-
-    const { data: projects = [] } = useQuery({
-        queryKey: ['projects'],
-        queryFn: () => base44.entities.Project.list(),
-        enabled: open
-    });
-
-    const { data: ramadanSchedules = [] } = useQuery({
-        queryKey: ['ramadanSchedules', formData.company],
-        queryFn: () => base44.entities.RamadanSchedule.filter({ company: formData.company, active: true }),
-        enabled: open && !!formData.company
-    });
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
