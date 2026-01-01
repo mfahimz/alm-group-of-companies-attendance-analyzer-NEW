@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Play, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Play, CheckCircle, AlertCircle, Loader2, AlertTriangle, Info, XCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 export default function RunAnalysisTab({ project }) {
@@ -14,6 +15,8 @@ export default function RunAnalysisTab({ project }) {
     const [dateFrom, setDateFrom] = useState(project.date_from);
     const [dateTo, setDateTo] = useState(project.date_to);
     const [reportName, setReportName] = useState('');
+    const [dataQualityIssues, setDataQualityIssues] = useState([]);
+    const [showQualityCheck, setShowQualityCheck] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: punches = [] } = useQuery({
@@ -647,6 +650,118 @@ export default function RunAnalysisTab({ project }) {
         };
     };
 
+    const performDataQualityCheck = () => {
+        const issues = [];
+        
+        // Check for employees without shifts
+        const employeesWithoutShifts = employees.filter(emp => {
+            const hasShift = shifts.some(s => s.attendance_id === emp.attendance_id);
+            return !hasShift;
+        });
+        
+        if (employeesWithoutShifts.length > 0) {
+            issues.push({
+                type: 'error',
+                title: `${employeesWithoutShifts.length} employees have no shift timings`,
+                details: employeesWithoutShifts.slice(0, 5).map(e => `${e.attendance_id} - ${e.name}`).join(', ') + 
+                         (employeesWithoutShifts.length > 5 ? ` and ${employeesWithoutShifts.length - 5} more` : '')
+            });
+        }
+        
+        // Check for unusual punch counts
+        const punchCounts = {};
+        punches.forEach(p => {
+            punchCounts[p.punch_date] = (punchCounts[p.punch_date] || 0) + 1;
+        });
+        
+        const unusualDates = Object.entries(punchCounts).filter(([date, count]) => count < 10 || count > 500);
+        if (unusualDates.length > 0) {
+            issues.push({
+                type: 'warning',
+                title: `${unusualDates.length} dates have unusual punch counts`,
+                details: unusualDates.slice(0, 3).map(([d, c]) => `${d}: ${c} punches`).join(', ')
+            });
+        }
+        
+        // Check for date gaps in punches
+        const punchDates = [...new Set(punches.map(p => p.punch_date))].sort();
+        if (punchDates.length > 0) {
+            const gaps = [];
+            for (let i = 1; i < punchDates.length; i++) {
+                const prev = new Date(punchDates[i-1]);
+                const curr = new Date(punchDates[i]);
+                const dayDiff = (curr - prev) / (1000 * 60 * 60 * 24);
+                if (dayDiff > 3) {
+                    gaps.push(`${punchDates[i-1]} to ${punchDates[i]} (${Math.floor(dayDiff)} days)`);
+                }
+            }
+            if (gaps.length > 0) {
+                issues.push({
+                    type: 'warning',
+                    title: `${gaps.length} date gaps found in punch data`,
+                    details: gaps.slice(0, 2).join(', ')
+                });
+            }
+        }
+        
+        // Auto-fix: Count duplicate punches that will be removed
+        let duplicateCount = 0;
+        const punchsByDate = {};
+        punches.forEach(p => {
+            if (!punchsByDate[p.punch_date]) punchsByDate[p.punch_date] = [];
+            punchsByDate[p.punch_date].push(p);
+        });
+        
+        Object.values(punchsByDate).forEach(dayPunches => {
+            if (dayPunches.length > 1) {
+                const sorted = dayPunches.sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw, project.company === 'Al Maraghi Automotive');
+                    const timeB = parseTime(b.timestamp_raw, project.company === 'Al Maraghi Automotive');
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+                
+                for (let i = 1; i < sorted.length; i++) {
+                    const prevTime = parseTime(sorted[i-1].timestamp_raw, project.company === 'Al Maraghi Automotive');
+                    const currTime = parseTime(sorted[i].timestamp_raw, project.company === 'Al Maraghi Automotive');
+                    if (prevTime && currTime) {
+                        const minutesDiff = Math.abs((currTime - prevTime) / (1000 * 60));
+                        if (minutesDiff < 10) duplicateCount++;
+                    }
+                }
+            }
+        });
+        
+        if (duplicateCount > 0) {
+            issues.push({
+                type: 'info',
+                title: `${duplicateCount} duplicate punches will be auto-removed`,
+                details: 'Punches within 10 minutes of each other are automatically filtered'
+            });
+        }
+        
+        setDataQualityIssues(issues);
+        return issues;
+    };
+
+    const handleAnalyze = async () => {
+        if (!dateFrom || !dateTo) {
+            toast.error('Please select date range');
+            return;
+        }
+        
+        // Perform data quality check
+        const issues = performDataQualityCheck();
+        const hasErrors = issues.some(i => i.type === 'error');
+        
+        if (hasErrors) {
+            setShowQualityCheck(true);
+            return;
+        }
+        
+        // Proceed to run analysis
+        await runAnalysis();
+    };
+
     const runAnalysis = async () => {
         if (!rules) {
             toast.error('Please configure attendance rules first');
@@ -872,9 +987,21 @@ export default function RunAnalysisTab({ project }) {
                         </div>
                     )}
 
-                    <div>
+                    <div className="flex gap-2">
+                        <Button 
+                            onClick={() => {
+                                performDataQualityCheck();
+                                setShowQualityCheck(true);
+                            }}
+                            variant="outline"
+                            disabled={isAnalyzing}
+                            size="lg"
+                        >
+                            <AlertTriangle className="w-5 h-5 mr-2" />
+                            Check Data Quality
+                        </Button>
                         <Button
-                            onClick={runAnalysis}
+                            onClick={handleAnalyze}
                             disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo || hasPendingExceptions}
                             className="bg-indigo-600 hover:bg-indigo-700"
                             size="lg"
@@ -890,11 +1017,10 @@ export default function RunAnalysisTab({ project }) {
                         </p>
                     </div>
                 </CardContent>
-                </Card>
-                </div>
+            </Card>
 
-                {/* Data Quality Check Dialog */}
-                <Dialog open={showQualityCheck} onOpenChange={setShowQualityCheck}>
+            {/* Data Quality Check Dialog */}
+            <Dialog open={showQualityCheck} onOpenChange={setShowQualityCheck}>
                 <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Data Quality Check</DialogTitle>
@@ -968,7 +1094,8 @@ export default function RunAnalysisTab({ project }) {
                         </Button>
                     )}
                 </div>
-                </DialogContent>
-                </Dialog>
-                );
-                }
+            </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
