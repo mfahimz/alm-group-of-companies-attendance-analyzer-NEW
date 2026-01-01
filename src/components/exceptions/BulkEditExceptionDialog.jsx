@@ -77,7 +77,6 @@ export default function BulkEditExceptionDialog({ open, onClose, selectedExcepti
                                         <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="OFF">Day Off</SelectItem>
                                         <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
                                         <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                         <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>

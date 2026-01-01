@@ -20,9 +20,6 @@ import TimePicker from '../ui/TimePicker';
 
 // Map user-friendly names to system type codes
 const TYPE_MAP = {
-    'off': 'OFF',
-    'leave': 'OFF',
-    'off / leave': 'OFF',
     'public holiday': 'PUBLIC_HOLIDAY',
     'holiday': 'PUBLIC_HOLIDAY',
     'shift override': 'SHIFT_OVERRIDE',
@@ -33,8 +30,6 @@ const TYPE_MAP = {
     'manual half': 'MANUAL_HALF',
     'half day': 'MANUAL_HALF',
     'half': 'MANUAL_HALF',
-    'manual early checkout': 'MANUAL_EARLY_CHECKOUT',
-    'early checkout': 'MANUAL_EARLY_CHECKOUT',
     'sick leave': 'SICK_LEAVE',
     'sick': 'SICK_LEAVE',
     // Also accept the exact system codes
@@ -43,7 +38,6 @@ const TYPE_MAP = {
     'manual_present': 'MANUAL_PRESENT',
     'manual_absent': 'MANUAL_ABSENT',
     'manual_half': 'MANUAL_HALF',
-    'manual_early_checkout': 'MANUAL_EARLY_CHECKOUT',
     'sick_leave': 'SICK_LEAVE',
     'allowed minutes': 'ALLOWED_MINUTES',
     'allowed_minutes': 'ALLOWED_MINUTES'
@@ -279,7 +273,7 @@ Thank you.
                     const type = TYPE_MAP[typeRaw];
                     
                     if (!type) {
-                        errors.push(`Row ${rowNum}: Invalid type "${row.type || ''}". Use: Off, Public Holiday, Sick Leave, Present, Absent, Half Day, Shift Override, Early Checkout`);
+                        errors.push(`Row ${rowNum}: Invalid type "${row.type || ''}". Use: Public Holiday, Sick Leave, Present, Absent, Half Day, Shift Override`);
                         return;
                     }
                     
@@ -350,7 +344,6 @@ Thank you.
 
     const downloadTemplate = () => {
         const template = `attendance_id,name,date_from,date_to,type,details,other_minutes
-544,John Smith,2025-11-10,2025-11-10,Off,Annual leave,0
 ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 322,Jane Doe,2025-11-12,2025-11-14,Sick Leave,Medical certificate,0
 123,Bob Johnson,2025-11-20,2025-11-20,Present,Worked from home,0
@@ -370,7 +363,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             attendance_id: '',
             date_from: '',
             date_to: '',
-            type: 'OFF',
+            type: 'PUBLIC_HOLIDAY',
             new_am_start: '',
             new_am_end: '',
             new_pm_start: '',
@@ -423,10 +416,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             cleanedData.new_pm_start = submitData.new_pm_start || null;
             cleanedData.new_pm_end = submitData.new_pm_end || null;
             cleanedData.include_friday = submitData.include_friday || false;
-        }
-        
-        if (submitData.type === 'MANUAL_EARLY_CHECKOUT' && submitData.early_checkout_minutes) {
-            cleanedData.early_checkout_minutes = parseInt(submitData.early_checkout_minutes);
         }
 
         // Added other_minutes to cleanedData
@@ -494,7 +483,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         });
 
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
-    const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
 
     const paginatedExceptions = filteredExceptions.slice(
@@ -626,13 +614,11 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="OFF">Off / Leave</SelectItem>
                                             <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
                                             <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                             <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                             <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
-                                            <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
                                         </SelectContent>
@@ -713,20 +699,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             ? 'This override will apply to all days including Friday' 
                                             : 'This override will apply to all working days except Friday'}
                                     </p>
-                                </div>
-                            )}
-
-                            {needsEarlyCheckoutMinutes && (
-                                <div className="max-w-xs">
-                                    <Label>Early Checkout Minutes *</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="e.g. 30"
-                                        value={formData.early_checkout_minutes}
-                                        onChange={(e) => setFormData({ ...formData, early_checkout_minutes: e.target.value })}
-                                        min="1"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-1">Minutes to add to early checkout total</p>
                                 </div>
                             )}
 
@@ -868,13 +840,11 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All types</SelectItem>
-                                <SelectItem value="OFF">Off / Leave</SelectItem>
                                 <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
                                 <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                 <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                 <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                 <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
-                                <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                 <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                 <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
                             </SelectContent>
@@ -1042,12 +1012,10 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <SelectContent>
                                     <SelectItem value="all">All types</SelectItem>
                                     <SelectItem value="MANUAL_LATE">Manual Late</SelectItem>
-                                    <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                     <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                     <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                     <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
-                                    <SelectItem value="OFF">Off / Leave</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -1243,13 +1211,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 : '✗ Excludes Friday'}
                                         </p>
                                     )}
-                                </div>
-                            )}
-
-                            {viewingException.type === 'MANUAL_EARLY_CHECKOUT' && viewingException.early_checkout_minutes && (
-                                <div className="border-t pt-4">
-                                    <Label className="text-slate-500 text-xs">Early Checkout Minutes</Label>
-                                    <p className="font-medium text-slate-900">{viewingException.early_checkout_minutes} minutes</p>
                                 </div>
                             )}
 

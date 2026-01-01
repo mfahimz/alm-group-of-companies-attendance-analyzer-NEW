@@ -78,9 +78,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.include_friday = formData.include_friday || false;
         }
 
-        if (formData.type === 'MANUAL_EARLY_CHECKOUT' && formData.early_checkout_minutes) {
-            cleanedData.early_checkout_minutes = parseInt(formData.early_checkout_minutes);
-        }
+
 
         if (formData.type === 'ALLOWED_MINUTES' && formData.allowed_minutes) {
             cleanedData.allowed_minutes = parseInt(formData.allowed_minutes);
@@ -93,7 +91,6 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     if (!exception) return null;
 
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
-    const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
 
     return (
@@ -122,13 +119,11 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="OFF">Off / Leave</SelectItem>
                                     <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
                                     <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                     <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                     <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
-                                    <SelectItem value="MANUAL_EARLY_CHECKOUT">Manual Early Checkout</SelectItem>
                                     <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                     <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
                                     </SelectContent>
