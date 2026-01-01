@@ -13,8 +13,25 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
 
     const closeProjectMutation = useMutation({
         mutationFn: async () => {
-            // Step 1: Delete all punches (backend handles this quickly with parallel processing)
-            setDeleteProgress({ phase: 'Deleting punch records in parallel batches...', percent: 40 });
+            // Step 1: Update employee grace minutes from last report
+            setDeleteProgress({ phase: 'Updating employee grace minutes...', percent: 20 });
+            const results = await base44.entities.AnalysisResult.filter({ report_run_id: lastSavedReport.id });
+            const employees = await base44.entities.Employee.filter({ company: project.company });
+            
+            for (const result of results) {
+                const employee = employees.find(e => e.attendance_id === result.attendance_id);
+                if (employee) {
+                    const usedMinutes = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                    const remainingGrace = Math.max(0, (result.grace_minutes || 0) - usedMinutes);
+                    
+                    await base44.entities.Employee.update(employee.id, {
+                        carried_grace_minutes: remainingGrace
+                    });
+                }
+            }
+
+            // Step 2: Delete all punches (backend handles this quickly with parallel processing)
+            setDeleteProgress({ phase: 'Deleting punch records in parallel batches...', percent: 60 });
             const deleteResult = await base44.functions.invoke('deleteProjectPunches', {
                 project_id: project.id
             });
@@ -23,10 +40,11 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                 throw new Error('Failed to delete punches');
             }
 
-            // Step 2: Update project status to closed
+            // Step 3: Update project status to closed
             setDeleteProgress({ phase: 'Finalizing project...', percent: 90 });
             await base44.entities.Project.update(project.id, {
-                status: 'closed'
+                status: 'closed',
+                last_saved_report_id: lastSavedReport.id
             });
 
             return deleteResult.data;
@@ -34,7 +52,8 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
         onSuccess: (result) => {
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['punches', project.id]);
-            toast.success(`Project closed successfully. ${result.deleted_count} punch records deleted.`);
+            queryClient.invalidateQueries(['employees']);
+            toast.success(`Project closed. Grace minutes updated for all employees. ${result.deleted_count} punch records deleted.`);
             setDeleteProgress(null);
             onClose();
         },
