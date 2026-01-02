@@ -17,10 +17,15 @@ Deno.serve(async (req) => {
         let projectsProcessed = 0;
         const errors = [];
 
+        // Get all employees once
+        const allEmployees = await base44.asServiceRole.entities.Employee.list();
+        
+        // Get all results once
+        const allResults = await base44.asServiceRole.entities.AnalysisResult.list();
+
         for (const project of closedProjects) {
             try {
-                // Get results from the last saved report
-                const allResults = await base44.asServiceRole.entities.AnalysisResult.list();
+                // Filter results for this project's last report
                 const results = allResults.filter(r => r.report_run_id === project.last_saved_report_id);
 
                 if (results.length === 0) {
@@ -28,25 +33,34 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
-                // Get all employees
-                const allEmployees = await base44.asServiceRole.entities.Employee.list();
+                // Filter employees for this company
                 const employees = allEmployees.filter(e => e.company === project.company);
 
-                // Update each employee's grace minutes
-                for (const result of results) {
-                    try {
-                        const employee = employees.find(e => e.attendance_id === result.attendance_id);
-                        if (employee) {
-                            const usedMinutes = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
-                            const remainingGrace = Math.max(0, (result.grace_minutes || 0) - usedMinutes);
-                            
-                            await base44.asServiceRole.entities.Employee.update(employee.id, {
-                                carried_grace_minutes: remainingGrace
-                            });
-                            processedEmployees++;
+                // Batch update employees
+                const batchSize = 10;
+                for (let i = 0; i < results.length; i += batchSize) {
+                    const batch = results.slice(i, i + batchSize);
+                    
+                    await Promise.all(batch.map(async (result) => {
+                        try {
+                            const employee = employees.find(e => e.attendance_id === result.attendance_id);
+                            if (employee) {
+                                const usedMinutes = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                                const remainingGrace = Math.max(0, (result.grace_minutes || 0) - usedMinutes);
+                                
+                                await base44.asServiceRole.entities.Employee.update(employee.id, {
+                                    carried_grace_minutes: remainingGrace
+                                });
+                                processedEmployees++;
+                            }
+                        } catch (empError) {
+                            errors.push(`Employee ${result.attendance_id}: ${empError.message}`);
                         }
-                    } catch (empError) {
-                        errors.push(`Employee ${result.attendance_id}: ${empError.message}`);
+                    }));
+                    
+                    // Small delay between batches to avoid rate limits
+                    if (i + batchSize < results.length) {
+                        await new Promise(resolve => setTimeout(resolve, 200));
                     }
                 }
 
