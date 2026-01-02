@@ -314,7 +314,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                                 }
                             </Button>
                             <p className="text-xs text-slate-500 mt-1">
-                                Leave empty to include all employees
+                                All employees are selected by default (cannot be unselected)
                             </p>
                         </div>
                     )}

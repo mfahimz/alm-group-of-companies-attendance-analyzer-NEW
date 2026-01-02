@@ -45,10 +45,9 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
     );
 
     const toggleEmployee = (hrmsId) => {
+        // Prevent unselecting - always keep all employees selected
         const newSelected = new Set(selectedIds);
-        if (newSelected.has(hrmsId)) {
-            newSelected.delete(hrmsId);
-        } else {
+        if (!newSelected.has(hrmsId)) {
             newSelected.add(hrmsId);
         }
         setSelectedIds(newSelected);
@@ -57,10 +56,6 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
     const selectAll = () => {
         const allIds = companyEmployees.map(e => e.hrms_id);
         setSelectedIds(new Set(allIds));
-    };
-
-    const deselectAll = () => {
-        setSelectedIds(new Set());
     };
 
     const handleConfirm = () => {
@@ -94,9 +89,6 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
                             <Button variant="outline" size="sm" onClick={selectAll}>
                                 Select All
                             </Button>
-                            <Button variant="outline" size="sm" onClick={deselectAll}>
-                                Deselect All
-                            </Button>
                         </div>
                         
                         <div className="flex items-center gap-2">
@@ -111,8 +103,8 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
                         </div>
                     </div>
 
-                    <div className="text-sm text-slate-600">
-                        {selectedIds.size} employee{selectedIds.size !== 1 ? 's' : ''} selected
+                    <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-2">
+                        <strong>{selectedIds.size}</strong> employee{selectedIds.size !== 1 ? 's' : ''} selected (All employees must remain selected)
                     </div>
 
                     {/* Employee List */}
