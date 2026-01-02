@@ -799,7 +799,6 @@ export default function RunAnalysisTab({ project }) {
                 const result = await analyzeEmployee(attendance_id);
                 allResults.push({
                     project_id: project.id,
-                    report_run_id: reportRun.id,
                     attendance_id: result.attendance_id,
                     working_days: result.working_days,
                     present_days: result.present_days,
@@ -835,9 +834,25 @@ export default function RunAnalysisTab({ project }) {
                 await delay(800);
             }
 
-            await updateProjectMutation.mutateAsync('analyzed');
+            // Create report run with actual employee count from saved results
+            const reportRun = await base44.entities.ReportRun.create({
+                project_id: project.id,
+                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
+                date_from: dateFrom,
+                date_to: dateTo,
+                employee_count: allResults.length
+            });
+
+            // Update project with last saved report
+            await base44.entities.Project.update(project.id, {
+                last_saved_report_id: reportRun.id,
+                status: 'analyzed'
+            });
+
             queryClient.invalidateQueries(['results', project.id]);
             queryClient.invalidateQueries(['reportRuns', project.id]);
+            queryClient.invalidateQueries(['project', project.id]);
+            queryClient.invalidateQueries(['projects']);
             toast.success(`Analysis completed for ${dateFrom} to ${dateTo}`);
             setProgress({ 
                 current: uniqueEmployeeIds.length, 
