@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, Users, FolderKanban, Clock, AlertCircle, CheckCircle, FileText, Calendar, Shield, Play } from 'lucide-react';
+import { Database, Users, FolderKanban, Clock, AlertCircle, CheckCircle, FileText, Calendar, Shield, Play, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +10,39 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import Breadcrumb from '../components/ui/Breadcrumb';
+
+function RecalculateGraceButton() {
+    const queryClient = useQueryClient();
+    const [isRecalculating, setIsRecalculating] = useState(false);
+
+    const recalculateMutation = useMutation({
+        mutationFn: async () => {
+            setIsRecalculating(true);
+            const response = await base44.functions.invoke('recalculateGraceMinutes', {});
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['employees']);
+            toast.success(data.message || 'Grace minutes recalculated successfully');
+            setIsRecalculating(false);
+        },
+        onError: (error) => {
+            toast.error('Failed to recalculate: ' + error.message);
+            setIsRecalculating(false);
+        }
+    });
+
+    return (
+        <Button
+            onClick={() => recalculateMutation.mutate()}
+            disabled={isRecalculating}
+            className="bg-purple-600 hover:bg-purple-700"
+        >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} />
+            {isRecalculating ? 'Processing...' : 'Recalculate from All Closed Projects'}
+        </Button>
+    );
+}
 
 export default function Diagnostics() {
     const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -318,6 +351,19 @@ export default function Diagnostics() {
                 <h1 className="text-3xl font-bold text-slate-900">System Diagnostics</h1>
                 <p className="text-slate-600 mt-2">Overview of system health and data statistics</p>
             </div>
+
+            {/* Grace Minutes Recalculation */}
+            <Card className="border-0 shadow-sm bg-purple-50 ring-1 ring-purple-200">
+                <CardHeader>
+                    <CardTitle>Recalculate Grace Minutes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-slate-700 mb-4">
+                        Process all closed projects and update employee grace minutes based on their last saved reports. Use this if grace minutes weren't automatically carried forward when projects were closed.
+                    </p>
+                    <RecalculateGraceButton />
+                </CardContent>
+            </Card>
 
             {/* Quick Analysis */}
             <Card className="border-0 shadow-sm">
