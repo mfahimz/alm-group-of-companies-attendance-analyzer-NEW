@@ -784,14 +784,6 @@ export default function RunAnalysisTab({ project }) {
         try {
             const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-            const reportRun = await base44.entities.ReportRun.create({
-                project_id: project.id,
-                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
-                date_from: dateFrom,
-                date_to: dateTo,
-                employee_count: uniqueEmployeeIds.length
-            });
-
             const allResults = [];
             for (let i = 0; i < uniqueEmployeeIds.length; i++) {
                 const attendance_id = uniqueEmployeeIds[i];
