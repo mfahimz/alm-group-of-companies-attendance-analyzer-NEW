@@ -122,7 +122,16 @@ export default function DepartmentHeadSettings() {
 
     const handleEditClick = (deptHead) => {
         setEditingHead(deptHead);
-        setSelectedManagedEmployees(deptHead.managed_employee_ids ? deptHead.managed_employee_ids.split(',').filter(Boolean) : []);
+        // If no managed employees set, auto-select from department
+        const managedIds = deptHead.managed_employee_ids ? deptHead.managed_employee_ids.split(',').filter(Boolean) : [];
+        if (managedIds.length === 0) {
+            const deptEmployees = employees
+                .filter(e => e.company === deptHead.company && e.active && e.department === deptHead.department)
+                .map(e => e.id);
+            setSelectedManagedEmployees(deptEmployees);
+        } else {
+            setSelectedManagedEmployees(managedIds);
+        }
         setSelectedReportsTo(deptHead.reports_to || '');
         setShowEditDialog(true);
     };
@@ -180,7 +189,14 @@ export default function DepartmentHeadSettings() {
                             <Label>Department</Label>
                             <Select 
                                 value={selectedDepartment} 
-                                onValueChange={setSelectedDepartment}
+                                onValueChange={(val) => {
+                                    setSelectedDepartment(val);
+                                    // Auto-select employees from this department
+                                    const deptEmployees = availableEmployees
+                                        .filter(e => e.department === val)
+                                        .map(e => e.id);
+                                    setSelectedManagedEmployees(deptEmployees);
+                                }}
                                 disabled={!selectedCompany}
                             >
                                 <SelectTrigger>

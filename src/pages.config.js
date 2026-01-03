@@ -2,11 +2,14 @@ import ActivityLogs from './pages/ActivityLogs';
 import AstraImport from './pages/AstraImport';
 import AuditTrail from './pages/AuditTrail';
 import Dashboard from './pages/Dashboard';
+import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
+import DeptHeadApproval from './pages/DeptHeadApproval';
 import Diagnostics from './pages/Diagnostics';
 import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
 import ExceptionApprovals from './pages/ExceptionApprovals';
+import HRManagerApproval from './pages/HRManagerApproval';
 import Home from './pages/Home';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
@@ -17,9 +20,6 @@ import RulesSettings from './pages/RulesSettings';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import DeptHeadApproval from './pages/DeptHeadApproval';
-import HRManagerApproval from './pages/HRManagerApproval';
-import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
 import __Layout from './Layout.jsx';
 
 
@@ -28,11 +28,14 @@ export const PAGES = {
     "AstraImport": AstraImport,
     "AuditTrail": AuditTrail,
     "Dashboard": Dashboard,
+    "DepartmentHeadSettings": DepartmentHeadSettings,
+    "DeptHeadApproval": DeptHeadApproval,
     "Diagnostics": Diagnostics,
     "Documentation": Documentation,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
     "ExceptionApprovals": ExceptionApprovals,
+    "HRManagerApproval": HRManagerApproval,
     "Home": Home,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
@@ -43,9 +46,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "DeptHeadApproval": DeptHeadApproval,
-    "HRManagerApproval": HRManagerApproval,
-    "DepartmentHeadSettings": DepartmentHeadSettings,
 }
 
 export const pagesConfig = {
