@@ -100,10 +100,7 @@ export default function EmployeeProfile() {
                             <label className="text-sm text-slate-500">Attendance ID</label>
                             <p className="font-medium text-slate-900">{employee.attendance_id}</p>
                         </div>
-                        <div>
-                            <label className="text-sm text-slate-500">Employee Code</label>
-                            <p className="font-medium text-slate-900">{employee.employee_code || '—'}</p>
-                        </div>
+
                     </CardContent>
                 </Card>
 

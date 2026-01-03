@@ -133,9 +133,17 @@ export default function ExceptionApprovals() {
         return project?.name || projectId;
     };
 
-    const getEmployeeName = (attendanceId) => {
+    const getEmployeeName = (attendanceId, projectId) => {
         if (attendanceId === 'ALL') return 'All Employees';
-        const employee = employees.find(e => e.attendance_id === attendanceId);
+        
+        // Get project to determine company context
+        const project = projects.find(p => p.id === projectId);
+        if (!project) return attendanceId;
+        
+        // Find employee by attendance_id within the same company
+        const employee = employees.find(e => 
+            e.attendance_id === attendanceId && e.company === project.company
+        );
         return employee?.name || attendanceId;
     };
 
@@ -212,7 +220,7 @@ export default function ExceptionApprovals() {
                                                     </div>
                                                     <div>
                                                         <span className="text-slate-500">Employee:</span>
-                                                        <p className="font-medium">{getEmployeeName(exception.attendance_id)}</p>
+                                                        <p className="font-medium">{getEmployeeName(exception.attendance_id, exception.project_id)}</p>
                                                     </div>
                                                     <div>
                                                         <span className="text-slate-500">Date Range:</span>

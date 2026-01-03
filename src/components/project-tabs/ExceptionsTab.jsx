@@ -924,7 +924,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             </TableCell>
                                             <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
-                                                    {exception.type === 'PUBLIC_HOLIDAY' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id)?.name || '—')}
+                                                    {exception.type === 'PUBLIC_HOLIDAY' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id && e.company === project.company)?.name || '—')}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="p-1">
@@ -1071,7 +1071,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             </TableCell>
                                             <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
-                                                   {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id)?.name || '—')}
+                                                   {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id && e.company === project.company)?.name || '—')}
                                                 </span>
                                                 </TableCell>
                                                 <TableCell className="p-1">
@@ -1167,7 +1167,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     <p className="font-medium text-slate-900">
                                         {viewingException.attendance_id === 'ALL' 
                                             ? '—' 
-                                            : employees.find(e => e.attendance_id === viewingException.attendance_id)?.name || '—'}
+                                            : employees.find(e => e.attendance_id === viewingException.attendance_id && e.company === project.company)?.name || '—'}
                                     </p>
                                 </div>
                                 <div>
