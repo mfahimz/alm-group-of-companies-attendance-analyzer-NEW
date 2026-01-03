@@ -103,6 +103,7 @@ export default function Layout({ children, currentPageName }) {
                 { name: 'Employees', path: 'Employees', icon: Users },
                 ...(isAdmin || isSupervisor ? [{ name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 }] : []),
                 ...(isAdmin || isSupervisor ? [{ name: 'Exception Approvals', path: 'ExceptionApprovals', icon: Shield }] : []),
+                      ...(userRole === 'hr_manager' ? [{ name: 'HR Manager Approval', path: 'HRManagerApproval', icon: Shield }] : []),
                 ...(isAdmin ? [{ name: 'Astra Import', path: 'AstraImport', icon: FileSpreadsheet }] : [])
             ]
         },
@@ -112,6 +113,7 @@ export default function Layout({ children, currentPageName }) {
             icon: Settings,
             items: [
                 { name: 'Users & Permissions', path: 'Users', icon: Shield },
+                { name: 'Department Heads', path: 'DepartmentHeadSettings', icon: Users },
                 { name: 'Audit Trail', path: 'AuditTrail', icon: FileSpreadsheet },
                 { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
                 { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
