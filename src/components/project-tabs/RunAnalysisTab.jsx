@@ -40,7 +40,7 @@ export default function RunAnalysisTab({ project }) {
     });
 
     // Check for pending exceptions
-    const hasPendingExceptions = exceptions.some(e => e.approval_status === 'pending');
+    const hasPendingExceptions = exceptions.some(e => e.approval_status === 'pending_dept_head');
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
@@ -263,7 +263,7 @@ export default function RunAnalysisTab({ project }) {
         const employeeExceptions = exceptions.filter(e => 
             (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
             e.use_in_analysis !== false &&
-            e.approval_status === 'approved'
+            ['approved', 'approved_dept_head', 'pending_hr'].includes(e.approval_status)
         );
         
         // Get employee to determine weekly off day
@@ -971,7 +971,7 @@ export default function RunAnalysisTab({ project }) {
                                 <div>
                                     <p className="font-medium text-amber-900">Pending Exception Approvals</p>
                                     <p className="text-sm text-amber-700 mt-1">
-                                        There are {exceptions.filter(e => e.approval_status === 'pending').length} exception(s) awaiting approval. 
+                                        There are {exceptions.filter(e => e.approval_status === 'pending_dept_head').length} exception(s) awaiting department head approval. 
                                         Analysis cannot run until all exceptions are approved or rejected.
                                     </p>
                                 </div>
