@@ -352,16 +352,44 @@ export default function Diagnostics() {
                 <p className="text-slate-600 mt-2">Overview of system health and data statistics</p>
             </div>
 
-            {/* Grace Minutes Recalculation */}
+            {/* System Maintenance */}
             <Card className="border-0 shadow-sm bg-purple-50 ring-1 ring-purple-200">
                 <CardHeader>
-                    <CardTitle>Recalculate Grace Minutes</CardTitle>
+                    <CardTitle>System Maintenance</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-slate-700 mb-4">
-                        Process all closed projects and update employee grace minutes based on their last saved reports. Use this if grace minutes weren't automatically carried forward when projects were closed.
-                    </p>
-                    <RecalculateGraceButton />
+                <CardContent className="space-y-4">
+                    <div>
+                        <p className="text-sm text-slate-700 mb-3">
+                            <strong>Generate Missing HRMS IDs:</strong> Automatically assign unique HRMS IDs to employees who don't have one.
+                        </p>
+                        <Button
+                            onClick={async () => {
+                                try {
+                                    toast.info('Generating HRMS IDs...');
+                                    const result = await base44.functions.invoke('generateMissingHrmsIds', {});
+                                    if (result.data.success) {
+                                        toast.success(result.data.message);
+                                        queryClient.invalidateQueries(['employees']);
+                                    } else {
+                                        toast.error(result.data.error || 'Failed to generate HRMS IDs');
+                                    }
+                                } catch (error) {
+                                    toast.error('Error: ' + error.message);
+                                }
+                            }}
+                            variant="outline"
+                            className="w-full"
+                        >
+                            <Users className="w-4 h-4 mr-2" />
+                            Generate Missing HRMS IDs
+                        </Button>
+                    </div>
+                    <div className="border-t pt-4">
+                        <p className="text-sm text-slate-700 mb-3">
+                            <strong>Recalculate Grace Minutes:</strong> Process all closed projects and update employee grace minutes based on their last saved reports.
+                        </p>
+                        <RecalculateGraceButton />
+                    </div>
                 </CardContent>
             </Card>
 
