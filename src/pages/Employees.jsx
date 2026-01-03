@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle, Edit, UserCheck } from 'lucide-react';
+import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle, Edit, UserCheck, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -656,6 +656,14 @@ export default function Employees() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => navigate(createPageUrl(`EmployeeProfile?id=${employee.id}`))}
+                                                    title="View Profile"
+                                                >
+                                                    <Eye className="w-4 h-4 text-blue-600" />
+                                                </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
