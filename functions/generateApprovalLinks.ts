@@ -56,18 +56,36 @@ Deno.serve(async (req) => {
             active: true
         });
 
-        // Generate links for each department with exceptions
+        // Generate links for each department head (multiple heads per department possible)
         const links = [];
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + validityDays);
+        const processedDeptHeads = new Set();
 
         for (const department of Object.keys(exceptionsByDept)) {
-            const deptHead = deptHeads.find(dh => dh.department === department);
+            const deptHeadsForDept = deptHeads.filter(dh => dh.department === department);
             
-            if (!deptHead) {
+            if (deptHeadsForDept.length === 0) {
                 // No department head assigned, skip this department
                 continue;
             }
+
+            // Generate links for each department head
+            for (const deptHead of deptHeadsForDept) {
+                if (processedDeptHeads.has(deptHead.id)) continue;
+                processedDeptHeads.add(deptHead.id);
+
+                // Filter exceptions to only those for managed employees
+                let relevantExceptions = exceptionsByDept[department];
+                if (deptHead.managed_employee_ids) {
+                    const managedIds = deptHead.managed_employee_ids.split(',').filter(Boolean);
+                    relevantExceptions = exceptionsByDept[department].filter(exc => {
+                        const employee = employees.find(e => e.attendance_id === exc.attendance_id);
+                        return employee && managedIds.includes(employee.id);
+                    });
+                }
+
+                if (relevantExceptions.length === 0) continue;
 
             // Generate unique token
             const token = crypto.randomUUID();
@@ -92,14 +110,15 @@ Deno.serve(async (req) => {
             // Get department head employee details
             const deptHeadEmployee = employees.find(e => e.id === deptHead.employee_id);
 
-            links.push({
-                department,
-                department_head_name: deptHeadEmployee?.name || 'Unknown',
-                link_token: token,
-                verification_code: verificationCode,
-                exception_count: exceptionsByDept[department].length,
-                expires_at: expiresAt.toISOString()
-            });
+                links.push({
+                    department,
+                    department_head_name: deptHeadEmployee?.name || 'Unknown',
+                    link_token: token,
+                    verification_code: verificationCode,
+                    exception_count: relevantExceptions.length,
+                    expires_at: expiresAt.toISOString()
+                });
+            }
         }
 
         return Response.json({

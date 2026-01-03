@@ -37,28 +37,52 @@ export default function DeptHeadApproval() {
         retry: false
     });
 
+    const { data: deptHead } = useQuery({
+        queryKey: ['deptHead', linkData?.department_head_id],
+        queryFn: async () => {
+            const deptHeads = await base44.entities.DepartmentHead.filter({
+                employee_id: linkData.department_head_id,
+                active: true
+            });
+            return deptHeads.find(dh => dh.company === linkData.company);
+        },
+        enabled: isVerified && !!linkData
+    });
+
     const { data: exceptions = [], isLoading: exceptionsLoading } = useQuery({
-        queryKey: ['deptExceptions', linkData?.report_run_id, linkData?.department],
+        queryKey: ['deptExceptions', linkData?.report_run_id, linkData?.department, deptHead?.id],
         queryFn: async () => {
             const allExceptions = await base44.entities.Exception.filter({
                 report_run_id: linkData.report_run_id,
                 approval_status: 'pending_dept_head'
             });
             
-            // Filter by department
+            // Get employees
             const employees = await base44.entities.Employee.filter({ 
                 company: linkData.company 
             });
             
-            return allExceptions.filter(exc => {
+            // Filter by managed employees if specified
+            let relevantExceptions = allExceptions.filter(exc => {
                 const employee = employees.find(e => 
                     e.attendance_id === exc.attendance_id && 
                     e.company === linkData.company
                 );
                 return employee?.department === linkData.department;
             });
+
+            // Further filter by managed employees if specified in deptHead
+            if (deptHead?.managed_employee_ids) {
+                const managedIds = deptHead.managed_employee_ids.split(',').filter(Boolean);
+                relevantExceptions = relevantExceptions.filter(exc => {
+                    const employee = employees.find(e => e.attendance_id === exc.attendance_id);
+                    return employee && managedIds.includes(employee.id);
+                });
+            }
+
+            return relevantExceptions;
         },
-        enabled: isVerified && !!linkData
+        enabled: isVerified && !!linkData && !!deptHead
     });
 
     const { data: employees = [] } = useQuery({
