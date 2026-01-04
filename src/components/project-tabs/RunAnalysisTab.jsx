@@ -148,8 +148,9 @@ export default function RunAnalysisTab({ project }) {
             let closestMatch = null;
             let minDistance = Infinity;
             let isExtendedMatch = false;
+            let isFarExtendedMatch = false;
             
-            // First pass: Try 60-minute radius (normal)
+            // Phase 1: Normal match (±60 minutes)
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
                 
@@ -161,7 +162,7 @@ export default function RunAnalysisTab({ project }) {
                 }
             }
             
-            // Second pass: If no match, try 120-minute radius (extended)
+            // Phase 2: Extended match (±120 minutes)
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
@@ -176,13 +177,29 @@ export default function RunAnalysisTab({ project }) {
                 }
             }
             
+            // Phase 3: Far extended match (±180 minutes)
+            if (!closestMatch) {
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    
+                    if (distance <= 180 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                        isFarExtendedMatch = true;
+                    }
+                }
+            }
+            
             if (closestMatch) {
                 matches.push({
                     punch,
                     matchedTo: closestMatch.type,
                     shiftTime: closestMatch.time,
                     distance: minDistance,
-                    isExtendedMatch
+                    isExtendedMatch,
+                    isFarExtendedMatch
                 });
                 usedShiftPoints.add(closestMatch.type);
             } else {
@@ -191,7 +208,8 @@ export default function RunAnalysisTab({ project }) {
                     matchedTo: null,
                     shiftTime: null,
                     distance: null,
-                    isExtendedMatch: false
+                    isExtendedMatch: false,
+                    isFarExtendedMatch: false
                 });
             }
         }
@@ -260,11 +278,18 @@ export default function RunAnalysisTab({ project }) {
             p.punch_date <= dateTo
         );
         const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
-        const employeeExceptions = exceptions.filter(e => 
-            (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
-            e.use_in_analysis !== false &&
-            ['approved', 'approved_dept_head', 'pending_hr'].includes(e.approval_status)
-        );
+
+        // Safely filter exceptions with try/catch for each exception
+        const employeeExceptions = exceptions.filter(e => {
+            try {
+                return (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
+                       e.use_in_analysis !== false &&
+                       ['approved', 'approved_dept_head', 'pending_hr'].includes(e.approval_status);
+            } catch (error) {
+                console.error(`Error filtering exception ${e.id}:`, error);
+                return false;
+            }
+        });
         
         // Get employee to determine weekly off day
         const employee = employees.find(e => e.attendance_id === attendance_id);
@@ -314,17 +339,28 @@ export default function RunAnalysisTab({ project }) {
 
             working_days++;
 
-            // Find all matching exceptions and get the latest one by created_date
-            const matchingExceptions = employeeExceptions.filter(ex => {
-                const exFrom = new Date(ex.date_from);
-                const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo && 
-                       (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
-            });
-            
-            const dateException = matchingExceptions.length > 0
-                ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
-                : null;
+            // Find all matching exceptions and get the latest one by created_date (with error handling)
+            let dateException = null;
+            try {
+                const matchingExceptions = employeeExceptions.filter(ex => {
+                    try {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        return currentDate >= exFrom && currentDate <= exTo && 
+                               (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
+                    } catch (error) {
+                        console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
+                        return false;
+                    }
+                });
+
+                dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                    : null;
+            } catch (error) {
+                console.error(`Error processing exceptions for date ${dateStr}:`, error);
+                dateException = null;
+            }
 
             if (dateException) {
                 if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
@@ -411,17 +447,21 @@ export default function RunAnalysisTab({ project }) {
             }
 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
-                // Check if include_friday flag exists and current day is Friday
-                const isFriday = dayOfWeek === 5;
-                const shouldApplyOverride = dateException.include_friday || !isFriday;
-                
-                if (shouldApplyOverride) {
-                    shift = {
-                        am_start: dateException.new_am_start,
-                        am_end: dateException.new_am_end,
-                        pm_start: dateException.new_pm_start,
-                        pm_end: dateException.new_pm_end
-                    };
+                try {
+                    // Check if include_friday flag exists and current day is Friday
+                    const isFriday = dayOfWeek === 5;
+                    const shouldApplyOverride = dateException.include_friday || !isFriday;
+
+                    if (shouldApplyOverride) {
+                        shift = {
+                            am_start: dateException.new_am_start,
+                            am_end: dateException.new_am_end,
+                            pm_start: dateException.new_pm_start,
+                            pm_end: dateException.new_pm_end
+                        };
+                    }
+                } catch (error) {
+                    console.error(`Error applying shift override for date ${dateStr}:`, error);
                 }
             }
 
@@ -479,10 +519,15 @@ export default function RunAnalysisTab({ project }) {
                 full_absence_count++;
             }
 
-            // Track allowed minutes from ALLOWED_MINUTES exception
+            // Track allowed minutes from ALLOWED_MINUTES exception (with error handling)
             let allowedMinutesForDay = 0;
-            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
-                allowedMinutesForDay = dateException.allowed_minutes || 0;
+            try {
+                if (dateException && dateException.type === 'ALLOWED_MINUTES') {
+                    allowedMinutesForDay = dateException.allowed_minutes || 0;
+                }
+            } catch (error) {
+                console.error(`Error reading allowed minutes for date ${dateStr}:`, error);
+                allowedMinutesForDay = 0;
             }
 
             // Skip time calculation if there's an exception that handles attendance status OR has manual time values
@@ -495,7 +540,7 @@ export default function RunAnalysisTab({ project }) {
             );
             
             const shouldSkipTimeCalculation = dateException && [
-                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
             // Use manual exception minutes if present, otherwise calculate from punches
@@ -556,13 +601,18 @@ export default function RunAnalysisTab({ project }) {
             
             // Mark as abnormal if any punch couldn't be matched or needed extended matching
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
+            const hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
             if (hasUnmatchedPunch) {
                 abnormal_dates_list.push(dateStr);
                 critical_abnormal_dates.push(dateStr); // RED - unmatched punch is critical
             }
+            if (hasFarExtendedMatch) {
+                abnormal_dates_list.push(dateStr);
+                critical_abnormal_dates.push(dateStr); // RED - far extended match (±180 min) is critical
+            }
             if (hasExtendedMatch) {
                 abnormal_dates_list.push(dateStr);
-                // Extended match is warning (YELLOW), not critical
+                // Extended match (±120 min) is warning (YELLOW), not critical
             }
             if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
                 abnormal_dates_list.push(dateStr);
