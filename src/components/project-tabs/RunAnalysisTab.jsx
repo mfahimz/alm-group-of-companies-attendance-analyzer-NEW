@@ -277,6 +277,7 @@ export default function RunAnalysisTab({ project }) {
         let full_absence_count = 0;
         let half_absence_count = 0;
         let sick_leave_count = 0;
+        let annual_leave_count = 0;
         let late_minutes = 0;
         let early_checkout_minutes = 0;
         let other_minutes = 0;
@@ -338,9 +339,19 @@ export default function RunAnalysisTab({ project }) {
                     present_days++;
                     half_absence_count++;
                 } else if (dateException.type === 'SICK_LEAVE') {
+                    // Sick leave counts regardless of punches
                     working_days--;
                     sick_leave_count++;
                     continue;
+                } else if (dateException.type === 'ANNUAL_LEAVE') {
+                    // Annual leave counts if no punches, otherwise mark as present
+                    if (filteredPunches.length === 0) {
+                        working_days--;
+                        annual_leave_count++;
+                        continue;
+                    } else {
+                        present_days++;
+                    }
                 }
             }
 
@@ -608,8 +619,54 @@ export default function RunAnalysisTab({ project }) {
             }
         }
 
-        // Only include critical (RED) abnormalities in notes
-        const criticalDatesFormatted = [...new Set(critical_abnormal_dates)].map(d => new Date(d).toLocaleDateString()).join(', ');
+        // Add double deduction warning for Monday/Saturday LOP
+        const doubleDeductionDates = [];
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const currentDate = new Date(d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay();
+
+            // Check if it's Monday (1) or Saturday (6)
+            if (dayOfWeek === 1 || dayOfWeek === 6) {
+                const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+                const matchingExceptions = employeeExceptions.filter(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return currentDate >= exFrom && currentDate <= exTo && 
+                           (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
+                });
+                const dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                    : null;
+
+                // Check if it's a working day (not weekly off or holiday)
+                let weeklyOffDay = null;
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                } else if (employee?.weekly_off) {
+                    weeklyOffDay = dayNameToNumber[employee.weekly_off];
+                }
+
+                const isWeeklyOff = weeklyOffDay !== null && dayOfWeek === weeklyOffDay;
+                const isHoliday = dateException && (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY' || dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
+
+                // If it's a working day with no punches and no exception, it's LOP
+                if (!isWeeklyOff && !isHoliday && dayPunches.length === 0 && (!dateException || dateException.type === 'MANUAL_ABSENT')) {
+                    const dayName = dayOfWeek === 1 ? 'Monday' : 'Saturday';
+                    doubleDeductionDates.push(`${new Date(dateStr).toLocaleDateString()} (${dayName} - Double Deduction)`);
+                }
+            }
+        }
+
+        // Only include critical (RED) abnormalities in notes + double deduction warnings
+        const notesArray = [];
+        if (critical_abnormal_dates.length > 0) {
+            notesArray.push([...new Set(critical_abnormal_dates)].map(d => new Date(d).toLocaleDateString()).join(', '));
+        }
+        if (doubleDeductionDates.length > 0) {
+            notesArray.push(doubleDeductionDates.join('; '));
+        }
+        const criticalDatesFormatted = notesArray.join(' | ');
         const autoResolutionNotes = auto_resolutions.length > 0 
             ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
             : '';
@@ -790,6 +847,7 @@ export default function RunAnalysisTab({ project }) {
                     full_absence_count: result.full_absence_count,
                     half_absence_count: result.half_absence_count,
                     sick_leave_count: result.sick_leave_count,
+                    annual_leave_count: result.annual_leave_count,
                     late_minutes: result.late_minutes,
                     early_checkout_minutes: result.early_checkout_minutes,
                     other_minutes: result.other_minutes,

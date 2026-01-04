@@ -32,6 +32,9 @@ const TYPE_MAP = {
     'half': 'MANUAL_HALF',
     'sick leave': 'SICK_LEAVE',
     'sick': 'SICK_LEAVE',
+    'annual leave': 'ANNUAL_LEAVE',
+    'annual': 'ANNUAL_LEAVE',
+    'vacation': 'ANNUAL_LEAVE',
     // Also accept the exact system codes
     'public_holiday': 'PUBLIC_HOLIDAY',
     'shift_override': 'SHIFT_OVERRIDE',
@@ -39,6 +42,7 @@ const TYPE_MAP = {
     'manual_absent': 'MANUAL_ABSENT',
     'manual_half': 'MANUAL_HALF',
     'sick_leave': 'SICK_LEAVE',
+    'annual_leave': 'ANNUAL_LEAVE',
     'allowed minutes': 'ALLOWED_MINUTES',
     'allowed_minutes': 'ALLOWED_MINUTES'
 };
@@ -355,6 +359,7 @@ Thank you.
         const template = `attendance_id,name,date_from,date_to,type,details,other_minutes
 ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 322,Jane Doe,2025-11-12,2025-11-14,Sick Leave,Medical certificate,0
+789,John Smith,2025-12-20,2025-12-22,Annual Leave,Vacation,0
 123,Bob Johnson,2025-11-20,2025-11-20,Present,Worked from home,0
 456,Alice Brown,2025-11-21,2025-11-21,Half Day,Left early,0`;
         
@@ -629,6 +634,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                             <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                            <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -855,6 +861,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                 <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                 <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                <SelectItem value="ANNUAL_LEAVE">Annual Leave</SelectItem>
                                 <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
                             </SelectContent>
                         </Select>

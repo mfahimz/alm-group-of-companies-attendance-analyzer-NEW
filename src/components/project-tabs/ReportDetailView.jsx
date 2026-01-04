@@ -313,6 +313,7 @@ export default function ReportDetailView({ reportRun, project }) {
         let fullAbsenceCount = 0;
         let halfAbsenceCount = 0;
         let sickLeaveCount = 0;
+        let annualLeaveCount = 0;
 
         const startDate = new Date(dateFrom);
         const endDate = new Date(dateTo);
@@ -528,8 +529,17 @@ export default function ReportDetailView({ reportRun, project }) {
                         presentDays++;
                         halfAbsenceCount++;
                     } else if (dateException.type === 'SICK_LEAVE') {
+                        // Sick leave counts regardless of punches
                         workingDays--;
                         sickLeaveCount++;
+                    } else if (dateException.type === 'ANNUAL_LEAVE') {
+                        // Annual leave counts if no punches
+                        if (dayPunches.length === 0) {
+                            workingDays--;
+                            annualLeaveCount++;
+                        } else {
+                            presentDays++;
+                        }
                     } else if (dayPunches.length > 0) {
                         presentDays++;
                     } else {
@@ -622,12 +632,13 @@ export default function ReportDetailView({ reportRun, project }) {
         return { 
             totalLateMinutes, 
             totalEarlyCheckout, 
-            totalOtherMinutes, // Included in return object
+            totalOtherMinutes,
             workingDays, 
             presentDays, 
             fullAbsenceCount, 
             halfAbsenceCount, 
-            sickLeaveCount 
+            sickLeaveCount,
+            annualLeaveCount
         };
     };
 
@@ -645,9 +656,10 @@ export default function ReportDetailView({ reportRun, project }) {
                     full_absence_count: result.full_absence_count,
                     half_absence_count: result.half_absence_count,
                     sick_leave_count: result.sick_leave_count || 0,
+                    annual_leave_count: result.annual_leave_count || 0,
                     late_minutes: result.late_minutes || 0,
                     early_checkout_minutes: result.early_checkout_minutes || 0,
-                    other_minutes: result.other_minutes || 0, // Added
+                    other_minutes: result.other_minutes || 0,
                     isVerified: verifiedEmployees.includes(result.attendance_id)
                 };
             }
@@ -656,12 +668,13 @@ export default function ReportDetailView({ reportRun, project }) {
             const { 
                 totalLateMinutes, 
                 totalEarlyCheckout, 
-                totalOtherMinutes, // Destructured
+                totalOtherMinutes,
                 workingDays, 
                 presentDays, 
                 fullAbsenceCount, 
                 halfAbsenceCount, 
-                sickLeaveCount 
+                sickLeaveCount,
+                annualLeaveCount
             } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
 
             return {
@@ -672,9 +685,10 @@ export default function ReportDetailView({ reportRun, project }) {
                 full_absence_count: fullAbsenceCount,
                 half_absence_count: halfAbsenceCount,
                 sick_leave_count: sickLeaveCount,
+                annual_leave_count: annualLeaveCount,
                 late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout),
-                other_minutes: Math.max(0, totalOtherMinutes), // Added
+                other_minutes: Math.max(0, totalOtherMinutes),
                 isVerified: verifiedEmployees.includes(result.attendance_id)
             };
         });
@@ -933,7 +947,7 @@ export default function ReportDetailView({ reportRun, project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Sick Leaves', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'Deductible'];
+        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'Deductible', 'Notes'];
         const rows = filteredResults.map(r => {
             const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
             const grace = r.grace_minutes ?? 15;
@@ -943,12 +957,14 @@ export default function ReportDetailView({ reportRun, project }) {
                 r.attendance_id,
                 r.name,
                 r.working_days,
+                r.annual_leave_count || 0,
                 r.sick_leave_count || 0,
                 r.full_absence_count,
                 r.late_minutes,
                 r.early_checkout_minutes || 0,
                 r.other_minutes || 0,
-                deductible
+                deductible,
+                r.notes || ''
             ];
         });
 
@@ -1246,6 +1262,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
                 else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
                 else if (dateException.type === 'SICK_LEAVE') status = 'Sick Leave';
+                else if (dateException.type === 'ANNUAL_LEAVE') status = dayPunches.length > 0 ? 'Present' : 'Annual Leave';
                 else if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
                     // Manual late/early should show as present
                     status = dayPunches.length > 0 ? 'Present' : 'Present (Manual)';
@@ -1526,11 +1543,14 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <SortableTableHead sortKey="present_days" currentSort={sort} onSort={setSort}>
                                         Present Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort}>
-                                        LOP Days
+                                    <SortableTableHead sortKey="annual_leave_count" currentSort={sort} onSort={setSort}>
+                                        Annual Leave
                                     </SortableTableHead>
                                     <SortableTableHead sortKey="sick_leave_count" currentSort={sort} onSort={setSort}>
                                         Sick Leave
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort}>
+                                        LOP Days
                                     </SortableTableHead>
                                     <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort}>
                                         Late Minutes
@@ -1561,13 +1581,18 @@ export default function ReportDetailView({ reportRun, project }) {
                                         <TableCell>{result.working_days}</TableCell>
                                         <TableCell>{result.present_days}</TableCell>
                                         <TableCell>
-                                            <span className={`${result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}`}>
-                                                {result.full_absence_count}
+                                            <span className={`${result.annual_leave_count > 0 ? 'text-blue-600 font-medium' : ''}`}>
+                                                {result.annual_leave_count || 0}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className={`${result.sick_leave_count > 0 ? 'text-purple-600 font-medium' : ''}`}>
                                                 {result.sick_leave_count || 0}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className={`${result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}`}>
+                                                {result.full_absence_count}
                                             </span>
                                         </TableCell>
                                         <TableCell>
