@@ -260,18 +260,11 @@ export default function RunAnalysisTab({ project }) {
             p.punch_date <= dateTo
         );
         const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
-
-        // Safely filter exceptions with try/catch for each exception
-        const employeeExceptions = exceptions.filter(e => {
-            try {
-                return (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
-                       e.use_in_analysis !== false &&
-                       ['approved', 'approved_dept_head', 'pending_hr'].includes(e.approval_status);
-            } catch (error) {
-                console.error(`Error filtering exception ${e.id}:`, error);
-                return false;
-            }
-        });
+        const employeeExceptions = exceptions.filter(e => 
+            (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
+            e.use_in_analysis !== false &&
+            ['approved', 'approved_dept_head', 'pending_hr'].includes(e.approval_status)
+        );
         
         // Get employee to determine weekly off day
         const employee = employees.find(e => e.attendance_id === attendance_id);
@@ -321,28 +314,17 @@ export default function RunAnalysisTab({ project }) {
 
             working_days++;
 
-            // Find all matching exceptions and get the latest one by created_date (with error handling)
-            let dateException = null;
-            try {
-                const matchingExceptions = employeeExceptions.filter(ex => {
-                    try {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return currentDate >= exFrom && currentDate <= exTo && 
-                               (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
-                    } catch (error) {
-                        console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
-                        return false;
-                    }
-                });
-
-                dateException = matchingExceptions.length > 0
-                    ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
-                    : null;
-            } catch (error) {
-                console.error(`Error processing exceptions for date ${dateStr}:`, error);
-                dateException = null;
-            }
+            // Find all matching exceptions and get the latest one by created_date
+            const matchingExceptions = employeeExceptions.filter(ex => {
+                const exFrom = new Date(ex.date_from);
+                const exTo = new Date(ex.date_to);
+                return currentDate >= exFrom && currentDate <= exTo && 
+                       (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
+            });
+            
+            const dateException = matchingExceptions.length > 0
+                ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                : null;
 
             if (dateException) {
                 if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
@@ -429,21 +411,17 @@ export default function RunAnalysisTab({ project }) {
             }
 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
-                try {
-                    // Check if include_friday flag exists and current day is Friday
-                    const isFriday = dayOfWeek === 5;
-                    const shouldApplyOverride = dateException.include_friday || !isFriday;
-
-                    if (shouldApplyOverride) {
-                        shift = {
-                            am_start: dateException.new_am_start,
-                            am_end: dateException.new_am_end,
-                            pm_start: dateException.new_pm_start,
-                            pm_end: dateException.new_pm_end
-                        };
-                    }
-                } catch (error) {
-                    console.error(`Error applying shift override for date ${dateStr}:`, error);
+                // Check if include_friday flag exists and current day is Friday
+                const isFriday = dayOfWeek === 5;
+                const shouldApplyOverride = dateException.include_friday || !isFriday;
+                
+                if (shouldApplyOverride) {
+                    shift = {
+                        am_start: dateException.new_am_start,
+                        am_end: dateException.new_am_end,
+                        pm_start: dateException.new_pm_start,
+                        pm_end: dateException.new_pm_end
+                    };
                 }
             }
 
@@ -501,15 +479,10 @@ export default function RunAnalysisTab({ project }) {
                 full_absence_count++;
             }
 
-            // Track allowed minutes from ALLOWED_MINUTES exception (with error handling)
+            // Track allowed minutes from ALLOWED_MINUTES exception
             let allowedMinutesForDay = 0;
-            try {
-                if (dateException && dateException.type === 'ALLOWED_MINUTES') {
-                    allowedMinutesForDay = dateException.allowed_minutes || 0;
-                }
-            } catch (error) {
-                console.error(`Error reading allowed minutes for date ${dateStr}:`, error);
-                allowedMinutesForDay = 0;
+            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
+                allowedMinutesForDay = dateException.allowed_minutes || 0;
             }
 
             // Skip time calculation if there's an exception that handles attendance status OR has manual time values

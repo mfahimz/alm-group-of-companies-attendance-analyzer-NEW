@@ -171,9 +171,7 @@ export default function ReportDetailView({ reportRun, project }) {
             let closestMatch = null;
             let minDistance = Infinity;
             let isExtendedMatch = false;
-            let isFarExtendedMatch = false;
             
-            // Phase 1: Normal match (±60 minutes)
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
                 
@@ -185,7 +183,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
             
-            // Phase 2: Extended match (±120 minutes)
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
@@ -200,29 +197,13 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
             
-            // Phase 3: Far extended match (±180 minutes)
-            if (!closestMatch) {
-                for (const shiftPoint of shiftPoints) {
-                    if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
-                    if (distance <= 180 && distance < minDistance) {
-                        minDistance = distance;
-                        closestMatch = shiftPoint;
-                        isFarExtendedMatch = true;
-                    }
-                }
-            }
-            
             if (closestMatch) {
                 matches.push({
                     punch,
                     matchedTo: closestMatch.type,
                     shiftTime: closestMatch.time,
                     distance: minDistance,
-                    isExtendedMatch,
-                    isFarExtendedMatch
+                    isExtendedMatch
                 });
                 usedShiftPoints.add(closestMatch.type);
             } else {
@@ -231,8 +212,7 @@ export default function ReportDetailView({ reportRun, project }) {
                     matchedTo: null,
                     shiftTime: null,
                     distance: null,
-                    isExtendedMatch: false,
-                    isFarExtendedMatch: false
+                    isExtendedMatch: false
                 });
             }
         }
@@ -1302,8 +1282,7 @@ export default function ReportDetailView({ reportRun, project }) {
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
-            const hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
-            if (hasUnmatchedPunch || hasExtendedMatch || hasFarExtendedMatch) {
+            if (hasUnmatchedPunch || hasExtendedMatch) {
                 isAbnormal = true;
             }
             const expectedPunchCount = isSingleShift ? 2 : 4;
@@ -1735,23 +1714,13 @@ export default function ReportDetailView({ reportRun, project }) {
                                                            };
                                                            return (
                                                                 <div key={matchIdx} className="flex items-center gap-1">
-                                                                    <span className={
-                                                                        match.matchedTo ? 
-                                                                            (match.isFarExtendedMatch ? 'text-orange-600 font-bold' : 
-                                                                             match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') 
-                                                                        : 'text-red-600 font-bold'
-                                                                    }>
+                                                                    <span className={match.matchedTo ? (match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') : 'text-red-600 font-bold'}>
                                                                         {extractTime(match.punch.timestamp_raw)}
                                                                     </span>
                                                                     {match.matchedTo && (
-                                                                        <span className={`text-[9px] ${
-                                                                            match.isFarExtendedMatch ? 'text-orange-600' : 
-                                                                            match.isExtendedMatch ? 'text-amber-600' : 
-                                                                            'text-slate-500'
-                                                                        }`}>
+                                                                        <span className={`text-[9px] ${match.isExtendedMatch ? 'text-amber-600' : 'text-slate-500'}`}>
                                                                             →{match.matchedTo.replace(/_/g, ' ')}
-                                                                            {match.isFarExtendedMatch && ' 🔴'}
-                                                                            {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
+                                                                            {match.isExtendedMatch && ' ⚠️'}
                                                                         </span>
                                                                     )}
                                                                     {!match.matchedTo && (
