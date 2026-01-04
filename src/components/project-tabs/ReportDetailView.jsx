@@ -1166,7 +1166,8 @@ export default function ReportDetailView({ reportRun, project }) {
                 if (dateException.type !== 'OFF' && 
                     dateException.type !== 'PUBLIC_HOLIDAY' && 
                     dateException.type !== 'MANUAL_ABSENT' && 
-                    dateException.type !== 'SICK_LEAVE') {
+                    dateException.type !== 'SICK_LEAVE' &&
+                    dateException.type !== 'ANNUAL_LEAVE') {
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
                         exceptionLateMinutes = dateException.late_minutes;
                     }
@@ -1186,7 +1187,7 @@ export default function ReportDetailView({ reportRun, project }) {
             }
             
             const shouldSkipTimeCalc = dateException && [
-                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
             // Check if exception has manual minutes - skip punch calculation if it does
