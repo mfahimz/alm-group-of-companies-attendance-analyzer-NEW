@@ -108,18 +108,18 @@ export default function ProjectDetail() {
                             Overview
                         </TabsTrigger>
                         <TabsTrigger 
-                            value="punches" 
-                            disabled={isReadOnly} 
-                            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300"
-                        >
-                            Punches {isReadOnly && '🔒'}
-                        </TabsTrigger>
-                        <TabsTrigger 
                             value="shifts" 
                             disabled={isReadOnly} 
                             className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300"
                         >
                             Shifts {isReadOnly && '🔒'}
+                        </TabsTrigger>
+                        <TabsTrigger 
+                            value="punches" 
+                            disabled={isReadOnly} 
+                            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300"
+                        >
+                            Punches {isReadOnly && '🔒'}
                         </TabsTrigger>
                         <TabsTrigger 
                             value="exceptions" 
@@ -148,12 +148,12 @@ export default function ProjectDetail() {
                     <OverviewTab project={project} />
                 </TabsContent>
 
-                <TabsContent value="punches">
-                    <PunchUploadTab project={project} />
-                </TabsContent>
-
                 <TabsContent value="shifts">
                     <ShiftTimingsTab project={project} />
+                </TabsContent>
+
+                <TabsContent value="punches">
+                    <PunchUploadTab project={project} />
                 </TabsContent>
 
                 <TabsContent value="exceptions">
