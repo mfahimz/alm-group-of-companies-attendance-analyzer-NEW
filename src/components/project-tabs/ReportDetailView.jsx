@@ -513,7 +513,7 @@ export default function ReportDetailView({ reportRun, project }) {
             }
 
             const shouldSkipTimeCalc = dateException && [
-                'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
             // Count based on actual attendance (if no override handled it)
