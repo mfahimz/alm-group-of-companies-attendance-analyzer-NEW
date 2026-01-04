@@ -63,7 +63,9 @@ export default function Layout({ children, currentPageName }) {
 
 
         // Silent fail
-      }return user;}
+      }
+      return user;
+    }
   });
 
   const { data: permissions = [] } = useQuery({
@@ -170,31 +172,31 @@ export default function Layout({ children, currentPageName }) {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-500">Loading...</div>
-            </div>);
-
+        <div className="text-slate-500">Loading...</div>
+      </div>
+    );
   }
 
   // Check if user has a company assigned (not required for admin/supervisor)
   if (!currentUser.company && userRole === 'user') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-600 text-center">
-                    No company is assigned. Wait for the administrator to assign a company.
-                </div>
-            </div>);
-
+        <div className="text-slate-600 text-center">
+          No company is assigned. Wait for the administrator to assign a company.
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
             {/* Mobile Sidebar Backdrop */}
-            {sidebarOpen &&
-      <div
-        className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden"
-        onClick={() => setSidebarOpen(false)} />
-
-      }
+            {sidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
 
             {/* Sidebar */}
             <aside className={cn(
@@ -209,18 +211,18 @@ export default function Layout({ children, currentPageName }) {
                             <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200">
                                 <BarChart3 className="w-6 h-6 text-white flex-shrink-0" />
                             </div>
-                            {!sidebarCollapsed &&
-              <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
+                            {!sidebarCollapsed && (
+                                <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
                                     ALM Attendance
                                 </span>
-              }
+                            )}
                         </div>
                         <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
-              onClick={() => setSidebarOpen(false)}>
-
+                            variant="ghost"
+                            size="icon"
+                            className="lg:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+                            onClick={() => setSidebarOpen(false)}
+                        >
                             <X className="w-5 h-5" />
                         </Button>
                     </div>
@@ -233,7 +235,7 @@ export default function Layout({ children, currentPageName }) {
 
               return (
                 <div key={group.id}>
-                                    {group.items.length === 1 ?
+                                    {group.items.length === 1 ? (
                   // Single item - render directly
                   <Link
                     to={createPageUrl(group.items[0].path)}
@@ -245,60 +247,62 @@ export default function Layout({ children, currentPageName }) {
                       "text-slate-600 hover:bg-slate-50/80 hover:text-slate-900"
                     )}
                     onClick={() => setSidebarOpen(false)}
-                    title={sidebarCollapsed ? group.items[0].name : undefined}>
-
-                                            <GroupIcon className={cn("w-5 h-5 flex-shrink-0 transition-colors", currentPageName === group.items[0].path ? "text-indigo-600" : "text-slate-400")} />
-                                            {!sidebarCollapsed && <span>{group.items[0].name}</span>}
-                                        </Link> :
+                    title={sidebarCollapsed ? group.items[0].name : undefined}
+                  >
+                    <GroupIcon className={cn("w-5 h-5 flex-shrink-0 transition-colors", currentPageName === group.items[0].path ? "text-indigo-600" : "text-slate-400")} />
+                    {!sidebarCollapsed && <span>{group.items[0].name}</span>}
+                  </Link>
+                ) : (
 
                   // Multiple items - render as collapsible group
                   <div className="mx-2">
-                                            <button
+                    <button
                       onClick={() => toggleGroup(group.id)}
                       className={cn(
                         "w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                         sidebarCollapsed ? "justify-center px-2" : "justify-between",
                         "text-slate-700 hover:bg-gray-100 hover:text-slate-900"
                       )}
-                      title={sidebarCollapsed ? group.name : undefined}>
-
-                                                <div className={cn("flex items-center", sidebarCollapsed ? "" : "space-x-3")}>
-                                                    <GroupIcon className="w-5 h-5 flex-shrink-0 text-slate-500" />
-                                                    {!sidebarCollapsed && <span>{group.name}</span>}
-                                                </div>
-                                                {!sidebarCollapsed &&
-                      <ChevronRight className={cn(
-                        "w-4 h-4 transition-transform text-slate-400",
-                        isExpanded && "rotate-90"
-                      )} />
-                      }
-                                            </button>
-                                            {isExpanded && !sidebarCollapsed &&
-                    <div className="mt-1 ml-4 pl-4 border-l-2 border-gray-200 space-y-1">
-                                                    {group.items.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <Link
-                            key={item.path}
-                            to={createPageUrl(item.path)}
-                            className={cn(
-                              "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
-                              currentPageName === item.path ?
-                              "bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-500" :
-                              "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                            )}
-                            onClick={() => setSidebarOpen(false)}>
-
-                                                                <Icon className={cn("w-4 h-4", currentPageName === item.path ? "text-indigo-600" : "text-slate-400")} />
-                                                                <span>{item.name}</span>
-                                                            </Link>);
-
-                      })}
-                                                </div>
-                    }
-                                        </div>
-                  }
-                                </div>);
+                      title={sidebarCollapsed ? group.name : undefined}
+                    >
+                      <div className={cn("flex items-center", sidebarCollapsed ? "" : "space-x-3")}>
+                        <GroupIcon className="w-5 h-5 flex-shrink-0 text-slate-500" />
+                        {!sidebarCollapsed && <span>{group.name}</span>}
+                      </div>
+                      {!sidebarCollapsed && (
+                        <ChevronRight className={cn(
+                          "w-4 h-4 transition-transform text-slate-400",
+                          isExpanded && "rotate-90"
+                        )} />
+                      )}
+                    </button>
+                    {isExpanded && !sidebarCollapsed && (
+                      <div className="mt-1 ml-4 pl-4 border-l-2 border-gray-200 space-y-1">
+                        {group.items.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.path}
+                              to={createPageUrl(item.path)}
+                              className={cn(
+                                "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
+                                currentPageName === item.path ?
+                                "bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-500" :
+                                "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                              )}
+                              onClick={() => setSidebarOpen(false)}
+                            >
+                              <Icon className={cn("w-4 h-4", currentPageName === item.path ? "text-indigo-600" : "text-slate-400")} />
+                              <span>{item.name}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
 
             })}
                     </nav>
@@ -306,22 +310,22 @@ export default function Layout({ children, currentPageName }) {
                     {/* Collapse Toggle (Desktop only) */}
                     <div className="hidden lg:block border-t border-slate-100 p-2">
                         <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="w-full justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50">
-
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                            className="w-full justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                        >
                             <ChevronDown className={cn(
-                "w-4 h-4 transition-transform",
-                sidebarCollapsed ? "-rotate-90" : "rotate-90"
-              )} />
+                                "w-4 h-4 transition-transform",
+                                sidebarCollapsed ? "-rotate-90" : "rotate-90"
+                            )} />
                         </Button>
                     </div>
 
                     {/* User Info & Logout */}
                     <div className={cn("border-t border-slate-100", sidebarCollapsed ? "p-2" : "p-4")}>
-                        {currentUser && !sidebarCollapsed &&
-            <div className="flex items-center justify-between mb-3">
+                        {currentUser && !sidebarCollapsed && (
+                            <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100">
                                         <UserIcon className="w-4 h-4 text-indigo-600" />
@@ -331,24 +335,24 @@ export default function Layout({ children, currentPageName }) {
                                             {currentUser.full_name}
                                         </p>
                                         <span className={cn(
-                    "inline-block px-2 py-0.5 rounded text-[10px] font-medium tracking-wider uppercase",
-                    isAdmin ? 'bg-purple-50 text-purple-700 border border-purple-100' :
-                    isSupervisor ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                    'bg-slate-50 text-slate-600 border border-slate-100'
-                  )}>
+                                            "inline-block px-2 py-0.5 rounded text-[10px] font-medium tracking-wider uppercase",
+                                            isAdmin ? 'bg-purple-50 text-purple-700 border border-purple-100' :
+                                            isSupervisor ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                            'bg-slate-50 text-slate-600 border border-slate-100'
+                                        )}>
                                             {isAdmin ? 'Admin' : isSupervisor ? 'Supervisor' : 'User'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-            }
+                        )}
                         <Button
-              variant="outline"
-              size="sm"
-              onClick={() => base44.auth.logout()}
-              className={cn("w-full border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900", sidebarCollapsed ? "p-2" : "justify-center")}
-              title={sidebarCollapsed ? "Logout" : undefined}>
-
+                            variant="outline"
+                            size="sm"
+                            onClick={() => base44.auth.logout()}
+                            className={cn("w-full border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900", sidebarCollapsed ? "p-2" : "justify-center")}
+                            title={sidebarCollapsed ? "Logout" : undefined}
+                        >
                             <LogOut className={cn("w-4 h-4", !sidebarCollapsed && "mr-2")} />
                             {!sidebarCollapsed && "Logout"}
                         </Button>
@@ -362,11 +366,11 @@ export default function Layout({ children, currentPageName }) {
                 <header className="lg:hidden flex-shrink-0 z-30 bg-white border-b border-slate-200 px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center">
                         <Button
-              variant="ghost"
-              size="icon"
-              className="text-slate-500"
-              onClick={() => setSidebarOpen(true)}>
-
+                            variant="ghost"
+                            size="icon"
+                            className="text-slate-500"
+                            onClick={() => setSidebarOpen(true)}
+                        >
                             <Menu className="w-6 h-6" />
                         </Button>
                         <span className="ml-4 text-lg font-semibold text-slate-900">Attendance</span>
@@ -393,9 +397,9 @@ export default function Layout({ children, currentPageName }) {
             <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
             {/* Keyboard Shortcut Hint */}
-            <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-3 py-2 rounded-lg shadow-lg text-xs opacity-0 hover:opacity-100 transition-opacity">
-                Press <kbd className="px-1 py-0.5 bg-slate-700 rounded">⌘K</kbd> to search
-            </div>
-            </div>);
-
+      <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-3 py-2 rounded-lg shadow-lg text-xs opacity-0 hover:opacity-100 transition-opacity">
+        Press <kbd className="px-1 py-0.5 bg-slate-700 rounded">⌘K</kbd> to search
+      </div>
+    </div>
+  );
 }
