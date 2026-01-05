@@ -636,20 +636,29 @@ export default function ShiftTimingsTab({ project }) {
                 // Filter by applicable day
                 let matchesDay = true;
                 if (applicableDayFilter !== 'all') {
-                    // Special case for Friday - check both is_friday_shift flag and applicable_days array
+                    matchesDay = false; // Default to false when filtering
+                    
+                    // Special case for Friday - check is_friday_shift flag
                     if (applicableDayFilter.toLowerCase() === 'friday' && shift.is_friday_shift) {
                         matchesDay = true;
-                    } else if (!shift.applicable_days) {
-                        matchesDay = true; // 'All days' shifts match any filter
-                    } else {
+                    }
+                    
+                    // Check applicable_days array
+                    if (shift.applicable_days) {
                         try {
                             const daysArray = JSON.parse(shift.applicable_days);
-                            if (Array.isArray(daysArray)) {
+                            if (Array.isArray(daysArray) && daysArray.length > 0) {
                                 matchesDay = daysArray.some(day => day.toLowerCase() === applicableDayFilter.toLowerCase());
                             }
                         } catch {
-                            matchesDay = true;
+                            // If parsing fails, check if it's a string match
+                            if (shift.applicable_days.toLowerCase().includes(applicableDayFilter.toLowerCase())) {
+                                matchesDay = true;
+                            }
                         }
+                    } else {
+                        // No applicable_days means all days - should match any filter
+                        matchesDay = true;
                     }
                 }
                 
