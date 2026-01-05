@@ -35,10 +35,6 @@ export default function Layout({ children, currentPageName }) {
     const [expandedGroups, setExpandedGroups] = useState(new Set(['dashboard', 'projects']));
     const [searchOpen, setSearchOpen] = useState(false);
 
-    // Public pages that don't require authentication
-    const publicPages = ['ShiftVerification'];
-    const isPublicPage = publicPages.includes(currentPageName);
-
     useKeyboardShortcuts({ onOpenSearch: () => setSearchOpen(true) });
 
     const { data: currentUser } = useQuery({
@@ -171,15 +167,6 @@ export default function Layout({ children, currentPageName }) {
       });
     }
   }, [currentPageName, filteredMenuGroups]);
-
-  // For public pages, render without authentication
-  if (isPublicPage) {
-      return (
-          <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
-              {children}
-          </div>
-      );
-  }
 
   // Don't render sidebar until user is loaded
   if (!currentUser) {
