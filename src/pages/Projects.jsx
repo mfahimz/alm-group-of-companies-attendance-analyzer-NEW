@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Copy, Trash2, Edit, Calendar, FolderKanban, TrendingUp, Clock } from 'lucide-react';
+import { Plus, Search, Copy, Trash2, Edit, Calendar, FolderKanban, TrendingUp, Clock, Filter, ArrowUpDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
@@ -13,6 +13,7 @@ import BulkEditProjectDialog from '../components/projects/BulkEditProjectDialog'
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function Projects() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -20,6 +21,8 @@ export default function Projects() {
     const [duplicateProject, setDuplicateProject] = useState(null);
     const [selectedProjects, setSelectedProjects] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('status-closed-last');
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -107,10 +110,50 @@ export default function Projects() {
         }
     });
 
-    const filteredProjects = projects.filter(project =>
-        project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.department?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProjects = React.useMemo(() => {
+        let filtered = projects.filter(project =>
+            project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            project.department?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(p => p.status === statusFilter);
+        }
+
+        // Apply sorting
+        filtered.sort((a, b) => {
+            if (sortBy === 'status-closed-last') {
+                // Closed projects at bottom, then by created date
+                if (a.status === 'closed' && b.status !== 'closed') return 1;
+                if (a.status !== 'closed' && b.status === 'closed') return -1;
+                return new Date(b.created_date) - new Date(a.created_date);
+            } else if (sortBy === 'name-asc') {
+                return a.name.localeCompare(b.name);
+            } else if (sortBy === 'name-desc') {
+                return b.name.localeCompare(a.name);
+            } else if (sortBy === 'date-newest') {
+                return new Date(b.created_date) - new Date(a.created_date);
+            } else if (sortBy === 'date-oldest') {
+                return new Date(a.created_date) - new Date(b.created_date);
+            }
+            return 0;
+        });
+
+        return filtered;
+    }, [projects, searchTerm, statusFilter, sortBy]);
+
+    // Group projects by company
+    const projectsByCompany = React.useMemo(() => {
+        const grouped = {};
+        filteredProjects.forEach(project => {
+            if (!grouped[project.company]) {
+                grouped[project.company] = [];
+            }
+            grouped[project.company].push(project);
+        });
+        return grouped;
+    }, [filteredProjects]);
 
     if (!currentUser) {
         return <div className="text-center py-12 text-slate-500">Loading...</div>;
@@ -147,15 +190,51 @@ export default function Projects() {
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="relative animate-in slide-in-from-top-4 duration-700 delay-100">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <Input
-                    placeholder="Search projects by name or department..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-12 h-12 bg-white/80 backdrop-blur-sm border-0 shadow-lg ring-1 ring-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all"
-                />
+            {/* Search and Filters */}
+            <div className="space-y-4 animate-in slide-in-from-top-4 duration-700 delay-100">
+                <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Input
+                        placeholder="Search projects by name or department..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-12 h-12 bg-white/80 backdrop-blur-sm border-0 shadow-lg ring-1 ring-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all"
+                    />
+                </div>
+                
+                <div className="flex gap-3">
+                    <div className="flex-1">
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="h-11 bg-white/80 backdrop-blur-sm border-0 shadow-md ring-1 ring-slate-200">
+                                <Filter className="w-4 h-4 mr-2 text-slate-400" />
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="draft">Draft</SelectItem>
+                                <SelectItem value="analyzed">Analyzed</SelectItem>
+                                <SelectItem value="locked">Locked</SelectItem>
+                                <SelectItem value="closed">Closed</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    
+                    <div className="flex-1">
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="h-11 bg-white/80 backdrop-blur-sm border-0 shadow-md ring-1 ring-slate-200">
+                                <ArrowUpDown className="w-4 h-4 mr-2 text-slate-400" />
+                                <SelectValue placeholder="Sort by" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="status-closed-last">Closed Last (Default)</SelectItem>
+                                <SelectItem value="date-newest">Newest First</SelectItem>
+                                <SelectItem value="date-oldest">Oldest First</SelectItem>
+                                <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                                <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
             </div>
 
             {/* Projects Grid */}
@@ -185,8 +264,18 @@ export default function Projects() {
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProjects.map((project, idx) => (
+                <div className="space-y-8">
+                    {Object.entries(projectsByCompany).map(([company, companyProjects]) => (
+                        <div key={company} className="space-y-4">
+                            <div className="flex items-center gap-3 sticky top-0 z-10 bg-gradient-to-r from-slate-50 to-transparent py-3 px-4 rounded-xl">
+                                <FolderKanban className="w-5 h-5 text-indigo-600" />
+                                <h2 className="text-xl font-bold text-slate-900">{company}</h2>
+                                <span className="ml-auto text-sm text-slate-500 font-medium">
+                                    {companyProjects.length} project{companyProjects.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {companyProjects.map((project, idx) => (
                         <Card 
                             key={project.id} 
                             className="border-0 bg-white shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 h-full group rounded-3xl overflow-hidden ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95"
@@ -299,6 +388,9 @@ export default function Projects() {
                                 )}
                             </CardContent>
                         </Card>
+                                ))}
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}
