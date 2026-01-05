@@ -28,6 +28,8 @@ export default function ReportDetailView({ reportRun, project }) {
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
+    const [approvalLinks, setApprovalLinks] = useState([]);
+    const [showLinksDialog, setShowLinksDialog] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
@@ -925,12 +927,42 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
 
-            return exceptionsToCreate.length;
+            // Generate approval links if there are pending exceptions
+            const hasPendingExceptions = exceptionsToCreate.some(e => e.approval_status === 'pending_dept_head' || e.approval_status === 'pending');
+            
+            if (hasPendingExceptions) {
+                setSaveProgress({ current: 100, total: 100, status: 'Generating approval links...' });
+                
+                try {
+                    const response = await base44.functions.invoke('generateApprovalLinks', {
+                        report_run_id: reportRun.id,
+                        project_id: project.id,
+                        company: project.company
+                    });
+                    
+                    if (response.data.success && response.data.links.length > 0) {
+                        return { exceptionCount: exceptionsToCreate.length, links: response.data.links };
+                    }
+                } catch (linkError) {
+                    console.error('Failed to generate approval links:', linkError);
+                }
+            }
+
+            return { exceptionCount: exceptionsToCreate.length, links: [] };
         },
-        onSuccess: (exceptionCount) => {
+        onSuccess: (result) => {
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
-            toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
+            queryClient.invalidateQueries(['approvalLinks']);
+            
+            if (result.links && result.links.length > 0) {
+                setApprovalLinks(result.links);
+                setShowLinksDialog(true);
+                toast.success(`Report saved! ${result.exceptionCount} exception${result.exceptionCount !== 1 ? 's' : ''} created. ${result.links.length} approval link${result.links.length !== 1 ? 's' : ''} generated.`);
+            } else {
+                toast.success(`Report saved! ${result.exceptionCount} exception${result.exceptionCount !== 1 ? 's' : ''} created from edits.`);
+            }
+            
             setIsSaving(false);
             setSaveProgress(null);
         },
@@ -1907,6 +1939,89 @@ export default function ReportDetailView({ reportRun, project }) {
                         >
                             Confirm & Save
                         </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Approval Links Dialog */}
+            <Dialog open={showLinksDialog} onOpenChange={setShowLinksDialog}>
+                <DialogContent className="max-w-4xl max-h-[85vh]">
+                    <DialogHeader>
+                        <DialogTitle>Department Head Approval Links</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4 overflow-y-auto max-h-[calc(85vh-120px)]">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p className="text-sm text-blue-800">
+                                Share these links with department heads to review and approve exception requests. 
+                                Each link is unique and expires in {approvalLinks[0] ? '3 days' : 'the configured time'}.
+                            </p>
+                        </div>
+                        
+                        {approvalLinks.map((link, idx) => (
+                            <Card key={idx} className="border-indigo-200 bg-indigo-50">
+                                <CardContent className="p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-semibold text-slate-900">{link.department}</p>
+                                            <p className="text-sm text-slate-600">Department Head: {link.department_head_name}</p>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {link.exception_count} exception{link.exception_count !== 1 ? 's' : ''} to review
+                                            </p>
+                                        </div>
+                                        <span className="text-xs text-slate-500">
+                                            Expires: {new Date(link.expires_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        <div>
+                                            <Label className="text-xs text-slate-600">Approval Link</Label>
+                                            <div className="flex gap-2 mt-1">
+                                                <Input
+                                                    value={`${window.location.origin}/DeptHeadApproval?token=${link.link_token}`}
+                                                    readOnly
+                                                    className="font-mono text-xs"
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(`${window.location.origin}/DeptHeadApproval?token=${link.link_token}`);
+                                                        toast.success('Link copied to clipboard');
+                                                    }}
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <Label className="text-xs text-slate-600">Verification Code</Label>
+                                            <div className="flex gap-2 mt-1">
+                                                <Input
+                                                    value={link.verification_code}
+                                                    readOnly
+                                                    className="font-mono text-lg font-bold tracking-widest text-center"
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(link.verification_code);
+                                                        toast.success('Code copied to clipboard');
+                                                    }}
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                    <div className="flex justify-end">
+                        <Button onClick={() => setShowLinksDialog(false)}>Close</Button>
                     </div>
                 </DialogContent>
             </Dialog>

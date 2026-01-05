@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
 import ReportDetailView from '../components/project-tabs/ReportDetailView';
+import ApprovalLinksHistory from '../components/reports/ApprovalLinksHistory';
 
 export default function ReportDetailPage() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -72,6 +73,8 @@ export default function ReportDetailPage() {
 
             {/* Report Detail View */}
             <ReportDetailView reportRun={reportRun} project={project} />
+            
+            <ApprovalLinksHistory reportRunId={reportRun.id} projectId={project.id} />
         </div>
     );
 }

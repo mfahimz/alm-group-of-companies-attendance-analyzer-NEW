@@ -23,11 +23,15 @@ Deno.serve(async (req) => {
 
         // Get all exceptions for this report that need approval
         const exceptions = await base44.asServiceRole.entities.Exception.filter({
-            report_run_id,
-            approval_status: 'pending_dept_head'
+            report_run_id
         });
+        
+        // Filter for pending exceptions (both old 'pending' and new 'pending_dept_head')
+        const pendingExceptions = exceptions.filter(e => 
+            e.approval_status === 'pending_dept_head' || e.approval_status === 'pending'
+        );
 
-        if (exceptions.length === 0) {
+        if (pendingExceptions.length === 0) {
             return Response.json({ 
                 success: true,
                 message: 'No exceptions require approval',
@@ -40,7 +44,7 @@ Deno.serve(async (req) => {
 
         // Group exceptions by department
         const exceptionsByDept = {};
-        for (const exception of exceptions) {
+        for (const exception of pendingExceptions) {
             const employee = employees.find(e => e.attendance_id === exception.attendance_id);
             if (employee && employee.department) {
                 if (!exceptionsByDept[employee.department]) {
@@ -110,13 +114,24 @@ Deno.serve(async (req) => {
             // Get department head employee details
             const deptHeadEmployee = employees.find(e => e.id === deptHead.employee_id);
 
+                // Get app URL from environment or construct it
+                let appUrl = Deno.env.get('CUSTOM_DOMAIN');
+                if (!appUrl) {
+                    const appId = Deno.env.get('BASE44_APP_ID');
+                    appUrl = appId ? `https://${appId}.base44.app` : 'https://app.base44.com';
+                }
+                if (appUrl && !appUrl.startsWith('http')) {
+                    appUrl = `https://${appUrl}`;
+                }
+
                 links.push({
                     department,
                     department_head_name: deptHeadEmployee?.name || 'Unknown',
                     link_token: token,
                     verification_code: verificationCode,
                     exception_count: relevantExceptions.length,
-                    expires_at: expiresAt.toISOString()
+                    expires_at: expiresAt.toISOString(),
+                    full_link: `${appUrl}/DeptHeadApproval?token=${token}`
                 });
             }
         }
