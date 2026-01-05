@@ -219,7 +219,16 @@ export default function Reports() {
                 ...emp,
                 attendanceRate: emp.workingDays > 0 ? ((emp.presentDays / emp.workingDays) * 100).toFixed(1) : 0
             }))
-            .sort((a, b) => b.attendanceRate - a.attendanceRate);
+            .sort((a, b) => {
+                // Sort by attendance rate ascending (worst first), then by absences descending, then by late minutes descending
+                if (a.attendanceRate !== b.attendanceRate) {
+                    return a.attendanceRate - b.attendanceRate;
+                }
+                if (a.absences !== b.absences) {
+                    return b.absences - a.absences;
+                }
+                return b.lateMinutes - a.lateMinutes;
+            });
     }, [filteredAnalysisResults, employees]);
 
     return (
@@ -459,7 +468,7 @@ export default function Reports() {
                 {/* Employee Attendance Trends */}
                 <Card className="border-0 shadow-md">
                     <CardHeader>
-                        <CardTitle>Top Employees by Attendance</CardTitle>
+                        <CardTitle>Employees Needing Attention</CardTitle>
                     </CardHeader>
                     <CardContent>
                         {employeeAttendanceTrends.length > 0 ? (
