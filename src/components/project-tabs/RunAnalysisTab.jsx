@@ -1002,33 +1002,11 @@ export default function RunAnalysisTab({ project }) {
                 status: 'analyzed'
             });
 
-            // Generate shift verification links
-            setProgress({ 
-                current: uniqueEmployeeIds.length, 
-                total: uniqueEmployeeIds.length, 
-                status: 'Generating verification links...',
-                subStatus: 'Creating department verification links'
-            });
-
-            try {
-                const response = await base44.functions.invoke('generateShiftVerificationLinks', {
-                    project_id: project.id
-                });
-                
-                if (response.data.success) {
-                    toast.success(`Report saved! ${response.data.links.length} verification link(s) generated. Check the Shifts tab for links.`);
-                } else {
-                    toast.success(`Report saved! Note: Failed to generate verification links.`);
-                }
-            } catch (linkError) {
-                console.error('Error generating verification links:', linkError);
-                toast.success(`Report saved! Note: Failed to generate verification links.`);
-            }
-
             queryClient.invalidateQueries(['results', project.id]);
             queryClient.invalidateQueries(['reportRuns', project.id]);
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['projects']);
+            toast.success(`Analysis completed for ${dateFrom} to ${dateTo}`);
             setProgress({ 
                 current: uniqueEmployeeIds.length, 
                 total: uniqueEmployeeIds.length, 

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye, Copy, Link as LinkIcon } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye, Copy } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SortableTableHead from '../ui/SortableTableHead';
@@ -43,9 +43,7 @@ export default function ShiftTimingsTab({ project }) {
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showCopyDialog, setShowCopyDialog] = useState(false);
     const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '' });
-    const [verificationLinks, setVerificationLinks] = useState([]);
-    const [showLinksDialog, setShowLinksDialog] = useState(false);
-    const [generatingLinks, setGeneratingLinks] = useState(false);
+
     const [formData, setFormData] = useState({
         attendance_id: '',
         am_start: '',
@@ -579,31 +577,7 @@ export default function ShiftTimingsTab({ project }) {
         }
     };
 
-    const generateVerificationLinks = async () => {
-        setGeneratingLinks(true);
-        try {
-            const response = await base44.functions.invoke('generateShiftVerificationLinks', {
-                project_id: project.id
-            });
-            
-            if (response.data.success) {
-                setVerificationLinks(response.data.links);
-                setShowLinksDialog(true);
-                toast.success(response.data.message);
-            } else {
-                toast.error('Failed to generate links');
-            }
-        } catch (error) {
-            toast.error('Failed to generate verification links: ' + error.message);
-        } finally {
-            setGeneratingLinks(false);
-        }
-    };
 
-    const copyToClipboard = (text) => {
-        navigator.clipboard.writeText(text);
-        toast.success('Copied to clipboard');
-    };
 
     const exportBlockShiftsToCSV = async (blockId, blockShifts) => {
         if (blockShifts.length === 0) {
@@ -1206,29 +1180,7 @@ export default function ShiftTimingsTab({ project }) {
                 </Card>
             )}
 
-            {/* Verification Links Section */}
-            {shifts.length > 0 && (userRole === 'admin' || userRole === 'hr_manager') && (
-                <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-purple-50">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-lg">Shift Verification Links</CardTitle>
-                                <p className="text-sm text-slate-600 mt-1">
-                                    Generate secure links for department heads to verify shift timings
-                                </p>
-                            </div>
-                            <Button
-                                onClick={generateVerificationLinks}
-                                disabled={generatingLinks}
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                            >
-                                <LinkIcon className="w-4 h-4 mr-2" />
-                                {generatingLinks ? 'Generating...' : 'Generate Links'}
-                            </Button>
-                        </div>
-                    </CardHeader>
-                </Card>
-            )}
+
 
             {/* Upload Section */}
             <Card className="border-0 shadow-sm">
@@ -1490,77 +1442,7 @@ export default function ShiftTimingsTab({ project }) {
                 </DialogContent>
             </Dialog>
 
-            {/* Verification Links Dialog */}
-            <Dialog open={showLinksDialog} onOpenChange={setShowLinksDialog}>
-                <DialogContent className="max-w-3xl max-h-[85vh]">
-                    <DialogHeader>
-                        <DialogTitle>Shift Verification Links</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4 overflow-y-auto max-h-[calc(85vh-120px)]">
-                        <p className="text-sm text-slate-600">
-                            Share these links with department heads to verify shift timings. Each link is unique and expires in 7 days.
-                        </p>
-                        {verificationLinks.map((link, idx) => (
-                            <Card key={idx} className="border-indigo-200 bg-indigo-50">
-                                <CardContent className="p-4 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{link.department}</p>
-                                            {link.department_head_id && (
-                                                <p className="text-sm text-slate-600">Head: {link.department_head_id}</p>
-                                            )}
-                                        </div>
-                                        <span className="text-xs text-slate-500">
-                                            Expires: {new Date(link.expires_at).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        <div>
-                                            <Label className="text-xs text-slate-600">Verification Link</Label>
-                                            <div className="flex gap-2 mt-1">
-                                                <Input
-                                                    value={link.link}
-                                                    readOnly
-                                                    className="font-mono text-xs"
-                                                />
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => copyToClipboard(link.link)}
-                                                >
-                                                    <Copy className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        
-                                        <div>
-                                            <Label className="text-xs text-slate-600">Verification Code</Label>
-                                            <div className="flex gap-2 mt-1">
-                                                <Input
-                                                    value={link.verification_code}
-                                                    readOnly
-                                                    className="font-mono text-lg font-bold tracking-widest text-center"
-                                                />
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => copyToClipboard(link.verification_code)}
-                                                >
-                                                    <Copy className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                    <div className="flex justify-end">
-                        <Button onClick={() => setShowLinksDialog(false)}>Close</Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+
 
             {/* Copy Shifts Dialog */}
             <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
