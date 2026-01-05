@@ -29,18 +29,22 @@ Deno.serve(async (req) => {
         const validityDays = settingsResult.length > 0 ? 
             parseInt(settingsResult[0].setting_value) : 7;
 
+        // Get all employees for this company
+        const employees = await base44.entities.Employee.filter({ company: project.company });
+
         // Get all shifts for this project
         const shifts = await base44.entities.ShiftTiming.filter({ project_id });
 
-        // Get unique departments from shifts
-        const departments = [...new Set(shifts.map(s => {
-            const employees = project.company ? 
-                base44.entities.Employee.filter({ 
-                    company: project.company,
-                    attendance_id: s.attendance_id 
-                }) : [];
-            return employees.length > 0 ? employees[0].department : null;
-        }).filter(Boolean))];
+        // Get unique departments from shifts by mapping to employees
+        const departmentSet = new Set();
+        for (const shift of shifts) {
+            const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+            if (employee?.department) {
+                departmentSet.add(employee.department);
+            }
+        }
+
+        const departments = Array.from(departmentSet);
 
         // If no departments found, use project department or 'All'
         if (departments.length === 0) {
