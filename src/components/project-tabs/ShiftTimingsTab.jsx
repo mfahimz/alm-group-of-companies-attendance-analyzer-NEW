@@ -636,7 +636,10 @@ export default function ShiftTimingsTab({ project }) {
                 // Filter by applicable day
                 let matchesDay = true;
                 if (applicableDayFilter !== 'all') {
-                    if (!shift.applicable_days) {
+                    // Special case for Friday - check both is_friday_shift flag and applicable_days array
+                    if (applicableDayFilter.toLowerCase() === 'friday' && shift.is_friday_shift) {
+                        matchesDay = true;
+                    } else if (!shift.applicable_days) {
                         matchesDay = true; // 'All days' shifts match any filter
                     } else {
                         try {
