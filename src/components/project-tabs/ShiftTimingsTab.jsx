@@ -28,6 +28,7 @@ export default function ShiftTimingsTab({ project }) {
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [isSingleShift, setIsSingleShift] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
+    const [applicableDayFilter, setApplicableDayFilter] = useState('all');
     const [selectedBlock, setSelectedBlock] = useState('block1');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -631,7 +632,25 @@ export default function ShiftTimingsTab({ project }) {
                     shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
                 const matchesDept = departmentFilter === 'all' || employee?.department === departmentFilter;
-                return matchesSearch && matchesDept;
+                
+                // Filter by applicable day
+                let matchesDay = true;
+                if (applicableDayFilter !== 'all') {
+                    if (!shift.applicable_days) {
+                        matchesDay = true; // 'All days' shifts match any filter
+                    } else {
+                        try {
+                            const daysArray = JSON.parse(shift.applicable_days);
+                            if (Array.isArray(daysArray)) {
+                                matchesDay = daysArray.some(day => day.toLowerCase() === applicableDayFilter.toLowerCase());
+                            }
+                        } catch {
+                            matchesDay = true;
+                        }
+                    }
+                }
+                
+                return matchesSearch && matchesDept && matchesDay;
             })
             .sort((a, b) => {
                 let aVal, bVal;
@@ -829,6 +848,21 @@ export default function ShiftTimingsTab({ project }) {
                                                 <SelectItem value="Operations">Operations</SelectItem>
                                                 <SelectItem value="Front Office">Front Office</SelectItem>
                                                 <SelectItem value="Housekeeping">Housekeeping</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={applicableDayFilter} onValueChange={setApplicableDayFilter}>
+                                            <SelectTrigger className="w-36">
+                                                <SelectValue placeholder="Day" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Days</SelectItem>
+                                                <SelectItem value="Sunday">Sunday</SelectItem>
+                                                <SelectItem value="Monday">Monday</SelectItem>
+                                                <SelectItem value="Tuesday">Tuesday</SelectItem>
+                                                <SelectItem value="Wednesday">Wednesday</SelectItem>
+                                                <SelectItem value="Thursday">Thursday</SelectItem>
+                                                <SelectItem value="Friday">Friday</SelectItem>
+                                                <SelectItem value="Saturday">Saturday</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <div className="relative w-64">
