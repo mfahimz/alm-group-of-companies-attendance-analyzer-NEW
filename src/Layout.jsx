@@ -30,17 +30,21 @@ import { cn } from '@/lib/utils';
 
 
 export default function Layout({ children, currentPageName }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState(new Set(['dashboard', 'projects']));
-  const [searchOpen, setSearchOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [expandedGroups, setExpandedGroups] = useState(new Set(['dashboard', 'projects']));
+    const [searchOpen, setSearchOpen] = useState(false);
 
-  useKeyboardShortcuts({ onOpenSearch: () => setSearchOpen(true) });
+    // Public pages that don't require authentication
+    const publicPages = ['ShiftVerification'];
+    const isPublicPage = publicPages.includes(currentPageName);
 
-  const { data: currentUser } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: async () => {
-      const user = await base44.auth.me();
+    useKeyboardShortcuts({ onOpenSearch: () => setSearchOpen(true) });
+
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: async () => {
+            const user = await base44.auth.me();
       // Log user activity
       try {
         // Try to get IP from external API
@@ -168,23 +172,32 @@ export default function Layout({ children, currentPageName }) {
     }
   }, [currentPageName, filteredMenuGroups]);
 
+  // For public pages, render without authentication
+  if (isPublicPage) {
+      return (
+          <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
+              {children}
+          </div>
+      );
+  }
+
   // Don't render sidebar until user is loaded
   if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-500">Loading...</div>
-      </div>);
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-slate-500">Loading...</div>
+          </div>);
 
   }
 
   // Check if user has a company assigned (not required for admin/supervisor)
   if (!currentUser.company && userRole === 'user') {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-600 text-center">
-          No company is assigned. Wait for the administrator to assign a company.
-        </div>
-      </div>);
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-slate-600 text-center">
+                  No company is assigned. Wait for the administrator to assign a company.
+              </div>
+          </div>);
 
   }
 
