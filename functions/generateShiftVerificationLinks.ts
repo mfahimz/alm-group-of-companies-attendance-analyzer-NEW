@@ -58,7 +58,8 @@ Deno.serve(async (req) => {
         });
 
         const links = [];
-        const appUrl = Deno.env.get('BASE44_APP_URL') || 'https://app.base44.com';
+        // Get the app's custom domain from environment or use default
+        const appUrl = Deno.env.get('APP_URL') || `https://${Deno.env.get('BASE44_APP_ID')}.base44.app`;
 
         for (const department of departments) {
             // Find department head for this department

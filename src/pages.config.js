@@ -17,10 +17,10 @@ import RamadanSchedules from './pages/RamadanSchedules';
 import ReportDetail from './pages/ReportDetail';
 import Reports from './pages/Reports';
 import RulesSettings from './pages/RulesSettings';
+import ShiftVerification from './pages/ShiftVerification';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import ShiftVerification from './pages/ShiftVerification';
 import __Layout from './Layout.jsx';
 
 
@@ -44,10 +44,10 @@ export const PAGES = {
     "ReportDetail": ReportDetail,
     "Reports": Reports,
     "RulesSettings": RulesSettings,
+    "ShiftVerification": ShiftVerification,
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "ShiftVerification": ShiftVerification,
 }
 
 export const pagesConfig = {

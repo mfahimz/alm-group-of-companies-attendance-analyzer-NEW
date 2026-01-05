@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CheckCircle, XCircle, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
+// This page is public and doesn't require authentication
 export default function ShiftVerification() {
     const [verificationCode, setVerificationCode] = useState('');
     const [isVerified, setIsVerified] = useState(false);
