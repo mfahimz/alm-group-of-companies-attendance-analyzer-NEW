@@ -306,6 +306,8 @@ export default function RunAnalysisTab({ project }) {
         let late_minutes = 0;
         let early_checkout_minutes = 0;
         let other_minutes = 0;
+        let overtime_hours = 0;
+        let overtime_holiday_hours = 0;
         const abnormal_dates_list = [];
         const critical_abnormal_dates = []; // RED - only critical issues
         const auto_resolutions = [];
@@ -475,6 +477,17 @@ export default function RunAnalysisTab({ project }) {
 
             let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
             
+            // Check if this is a weekly off or holiday for overtime premium calculation
+            let isWeeklyOffForOT = false;
+            let isHolidayForOT = false;
+            
+            if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                isWeeklyOffForOT = true;
+            }
+            if (dateException && (dateException.type === 'PUBLIC_HOLIDAY' || dateException.type === 'OFF')) {
+                isHolidayForOT = true;
+            }
+            
             let punchMatches = [];
             let hasUnmatchedPunch = false;
             if (shift && filteredPunches.length > 0) {
@@ -595,6 +608,48 @@ export default function RunAnalysisTab({ project }) {
                 
                 late_minutes += dayLateMinutes;
                 early_checkout_minutes += dayEarlyMinutes;
+            }
+            
+            // Calculate overtime hours for this day
+            if (shift && filteredPunches.length >= 2 && !shouldSkipTimeCalculation) {
+                try {
+                    const punchesWithTime = filteredPunches.map(p => ({
+                        ...p,
+                        time: parseTime(p.timestamp_raw, includeSeconds)
+                    })).filter(p => p.time).sort((a, b) => a.time - b.time);
+                    
+                    if (punchesWithTime.length >= 2) {
+                        const firstPunch = punchesWithTime[0].time;
+                        const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
+                        
+                        // Calculate total worked hours
+                        const totalWorkedMinutes = (lastPunch - firstPunch) / (1000 * 60);
+                        
+                        // Calculate expected shift duration
+                        const shiftStart = parseTime(shift.am_start);
+                        const shiftEnd = parseTime(shift.pm_end);
+                        const expectedMinutes = shiftStart && shiftEnd ? (shiftEnd - shiftStart) / (1000 * 60) : 0;
+                        
+                        // Get overtime rules from company rules
+                        const dailyOTThreshold = rules?.overtime_rules?.daily_threshold_hours || 9;
+                        const dailyThresholdMinutes = dailyOTThreshold * 60;
+                        
+                        // Calculate overtime (worked minutes beyond expected shift + threshold)
+                        const overtimeMinutes = Math.max(0, totalWorkedMinutes - Math.max(expectedMinutes, dailyThresholdMinutes));
+                        const overtimeHours = overtimeMinutes / 60;
+                        
+                        if (overtimeHours > 0) {
+                            // Premium rate for weekly off or holidays
+                            if (isWeeklyOffForOT || isHolidayForOT) {
+                                overtime_holiday_hours += overtimeHours;
+                            } else {
+                                overtime_hours += overtimeHours;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error calculating overtime for date ${dateStr}:`, error);
+                }
             }
 
             const expectedPunches = isSingleShift ? 2 : 4;
@@ -732,9 +787,12 @@ export default function RunAnalysisTab({ project }) {
             full_absence_count,
             half_absence_count,
             sick_leave_count,
+            annual_leave_count,
             late_minutes,
             early_checkout_minutes,
             other_minutes,
+            overtime_hours: Math.round(overtime_hours * 100) / 100, // Round to 2 decimals
+            overtime_holiday_hours: Math.round(overtime_holiday_hours * 100) / 100,
             grace_minutes: baseGrace + carriedGrace,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
             notes: criticalDatesFormatted, // Only RED (critical) exceptions
@@ -901,6 +959,8 @@ export default function RunAnalysisTab({ project }) {
                     late_minutes: result.late_minutes,
                     early_checkout_minutes: result.early_checkout_minutes,
                     other_minutes: result.other_minutes,
+                    overtime_hours: result.overtime_hours,
+                    overtime_holiday_hours: result.overtime_holiday_hours,
                     grace_minutes: result.grace_minutes,
                     abnormal_dates: result.abnormal_dates,
                     notes: result.notes,

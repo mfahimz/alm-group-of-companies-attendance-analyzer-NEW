@@ -947,7 +947,7 @@ export default function ReportDetailView({ reportRun, project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'Deductible', 'Notes'];
+        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'OT Hours', 'OT Holiday Hours', 'Deductible', 'Notes'];
         const rows = filteredResults.map(r => {
             const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
             const grace = r.grace_minutes ?? 15;
@@ -963,6 +963,8 @@ export default function ReportDetailView({ reportRun, project }) {
                 r.late_minutes,
                 r.early_checkout_minutes || 0,
                 r.other_minutes || 0,
+                r.overtime_hours?.toFixed(2) || '0.00',
+                r.overtime_holiday_hours?.toFixed(2) || '0.00',
                 deductible,
                 r.notes || ''
             ];
@@ -1396,7 +1398,8 @@ export default function ReportDetailView({ reportRun, project }) {
                 lateInfo: lateInfo || '-',
                 lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
-                otherMinutes: currentOtherMinutes, // Included in breakdown object
+                otherMinutes: currentOtherMinutes,
+                overtimeHours: dayOvertimeHours,
                 hasOverride: !!dayOverride,
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
@@ -1559,8 +1562,14 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
                                         Early Checkout
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}> {/* Added */}
+                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}>
                                         Other Minutes
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="overtime_hours" currentSort={sort} onSort={setSort}>
+                                        OT Hours
+                                    </SortableTableHead>
+                                    <SortableTableHead sortKey="overtime_holiday_hours" currentSort={sort} onSort={setSort}>
+                                        OT Holiday
                                     </SortableTableHead>
                                     <TableHead>Grace</TableHead>
                                     <TableHead>Deductible</TableHead>
@@ -1606,9 +1615,19 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 {result.early_checkout_minutes || 0}
                                             </span>
                                         </TableCell>
-                                        <TableCell> {/* Added */}
+                                        <TableCell>
                                             <span className={`${result.other_minutes > 0 ? 'text-purple-600 font-medium' : ''}`}>
                                                 {result.other_minutes || 0}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className={`${result.overtime_hours > 0 ? 'text-green-600 font-medium' : ''}`}>
+                                                {result.overtime_hours?.toFixed(2) || '0.00'}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className={`${result.overtime_holiday_hours > 0 ? 'text-green-700 font-bold' : ''}`}>
+                                                {result.overtime_holiday_hours?.toFixed(2) || '0.00'}
                                             </span>
                                         </TableCell>
                                         <TableCell>
@@ -1687,7 +1706,8 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <TableHead>Status</TableHead>
                                     <TableHead>Late Min</TableHead>
                                     <TableHead>Early Min</TableHead>
-                                    <TableHead>Other Min</TableHead> {/* Added */}
+                                    <TableHead>Other Min</TableHead>
+                                    <TableHead>OT Hours</TableHead>
                                     <TableHead>Abnormal</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -1771,9 +1791,16 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 <span className="text-slate-400">-</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-xs"> {/* Added */}
+                                        <TableCell className="text-xs">
                                             {day.otherMinutes > 0 ? (
                                                 <span className="text-purple-600 font-medium">{day.otherMinutes} min</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.overtimeHours > 0 ? (
+                                                <span className="text-green-600 font-medium">{day.overtimeHours.toFixed(2)} hrs</span>
                                             ) : (
                                                 <span className="text-slate-400">-</span>
                                             )}
