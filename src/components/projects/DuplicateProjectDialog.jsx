@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
+import ShiftConfirmationDialog from './ShiftConfirmationDialog';
 
 export default function DuplicateProjectDialog({ open, onClose, sourceProject, projects }) {
     const [formData, setFormData] = useState({
@@ -15,6 +16,8 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
         date_from: '',
         date_to: ''
     });
+    const [showShiftConfirmation, setShowShiftConfirmation] = useState(false);
+    const [newProjectData, setNewProjectData] = useState(null);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -72,8 +75,8 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
         onSuccess: (newProject) => {
             queryClient.invalidateQueries(['projects']);
             toast.success('Project duplicated successfully');
-            onClose();
-            navigate(createPageUrl(`ProjectDetail?id=${newProject.id}`));
+            setNewProjectData(newProject);
+            setShowShiftConfirmation(true);
         },
         onError: () => {
             toast.error('Failed to duplicate project');
@@ -117,8 +120,21 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
         duplicateMutation.mutate(formData);
     };
 
+    const handleConfirmShifts = () => {
+        setShowShiftConfirmation(false);
+        onClose();
+        navigate(createPageUrl(`ProjectDetail?id=${newProjectData.id}`));
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onClose}>
+        <>
+            <ShiftConfirmationDialog
+                open={showShiftConfirmation}
+                onClose={() => setShowShiftConfirmation(false)}
+                onConfirm={handleConfirmShifts}
+                projectName={newProjectData?.name}
+            />
+            <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Duplicate Project</DialogTitle>
@@ -169,5 +185,6 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
                 </form>
             </DialogContent>
         </Dialog>
+        </>
     );
 }
