@@ -1207,7 +1207,7 @@ export default function ShiftTimingsTab({ project }) {
             )}
 
             {/* Verification Links Section */}
-            {shifts.length > 0 && !isUser && (
+            {shifts.length > 0 && (userRole === 'admin' || userRole === 'hr_manager') && (
                 <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-purple-50">
                     <CardHeader>
                         <div className="flex items-center justify-between">
