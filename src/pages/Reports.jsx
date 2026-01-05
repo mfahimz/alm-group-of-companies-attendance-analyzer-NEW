@@ -62,7 +62,11 @@ export default function Reports() {
             filtered = filtered.filter(e => e.company === selectedCompany);
         }
         
-        return filtered;
+        return filtered.sort((a, b) => {
+            const nameA = a.name?.toLowerCase() || '';
+            const nameB = b.name?.toLowerCase() || '';
+            return nameA.localeCompare(nameB);
+        });
     }, [allEmployees, currentUser, selectedCompany]);
 
     // Get unique companies
@@ -81,19 +85,36 @@ export default function Reports() {
         }
 
         if (selectedEmployee !== 'all') {
-            filtered = filtered.filter(e => e.attendance_id === selectedEmployee);
+            const employee = allEmployees.find(emp => emp.attendance_id === selectedEmployee);
+            if (employee) {
+                filtered = filtered.filter(e => e.attendance_id === employee.attendance_id);
+            } else {
+                filtered = [];
+            }
         }
 
         if (dateFrom) {
-            filtered = filtered.filter(e => new Date(e.date_from) >= new Date(dateFrom));
+            const fromDate = new Date(dateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            filtered = filtered.filter(e => {
+                const exceptionFrom = new Date(e.date_from);
+                exceptionFrom.setHours(0, 0, 0, 0);
+                return exceptionFrom >= fromDate;
+            });
         }
 
         if (dateTo) {
-            filtered = filtered.filter(e => new Date(e.date_to) <= new Date(dateTo));
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(e => {
+                const exceptionTo = new Date(e.date_to);
+                exceptionTo.setHours(0, 0, 0, 0);
+                return exceptionTo <= toDate;
+            });
         }
 
         return filtered;
-    }, [allExceptions, selectedCompany, selectedEmployee, dateFrom, dateTo, allProjects]);
+    }, [allExceptions, selectedCompany, selectedEmployee, dateFrom, dateTo, allProjects, allEmployees]);
 
     const filteredAnalysisResults = React.useMemo(() => {
         let filtered = allAnalysisResults;
@@ -104,17 +125,29 @@ export default function Reports() {
         }
 
         if (selectedEmployee !== 'all') {
-            filtered = filtered.filter(r => r.attendance_id === selectedEmployee);
+            const employee = allEmployees.find(emp => emp.attendance_id === selectedEmployee);
+            if (employee) {
+                filtered = filtered.filter(r => r.attendance_id === employee.attendance_id);
+            } else {
+                filtered = [];
+            }
         }
 
         return filtered;
-    }, [allAnalysisResults, selectedCompany, selectedEmployee, allProjects]);
+    }, [allAnalysisResults, selectedCompany, selectedEmployee, allProjects, allEmployees]);
 
     // Calculate Exception Metrics
     const exceptionMetrics = React.useMemo(() => {
         const total = filteredExceptions.length;
-        const pending = filteredExceptions.filter(e => e.approval_status === 'pending').length;
-        const approved = filteredExceptions.filter(e => e.approval_status === 'approved').length;
+        const pending = filteredExceptions.filter(e => 
+            e.approval_status === 'pending_dept_head' || 
+            e.approval_status === 'pending_hr' || 
+            e.approval_status === 'pending'
+        ).length;
+        const approved = filteredExceptions.filter(e => 
+            e.approval_status === 'approved' || 
+            e.approval_status === 'approved_dept_head'
+        ).length;
         const rejected = filteredExceptions.filter(e => e.approval_status === 'rejected').length;
         const approvalRate = total > 0 ? ((approved / total) * 100).toFixed(1) : 0;
 
@@ -224,9 +257,13 @@ export default function Reports() {
                         </div>
                         <div>
                             <label className="text-sm font-medium text-slate-700 mb-2 block">Employee</label>
-                            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                            <Select 
+                                value={selectedEmployee} 
+                                onValueChange={setSelectedEmployee}
+                                disabled={employees.length === 0}
+                            >
                                 <SelectTrigger>
-                                    <SelectValue />
+                                    <SelectValue placeholder={employees.length === 0 ? "No employees available" : "Select employee"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Employees</SelectItem>
