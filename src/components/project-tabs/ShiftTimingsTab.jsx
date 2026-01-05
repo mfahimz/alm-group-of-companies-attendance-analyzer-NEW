@@ -1492,11 +1492,11 @@ export default function ShiftTimingsTab({ project }) {
 
             {/* Verification Links Dialog */}
             <Dialog open={showLinksDialog} onOpenChange={setShowLinksDialog}>
-                <DialogContent className="max-w-3xl">
+                <DialogContent className="max-w-3xl max-h-[85vh]">
                     <DialogHeader>
                         <DialogTitle>Shift Verification Links</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+                    <div className="space-y-4 py-4 overflow-y-auto max-h-[calc(85vh-120px)]">
                         <p className="text-sm text-slate-600">
                             Share these links with department heads to verify shift timings. Each link is unique and expires in 7 days.
                         </p>
