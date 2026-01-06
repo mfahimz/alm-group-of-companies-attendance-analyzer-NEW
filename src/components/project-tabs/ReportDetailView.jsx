@@ -39,6 +39,7 @@ export default function ReportDetailView({ reportRun, project }) {
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user';
+    const isAdmin = userRole === 'admin';
 
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
