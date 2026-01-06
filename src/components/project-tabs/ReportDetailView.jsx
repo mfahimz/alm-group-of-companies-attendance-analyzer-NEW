@@ -730,7 +730,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
                 return 0;
             });
-    }, [enrichedResults, searchTerm, sort, riskFilter]);
+    }, [enrichedResults, searchTerm, sort]);
 
     const updateVerificationMutation = useMutation({
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
@@ -840,6 +840,10 @@ export default function ReportDetailView({ reportRun, project }) {
                     ranges.push(currentRange);
 
                     for (const range of ranges) {
+                        // Determine if this edit needs approval
+                        const employee = employees.find(e => e.attendance_id === group.attendance_id);
+                        const needsApproval = isCurrentUserRegular && employee?.company === currentUser?.company;
+
                         // Build detailed description
                         const detailsParts = [];
                         if (group.data.lateMinutes > 0) {
@@ -872,7 +876,7 @@ export default function ReportDetailView({ reportRun, project }) {
                             created_from_report: true,
                             report_run_id: reportRun.id,
                             use_in_analysis: true,
-                            approval_status: 'pending_dept_head'
+                            approval_status: needsApproval ? 'pending' : 'approved'
                         };
 
                         // Store ALL time adjustment fields
@@ -1427,7 +1431,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 otherMinutes: currentOtherMinutes,
-                overtimeHours: 0,
+                overtimeHours: dayOvertimeHours,
                 hasOverride: !!dayOverride,
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
@@ -1907,8 +1911,11 @@ export default function ReportDetailView({ reportRun, project }) {
                             <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
                             <ul className="text-sm text-amber-700 space-y-1">
                                 <li>• All manual edits in daily breakdowns will be converted to exceptions</li>
-                                <li>• All edits will require department head approval before being applied</li>
-                                <li>• Approval links will be automatically generated for department heads</li>
+                                {isUser ? (
+                                    <li>• Your edits will be marked as pending and require admin/supervisor approval</li>
+                                ) : (
+                                    <li>• Admin/supervisor edits will be automatically approved and used in future analysis</li>
+                                )}
                                 <li>• Verification status will be saved for all marked employees</li>
                                 <li>• This action cannot be easily undone</li>
                             </ul>

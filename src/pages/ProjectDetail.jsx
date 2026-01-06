@@ -21,16 +21,12 @@ export default function ProjectDetail() {
     const { data: project, isLoading } = useQuery({
         queryKey: ['project', projectId],
         queryFn: () => base44.entities.Project.filter({ id: projectId }).then(res => res[0]),
-        enabled: !!projectId,
-        staleTime: 2 * 60 * 1000,
-        refetchOnWindowFocus: false
+        enabled: !!projectId
     });
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me(),
-        staleTime: 5 * 60 * 1000,
-        refetchOnWindowFocus: false
+        queryFn: () => base44.auth.me()
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';

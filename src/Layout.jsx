@@ -39,37 +39,34 @@ export default function Layout({ children, currentPageName }) {
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me(),
-        staleTime: 5 * 60 * 1000 // 5 minutes
-    });
+        queryFn: async () => {
+            const user = await base44.auth.me();
+      // Log user activity
+      try {
+        // Try to get IP from external API
+        let ipAddress = 'Unknown';
+        try {
+          const ipResponse = await fetch('https://api.ipify.org?format=json');
+          const ipData = await ipResponse.json();
+          ipAddress = ipData.ip;
+        } catch {}
 
-    // Log activity once when user loads (separate from query to prevent refetch loops)
-    React.useEffect(() => {
-        if (currentUser) {
-            const logActivity = async () => {
-                try {
-                    let ipAddress = 'Unknown';
-                    try {
-                        const ipResponse = await fetch('https://api.ipify.org?format=json');
-                        const ipData = await ipResponse.json();
-                        ipAddress = ipData.ip;
-                    } catch {}
+        await base44.entities.ActivityLog.create({
+          user_email: user.email,
+          user_name: user.full_name,
+          user_role: user.role,
+          ip_address: ipAddress,
+          user_agent: navigator.userAgent,
+          location: 'UAE'
+        });
+      } catch (e) {
 
-                    await base44.entities.ActivityLog.create({
-                        user_email: currentUser.email,
-                        user_name: currentUser.full_name,
-                        user_role: currentUser.role,
-                        ip_address: ipAddress,
-                        user_agent: navigator.userAgent,
-                        location: 'UAE'
-                    });
-                } catch (e) {
-                    // Silent fail
-                }
-            };
-            logActivity();
-        }
-    }, [currentUser?.email]); // Only log once per user session
+
+
+        // Silent fail
+      }return user;
+    }
+  });
 
   const { data: permissions = [] } = useQuery({
     queryKey: ['pagePermissions'],
@@ -82,15 +79,15 @@ export default function Layout({ children, currentPageName }) {
   const isSupervisor = userRole === 'supervisor';
   const canAccessAllCompanies = isAdmin || isSupervisor;
 
-  const hasPageAccess = React.useCallback((pageName) => {
+  const hasPageAccess = (pageName) => {
     if (!currentUser) return false;
     const permission = permissions.find((p) => p.page_name === pageName);
     if (!permission) return true; // If no permission configured, allow by default
     const allowedRoles = permission.allowed_roles.split(',').map((r) => r.trim());
     return allowedRoles.includes(userRole);
-  }, [currentUser, permissions, userRole]);
+  };
 
-  const menuGroups = React.useMemo(() => [
+  const menuGroups = [
   {
     id: 'dashboard',
     name: 'Dashboard',
@@ -134,7 +131,7 @@ export default function Layout({ children, currentPageName }) {
     items: [
     { name: 'My Profile', path: 'UserProfile', icon: UserIcon }]
 
-  }], [isAdmin, isSupervisor, userRole]);
+  }];
 
 
   // Filter menu items based on user permissions
@@ -145,7 +142,7 @@ export default function Layout({ children, currentPageName }) {
       ...group,
       items: group.items.filter((item) => hasPageAccess(item.path))
     })).filter((group) => group.items.length > 0);
-  }, [currentUser, permissions, menuGroups, hasPageAccess]);
+  }, [currentUser, permissions]);
 
   const toggleGroup = (groupId) => {
     setExpandedGroups((prev) => {
@@ -161,21 +158,14 @@ export default function Layout({ children, currentPageName }) {
 
   // Auto-expand category if current page is in it
   React.useEffect(() => {
-      if (currentPageName && filteredMenuGroups.length > 0) {
-          filteredMenuGroups.forEach((group) => {
-              const isCurrentPageInGroup = group.items.some((item) => item.path === currentPageName);
-              if (isCurrentPageInGroup) {
-                  setExpandedGroups((prev) => {
-                      if (!prev.has(group.id)) {
-                          const newSet = new Set(prev);
-                          newSet.add(group.id);
-                          return newSet;
-                      }
-                      return prev;
-                  });
-              }
-          });
-      }
+    if (currentPageName) {
+      filteredMenuGroups.forEach((group) => {
+        const isCurrentPageInGroup = group.items.some((item) => item.path === currentPageName);
+        if (isCurrentPageInGroup) {
+          setExpandedGroups((prev) => new Set([...prev, group.id]));
+        }
+      });
+    }
   }, [currentPageName, filteredMenuGroups]);
 
   // Don't render sidebar until user is loaded

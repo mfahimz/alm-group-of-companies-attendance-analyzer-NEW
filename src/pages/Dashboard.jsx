@@ -17,9 +17,7 @@ import UserDashboard from '../components/dashboard/UserDashboard';
 export default function Dashboard() {
     const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me(),
-        staleTime: 5 * 60 * 1000,
-        refetchOnWindowFocus: false
+        queryFn: () => base44.auth.me()
     });
 
     const { data: allProjects = [], isLoading: projectsLoading } = useQuery({

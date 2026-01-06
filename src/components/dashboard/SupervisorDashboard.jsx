@@ -18,10 +18,7 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                 // Would need to join with project to get company
                 return ex.approval_status === 'pending';
             });
-        },
-        enabled: !!userCompany,
-        staleTime: 2 * 60 * 1000,
-        refetchOnWindowFocus: false
+        }
     });
 
     const teamProjects = projects.filter(p => p.company === userCompany);
