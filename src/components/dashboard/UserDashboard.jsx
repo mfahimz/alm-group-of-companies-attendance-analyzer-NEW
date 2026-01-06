@@ -13,7 +13,10 @@ export default function UserDashboard({ currentUser, projects }) {
         queryFn: async () => {
             const allExceptions = await base44.entities.Exception.list('-created_date');
             return allExceptions.filter(e => e.created_by === currentUser?.email);
-        }
+        },
+        enabled: !!currentUser?.email,
+        staleTime: 2 * 60 * 1000,
+        refetchOnWindowFocus: false
     });
 
     const userProjects = projects.filter(p => p.company === currentUser?.company);
