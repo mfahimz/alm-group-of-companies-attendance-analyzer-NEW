@@ -158,15 +158,27 @@ export default function Layout({ children, currentPageName }) {
 
   // Auto-expand category if current page is in it
   React.useEffect(() => {
-    if (currentPageName) {
-      filteredMenuGroups.forEach((group) => {
-        const isCurrentPageInGroup = group.items.some((item) => item.path === currentPageName);
-        if (isCurrentPageInGroup) {
-          setExpandedGroups((prev) => new Set([...prev, group.id]));
-        }
-      });
-    }
-  }, [currentPageName, filteredMenuGroups]);
+      if (currentPageName && filteredMenuGroups.length > 0) {
+          const groupsToExpand = new Set();
+          filteredMenuGroups.forEach((group) => {
+              const isCurrentPageInGroup = group.items.some((item) => item.path === currentPageName);
+              if (isCurrentPageInGroup) {
+                  groupsToExpand.add(group.id);
+              }
+          });
+
+          if (groupsToExpand.size > 0) {
+              setExpandedGroups((prev) => {
+                  const combined = new Set([...prev, ...groupsToExpand]);
+                  // Only update if actually changed
+                  if (combined.size === prev.size && [...combined].every(id => prev.has(id))) {
+                      return prev;
+                  }
+                  return combined;
+              });
+          }
+      }
+  }, [currentPageName]);
 
   // Don't render sidebar until user is loaded
   if (!currentUser) {
