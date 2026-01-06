@@ -102,15 +102,32 @@ export default function ProjectDetail() {
                             </p>
                         </div>
                     </div>
-                    <span className={`
-                        px-4 py-2.5 rounded-2xl text-sm font-bold uppercase tracking-wider shadow-lg ring-2 whitespace-nowrap
-                        ${project.status === 'draft' ? 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 ring-amber-200' : ''}
-                        ${project.status === 'analyzed' ? 'bg-gradient-to-r from-green-50 to-green-100 text-green-700 ring-green-200' : ''}
-                        ${project.status === 'locked' ? 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 ring-slate-300' : ''}
-                        ${project.status === 'closed' ? 'bg-gradient-to-r from-red-50 to-red-100 text-red-700 ring-red-200' : ''}
-                    `}>
-                        {project.status}
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <span className={`
+                            px-4 py-2.5 rounded-2xl text-sm font-bold uppercase tracking-wider shadow-lg ring-2 whitespace-nowrap
+                            ${project.status === 'draft' ? 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 ring-amber-200' : ''}
+                            ${project.status === 'analyzed' ? 'bg-gradient-to-r from-green-50 to-green-100 text-green-700 ring-green-200' : ''}
+                            ${project.status === 'locked' ? 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 ring-slate-300' : ''}
+                            ${project.status === 'closed' ? 'bg-gradient-to-r from-red-50 to-red-100 text-red-700 ring-red-200' : ''}
+                        `}>
+                            {project.status}
+                        </span>
+                        {project.status === 'closed' && isAdmin && (
+                            <Button
+                                size="sm"
+                                onClick={() => {
+                                    if (window.confirm('Reopen this project? This will allow editing again.')) {
+                                        reopenProjectMutation.mutate();
+                                    }
+                                }}
+                                disabled={reopenProjectMutation.isPending}
+                                className="bg-green-600 hover:bg-green-700"
+                            >
+                                <LockOpen className="w-4 h-4 mr-2" />
+                                Reopen Project
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
 
