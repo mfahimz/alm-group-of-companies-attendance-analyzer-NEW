@@ -1489,21 +1489,21 @@ export default function ReportDetailView({ reportRun, project }) {
                         </div>
                         <div className="flex gap-2">
                            <Button
-                               onClick={exportToExcel}
-                               variant="outline"
+                              onClick={exportToExcel}
+                              variant="outline"
                            >
-                               <Download className="w-4 h-4 mr-2" />
-                               Export
+                              <Download className="w-4 h-4 mr-2" />
+                              Export
                            </Button>
-                           {project.status !== 'closed' && (
-                               <Button
-                                   onClick={() => setShowSaveConfirmation(true)}
-                                   disabled={isSaving}
-                                   className="bg-green-600 hover:bg-green-700"
-                               >
-                                   <Save className="w-4 h-4 mr-2" />
-                                   {isSaving ? 'Saving...' : 'Save Report'}
-                               </Button>
+                           {(project.status !== 'closed' || isAdmin) && (
+                              <Button
+                                  onClick={() => setShowSaveConfirmation(true)}
+                                  disabled={isSaving}
+                                  className="bg-green-600 hover:bg-green-700"
+                              >
+                                  <Save className="w-4 h-4 mr-2" />
+                                  {isSaving ? 'Saving...' : 'Save Report'}
+                              </Button>
                            )}
                         </div>
                     </div>
