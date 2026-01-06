@@ -730,7 +730,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
                 return 0;
             });
-    }, [enrichedResults, searchTerm, sort]);
+    }, [enrichedResults, searchTerm, sort, riskFilter]);
 
     const updateVerificationMutation = useMutation({
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
@@ -1427,7 +1427,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 otherMinutes: currentOtherMinutes,
-                overtimeHours: dayOvertimeHours,
+                overtimeHours: 0,
                 hasOverride: !!dayOverride,
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
