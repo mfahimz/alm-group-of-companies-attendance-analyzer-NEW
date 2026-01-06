@@ -31,11 +31,26 @@ export default function ProjectDetail() {
         queryFn: () => base44.auth.me()
     });
 
+    const queryClient = useQueryClient();
+    
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
     const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
+
+    const reopenProjectMutation = useMutation({
+        mutationFn: async () => {
+            await base44.entities.Project.update(project.id, { status: 'analyzed' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['project', projectId]);
+            toast.success('Project reopened successfully');
+        },
+        onError: () => {
+            toast.error('Failed to reopen project');
+        }
+    });
 
     if (isLoading) {
         return (
