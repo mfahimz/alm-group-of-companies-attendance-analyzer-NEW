@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Copy, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     const [selectedLink, setSelectedLink] = useState(null);
