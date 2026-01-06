@@ -13,13 +13,17 @@ export default function NotificationCenter() {
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
+        queryFn: () => base44.auth.me(),
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false
     });
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['pendingExceptions'],
         queryFn: () => base44.entities.Exception.filter({ approval_status: 'pending' }),
-        enabled: !!currentUser
+        enabled: !!currentUser,
+        staleTime: 60 * 1000,
+        refetchInterval: 60 * 1000
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
