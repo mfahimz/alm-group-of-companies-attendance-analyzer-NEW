@@ -1957,7 +1957,9 @@ export default function ReportDetailView({ reportRun, project }) {
                             </p>
                         </div>
                         
-                        {approvalLinks.map((link, idx) => (
+                        {approvalLinks.map((link, idx) => {
+                            const appUrl = window.location.origin;
+                            return (
                             <Card key={idx} className="border-indigo-200 bg-indigo-50">
                                 <CardContent className="p-4 space-y-3">
                                     <div className="flex items-center justify-between">
@@ -1978,7 +1980,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                             <Label className="text-xs text-slate-600">Approval Link</Label>
                                             <div className="flex gap-2 mt-1">
                                                 <Input
-                                                    value={`${window.location.origin}/DeptHeadApproval?token=${link.link_token}`}
+                                                    value={`${appUrl}/DeptHeadApproval?token=${link.link_token}`}
                                                     readOnly
                                                     className="font-mono text-xs"
                                                 />
@@ -1986,7 +1988,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={() => {
-                                                        navigator.clipboard.writeText(`${window.location.origin}/DeptHeadApproval?token=${link.link_token}`);
+                                                        navigator.clipboard.writeText(`${appUrl}/DeptHeadApproval?token=${link.link_token}`);
                                                         toast.success('Link copied to clipboard');
                                                     }}
                                                 >
@@ -2018,7 +2020,8 @@ export default function ReportDetailView({ reportRun, project }) {
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
+                        );
+                        })}
                     </div>
                     <div className="flex justify-end">
                         <Button onClick={() => setShowLinksDialog(false)}>Close</Button>
