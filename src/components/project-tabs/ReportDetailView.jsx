@@ -1687,7 +1687,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                             {result.notes || '-'}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {project.status === 'closed' || !currentUser ? (
+                                            {(project.status === 'closed' && !isAdmin) || !currentUser ? (
                                                 <span className="text-xs text-slate-400">—</span>
                                             ) : (
                                                 <Button
