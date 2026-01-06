@@ -39,34 +39,37 @@ export default function Layout({ children, currentPageName }) {
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: async () => {
-            const user = await base44.auth.me();
-      // Log user activity
-      try {
-        // Try to get IP from external API
-        let ipAddress = 'Unknown';
-        try {
-          const ipResponse = await fetch('https://api.ipify.org?format=json');
-          const ipData = await ipResponse.json();
-          ipAddress = ipData.ip;
-        } catch {}
+        queryFn: () => base44.auth.me(),
+        staleTime: 5 * 60 * 1000 // 5 minutes
+    });
 
-        await base44.entities.ActivityLog.create({
-          user_email: user.email,
-          user_name: user.full_name,
-          user_role: user.role,
-          ip_address: ipAddress,
-          user_agent: navigator.userAgent,
-          location: 'UAE'
-        });
-      } catch (e) {
+    // Log activity once when user loads (separate from query to prevent refetch loops)
+    React.useEffect(() => {
+        if (currentUser) {
+            const logActivity = async () => {
+                try {
+                    let ipAddress = 'Unknown';
+                    try {
+                        const ipResponse = await fetch('https://api.ipify.org?format=json');
+                        const ipData = await ipResponse.json();
+                        ipAddress = ipData.ip;
+                    } catch {}
 
-
-
-        // Silent fail
-      }return user;
-    }
-  });
+                    await base44.entities.ActivityLog.create({
+                        user_email: currentUser.email,
+                        user_name: currentUser.full_name,
+                        user_role: currentUser.role,
+                        ip_address: ipAddress,
+                        user_agent: navigator.userAgent,
+                        location: 'UAE'
+                    });
+                } catch (e) {
+                    // Silent fail
+                }
+            };
+            logActivity();
+        }
+    }, [currentUser?.email]); // Only log once per user session
 
   const { data: permissions = [] } = useQuery({
     queryKey: ['pagePermissions'],
