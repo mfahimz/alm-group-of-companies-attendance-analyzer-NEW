@@ -927,40 +927,28 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
             }
 
-            // Generate approval links if there are pending exceptions
-            const hasPendingExceptions = exceptionsToCreate.some(e => e.approval_status === 'pending_dept_head' || e.approval_status === 'pending');
-            
-            if (hasPendingExceptions) {
-                setSaveProgress({ current: 100, total: 100, status: 'Generating approval links...' });
-                
-                try {
-                    const response = await base44.functions.invoke('generateApprovalLinks', {
-                        report_run_id: reportRun.id,
-                        project_id: project.id,
-                        company: project.company
-                    });
-                    
-                    if (response.data.success && response.data.links.length > 0) {
-                        return { exceptionCount: exceptionsToCreate.length, links: response.data.links };
-                    }
-                } catch (linkError) {
-                    console.error('Failed to generate approval links:', linkError);
-                }
-            }
-
-            return { exceptionCount: exceptionsToCreate.length, links: [] };
+            return exceptionsToCreate.length;
         },
-        onSuccess: (result) => {
+        onSuccess: async (exceptionCount) => {
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
-            queryClient.invalidateQueries(['approvalLinks']);
+            toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
             
-            if (result.links && result.links.length > 0) {
-                setApprovalLinks(result.links);
-                setShowLinksDialog(true);
-                toast.success(`Report saved! ${result.exceptionCount} exception${result.exceptionCount !== 1 ? 's' : ''} created. ${result.links.length} approval link${result.links.length !== 1 ? 's' : ''} generated.`);
-            } else {
-                toast.success(`Report saved! ${result.exceptionCount} exception${result.exceptionCount !== 1 ? 's' : ''} created from edits.`);
+            // Try to generate approval links after save
+            try {
+                const response = await base44.functions.invoke('generateApprovalLinks', {
+                    report_run_id: reportRun.id,
+                    project_id: project.id,
+                    company: project.company
+                });
+                
+                if (response.data.success && response.data.links && response.data.links.length > 0) {
+                    setApprovalLinks(response.data.links);
+                    setShowLinksDialog(true);
+                    queryClient.invalidateQueries(['approvalLinks']);
+                }
+            } catch (linkError) {
+                console.error('Failed to generate approval links:', linkError);
             }
             
             setIsSaving(false);
