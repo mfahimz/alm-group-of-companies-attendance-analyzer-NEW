@@ -82,15 +82,15 @@ export default function Layout({ children, currentPageName }) {
   const isSupervisor = userRole === 'supervisor';
   const canAccessAllCompanies = isAdmin || isSupervisor;
 
-  const hasPageAccess = (pageName) => {
+  const hasPageAccess = React.useCallback((pageName) => {
     if (!currentUser) return false;
     const permission = permissions.find((p) => p.page_name === pageName);
     if (!permission) return true; // If no permission configured, allow by default
     const allowedRoles = permission.allowed_roles.split(',').map((r) => r.trim());
     return allowedRoles.includes(userRole);
-  };
+  }, [currentUser, permissions, userRole]);
 
-  const menuGroups = [
+  const menuGroups = React.useMemo(() => [
   {
     id: 'dashboard',
     name: 'Dashboard',
@@ -134,7 +134,7 @@ export default function Layout({ children, currentPageName }) {
     items: [
     { name: 'My Profile', path: 'UserProfile', icon: UserIcon }]
 
-  }];
+  }], [isAdmin, isSupervisor, userRole]);
 
 
   // Filter menu items based on user permissions
@@ -145,7 +145,7 @@ export default function Layout({ children, currentPageName }) {
       ...group,
       items: group.items.filter((item) => hasPageAccess(item.path))
     })).filter((group) => group.items.length > 0);
-  }, [currentUser, permissions]);
+  }, [currentUser, permissions, menuGroups, hasPageAccess]);
 
   const toggleGroup = (groupId) => {
     setExpandedGroups((prev) => {
