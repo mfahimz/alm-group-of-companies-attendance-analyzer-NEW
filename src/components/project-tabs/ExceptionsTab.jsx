@@ -109,65 +109,21 @@ export default function ExceptionsTab({ project }) {
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
-            // Auto-approval rules: exceptions under 30 min auto-approve
-            let approvalStatus = 'approved';
-            if (isUser) {
-                const totalMinutes = (data.late_minutes || 0) + (data.early_checkout_minutes || 0) + (data.other_minutes || 0);
-                approvalStatus = totalMinutes <= 30 ? 'approved' : 'pending';
-            }
-            
+            // All exceptions are now auto-approved
             const exceptionData = {
                 ...data,
                 project_id: project.id,
-                approval_status: approvalStatus
+                approval_status: 'approved'
             };
             
-            const newException = await base44.entities.Exception.create(exceptionData);
-            
-            // Send email to admins and supervisors if user created the exception
-            if (isUser) {
-                const adminsAndSupervisors = allUsers.filter(u => {
-                    const uRole = u.extended_role || u.role;
-                    return uRole === 'admin' || uRole === 'supervisor';
-                });
-                
-                for (const user of adminsAndSupervisors) {
-                    try {
-                        await base44.integrations.Core.SendEmail({
-                            to: user.email,
-                            subject: `New Exception Request Pending Approval - ${project.name}`,
-                            body: `
-Hello ${user.full_name},
-
-A new exception has been created and requires your approval.
-
-Created by: ${currentUser.full_name} (${currentUser.email})
-Project: ${project.name}
-Exception Type: ${data.type}
-Date Range: ${data.date_from} to ${data.date_to}
-${data.details ? `Details: ${data.details}` : ''}
-
-Please log in to the system to review and approve/reject this exception.
-
-Thank you.
-                            `
-                        });
-                    } catch (e) {
-                        console.error('Failed to send email:', e);
-                    }
-                }
-            }
-
-            return newException;
-            },
-            onSuccess: (data, variables) => {
+            return await base44.entities.Exception.create(exceptionData);
+        },
+        onSuccess: () => {
             queryClient.invalidateQueries(['exceptions', project.id]);
-            const totalMinutes = (variables.late_minutes || 0) + (variables.early_checkout_minutes || 0) + (variables.other_minutes || 0);
-            const autoApproved = isUser && totalMinutes <= 30;
-            toast.success(autoApproved ? 'Exception auto-approved (≤30 min)' : isUser ? 'Exception submitted for approval' : 'Exception added successfully');
+            toast.success('Exception added successfully');
             setShowForm(false);
             resetForm();
-            },
+        },
         onError: (error) => {
             toast.error('Failed to add exception: ' + (error.message || 'Unknown error'));
         }
@@ -937,15 +893,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             <TableCell className="p-1">
                                                 <div className="text-sm">
                                                     {exception.type.replace(/_/g, ' ')}
-                                                    {exception.approval_status === 'pending' && (
-                                                        <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Pending</span>
-                                                    )}
-                                                    {exception.approval_status === 'approved' && (
-                                                        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">Approved</span>
-                                                    )}
-                                                    {exception.approval_status === 'rejected' && (
-                                                        <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">Rejected</span>
-                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="p-1 text-sm">
