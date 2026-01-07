@@ -1419,7 +1419,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 otherMinutes: currentOtherMinutes,
-                overtimeHours: dayOvertimeHours,
+                overtimeHours: 0,
                 hasOverride: !!dayOverride,
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
