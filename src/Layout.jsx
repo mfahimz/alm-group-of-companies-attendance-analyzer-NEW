@@ -104,7 +104,6 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Projects', path: 'Projects', icon: FolderKanban },
     { name: 'Employees', path: 'Employees', icon: Users },
     ...(isAdmin || isSupervisor ? [{ name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 }] : []),
-    ...(isAdmin || isSupervisor ? [{ name: 'Exception Approvals', path: 'ExceptionApprovals', icon: Shield }] : []),
     ...(userRole === 'hr_manager' ? [{ name: 'HR Manager Approval', path: 'HRManagerApproval', icon: Shield }] : []),
     ...(isAdmin ? [{ name: 'Astra Import', path: 'AstraImport', icon: FileSpreadsheet }] : [])]
 

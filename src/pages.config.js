@@ -8,7 +8,6 @@ import Diagnostics from './pages/Diagnostics';
 import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
-import ExceptionApprovals from './pages/ExceptionApprovals';
 import HRManagerApproval from './pages/HRManagerApproval';
 import Home from './pages/Home';
 import ProjectDetail from './pages/ProjectDetail';
@@ -34,7 +33,6 @@ export const PAGES = {
     "Documentation": Documentation,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
-    "ExceptionApprovals": ExceptionApprovals,
     "HRManagerApproval": HRManagerApproval,
     "Home": Home,
     "ProjectDetail": ProjectDetail,

@@ -840,9 +840,8 @@ export default function ReportDetailView({ reportRun, project }) {
                     ranges.push(currentRange);
 
                     for (const range of ranges) {
-                        // Determine if this edit needs approval
-                        const employee = employees.find(e => e.attendance_id === group.attendance_id);
-                        const needsApproval = isCurrentUserRegular && employee?.company === currentUser?.company;
+                        // All edits are auto-approved now
+                        const needsApproval = false;
 
                         // Build detailed description
                         const detailsParts = [];
