@@ -4,29 +4,34 @@ import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { AlertTriangle, Trash2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function CloseProjectDialog({ open, onClose, project, lastSavedReport }) {
     const [deleteProgress, setDeleteProgress] = useState(null);
+    const [captureGraceMinutes, setCaptureGraceMinutes] = useState(true);
     const queryClient = useQueryClient();
 
     const closeProjectMutation = useMutation({
         mutationFn: async () => {
-            // Step 1: Update employee grace minutes from last report
-            setDeleteProgress({ phase: 'Updating employee grace minutes...', percent: 20 });
-            const results = await base44.entities.AnalysisResult.filter({ report_run_id: lastSavedReport.id });
-            const employees = await base44.entities.Employee.filter({ company: project.company });
-            
-            for (const result of results) {
-                const employee = employees.find(e => e.attendance_id === result.attendance_id);
-                if (employee) {
-                    const usedMinutes = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
-                    const remainingGrace = Math.max(0, (result.grace_minutes || 0) - usedMinutes);
-                    
-                    await base44.entities.Employee.update(employee.id, {
-                        carried_grace_minutes: remainingGrace
-                    });
+            // Step 1: Update employee grace minutes from last report (if enabled)
+            if (captureGraceMinutes) {
+                setDeleteProgress({ phase: 'Updating employee grace minutes...', percent: 20 });
+                const results = await base44.entities.AnalysisResult.filter({ report_run_id: lastSavedReport.id });
+                const employees = await base44.entities.Employee.filter({ company: project.company });
+                
+                for (const result of results) {
+                    const employee = employees.find(e => e.attendance_id === result.attendance_id);
+                    if (employee) {
+                        const usedMinutes = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                        const remainingGrace = Math.max(0, (result.grace_minutes || 0) - usedMinutes);
+                        
+                        await base44.entities.Employee.update(employee.id, {
+                            carried_grace_minutes: remainingGrace
+                        });
+                    }
                 }
             }
 
@@ -53,7 +58,10 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['punches', project.id]);
             queryClient.invalidateQueries(['employees']);
-            toast.success(`Project closed. Grace minutes updated for all employees. ${result.deleted_count} punch records deleted.`);
+            const message = captureGraceMinutes 
+                ? `Project closed. Grace minutes updated for all employees. ${result.deleted_count} punch records deleted.`
+                : `Project closed. ${result.deleted_count} punch records deleted.`;
+            toast.success(message);
             setDeleteProgress(null);
             onClose();
         },
@@ -129,6 +137,27 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                             </CardContent>
                         </Card>
                     )}
+
+                    {/* Grace Minutes Capture Option */}
+                    <Card className="border-slate-200 bg-slate-50">
+                        <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                                <Checkbox
+                                    id="capture-grace"
+                                    checked={captureGraceMinutes}
+                                    onCheckedChange={setCaptureGraceMinutes}
+                                />
+                                <div className="flex-1">
+                                    <Label htmlFor="capture-grace" className="cursor-pointer font-medium text-slate-900">
+                                        Capture unused grace minutes for next project
+                                    </Label>
+                                    <p className="text-sm text-slate-600 mt-1">
+                                        Calculate remaining grace minutes from this report and carry them forward to each employee's profile for future projects.
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {/* Confirmation Question */}
                     <p className="text-slate-700 font-medium">
