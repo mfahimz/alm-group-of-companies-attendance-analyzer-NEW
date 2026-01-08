@@ -953,9 +953,14 @@ export default function ReportDetailView({ reportRun, project }) {
                         queryClient.invalidateQueries(['approvalLinks']);
                         toast.success(`Approval links generated for ${response.data.links.length} department${response.data.links.length !== 1 ? 's' : ''}`);
                     } else if (response.data.warnings && response.data.warnings.length > 0) {
-                        toast.warning(`No links generated: ${response.data.warnings[0]}`);
+                        // Show all warnings to help debug
+                        response.data.warnings.forEach(warning => toast.warning(warning));
                     } else if (response.data.skipped_exceptions && response.data.skipped_exceptions.length > 0) {
-                        toast.warning(`Some exceptions skipped: ${response.data.skipped_exceptions[0].reason}`);
+                        // Show why exceptions were skipped
+                        const reasons = response.data.skipped_exceptions.map(s => 
+                            `${s.attendance_id || s.employee_name}: ${s.reason}`
+                        ).join('\n');
+                        toast.warning(`Exceptions skipped:\n${reasons}`);
                     } else if (response.data.message) {
                         toast.info(response.data.message);
                     }
