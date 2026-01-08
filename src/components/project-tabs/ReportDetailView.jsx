@@ -949,6 +949,10 @@ export default function ReportDetailView({ reportRun, project }) {
                         setShowLinksDialog(true);
                         queryClient.invalidateQueries(['approvalLinks']);
                         toast.success(`Approval links generated for ${response.data.links.length} department${response.data.links.length !== 1 ? 's' : ''}`);
+                    } else if (response.data.warnings && response.data.warnings.length > 0) {
+                        toast.warning(`No links generated: ${response.data.warnings[0]}`);
+                    } else if (response.data.skipped_exceptions && response.data.skipped_exceptions.length > 0) {
+                        toast.warning(`Some exceptions skipped: ${response.data.skipped_exceptions[0].reason}`);
                     } else if (response.data.message) {
                         toast.info(response.data.message);
                     }

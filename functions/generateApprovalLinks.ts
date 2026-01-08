@@ -41,14 +41,23 @@ Deno.serve(async (req) => {
 
         // Group exceptions by department
         const exceptionsByDept = {};
+        const skippedExceptions = [];
+        
         for (const exception of pendingExceptions) {
             const employee = employees.find(e => e.attendance_id === exception.attendance_id);
-            if (employee && employee.department) {
-                if (!exceptionsByDept[employee.department]) {
-                    exceptionsByDept[employee.department] = [];
-                }
-                exceptionsByDept[employee.department].push(exception);
+            if (!employee) {
+                skippedExceptions.push({ exception_id: exception.id, reason: 'Employee not found', attendance_id: exception.attendance_id });
+                continue;
             }
+            if (!employee.department) {
+                skippedExceptions.push({ exception_id: exception.id, reason: 'No department assigned', employee_name: employee.name });
+                continue;
+            }
+            
+            if (!exceptionsByDept[employee.department]) {
+                exceptionsByDept[employee.department] = [];
+            }
+            exceptionsByDept[employee.department].push(exception);
         }
 
         // Get department heads
@@ -62,12 +71,13 @@ Deno.serve(async (req) => {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + validityDays);
         const processedDeptHeads = new Set();
+        const warnings = [];
 
         for (const department of Object.keys(exceptionsByDept)) {
             const deptHeadsForDept = deptHeads.filter(dh => dh.department === department);
             
             if (deptHeadsForDept.length === 0) {
-                // No department head assigned, skip this department
+                warnings.push(`No department head assigned for ${department} department (${exceptionsByDept[department].length} exceptions skipped)`);
                 continue;
             }
 
@@ -86,7 +96,10 @@ Deno.serve(async (req) => {
                     });
                 }
 
-                if (relevantExceptions.length === 0) continue;
+                if (relevantExceptions.length === 0) {
+                    warnings.push(`Department head for ${department} has no managed employees matching the exceptions`);
+                    continue;
+                }
 
             // Generate unique token
             const token = crypto.randomUUID();
@@ -135,8 +148,12 @@ Deno.serve(async (req) => {
 
         return Response.json({
             success: true,
-            message: `Generated ${links.length} approval links`,
+            message: links.length > 0 
+                ? `Generated ${links.length} approval link${links.length !== 1 ? 's' : ''}` 
+                : 'No approval links generated',
             links,
+            warnings,
+            skipped_exceptions: skippedExceptions,
             validity_days: validityDays
         });
 
