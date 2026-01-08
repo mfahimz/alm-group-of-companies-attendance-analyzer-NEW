@@ -15,11 +15,8 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
         }
 
-        // Get link validity duration from settings (default: 3 days)
-        const settingsList = await base44.asServiceRole.entities.SystemSettings.filter({ 
-            setting_key: 'approval_link_validity_days' 
-        });
-        const validityDays = settingsList.length > 0 ? parseInt(settingsList[0].setting_value) : 3;
+        // Set link validity to 1 day (24 hours)
+        const validityDays = 1;
 
         // Get all exceptions for this report that need approval
         const exceptions = await base44.asServiceRole.entities.Exception.filter({
