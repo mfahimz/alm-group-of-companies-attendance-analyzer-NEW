@@ -933,21 +933,29 @@ export default function ReportDetailView({ reportRun, project }) {
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
             
-            // Try to generate approval links after save
-            try {
-                const response = await base44.functions.invoke('generateApprovalLinks', {
-                    report_run_id: reportRun.id,
-                    project_id: project.id,
-                    company: project.company
-                });
-                
-                if (response.data.success && response.data.links && response.data.links.length > 0) {
-                    setApprovalLinks(response.data.links);
-                    setShowLinksDialog(true);
-                    queryClient.invalidateQueries(['approvalLinks']);
+            // Always try to generate approval links after save if there were edits
+            if (exceptionCount > 0) {
+                try {
+                    setSaveProgress({ current: 100, total: 100, status: 'Generating approval links...' });
+                    
+                    const response = await base44.functions.invoke('generateApprovalLinks', {
+                        report_run_id: reportRun.id,
+                        project_id: project.id,
+                        company: project.company
+                    });
+                    
+                    if (response.data.success && response.data.links && response.data.links.length > 0) {
+                        setApprovalLinks(response.data.links);
+                        setShowLinksDialog(true);
+                        queryClient.invalidateQueries(['approvalLinks']);
+                        toast.success(`Approval links generated for ${response.data.links.length} department${response.data.links.length !== 1 ? 's' : ''}`);
+                    } else if (response.data.message) {
+                        toast.info(response.data.message);
+                    }
+                } catch (linkError) {
+                    console.error('Failed to generate approval links:', linkError);
+                    toast.error('Failed to generate approval links: ' + linkError.message);
                 }
-            } catch (linkError) {
-                console.error('Failed to generate approval links:', linkError);
             }
             
             setIsSaving(false);

@@ -26,12 +26,26 @@ export default function DeptHeadApproval() {
         }
     }, []);
 
-    const { data: approvalLink, isLoading: linkLoading } = useQuery({
+    const { data: approvalLink, isLoading: linkLoading, error: linkError } = useQuery({
         queryKey: ['approvalLink', token],
         queryFn: async () => {
             const links = await base44.entities.ApprovalLink.filter({ link_token: token });
-            if (links.length === 0) throw new Error('Invalid or expired link');
-            return links[0];
+            if (links.length === 0) throw new Error('LINK_NOT_FOUND');
+            
+            const link = links[0];
+            
+            // Check if expired
+            const expiresAt = new Date(link.expires_at);
+            if (new Date() > expiresAt) {
+                throw new Error('LINK_EXPIRED');
+            }
+            
+            // Check if already used
+            if (link.used) {
+                throw new Error('LINK_USED');
+            }
+            
+            return link;
         },
         enabled: !!token && !isVerified,
         retry: false
@@ -94,17 +108,6 @@ export default function DeptHeadApproval() {
     const verifyMutation = useMutation({
         mutationFn: async () => {
             if (!approvalLink) throw new Error('No link data');
-            
-            // Check if link is expired
-            const expiresAt = new Date(approvalLink.expires_at);
-            if (new Date() > expiresAt) {
-                throw new Error('This link has expired');
-            }
-
-            // Check if link was already used
-            if (approvalLink.used) {
-                throw new Error('This link has already been used');
-            }
 
             // Verify code
             if (verificationCode !== approvalLink.verification_code) {
@@ -201,6 +204,47 @@ export default function DeptHeadApproval() {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-slate-500">Loading...</div>
+            </div>
+        );
+    }
+
+    // Handle link errors with custom branding
+    if (linkError) {
+        const errorType = linkError.message;
+        let errorTitle = 'Link Error';
+        let errorMessage = 'This approval link is invalid or has expired.';
+        
+        if (errorType === 'LINK_EXPIRED') {
+            errorTitle = 'Link Expired';
+            errorMessage = 'This approval link has expired. Links are valid for 24 hours after generation. Please contact your administrator to generate a new approval link.';
+        } else if (errorType === 'LINK_USED') {
+            errorTitle = 'Link Already Used';
+            errorMessage = 'This approval link has already been used. Each link can only be used once for security reasons.';
+        } else if (errorType === 'LINK_NOT_FOUND') {
+            errorTitle = 'Invalid Link';
+            errorMessage = 'This approval link is invalid. Please check the link and try again, or contact your administrator.';
+        }
+        
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
+                <Card className="w-full max-w-md border-red-200 bg-white shadow-xl">
+                    <CardHeader className="text-center pb-6">
+                        <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                            <XCircle className="w-10 h-10 text-red-600" />
+                        </div>
+                        <CardTitle className="text-2xl font-bold text-slate-900">{errorTitle}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center space-y-4">
+                        <p className="text-slate-600 leading-relaxed">
+                            {errorMessage}
+                        </p>
+                        <div className="pt-4 border-t">
+                            <p className="text-sm text-slate-500">
+                                ALM Attendance Management System
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
