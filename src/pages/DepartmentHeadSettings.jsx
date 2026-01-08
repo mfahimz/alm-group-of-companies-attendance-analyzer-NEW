@@ -480,6 +480,7 @@ export default function DepartmentHeadSettings() {
                                     <TableHead>Department</TableHead>
                                     <TableHead>Department Head</TableHead>
                                     <TableHead>Managed Employees</TableHead>
+                                    <TableHead>Pending/Links</TableHead>
                                     <TableHead>Reports To</TableHead>
                                     <TableHead>Actions</TableHead>
                                 </TableRow>
@@ -526,7 +527,7 @@ export default function DepartmentHeadSettings() {
                                                         </div>
                                                     )}
                                                     {stats.pendingExceptions === 0 && stats.pendingLinks === 0 && stats.approvedLinks === 0 && (
-                                                        <span className="text-xs text-slate-400">No activity</span>
+                                                        <span className="text-xs text-slate-400">—</span>
                                                     )}
                                                 </div>
                                             </TableCell>
