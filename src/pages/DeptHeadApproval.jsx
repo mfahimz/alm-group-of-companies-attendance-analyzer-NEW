@@ -17,6 +17,11 @@ export default function DeptHeadApproval() {
     const [linkData, setLinkData] = useState(null);
     const queryClient = useQueryClient();
 
+    // Set page title
+    React.useEffect(() => {
+        document.title = 'Department Head Approval - ALM Attendance';
+    }, []);
+
     // Get token from URL
     React.useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -29,7 +34,7 @@ export default function DeptHeadApproval() {
     const { data: approvalLink, isLoading: linkLoading, error: linkError } = useQuery({
         queryKey: ['approvalLink', token],
         queryFn: async () => {
-            const links = await base44.entities.ApprovalLink.filter({ link_token: token });
+            const links = await base44.asServiceRole.entities.ApprovalLink.filter({ link_token: token });
             if (links.length === 0) throw new Error('LINK_NOT_FOUND');
             
             const link = links[0];
@@ -54,7 +59,7 @@ export default function DeptHeadApproval() {
     const { data: deptHead } = useQuery({
         queryKey: ['deptHead', linkData?.department_head_id],
         queryFn: async () => {
-            const deptHeads = await base44.entities.DepartmentHead.filter({
+            const deptHeads = await base44.asServiceRole.entities.DepartmentHead.filter({
                 employee_id: linkData.department_head_id,
                 active: true
             });
@@ -66,13 +71,13 @@ export default function DeptHeadApproval() {
     const { data: exceptions = [], isLoading: exceptionsLoading } = useQuery({
         queryKey: ['deptExceptions', linkData?.report_run_id, linkData?.department, deptHead?.id],
         queryFn: async () => {
-            const allExceptions = await base44.entities.Exception.filter({
+            const allExceptions = await base44.asServiceRole.entities.Exception.filter({
                 report_run_id: linkData.report_run_id,
                 approval_status: 'pending_dept_head'
             });
             
             // Get employees
-            const employees = await base44.entities.Employee.filter({ 
+            const employees = await base44.asServiceRole.entities.Employee.filter({ 
                 company: linkData.company 
             });
             
@@ -101,7 +106,7 @@ export default function DeptHeadApproval() {
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', linkData?.company],
-        queryFn: () => base44.entities.Employee.filter({ company: linkData.company }),
+        queryFn: () => base44.asServiceRole.entities.Employee.filter({ company: linkData.company }),
         enabled: isVerified && !!linkData
     });
 
@@ -128,7 +133,7 @@ export default function DeptHeadApproval() {
 
     const approveMutation = useMutation({
         mutationFn: async (exceptionId) => {
-            await base44.entities.Exception.update(exceptionId, {
+            await base44.asServiceRole.entities.Exception.update(exceptionId, {
                 approval_status: 'approved_dept_head',
                 approved_by_dept_head: linkData.department_head_id,
                 dept_head_approval_date: new Date().toISOString()
@@ -146,7 +151,7 @@ export default function DeptHeadApproval() {
     const approveAllMutation = useMutation({
         mutationFn: async () => {
             for (const exception of exceptions) {
-                await base44.entities.Exception.update(exception.id, {
+                await base44.asServiceRole.entities.Exception.update(exception.id, {
                     approval_status: 'approved_dept_head',
                     approved_by_dept_head: linkData.department_head_id,
                     dept_head_approval_date: new Date().toISOString()
@@ -154,7 +159,7 @@ export default function DeptHeadApproval() {
             }
 
             // Mark link as used
-            await base44.entities.ApprovalLink.update(approvalLink.id, {
+            await base44.asServiceRole.entities.ApprovalLink.update(approvalLink.id, {
                 used: true,
                 used_at: new Date().toISOString(),
                 approved: true
