@@ -46,11 +46,20 @@ Deno.serve(async (req) => {
         for (const exception of pendingExceptions) {
             const employee = employees.find(e => e.attendance_id === exception.attendance_id);
             if (!employee) {
-                skippedExceptions.push({ exception_id: exception.id, reason: 'Employee not found', attendance_id: exception.attendance_id });
+                skippedExceptions.push({ 
+                    exception_id: exception.id, 
+                    reason: 'Employee not found', 
+                    attendance_id: exception.attendance_id 
+                });
                 continue;
             }
-            if (!employee.department) {
-                skippedExceptions.push({ exception_id: exception.id, reason: 'No department assigned', employee_name: employee.name });
+            if (!employee.department || employee.department.trim() === '') {
+                skippedExceptions.push({ 
+                    exception_id: exception.id, 
+                    reason: 'No department assigned', 
+                    employee_name: employee.name,
+                    attendance_id: employee.attendance_id
+                });
                 continue;
             }
             
