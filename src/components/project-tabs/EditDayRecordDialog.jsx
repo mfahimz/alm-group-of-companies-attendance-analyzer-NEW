@@ -427,9 +427,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 console.error('Failed to log audit:', e);
             }
         },
-        onSuccess: async () => {
-            await queryClient.invalidateQueries(['results', project.id]);
-            await queryClient.refetchQueries(['results', project.id]);
+        onSuccess: () => {
+            queryClient.invalidateQueries(['results', project.id]);
             toast.success(isUser ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');
             if (onSave) onSave();
             onClose();
