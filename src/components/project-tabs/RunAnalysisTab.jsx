@@ -935,6 +935,15 @@ export default function RunAnalysisTab({ project }) {
             const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
             const allResults = [];
+            // Create report run FIRST to get the report_run_id
+            const reportRun = await base44.entities.ReportRun.create({
+                project_id: project.id,
+                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
+                date_from: dateFrom,
+                date_to: dateTo,
+                employee_count: uniqueEmployeeIds.length
+            });
+
             for (let i = 0; i < uniqueEmployeeIds.length; i++) {
                 const attendance_id = uniqueEmployeeIds[i];
                 const employee = employees.find(e => e.attendance_id === attendance_id);
@@ -949,6 +958,7 @@ export default function RunAnalysisTab({ project }) {
                 const result = await analyzeEmployee(attendance_id);
                 allResults.push({
                     project_id: project.id,
+                    report_run_id: reportRun.id,
                     attendance_id: result.attendance_id,
                     working_days: result.working_days,
                     present_days: result.present_days,
@@ -986,15 +996,6 @@ export default function RunAnalysisTab({ project }) {
                 });
                 await delay(800);
             }
-
-            // Create report run with actual employee count from saved results
-            const reportRun = await base44.entities.ReportRun.create({
-                project_id: project.id,
-                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
-                date_from: dateFrom,
-                date_to: dateTo,
-                employee_count: allResults.length
-            });
 
             // Update project with last saved report
             await base44.entities.Project.update(project.id, {
