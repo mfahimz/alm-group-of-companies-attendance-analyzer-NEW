@@ -840,8 +840,8 @@ export default function ReportDetailView({ reportRun, project }) {
                     ranges.push(currentRange);
 
                     for (const range of ranges) {
-                        // All edits are auto-approved now
-                        const needsApproval = false;
+                        // Edits from reports need department head approval
+                        const needsApproval = true;
 
                         // Build detailed description
                         const detailsParts = [];
@@ -875,7 +875,7 @@ export default function ReportDetailView({ reportRun, project }) {
                             created_from_report: true,
                             report_run_id: reportRun.id,
                             use_in_analysis: true,
-                            approval_status: needsApproval ? 'pending' : 'approved'
+                            approval_status: needsApproval ? 'pending_dept_head' : 'approved'
                         };
 
                         // Store ALL time adjustment fields
