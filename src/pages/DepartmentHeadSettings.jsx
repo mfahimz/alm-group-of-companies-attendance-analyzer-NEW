@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, Users } from 'lucide-react';
+import { Plus, Trash2, Edit, Users, Search, Filter, CheckCircle, Clock, XCircle, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
@@ -19,6 +20,9 @@ export default function DepartmentHeadSettings() {
     const [selectedReportsTo, setSelectedReportsTo] = useState('');
     const [editingHead, setEditingHead] = useState(null);
     const [showEditDialog, setShowEditDialog] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterCompany, setFilterCompany] = useState('all');
+    const [filterDepartment, setFilterDepartment] = useState('all');
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -34,6 +38,16 @@ export default function DepartmentHeadSettings() {
     const { data: companySettings = [] } = useQuery({
         queryKey: ['companySettings'],
         queryFn: () => base44.entities.CompanySettings.list()
+    });
+
+    const { data: approvalLinks = [] } = useQuery({
+        queryKey: ['approvalLinks'],
+        queryFn: () => base44.entities.ApprovalLink.list('-created_date')
+    });
+
+    const { data: exceptions = [] } = useQuery({
+        queryKey: ['exceptions'],
+        queryFn: () => base44.entities.Exception.list()
     });
 
     const companies = ['Al Maraghi Auto Repairs', 'Al Maraghi Automotive', 'Naser Mohsin Auto Parts', 'Astra Auto Parts'];
@@ -151,13 +165,134 @@ export default function DepartmentHeadSettings() {
         );
     };
 
+    // Calculate approval statistics for each department head
+    const getDeptHeadStats = (deptHead) => {
+        const deptHeadLinks = approvalLinks.filter(link => 
+            link.department_head_id === deptHead.employee_id && 
+            link.department === deptHead.department &&
+            link.company === deptHead.company
+        );
+
+        const totalLinks = deptHeadLinks.length;
+        const usedLinks = deptHeadLinks.filter(link => link.used).length;
+        const approvedLinks = deptHeadLinks.filter(link => link.approved).length;
+        const pendingLinks = deptHeadLinks.filter(link => !link.used && new Date(link.expires_at) > new Date()).length;
+
+        // Get pending exceptions for this dept head
+        const managedEmployeeIds = deptHead.managed_employee_ids ? deptHead.managed_employee_ids.split(',').filter(Boolean) : [];
+        const pendingExceptions = exceptions.filter(exc => {
+            const employee = employees.find(e => e.attendance_id === exc.attendance_id);
+            return employee && 
+                   managedEmployeeIds.includes(employee.id) && 
+                   exc.approval_status === 'pending_dept_head';
+        }).length;
+
+        return {
+            totalLinks,
+            usedLinks,
+            approvedLinks,
+            pendingLinks,
+            pendingExceptions
+        };
+    };
+
+    // Filter department heads
+    const filteredDeptHeads = deptHeads.filter(dh => {
+        if (!dh.active) return false;
+        
+        const matchesSearch = searchTerm === '' || 
+            getDeptHeadName(dh.employee_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+            dh.department.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesCompany = filterCompany === 'all' || dh.company === filterCompany;
+        const matchesDepartment = filterDepartment === 'all' || dh.department === filterDepartment;
+        
+        return matchesSearch && matchesCompany && matchesDepartment;
+    });
+
+    const allDepartments = [...new Set(deptHeads.filter(dh => dh.active).map(dh => dh.department))];
+
+    const sendNotification = async (deptHead) => {
+        try {
+            const deptHeadEmployee = employees.find(e => e.id === deptHead.employee_id);
+            if (!deptHeadEmployee?.email) {
+                toast.error('Department head has no email set');
+                return;
+            }
+
+            await base44.integrations.Core.SendEmail({
+                to: deptHeadEmployee.email,
+                subject: 'Pending Attendance Exception Approvals',
+                body: `Dear ${deptHeadEmployee.name},\n\nYou have pending attendance exception approvals waiting for your review.\n\nPlease log in to the system to review and approve these requests.\n\nBest regards,\nHR Team`
+            });
+
+            toast.success('Notification sent successfully');
+        } catch (error) {
+            toast.error('Failed to send notification: ' + error.message);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <Breadcrumb items={[{ label: 'Settings', href: 'RulesSettings' }, { label: 'Department Heads' }]} />
 
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">Department Head Settings</h1>
-                <p className="text-slate-600 mt-2">Assign department heads with managed employees and reporting hierarchy</p>
+                <p className="text-slate-600 mt-2">Manage department heads, their teams, and approval workflows</p>
+            </div>
+
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-600">Total Dept Heads</p>
+                                <p className="text-2xl font-bold text-slate-900">{deptHeads.filter(dh => dh.active).length}</p>
+                            </div>
+                            <Users className="w-8 h-8 text-indigo-600 opacity-20" />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-600">Pending Exceptions</p>
+                                <p className="text-2xl font-bold text-amber-600">
+                                    {exceptions.filter(e => e.approval_status === 'pending_dept_head').length}
+                                </p>
+                            </div>
+                            <Clock className="w-8 h-8 text-amber-600 opacity-20" />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-600">Active Links</p>
+                                <p className="text-2xl font-bold text-blue-600">
+                                    {approvalLinks.filter(link => !link.used && new Date(link.expires_at) > new Date()).length}
+                                </p>
+                            </div>
+                            <CheckCircle className="w-8 h-8 text-blue-600 opacity-20" />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-600">Total Approved</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                    {approvalLinks.filter(link => link.approved).length}
+                                </p>
+                            </div>
+                            <CheckCircle className="w-8 h-8 text-green-600 opacity-20" />
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <Card className="border-0 shadow-md">
@@ -294,10 +429,46 @@ export default function DepartmentHeadSettings() {
 
             <Card className="border-0 shadow-md">
                 <CardHeader>
-                    <CardTitle>Current Department Heads</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Current Department Heads</CardTitle>
+                        <div className="flex gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                    placeholder="Search..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-10 w-64"
+                                />
+                            </div>
+                            <Select value={filterCompany} onValueChange={setFilterCompany}>
+                                <SelectTrigger className="w-48">
+                                    <Filter className="w-4 h-4 mr-2" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Companies</SelectItem>
+                                    {companies.map(c => (
+                                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+                                <SelectTrigger className="w-48">
+                                    <SelectValue placeholder="All Departments" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Departments</SelectItem>
+                                    {allDepartments.map(d => (
+                                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    {deptHeads.filter(dh => dh.active).length === 0 ? (
+                    {filteredDeptHeads.length === 0 ? (
                         <div className="text-center py-12 text-slate-500">
                             No department heads assigned yet
                         </div>
@@ -314,33 +485,71 @@ export default function DepartmentHeadSettings() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {deptHeads.filter(dh => dh.active).map(dh => {
+                                {filteredDeptHeads.map(dh => {
                                     const managedCount = dh.managed_employee_ids 
                                         ? dh.managed_employee_ids.split(',').filter(Boolean).length 
                                         : 0;
                                     
+                                    const stats = getDeptHeadStats(dh);
+                                    
                                     return (
                                         <TableRow key={dh.id}>
-                                            <TableCell>{dh.company}</TableCell>
-                                            <TableCell>{dh.department}</TableCell>
-                                            <TableCell className="font-medium">
+                                            <TableCell className="text-sm">{dh.company}</TableCell>
+                                            <TableCell className="font-medium">{dh.department}</TableCell>
+                                            <TableCell className="font-medium text-slate-900">
                                                 {getDeptHeadName(dh.employee_id)}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Users className="w-4 h-4 text-slate-400" />
-                                                    <span className="text-sm">{managedCount} employees</span>
+                                                    <span className="text-sm font-medium">{managedCount}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col gap-1">
+                                                    {stats.pendingExceptions > 0 && (
+                                                        <div className="flex items-center gap-1 text-amber-600">
+                                                            <Clock className="w-3 h-3" />
+                                                            <span className="text-xs font-medium">{stats.pendingExceptions} pending</span>
+                                                        </div>
+                                                    )}
+                                                    {stats.pendingLinks > 0 && (
+                                                        <div className="flex items-center gap-1 text-blue-600">
+                                                            <Mail className="w-3 h-3" />
+                                                            <span className="text-xs font-medium">{stats.pendingLinks} active links</span>
+                                                        </div>
+                                                    )}
+                                                    {stats.approvedLinks > 0 && (
+                                                        <div className="flex items-center gap-1 text-green-600">
+                                                            <CheckCircle className="w-3 h-3" />
+                                                            <span className="text-xs font-medium">{stats.approvedLinks} approved</span>
+                                                        </div>
+                                                    )}
+                                                    {stats.pendingExceptions === 0 && stats.pendingLinks === 0 && stats.approvedLinks === 0 && (
+                                                        <span className="text-xs text-slate-400">No activity</span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-sm text-slate-600">
                                                 {dh.reports_to ? getReportsToName(dh.reports_to) : '—'}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-1">
+                                                    {stats.pendingExceptions > 0 && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => sendNotification(dh)}
+                                                            title="Send notification"
+                                                        >
+                                                            <Mail className="w-4 h-4 text-blue-600" />
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
                                                         onClick={() => handleEditClick(dh)}
+                                                        title="Edit"
                                                     >
                                                         <Edit className="w-4 h-4 text-indigo-600" />
                                                     </Button>
@@ -352,6 +561,7 @@ export default function DepartmentHeadSettings() {
                                                                 deleteMutation.mutate(dh.id);
                                                             }
                                                         }}
+                                                        title="Delete"
                                                     >
                                                         <Trash2 className="w-4 h-4 text-red-600" />
                                                     </Button>
