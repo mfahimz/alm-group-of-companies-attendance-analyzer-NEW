@@ -1938,7 +1938,8 @@ export default function ReportDetailView({ reportRun, project }) {
                         </div>
                         
                         {approvalLinks.map((link, idx) => {
-                            const appUrl = window.location.origin;
+                            // Use the full_link from backend which includes CUSTOM_DOMAIN
+                            const linkUrl = link.full_link || `${window.location.origin}/DeptHeadApproval?token=${link.link_token}`;
                             return (
                             <Card key={idx} className="border-indigo-200 bg-indigo-50">
                                 <CardContent className="p-4 space-y-3">
@@ -1960,18 +1961,18 @@ export default function ReportDetailView({ reportRun, project }) {
                                             <Label className="text-xs text-slate-600">Approval Link</Label>
                                             <div className="flex gap-2 mt-1">
                                                 <Input
-                                                    value={`${appUrl}/DeptHeadApproval?token=${link.link_token}`}
-                                                    readOnly
-                                                    className="font-mono text-xs"
-                                                />
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(`${appUrl}/DeptHeadApproval?token=${link.link_token}`);
-                                                        toast.success('Link copied to clipboard');
-                                                    }}
-                                                >
+                                                            value={linkUrl}
+                                                            readOnly
+                                                            className="font-mono text-xs"
+                                                        />
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(linkUrl);
+                                                                toast.success('Link copied to clipboard');
+                                                            }}
+                                                        >
                                                     <Copy className="w-4 h-4" />
                                                 </Button>
                                             </div>
