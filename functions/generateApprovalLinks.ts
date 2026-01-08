@@ -133,14 +133,18 @@ Deno.serve(async (req) => {
             // Get department head employee details
             const deptHeadEmployee = employees.find(e => e.id === deptHead.employee_id);
 
-                // Get app URL from environment or construct it
+                // Get app URL from custom domain
                 let appUrl = Deno.env.get('CUSTOM_DOMAIN');
                 if (!appUrl) {
                     const appId = Deno.env.get('BASE44_APP_ID');
                     appUrl = appId ? `https://${appId}.base44.app` : 'https://app.base44.com';
-                }
-                if (appUrl && !appUrl.startsWith('http')) {
-                    appUrl = `https://${appUrl}`;
+                } else {
+                    // Ensure CUSTOM_DOMAIN has proper protocol
+                    if (!appUrl.startsWith('http://') && !appUrl.startsWith('https://')) {
+                        appUrl = `https://${appUrl}`;
+                    }
+                    // Remove trailing slash if present
+                    appUrl = appUrl.replace(/\/$/, '');
                 }
 
                 links.push({
