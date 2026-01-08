@@ -928,10 +928,28 @@ export default function ReportDetailView({ reportRun, project }) {
 
             return exceptionsToCreate.length;
         },
-        onSuccess: (exceptionCount) => {
+        onSuccess: async (exceptionCount) => {
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
+            
+            // Try to generate approval links after save
+            try {
+                const response = await base44.functions.invoke('generateApprovalLinks', {
+                    report_run_id: reportRun.id,
+                    project_id: project.id,
+                    company: project.company
+                });
+                
+                if (response.data.success && response.data.links && response.data.links.length > 0) {
+                    setApprovalLinks(response.data.links);
+                    setShowLinksDialog(true);
+                    queryClient.invalidateQueries(['approvalLinks']);
+                }
+            } catch (linkError) {
+                console.error('Failed to generate approval links:', linkError);
+            }
+            
             setIsSaving(false);
             setSaveProgress(null);
         },
