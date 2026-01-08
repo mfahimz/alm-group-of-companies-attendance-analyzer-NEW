@@ -889,13 +889,15 @@ export default function ReportDetailView({ reportRun, project }) {
                             exceptionData.other_minutes = group.data.otherMinutes;
                         }
 
-                        // Determine type based on what's present
+                        // Determine type based on what's present (override the initial type)
                         if (group.data.shiftOverride) {
                             exceptionData.type = 'SHIFT_OVERRIDE';
                             exceptionData.new_am_start = group.data.shiftOverride.am_start;
                             exceptionData.new_am_end = group.data.shiftOverride.am_end;
                             exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
                             exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
+                        } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes > 0) {
+                            exceptionData.type = 'MANUAL_LATE';
                         } else if (exceptionData.late_minutes > 0) {
                             exceptionData.type = 'MANUAL_LATE';
                         } else if (exceptionData.early_checkout_minutes > 0) {
@@ -903,6 +905,7 @@ export default function ReportDetailView({ reportRun, project }) {
                         } else if (exceptionData.other_minutes > 0) {
                             exceptionData.type = 'MANUAL_OTHER_MINUTES';
                         }
+                        // If none of the time fields are set, keep the original type from group.data.type
 
                         exceptionsToCreate.push(exceptionData);
                     }
