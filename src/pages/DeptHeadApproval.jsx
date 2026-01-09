@@ -34,92 +34,48 @@ export default function DeptHeadApproval() {
     const { data: approvalLink, isLoading: linkLoading, error: linkError } = useQuery({
         queryKey: ['approvalLink', token],
         queryFn: async () => {
-            const links = await base44.asServiceRole.entities.ApprovalLink.filter({ link_token: token });
-            if (links.length === 0) throw new Error('LINK_NOT_FOUND');
-            
-            const link = links[0];
-            
-            // Check if expired
-            const expiresAt = new Date(link.expires_at);
-            if (new Date() > expiresAt) {
-                throw new Error('LINK_EXPIRED');
+            const response = await base44.functions.invoke('verifyApprovalLink', { token });
+            if (!response.data.success) {
+                throw new Error(response.data.error);
             }
-            
-            // Check if already used
-            if (link.used) {
-                throw new Error('LINK_USED');
-            }
-            
-            return link;
+            return response.data.link_data;
         },
         enabled: !!token && !isVerified,
         retry: false
     });
 
-    const { data: deptHead } = useQuery({
-        queryKey: ['deptHead', linkData?.department_head_id],
+    const { data: verifiedData, isLoading: exceptionsLoading } = useQuery({
+        queryKey: ['verifiedData', token],
         queryFn: async () => {
-            const deptHeads = await base44.asServiceRole.entities.DepartmentHead.filter({
-                employee_id: linkData.department_head_id,
-                active: true
+            const response = await base44.functions.invoke('verifyApprovalLink', { 
+                token,
+                verification_code: verificationCode 
             });
-            return deptHeads.find(dh => dh.company === linkData.company);
-        },
-        enabled: isVerified && !!linkData
-    });
-
-    const { data: exceptions = [], isLoading: exceptionsLoading } = useQuery({
-        queryKey: ['deptExceptions', linkData?.report_run_id, linkData?.department, deptHead?.id],
-        queryFn: async () => {
-            const allExceptions = await base44.asServiceRole.entities.Exception.filter({
-                report_run_id: linkData.report_run_id,
-                approval_status: 'pending_dept_head'
-            });
-            
-            // Get employees
-            const employees = await base44.asServiceRole.entities.Employee.filter({ 
-                company: linkData.company 
-            });
-            
-            // Filter by managed employees if specified
-            let relevantExceptions = allExceptions.filter(exc => {
-                const employee = employees.find(e => 
-                    e.attendance_id === exc.attendance_id && 
-                    e.company === linkData.company
-                );
-                return employee?.department === linkData.department;
-            });
-
-            // Further filter by managed employees if specified in deptHead
-            if (deptHead?.managed_employee_ids) {
-                const managedIds = deptHead.managed_employee_ids.split(',').filter(Boolean);
-                relevantExceptions = relevantExceptions.filter(exc => {
-                    const employee = employees.find(e => e.attendance_id === exc.attendance_id);
-                    return employee && managedIds.includes(employee.id);
-                });
+            if (!response.data.success) {
+                throw new Error(response.data.error);
             }
-
-            return relevantExceptions;
+            return response.data;
         },
-        enabled: isVerified && !!linkData && !!deptHead
+        enabled: isVerified && !!token,
+        retry: false
     });
 
-    const { data: employees = [] } = useQuery({
-        queryKey: ['employees', linkData?.company],
-        queryFn: () => base44.asServiceRole.entities.Employee.filter({ company: linkData.company }),
-        enabled: isVerified && !!linkData
-    });
+    const exceptions = verifiedData?.exceptions || [];
+    const employees = verifiedData?.employees || [];
+    const deptHead = verifiedData?.dept_head;
 
     const verifyMutation = useMutation({
         mutationFn: async () => {
-            if (!approvalLink) throw new Error('No link data');
-
-            // Verify code
-            if (verificationCode !== approvalLink.verification_code) {
-                throw new Error('Invalid verification code');
+            const response = await base44.functions.invoke('verifyApprovalLink', { 
+                token,
+                verification_code: verificationCode 
+            });
+            
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'Verification failed');
             }
-
-            return approvalLink;
+            
+            return response.data.link_data;
         },
         onSuccess: (data) => {
             setIsVerified(true);
@@ -133,14 +89,18 @@ export default function DeptHeadApproval() {
 
     const approveMutation = useMutation({
         mutationFn: async (exceptionId) => {
-            await base44.asServiceRole.entities.Exception.update(exceptionId, {
-                approval_status: 'approved_dept_head',
-                approved_by_dept_head: linkData.department_head_id,
-                dept_head_approval_date: new Date().toISOString()
+            const response = await base44.functions.invoke('approveExceptions', {
+                token,
+                exception_ids: exceptionId,
+                approve_all: false
             });
+            
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'Approval failed');
+            }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['deptExceptions']);
+            queryClient.invalidateQueries(['verifiedData']);
             toast.success('Exception approved');
         },
         onError: () => {
@@ -150,23 +110,19 @@ export default function DeptHeadApproval() {
 
     const approveAllMutation = useMutation({
         mutationFn: async () => {
-            for (const exception of exceptions) {
-                await base44.asServiceRole.entities.Exception.update(exception.id, {
-                    approval_status: 'approved_dept_head',
-                    approved_by_dept_head: linkData.department_head_id,
-                    dept_head_approval_date: new Date().toISOString()
-                });
-            }
-
-            // Mark link as used
-            await base44.asServiceRole.entities.ApprovalLink.update(approvalLink.id, {
-                used: true,
-                used_at: new Date().toISOString(),
-                approved: true
+            const exceptionIds = exceptions.map(e => e.id);
+            const response = await base44.functions.invoke('approveExceptions', {
+                token,
+                exception_ids: exceptionIds,
+                approve_all: true
             });
+            
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'Approval failed');
+            }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['deptExceptions']);
+            queryClient.invalidateQueries(['verifiedData']);
             toast.success('All exceptions approved successfully');
             setTimeout(() => {
                 window.location.href = 'about:blank';
