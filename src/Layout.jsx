@@ -100,6 +100,12 @@ export default function Layout({ children, currentPageName }) {
         staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
+    // Calculate user role BEFORE any conditional returns
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const canAccessAllCompanies = isAdmin || isSupervisor;
+
     // AFTER all hooks, handle conditional rendering
     // For public pages, render without layout
     if (isPublicPage) {
@@ -128,11 +134,6 @@ export default function Layout({ children, currentPageName }) {
             </div>
         );
     }
-
-  const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-  const isAdmin = userRole === 'admin';
-  const isSupervisor = userRole === 'supervisor';
-  const canAccessAllCompanies = isAdmin || isSupervisor;
 
   const hasPageAccess = (pageName) => {
     if (!currentUser) return false;
