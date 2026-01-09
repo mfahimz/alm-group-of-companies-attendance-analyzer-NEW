@@ -138,59 +138,59 @@ export default function Layout({ children, currentPageName }) {
       );
   }
 
-  const menuGroups = [
-  {
-    id: 'dashboard',
-    name: 'Dashboard',
-    icon: LayoutDashboard,
-    items: [
-    { name: 'Dashboard', path: 'Dashboard', icon: LayoutDashboard }]
-
-  },
-  {
-    id: 'projects',
-    name: 'Project Management',
-    icon: FolderKanban,
-    items: [
-    { name: 'Projects', path: 'Projects', icon: FolderKanban },
-    { name: 'Employees', path: 'Employees', icon: Users },
-    ...(isAdmin || isSupervisor ? [{ name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 }] : []),
-    ...(userRole === 'hr_manager' ? [{ name: 'HR Manager Approval', path: 'HRManagerApproval', icon: Shield }] : [])]
-
-  },
-  ...(isAdmin ? [{
-    id: 'settings',
-    name: 'System Settings',
-    icon: Settings,
-    items: [
-    { name: 'Users & Permissions', path: 'Users', icon: Shield },
-    { name: 'Department Heads', path: 'DepartmentHeadSettings', icon: Users },
-    { name: 'Audit Trail', path: 'AuditTrail', icon: FileSpreadsheet },
-    { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
-    { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
-    { name: 'Documentation', path: 'Documentation', icon: Book },
-    { name: 'Training Guide', path: 'Training', icon: Book }]
-
-  }] : []),
-  {
-    id: 'profile',
-    name: 'User',
-    icon: UserIcon,
-    items: [
-    { name: 'My Profile', path: 'UserProfile', icon: UserIcon }]
-
-  }];
-
-
   // Filter menu items based on user permissions
   const filteredMenuGroups = React.useMemo(() => {
     if (!currentUser) return [];
+
+    const menuGroups = [
+      {
+        id: 'dashboard',
+        name: 'Dashboard',
+        icon: LayoutDashboard,
+        items: [
+          { name: 'Dashboard', path: 'Dashboard', icon: LayoutDashboard }
+        ]
+      },
+      {
+        id: 'projects',
+        name: 'Project Management',
+        icon: FolderKanban,
+        items: [
+          { name: 'Projects', path: 'Projects', icon: FolderKanban },
+          { name: 'Employees', path: 'Employees', icon: Users },
+          ...(isAdmin || isSupervisor ? [{ name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 }] : []),
+          ...(userRole === 'hr_manager' ? [{ name: 'HR Manager Approval', path: 'HRManagerApproval', icon: Shield }] : [])
+        ]
+      },
+      ...(isAdmin ? [{
+        id: 'settings',
+        name: 'System Settings',
+        icon: Settings,
+        items: [
+          { name: 'Users & Permissions', path: 'Users', icon: Shield },
+          { name: 'Department Heads', path: 'DepartmentHeadSettings', icon: Users },
+          { name: 'Audit Trail', path: 'AuditTrail', icon: FileSpreadsheet },
+          { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
+          { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
+          { name: 'Documentation', path: 'Documentation', icon: Book },
+          { name: 'Training Guide', path: 'Training', icon: Book }
+        ]
+      }] : []),
+      {
+        id: 'profile',
+        name: 'User',
+        icon: UserIcon,
+        items: [
+          { name: 'My Profile', path: 'UserProfile', icon: UserIcon }
+        ]
+      }
+    ];
 
     return menuGroups.map((group) => ({
       ...group,
       items: group.items.filter((item) => hasPageAccess(item.path))
     })).filter((group) => group.items.length > 0);
-  }, [currentUser, permissions]);
+  }, [currentUser, permissions, isAdmin, isSupervisor, userRole]);
 
   const toggleGroup = (groupId) => {
     setExpandedGroups((prev) => {
