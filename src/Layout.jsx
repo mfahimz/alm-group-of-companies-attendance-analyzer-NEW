@@ -88,8 +88,16 @@ export default function Layout({ children, currentPageName }) {
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
-        queryFn: () => base44.entities.PagePermission.list(),
-        enabled: !!currentUser && !isPublicPage
+        queryFn: async () => {
+            try {
+                return await base44.entities.PagePermission.list();
+            } catch (err) {
+                console.error('Permissions fetch error:', err);
+                return []; // Return empty array on error instead of failing
+            }
+        },
+        enabled: !!currentUser && !isPublicPage,
+        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
     // AFTER all hooks, handle conditional rendering
