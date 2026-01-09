@@ -116,6 +116,17 @@ export default function Layout({ children, currentPageName }) {
     return allowedRoles.includes(userRole);
   };
 
+  // Check if user has a company assigned (not required for admin/supervisor)
+  if (!currentUser.company && userRole === 'user') {
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-slate-600 text-center">
+                  No company is assigned. Wait for the administrator to assign a company.
+              </div>
+          </div>
+      );
+  }
+
   const menuGroups = [
   {
     id: 'dashboard',
