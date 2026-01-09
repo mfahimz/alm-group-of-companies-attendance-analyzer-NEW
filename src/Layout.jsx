@@ -118,8 +118,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Projects', path: 'Projects', icon: FolderKanban },
     { name: 'Employees', path: 'Employees', icon: Users },
     ...(isAdmin || isSupervisor ? [{ name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 }] : []),
-    ...(userRole === 'hr_manager' ? [{ name: 'HR Manager Approval', path: 'HRManagerApproval', icon: Shield }] : []),
-    ...(isAdmin ? [{ name: 'Astra Import', path: 'AstraImport', icon: FileSpreadsheet }] : [])]
+    ...(userRole === 'hr_manager' ? [{ name: 'HR Manager Approval', path: 'HRManagerApproval', icon: Shield }] : [])]
 
   },
   ...(isAdmin ? [{
@@ -132,7 +131,6 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Audit Trail', path: 'AuditTrail', icon: FileSpreadsheet },
     { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
     { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
-    { name: 'Diagnostics', path: 'Diagnostics', icon: Activity },
     { name: 'Documentation', path: 'Documentation', icon: Book },
     { name: 'Training Guide', path: 'Training', icon: Book }]
 
