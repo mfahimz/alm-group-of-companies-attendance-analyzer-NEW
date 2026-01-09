@@ -97,10 +97,19 @@ export default function Layout({ children, currentPageName }) {
     }
 
     // For protected pages, show loading while checking auth
-    if (isLoading || !currentUser) {
+    if (isLoading) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-slate-500">Loading...</div>
+            </div>
+        );
+    }
+
+    // If not loading but no user (error state), show loading while redirect happens
+    if (!currentUser) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-500">Redirecting to login...</div>
             </div>
         );
     }
