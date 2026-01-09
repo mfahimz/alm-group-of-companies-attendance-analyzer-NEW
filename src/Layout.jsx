@@ -30,6 +30,20 @@ import { cn } from '@/lib/utils';
 
 
 export default function Layout({ children, currentPageName }) {
+    // Public pages that don't require authentication
+    const publicPages = ['DeptHeadApproval'];
+    const isPublicPage = publicPages.includes(currentPageName);
+
+    // For public pages, render without layout
+    if (isPublicPage) {
+        return (
+            <>
+                {children}
+                <Toaster position="top-right" richColors />
+            </>
+        );
+    }
+
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState(new Set(['dashboard', 'projects']));
