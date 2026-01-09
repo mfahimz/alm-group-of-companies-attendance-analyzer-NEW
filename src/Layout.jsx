@@ -41,67 +41,60 @@ export default function Layout({ children, currentPageName }) {
 
     useKeyboardShortcuts({ onOpenSearch: () => setSearchOpen(true) });
 
-    const { data: currentUser } = useQuery({
-        queryKey: ['currentUser'],
-        queryFn: async () => {
-            const user = await base44.auth.me();
-      // Log user activity
-      try {
-        // Try to get IP from external API
-        let ipAddress = 'Unknown';
+    const { data: currentUser, isLoading } = useQuery({
+      queryKey: ['currentUser'],
+      queryFn: async () => {
+          const user = await base44.auth.me();
+        // Log user activity
         try {
-          const ipResponse = await fetch('https://api.ipify.org?format=json');
-          const ipData = await ipResponse.json();
-          ipAddress = ipData.ip;
-        } catch {}
+          // Try to get IP from external API
+          let ipAddress = 'Unknown';
+          try {
+            const ipResponse = await fetch('https://api.ipify.org?format=json');
+            const ipData = await ipResponse.json();
+            ipAddress = ipData.ip;
+          } catch {}
 
-        await base44.entities.ActivityLog.create({
-          user_email: user.email,
-          user_name: user.full_name,
-          user_role: user.role,
-          ip_address: ipAddress,
-          user_agent: navigator.userAgent,
-          location: 'UAE'
-        });
-      } catch (e) {
+          await base44.entities.ActivityLog.create({
+            user_email: user.email,
+            user_name: user.full_name,
+            user_role: user.role,
+            ip_address: ipAddress,
+            user_agent: navigator.userAgent,
+            location: 'UAE'
+          });
+        } catch (e) {
+          // Silent fail
+        }
+        return user;
+      },
+      enabled: !isPublicPage
+    });
 
+    const { data: permissions = [] } = useQuery({
+      queryKey: ['pagePermissions'],
+      queryFn: () => base44.entities.PagePermission.list(),
+      enabled: !!currentUser && !isPublicPage
+    });
 
+    // For public pages, render without layout
+    if (isPublicPage) {
+        return (
+            <>
+                {children}
+                <Toaster position="top-right" richColors />
+            </>
+        );
+    }
 
-        // Silent fail
-      }return user;
-    },
-    enabled: !isPublicPage
-  });
-
-  const { data: permissions = [] } = useQuery({
-    queryKey: ['pagePermissions'],
-    queryFn: () => base44.entities.PagePermission.list(),
-    enabled: !!currentUser && !isPublicPage
-  });
-
-  // For public pages, render without layout
-  if (isPublicPage) {
-      return (
-          <>
-              {children}
-              <Toaster position="top-right" richColors />
-          </>
-      );
-  }
-
-  // For protected pages, require authentication
-  if (!currentUser) {
-      // Redirect to login for non-public pages
-      React.useEffect(() => {
-          base44.auth.redirectToLogin(window.location.pathname);
-      }, []);
-      
-      return (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-              <div className="text-slate-500">Redirecting to login...</div>
-          </div>
-      );
-  }
+    // For protected pages, show loading while checking auth
+    if (isLoading || !currentUser) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-500">Loading...</div>
+            </div>
+        );
+    }
 
   const userRole = currentUser?.extended_role || currentUser?.role || 'user';
   const isAdmin = userRole === 'admin';
