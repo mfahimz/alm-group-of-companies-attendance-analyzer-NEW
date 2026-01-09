@@ -89,6 +89,20 @@ export default function Layout({ children, currentPageName }) {
       );
   }
 
+  // For protected pages, require authentication
+  if (!currentUser) {
+      // Redirect to login for non-public pages
+      React.useEffect(() => {
+          base44.auth.redirectToLogin(window.location.pathname);
+      }, []);
+      
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-slate-500">Redirecting to login...</div>
+          </div>
+      );
+  }
+
   const userRole = currentUser?.extended_role || currentUser?.role || 'user';
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
