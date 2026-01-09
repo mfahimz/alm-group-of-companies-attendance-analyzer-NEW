@@ -205,26 +205,6 @@ export default function Layout({ children, currentPageName }) {
     }
   }, [currentPageName, filteredMenuGroups]);
 
-  // Don't render sidebar until user is loaded
-  if (!currentUser) {
-      return (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-              <div className="text-slate-500">Loading...</div>
-          </div>);
-
-  }
-
-  // Check if user has a company assigned (not required for admin/supervisor)
-  if (!currentUser.company && userRole === 'user') {
-      return (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-              <div className="text-slate-600 text-center">
-                  No company is assigned. Wait for the administrator to assign a company.
-              </div>
-          </div>);
-
-  }
-
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
             {/* Mobile Sidebar Backdrop */}
