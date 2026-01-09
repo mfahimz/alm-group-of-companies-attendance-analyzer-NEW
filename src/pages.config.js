@@ -1,10 +1,8 @@
 import ActivityLogs from './pages/ActivityLogs';
-import AstraImport from './pages/AstraImport';
 import AuditTrail from './pages/AuditTrail';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
 import DeptHeadApproval from './pages/DeptHeadApproval';
-import Diagnostics from './pages/Diagnostics';
 import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
@@ -24,12 +22,10 @@ import __Layout from './Layout.jsx';
 
 export const PAGES = {
     "ActivityLogs": ActivityLogs,
-    "AstraImport": AstraImport,
     "AuditTrail": AuditTrail,
     "Dashboard": Dashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
     "DeptHeadApproval": DeptHeadApproval,
-    "Diagnostics": Diagnostics,
     "Documentation": Documentation,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
