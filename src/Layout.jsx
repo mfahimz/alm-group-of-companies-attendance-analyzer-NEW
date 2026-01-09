@@ -30,19 +30,9 @@ import { cn } from '@/lib/utils';
 
 
 export default function Layout({ children, currentPageName }) {
-    // Public pages that don't require authentication
+    // Public pages that don't require authentication - check FIRST before any hooks
     const publicPages = ['DeptHeadApproval'];
     const isPublicPage = publicPages.includes(currentPageName);
-
-    // For public pages, render without layout
-    if (isPublicPage) {
-        return (
-            <>
-                {children}
-                <Toaster position="top-right" richColors />
-            </>
-        );
-    }
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -79,14 +69,25 @@ export default function Layout({ children, currentPageName }) {
 
         // Silent fail
       }return user;
-    }
+    },
+    enabled: !isPublicPage
   });
 
   const { data: permissions = [] } = useQuery({
     queryKey: ['pagePermissions'],
     queryFn: () => base44.entities.PagePermission.list(),
-    enabled: !!currentUser
+    enabled: !!currentUser && !isPublicPage
   });
+
+  // For public pages, render without layout
+  if (isPublicPage) {
+      return (
+          <>
+              {children}
+              <Toaster position="top-right" richColors />
+          </>
+      );
+  }
 
   const userRole = currentUser?.extended_role || currentUser?.role || 'user';
   const isAdmin = userRole === 'admin';
