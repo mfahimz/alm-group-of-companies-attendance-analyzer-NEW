@@ -30,10 +30,11 @@ import { cn } from '@/lib/utils';
 
 
 export default function Layout({ children, currentPageName }) {
-    // Public pages that don't require authentication - check FIRST before any hooks
+    // Public pages that don't require authentication
     const publicPages = ['DeptHeadApproval'];
     const isPublicPage = publicPages.includes(currentPageName);
 
+    // ALL hooks must be called unconditionally at the top
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState(new Set(['dashboard', 'projects']));
@@ -42,47 +43,48 @@ export default function Layout({ children, currentPageName }) {
     useKeyboardShortcuts({ onOpenSearch: () => setSearchOpen(true) });
 
     const { data: currentUser, isLoading } = useQuery({
-      queryKey: ['currentUser'],
-      queryFn: async () => {
-        try {
-          const user = await base44.auth.me();
-          // Log user activity
-          try {
-            let ipAddress = 'Unknown';
+        queryKey: ['currentUser'],
+        queryFn: async () => {
             try {
-              const ipResponse = await fetch('https://api.ipify.org?format=json');
-              const ipData = await ipResponse.json();
-              ipAddress = ipData.ip;
-            } catch {}
+                const user = await base44.auth.me();
+                // Log user activity
+                try {
+                    let ipAddress = 'Unknown';
+                    try {
+                        const ipResponse = await fetch('https://api.ipify.org?format=json');
+                        const ipData = await ipResponse.json();
+                        ipAddress = ipData.ip;
+                    } catch {}
 
-            await base44.entities.ActivityLog.create({
-              user_email: user.email,
-              user_name: user.full_name,
-              user_role: user.role,
-              ip_address: ipAddress,
-              user_agent: navigator.userAgent,
-              location: 'UAE'
-            });
-          } catch (e) {
-            // Silent fail for activity log
-          }
-          return user;
-        } catch (error) {
-          // User not authenticated - redirect to login
-          base44.auth.redirectToLogin(window.location.pathname);
-          return null;
-        }
-      },
-      enabled: !isPublicPage,
-      retry: false
+                    await base44.entities.ActivityLog.create({
+                        user_email: user.email,
+                        user_name: user.full_name,
+                        user_role: user.role,
+                        ip_address: ipAddress,
+                        user_agent: navigator.userAgent,
+                        location: 'UAE'
+                    });
+                } catch (e) {
+                    // Silent fail for activity log
+                }
+                return user;
+            } catch (error) {
+                // User not authenticated - redirect to login
+                base44.auth.redirectToLogin(window.location.pathname);
+                return null;
+            }
+        },
+        enabled: !isPublicPage,
+        retry: false
     });
 
     const { data: permissions = [] } = useQuery({
-      queryKey: ['pagePermissions'],
-      queryFn: () => base44.entities.PagePermission.list(),
-      enabled: !!currentUser && !isPublicPage
+        queryKey: ['pagePermissions'],
+        queryFn: () => base44.entities.PagePermission.list(),
+        enabled: !!currentUser && !isPublicPage
     });
 
+    // AFTER all hooks, handle conditional rendering
     // For public pages, render without layout
     if (isPublicPage) {
         return (
