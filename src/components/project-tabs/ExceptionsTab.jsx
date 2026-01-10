@@ -332,6 +332,35 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         URL.revokeObjectURL(url);
     };
 
+    const handleExport = async () => {
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            
+            const exportData = filteredExceptions.map(ex => {
+                const employee = employees.find(e => e.attendance_id === ex.attendance_id);
+                return {
+                    'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
+                    'Employee Name': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
+                    'Type': ex.is_custom_type ? ex.custom_type_name || 'Custom' : ex.type.replace(/_/g, ' '),
+                    'From Date': ex.is_custom_type && (!ex.date_from || ex.date_from === project.date_from) ? '—' : new Date(ex.date_from).toLocaleDateString(),
+                    'To Date': ex.is_custom_type && (!ex.date_to || ex.date_to === project.date_to) ? '—' : new Date(ex.date_to).toLocaleDateString(),
+                    'Details': ex.details || '',
+                    'Created Date': new Date(ex.created_date).toLocaleDateString(),
+                    'Created By': ex.created_by || ''
+                };
+            });
+            
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Exceptions');
+            XLSX.writeFile(workbook, `exceptions_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            
+            toast.success(`Exported ${exportData.length} exceptions`);
+        } catch (error) {
+            toast.error('Failed to export: ' + error.message);
+        }
+    };
+
     const resetForm = () => {
         setFormData({
             attendance_id: '',
@@ -765,6 +794,15 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                     <div className="flex items-center justify-between">
                         <CardTitle>Exceptions</CardTitle>
                         <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExport}
+                            disabled={filteredExceptions.length === 0}
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export
+                        </Button>
                         {!isUser && (
                             <>
                                 <Button
@@ -803,7 +841,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 Add Exception
                             </Button>
                         )}
-                    </div>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
