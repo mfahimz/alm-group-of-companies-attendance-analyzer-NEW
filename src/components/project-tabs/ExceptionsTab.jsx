@@ -607,9 +607,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             </div>
 
                             {formData.type !== 'SINGLE_SHIFT' && (
-                                <>
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <Label>From Date *</Label>
+                                        <Label>From Date <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="date"
                                             value={formData.date_from}
@@ -617,14 +617,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                         />
                                     </div>
                                     <div>
-                                        <Label>To Date *</Label>
+                                        <Label>To Date <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="date"
                                             value={formData.date_to}
                                             onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
                                         />
                                     </div>
-                                </>
+                                </div>
                             )}
 
                             {needsShiftOverride && (
