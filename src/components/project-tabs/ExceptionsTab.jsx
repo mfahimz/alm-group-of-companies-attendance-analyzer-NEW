@@ -592,6 +592,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                             <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
+                                            {/* MANUAL_LATE, MANUAL_EARLY_CHECKOUT, MANUAL_OTHER_MINUTES are excluded - only creatable from report edits */}
                                         </SelectContent>
                                     </Select>
                                 </div>
