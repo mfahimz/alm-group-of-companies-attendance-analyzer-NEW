@@ -249,18 +249,18 @@ export default function DeptHeadApproval() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6">
-            <div className="max-w-6xl mx-auto space-y-6">
+        <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
+            <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
                 <Card className="border-0 shadow-md">
                     <CardHeader>
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div>
-                                <CardTitle>Department Head Approval</CardTitle>
-                                <p className="text-sm text-slate-600 mt-1">
+                                <CardTitle className="text-lg sm:text-xl">Department Head Approval</CardTitle>
+                                <p className="text-xs sm:text-sm text-slate-600 mt-1">
                                     Department: <strong>{linkData?.department}</strong>
                                 </p>
                             </div>
-                            <Badge className="bg-amber-100 text-amber-800">
+                            <Badge className="bg-amber-100 text-amber-800 w-fit">
                                 <Clock className="w-3 h-3 mr-1" />
                                 {exceptions.length} Pending
                             </Badge>
@@ -276,70 +276,124 @@ export default function DeptHeadApproval() {
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Employee</TableHead>
-                                            <TableHead>Date Range</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>Changes</TableHead>
-                                            <TableHead>Details</TableHead>
-                                            <TableHead>Action</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {exceptions.map((exception) => (
-                                            <TableRow key={exception.id}>
-                                                <TableCell className="font-medium">
-                                                    {getEmployeeName(exception.attendance_id)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {new Date(exception.date_from).toLocaleDateString('en-GB')} - {new Date(exception.date_to).toLocaleDateString('en-GB')}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">{exception.type}</Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {exception.old_late_minutes !== undefined && (
-                                                        <div className="text-xs">
-                                                            Late: {exception.old_late_minutes} → {exception.late_minutes || 0} min
-                                                        </div>
-                                                    )}
-                                                    {exception.old_early_checkout_minutes !== undefined && (
-                                                        <div className="text-xs">
-                                                            Early: {exception.old_early_checkout_minutes} → {exception.early_checkout_minutes || 0} min
-                                                        </div>
-                                                    )}
-                                                    {exception.old_other_minutes !== undefined && (
-                                                        <div className="text-xs">
-                                                            Other: {exception.old_other_minutes || 0} → {exception.other_minutes || 0} min
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-slate-600">
-                                                    {exception.details || '—'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => approveMutation.mutate(exception.id)}
-                                                        disabled={approveMutation.isPending}
-                                                        className="bg-green-600 hover:bg-green-700"
-                                                    >
-                                                        <CheckCircle className="w-4 h-4 mr-1" />
-                                                        Approve
-                                                    </Button>
-                                                </TableCell>
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Employee</TableHead>
+                                                <TableHead>Date Range</TableHead>
+                                                <TableHead>Type</TableHead>
+                                                <TableHead>Changes</TableHead>
+                                                <TableHead>Details</TableHead>
+                                                <TableHead>Action</TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {exceptions.map((exception) => (
+                                                <TableRow key={exception.id}>
+                                                    <TableCell className="font-medium">
+                                                        {getEmployeeName(exception.attendance_id)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {new Date(exception.date_from).toLocaleDateString('en-GB')} - {new Date(exception.date_to).toLocaleDateString('en-GB')}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline">{exception.type}</Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {exception.old_late_minutes !== undefined && (
+                                                            <div className="text-xs">
+                                                                Late: {exception.old_late_minutes} → {exception.late_minutes || 0} min
+                                                            </div>
+                                                        )}
+                                                        {exception.old_early_checkout_minutes !== undefined && (
+                                                            <div className="text-xs">
+                                                                Early: {exception.old_early_checkout_minutes} → {exception.early_checkout_minutes || 0} min
+                                                            </div>
+                                                        )}
+                                                        {exception.old_other_minutes !== undefined && (
+                                                            <div className="text-xs">
+                                                                Other: {exception.old_other_minutes || 0} → {exception.other_minutes || 0} min
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-600">
+                                                        {exception.details || '—'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => approveMutation.mutate(exception.id)}
+                                                            disabled={approveMutation.isPending}
+                                                            className="bg-green-600 hover:bg-green-700"
+                                                        >
+                                                            <CheckCircle className="w-4 h-4 mr-1" />
+                                                            Approve
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+
+                                {/* Mobile Card View */}
+                                <div className="md:hidden space-y-3">
+                                    {exceptions.map((exception) => (
+                                        <Card key={exception.id} className="border shadow-sm">
+                                            <CardContent className="p-4 space-y-3">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-medium text-sm truncate">
+                                                            {getEmployeeName(exception.attendance_id)}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {new Date(exception.date_from).toLocaleDateString('en-GB')} - {new Date(exception.date_to).toLocaleDateString('en-GB')}
+                                                        </p>
+                                                    </div>
+                                                    <Badge variant="outline" className="text-xs flex-shrink-0">{exception.type}</Badge>
+                                                </div>
+                                                
+                                                {(exception.old_late_minutes !== undefined || 
+                                                  exception.old_early_checkout_minutes !== undefined || 
+                                                  exception.old_other_minutes !== undefined) && (
+                                                    <div className="text-xs space-y-1 bg-slate-50 p-2 rounded">
+                                                        {exception.old_late_minutes !== undefined && (
+                                                            <div>Late: {exception.old_late_minutes} → {exception.late_minutes || 0} min</div>
+                                                        )}
+                                                        {exception.old_early_checkout_minutes !== undefined && (
+                                                            <div>Early: {exception.old_early_checkout_minutes} → {exception.early_checkout_minutes || 0} min</div>
+                                                        )}
+                                                        {exception.old_other_minutes !== undefined && (
+                                                            <div>Other: {exception.old_other_minutes || 0} → {exception.other_minutes || 0} min</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                
+                                                {exception.details && (
+                                                    <p className="text-xs text-slate-600">{exception.details}</p>
+                                                )}
+                                                
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => approveMutation.mutate(exception.id)}
+                                                    disabled={approveMutation.isPending}
+                                                    className="w-full bg-green-600 hover:bg-green-700"
+                                                >
+                                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                                    Approve
+                                                </Button>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
 
                                 <div className="flex justify-end gap-3 pt-4 border-t">
                                     <Button
                                         onClick={() => approveAllMutation.mutate()}
                                         disabled={approveAllMutation.isPending}
-                                        className="bg-green-600 hover:bg-green-700"
+                                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
                                     >
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         {approveAllMutation.isPending ? 'Approving All...' : 'Approve All & Submit'}
