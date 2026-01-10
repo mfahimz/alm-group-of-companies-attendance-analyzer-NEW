@@ -1,32 +1,22 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from './utils';
-import {
-  BarChart3,
-  FolderKanban,
-  Users,
-  Settings,
-  LayoutDashboard,
-  Shield,
-  User as UserIcon,
-  LogOut,
-  Menu,
-  X,
-  ChevronDown,
-  ChevronRight,
-  Book,
-  Activity,
-  Calendar,
-  FileSpreadsheet } from
-'lucide-react';
 import { Toaster } from 'sonner';
 import NotificationCenter from './components/ui/NotificationCenter';
 import GlobalSearch from './components/ui/GlobalSearch';
 import { useKeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Navbar1 } from '@/components/ui/Navbar1';
+import {
+    BarChart3,
+    FolderKanban,
+    Users,
+    Settings,
+    LayoutDashboard,
+    Shield,
+    Book,
+    Calendar,
+    FileSpreadsheet
+} from 'lucide-react';
 
 
 export default function Layout({ children, currentPageName }) {
@@ -35,9 +25,6 @@ export default function Layout({ children, currentPageName }) {
     const isPublicPage = publicPages.includes(currentPageName);
 
     // ALL hooks must be called unconditionally at the top
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [expandedGroups, setExpandedGroups] = useState(new Set(['dashboard', 'projects']));
     const [searchOpen, setSearchOpen] = useState(false);
 
     useKeyboardShortcuts({ onOpenSearch: () => setSearchOpen(true) });
@@ -114,71 +101,47 @@ export default function Layout({ children, currentPageName }) {
       return allowedRoles.includes(userRole);
     }, [currentUser, permissions, userRole]);
 
-    // Filter menu items based on user permissions - MUST be before conditional returns
-    const filteredMenuGroups = React.useMemo(() => {
-      if (!currentUser) return [];
+    // Build navbar menu - MUST be before conditional returns
+    const navbarMenu = React.useMemo(() => {
+        if (!currentUser) return [];
 
-      const menuGroups = [
-      {
-        id: 'dashboard',
-        name: 'Dashboard',
-        icon: LayoutDashboard,
-        items: [
-          { name: 'Dashboard', path: 'Dashboard', icon: LayoutDashboard }
-        ]
-      },
-      {
-        id: 'projects',
-        name: 'Project Management',
-        icon: FolderKanban,
-        items: [
-          { name: 'Projects', path: 'Projects', icon: FolderKanban },
-          { name: 'Employees', path: 'Employees', icon: Users },
-          ...(isAdmin || isSupervisor ? [{ name: 'Reports & Analytics', path: 'Reports', icon: BarChart3 }] : []),
-          ...(userRole === 'hr_manager' ? [{ name: 'HR Manager Approval', path: 'HRManagerApproval', icon: Shield }] : [])
-        ]
-      },
-      ...(isAdmin ? [{
-        id: 'settings',
-        name: 'System Settings',
-        icon: Settings,
-        items: [
-          { name: 'Users & Permissions', path: 'Users', icon: Shield },
-          { name: 'Department Heads', path: 'DepartmentHeadSettings', icon: Users },
-          { name: 'Audit Trail', path: 'AuditTrail', icon: FileSpreadsheet },
-          { name: 'Rules Settings', path: 'RulesSettings', icon: Settings },
-          { name: 'Ramadan Schedules', path: 'RamadanSchedules', icon: Calendar },
-          { name: 'Documentation', path: 'Documentation', icon: Book },
-          { name: 'Training Guide', path: 'Training', icon: Book }
-        ]
-      }] : []),
-      {
-        id: 'profile',
-        name: 'User',
-        icon: UserIcon,
-        items: [
-          { name: 'My Profile', path: 'UserProfile', icon: UserIcon }
-        ]
-      }
-    ];
+        const menu = [
+            { title: 'Dashboard', url: 'Dashboard' },
+            {
+                title: 'Projects',
+                url: 'Projects',
+                items: [
+                    { title: 'Projects', url: 'Projects', icon: <FolderKanban className="w-5 h-5" /> },
+                    { title: 'Employees', url: 'Employees', icon: <Users className="w-5 h-5" /> },
+                    ...(isAdmin || isSupervisor ? [{ title: 'Reports & Analytics', url: 'Reports', icon: <BarChart3 className="w-5 h-5" /> }] : []),
+                    ...(userRole === 'hr_manager' ? [{ title: 'HR Manager Approval', url: 'HRManagerApproval', icon: <Shield className="w-5 h-5" /> }] : [])
+                ]
+            }
+        ];
 
-    return menuGroups.map((group) => ({
-      ...group,
-      items: group.items.filter((item) => hasPageAccess(item.path))
-    })).filter((group) => group.items.length > 0);
+        if (isAdmin) {
+            menu.push({
+                title: 'Settings',
+                url: '#',
+                items: [
+                    { title: 'Users & Permissions', url: 'Users', icon: <Shield className="w-5 h-5" /> },
+                    { title: 'Department Heads', url: 'DepartmentHeadSettings', icon: <Users className="w-5 h-5" /> },
+                    { title: 'Audit Trail', url: 'AuditTrail', icon: <FileSpreadsheet className="w-5 h-5" /> },
+                    { title: 'Rules Settings', url: 'RulesSettings', icon: <Settings className="w-5 h-5" /> },
+                    { title: 'Ramadan Schedules', url: 'RamadanSchedules', icon: <Calendar className="w-5 h-5" /> },
+                    { title: 'Documentation', url: 'Documentation', icon: <Book className="w-5 h-5" /> },
+                    { title: 'Training Guide', url: 'Training', icon: <Book className="w-5 h-5" /> }
+                ]
+            });
+        }
+
+        return menu.filter(item => {
+            if (item.items) {
+                return item.items.some(subItem => hasPageAccess(subItem.url));
+            }
+            return hasPageAccess(item.url);
+        });
     }, [currentUser, permissions, isAdmin, isSupervisor, userRole, hasPageAccess]);
-
-    // Auto-expand category if current page is in it (MUST be before conditional returns)
-    React.useEffect(() => {
-      if (currentPageName) {
-          filteredMenuGroups.forEach((group) => {
-              const isCurrentPageInGroup = group.items.some((item) => item.path === currentPageName);
-              if (isCurrentPageInGroup) {
-                  setExpandedGroups((prev) => new Set([...prev, group.id]));
-              }
-          });
-      }
-    }, [currentPageName, filteredMenuGroups]);
 
     // AFTER all hooks, handle conditional rendering
     // For public pages, render without layout
@@ -220,220 +183,32 @@ export default function Layout({ children, currentPageName }) {
       );
     }
 
-    const toggleGroup = (groupId) => {
-    setExpandedGroups((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(groupId)) {
-        newSet.delete(groupId);
-      } else {
-        newSet.add(groupId);
-      }
-      return newSet;
-    });
-  };
-
-  return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
-            {/* Mobile Sidebar Backdrop */}
-            {sidebarOpen &&
-      <div
-        className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden"
-        onClick={() => setSidebarOpen(false)} />
-
-      }
-
-            {/* Sidebar */}
-            <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-white/80 backdrop-blur-xl border-r border-white/20 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shadow-2xl shadow-indigo-100/50 h-screen",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full",
-        sidebarCollapsed ? "w-20" : "w-72"
-      )}>
-                <div className="flex flex-col h-full overflow-hidden">
-                    {/* Logo */}
-                    <div className={cn("flex items-center justify-between h-20 mb-2", sidebarCollapsed ? "px-4 justify-center" : "px-8")}>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200">
-                                <BarChart3 className="w-6 h-6 text-white flex-shrink-0" />
-                            </div>
-                            {!sidebarCollapsed &&
-              <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
-                                    ALM Attendance
-                                </span>
-              }
-                        </div>
-                        <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
-              onClick={() => setSidebarOpen(false)}>
-
-                            <X className="w-5 h-5" />
-                        </Button>
-                    </div>
-
-                    {/* Navigation */}
-                    <nav className="px-4 py-6 opacity-100 flex-1 overflow-y-auto space-y-2">
-                        {filteredMenuGroups.map((group) => {
-              const GroupIcon = group.icon;
-              const isExpanded = expandedGroups.has(group.id);
-
-              return (
-                <div key={group.id}>
-                                    {group.items.length === 1 ?
-                  // Single item - render directly
-                  <Link
-                    to={createPageUrl(group.items[0].path)}
-                    className={cn(
-                      "flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 mx-2",
-                      sidebarCollapsed ? "justify-center px-2" : "space-x-3",
-                      currentPageName === group.items[0].path ?
-                      "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 shadow-sm ring-1 ring-indigo-100" :
-                      "text-slate-600 hover:bg-slate-50/80 hover:text-slate-900"
-                    )}
-                    onClick={() => setSidebarOpen(false)}
-                    title={sidebarCollapsed ? group.items[0].name : undefined}>
-
-                    <GroupIcon className={cn("w-5 h-5 flex-shrink-0 transition-colors", currentPageName === group.items[0].path ? "text-indigo-600" : "text-slate-400")} />
-                    {!sidebarCollapsed && <span>{group.items[0].name}</span>}
-                  </Link> :
-
-
-                  // Multiple items - render as collapsible group
-                  <div className="mx-2">
-                    <button
-                      onClick={() => toggleGroup(group.id)}
-                      className={cn(
-                        "w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
-                        sidebarCollapsed ? "justify-center px-2" : "justify-between",
-                        "text-slate-700 hover:bg-gray-100 hover:text-slate-900"
-                      )}
-                      title={sidebarCollapsed ? group.name : undefined}>
-
-                      <div className={cn("flex items-center", sidebarCollapsed ? "" : "space-x-3")}>
-                        <GroupIcon className="w-5 h-5 flex-shrink-0 text-slate-500" />
-                        {!sidebarCollapsed && <span>{group.name}</span>}
-                      </div>
-                      {!sidebarCollapsed &&
-                      <ChevronRight className={cn(
-                        "w-4 h-4 transition-transform text-slate-400",
-                        isExpanded && "rotate-90"
-                      )} />
-                      }
-                    </button>
-                    {isExpanded && !sidebarCollapsed &&
-                    <div className="mt-1 ml-4 pl-4 border-l-2 border-gray-200 space-y-1">
-                        {group.items.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <Link
-                            key={item.path}
-                            to={createPageUrl(item.path)}
-                            className={cn(
-                              "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
-                              currentPageName === item.path ?
-                              "bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-500" :
-                              "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                            )}
-                            onClick={() => setSidebarOpen(false)}>
-
-                              <Icon className={cn("w-4 h-4", currentPageName === item.path ? "text-indigo-600" : "text-slate-400")} />
-                              <span>{item.name}</span>
-                            </Link>);
-
-                      })}
-                      </div>
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
+            {/* Top Navbar */}
+            <Navbar1
+                logo={{
+                    url: 'Dashboard',
+                    icon: BarChart3,
+                    title: 'ALM Attendance'
+                }}
+                menu={navbarMenu}
+                auth={{
+                    logout: {
+                        text: 'Logout',
+                        onClick: () => base44.auth.logout()
                     }
-                  </div>
-                  }
-              </div>);
+                }}
+            />
 
-
-            })}
-                    </nav>
-
-                    {/* Collapse Toggle (Desktop only) */}
-                    <div className="hidden lg:block border-t border-slate-100 p-2">
-                        <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="w-full justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50">
-
-                            <ChevronDown className={cn(
-                "w-4 h-4 transition-transform",
-                sidebarCollapsed ? "-rotate-90" : "rotate-90"
-              )} />
-                        </Button>
-                    </div>
-
-                    {/* User Info & Logout */}
-                    <div className={cn("border-t border-slate-100", sidebarCollapsed ? "p-2" : "p-4")}>
-                        {currentUser && !sidebarCollapsed &&
-            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100">
-                                        <UserIcon className="w-4 h-4 text-indigo-600" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-slate-900 truncate">
-                                            {currentUser.full_name}
-                                        </p>
-                                        <span className={cn(
-                    "inline-block px-2 py-0.5 rounded text-[10px] font-medium tracking-wider uppercase",
-                    isAdmin ? 'bg-purple-50 text-purple-700 border border-purple-100' :
-                    isSupervisor ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                    'bg-slate-50 text-slate-600 border border-slate-100'
-                  )}>
-                                            {isAdmin ? 'Admin' : isSupervisor ? 'Supervisor' : 'User'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-            }
-                        <Button
-              variant="outline"
-              size="sm"
-              onClick={() => base44.auth.logout()}
-              className={cn("w-full border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900", sidebarCollapsed ? "p-2" : "justify-center")}
-              title={sidebarCollapsed ? "Logout" : undefined}>
-
-                            <LogOut className={cn("w-4 h-4", !sidebarCollapsed && "mr-2")} />
-                            {!sidebarCollapsed && "Logout"}
-                        </Button>
-                    </div>
-                </div>
-            </aside>
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-                {/* Mobile Header */}
-                <header className="lg:hidden flex-shrink-0 z-30 bg-white border-b border-slate-200 px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center">
-                        <Button
-              variant="ghost"
-              size="icon"
-              className="text-slate-500"
-              onClick={() => setSidebarOpen(true)}>
-
-                            <Menu className="w-6 h-6" />
-                        </Button>
-                        <span className="ml-4 text-lg font-semibold text-slate-900">Attendance</span>
-                    </div>
+            {/* Main Content */}
+            <main className="container mx-auto px-4 py-6">
+                <div className="flex justify-end mb-4">
                     <NotificationCenter />
-                </header>
+                </div>
+                {children}
+            </main>
 
-                {/* Page Content */}
-                <main className="bg-slate-50 p-6 flex-1 overflow-y-auto lg:p-8 min-h-0">
-                    <div className="max-w-7xl mx-auto">
-                        {/* Desktop Notification */}
-                        <div className="hidden lg:flex justify-end mb-4">
-                            <NotificationCenter />
-                        </div>
-                        {children}
-                    </div>
-                </main>
-            </div>
-            
             {/* Toast Notifications */}
             <Toaster position="top-right" richColors />
 
@@ -441,9 +216,10 @@ export default function Layout({ children, currentPageName }) {
             <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
             {/* Keyboard Shortcut Hint */}
-      <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-3 py-2 rounded-lg shadow-lg text-xs opacity-0 hover:opacity-100 transition-opacity">
-        Press <kbd className="px-1 py-0.5 bg-slate-700 rounded">⌘K</kbd> to search
-      </div>
-    </div>);
+            <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-3 py-2 rounded-lg shadow-lg text-xs opacity-0 hover:opacity-100 transition-opacity">
+                Press <kbd className="px-1 py-0.5 bg-slate-700 rounded">⌘K</kbd> to search
+            </div>
+        </div>
+    );
 
 }
