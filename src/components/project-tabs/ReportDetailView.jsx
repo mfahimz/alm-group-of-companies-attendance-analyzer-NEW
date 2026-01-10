@@ -1805,16 +1805,11 @@ export default function ReportDetailView({ reportRun, project }) {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-xs">
-                                           {(() => {
-                                               const earlyCheckoutMinutes = day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' 
-                                                   ? parseInt(day.earlyCheckoutInfo) || 0
-                                                   : 0;
-                                               return earlyCheckoutMinutes > 0 ? (
-                                                   <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
-                                               ) : (
-                                                   <span className="text-slate-400">-</span>
-                                               );
-                                           })()}
+                                            {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
+                                                <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-xs">
                                             {day.otherMinutes > 0 ? (
