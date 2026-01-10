@@ -348,7 +348,11 @@ export default function DepartmentHeadSettings() {
                             <Label>Employee (Department Head)</Label>
                             <Select 
                                 value={selectedEmployee} 
-                                onValueChange={setSelectedEmployee}
+                                onValueChange={(val) => {
+                                    setSelectedEmployee(val);
+                                    // Auto-uncheck the selected employee from managed employees
+                                    setSelectedManagedEmployees(prev => prev.filter(id => id !== val));
+                                }}
                                 disabled={!selectedCompany}
                             >
                                 <SelectTrigger>
@@ -378,16 +382,20 @@ export default function DepartmentHeadSettings() {
                                                         type="checkbox"
                                                         checked={selectedManagedEmployees.includes(emp.id)}
                                                         onChange={() => toggleManagedEmployee(emp.id)}
+                                                        disabled={emp.id === selectedEmployee}
                                                         className="rounded border-slate-300"
                                                     />
-                                                    <span className="text-sm">{emp.name} ({emp.attendance_id})</span>
+                                                    <span className={`text-sm ${emp.id === selectedEmployee ? 'text-slate-400' : ''}`}>
+                                                        {emp.name} ({emp.attendance_id})
+                                                        {emp.id === selectedEmployee && ' (Department Head)'}
+                                                    </span>
                                                 </label>
                                             ))}
                                         </div>
                                     )}
                                 </div>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Select employees managed by this department head
+                                    Select employees managed by this department head. Department head cannot manage themselves.
                                 </p>
                             </div>
 
@@ -610,9 +618,13 @@ export default function DepartmentHeadSettings() {
                                                         type="checkbox"
                                                         checked={selectedManagedEmployees.includes(emp.id)}
                                                         onChange={() => toggleManagedEmployee(emp.id)}
+                                                        disabled={emp.id === editingHead.employee_id}
                                                         className="rounded border-slate-300"
                                                     />
-                                                    <span className="text-sm">{emp.name} ({emp.attendance_id})</span>
+                                                    <span className={`text-sm ${emp.id === editingHead.employee_id ? 'text-slate-400' : ''}`}>
+                                                        {emp.name} ({emp.attendance_id})
+                                                        {emp.id === editingHead.employee_id && ' (Department Head)'}
+                                                    </span>
                                                 </label>
                                             ))}
                                         </div>
