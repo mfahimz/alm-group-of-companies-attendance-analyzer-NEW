@@ -284,6 +284,7 @@ export default function RunAnalysisTab({ project }) {
             try {
                 return (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
                        e.use_in_analysis !== false &&
+                       e.is_custom_type !== true &&
                        ['approved', 'approved_dept_head', 'pending_hr'].includes(e.approval_status);
             } catch (error) {
                 console.error(`Error filtering exception ${e.id}:`, error);
