@@ -40,6 +40,11 @@ export default function DepartmentHeadSettings() {
         queryFn: () => base44.entities.CompanySettings.list()
     });
 
+    const { data: users = [] } = useQuery({
+        queryKey: ['users'],
+        queryFn: () => base44.entities.User.list()
+    });
+
     const { data: approvalLinks = [] } = useQuery({
         queryKey: ['approvalLinks'],
         queryFn: () => base44.entities.ApprovalLink.list('-created_date')
@@ -128,8 +133,18 @@ export default function DepartmentHeadSettings() {
         return emp?.name || 'Unknown';
     };
 
-    const getReportsToName = (deptHeadId) => {
-        const dh = deptHeads.find(d => d.id === deptHeadId);
+    const getReportsToName = (reportsToValue) => {
+        // Check if it's HR Manager
+        if (reportsToValue === 'HR_MANAGER') {
+            const hrManagers = users.filter(u => (u.extended_role || u.role) === 'hr_manager');
+            if (hrManagers.length > 0) {
+                return `HR Manager (${hrManagers.map(h => h.full_name).join(', ')})`;
+            }
+            return 'HR Manager';
+        }
+        
+        // Check if it's a department head
+        const dh = deptHeads.find(d => d.id === reportsToValue);
         if (!dh) return '—';
         return getDeptHeadName(dh.employee_id);
     };
@@ -410,6 +425,7 @@ export default function DepartmentHeadSettings() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value={null}>None</SelectItem>
+                                        <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
                                         {availableReportsTo.map(dh => (
                                             <SelectItem key={dh.id} value={dh.id}>
                                                 {getDeptHeadName(dh.employee_id)} ({dh.department})
@@ -640,6 +656,7 @@ export default function DepartmentHeadSettings() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value={null}>None</SelectItem>
+                                        <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
                                         {deptHeads.filter(dh => 
                                             dh.company === editingHead.company && 
                                             dh.active && 
