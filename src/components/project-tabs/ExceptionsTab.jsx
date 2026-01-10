@@ -55,6 +55,7 @@ export default function ExceptionsTab({ project }) {
         date_from: '',
         date_to: '',
         type: 'PUBLIC_HOLIDAY',
+        custom_type_name: '',
         new_am_start: '',
         new_am_end: '',
         new_pm_start: '',
@@ -64,7 +65,7 @@ export default function ExceptionsTab({ project }) {
         allowed_minutes_type: 'both',
         details: '',
         include_friday: false,
-        other_minutes: '' // Added other_minutes to formData
+        other_minutes: ''
     });
     const [filter, setFilter] = useState({ search: '', type: 'all' });
     const [reportFilter, setReportFilter] = useState({ search: '', type: 'all' });
@@ -113,7 +114,10 @@ export default function ExceptionsTab({ project }) {
             const exceptionData = {
                 ...data,
                 project_id: project.id,
-                approval_status: 'approved'
+                approval_status: 'approved',
+                // If type is CUSTOM, mark it and ensure it's never used in analysis
+                is_custom_type: data.type === 'CUSTOM',
+                use_in_analysis: data.type === 'CUSTOM' ? false : true
             };
             
             return await base44.entities.Exception.create(exceptionData);
@@ -334,6 +338,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             date_from: '',
             date_to: '',
             type: 'PUBLIC_HOLIDAY',
+            custom_type_name: '',
             new_am_start: '',
             new_am_end: '',
             new_pm_start: '',
@@ -341,13 +346,19 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             early_checkout_minutes: '',
             details: '',
             include_friday: false,
-            other_minutes: '' // Added other_minutes
+            other_minutes: ''
         });
         setEmployeeSearch('');
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        // Validate custom type name
+        if (formData.type === 'CUSTOM' && !formData.custom_type_name.trim()) {
+            toast.error('Please enter a custom exception type name');
+            return;
+        }
 
         // For PUBLIC_HOLIDAY and ALLOWED_MINUTES (when set to ALL), attendance_id can be ALL
         if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && !formData.attendance_id) {
@@ -377,6 +388,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : submitData.date_from,
             date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : submitData.date_to,
             type: submitData.type,
+            custom_type_name: submitData.type === 'CUSTOM' ? submitData.custom_type_name.trim() : null,
             details: submitData.details || null
         };
         
@@ -592,6 +604,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                             <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
+                                            <SelectItem value="CUSTOM">Custom Type (Not used in analysis)</SelectItem>
                                             {/* MANUAL_LATE, MANUAL_EARLY_CHECKOUT, MANUAL_OTHER_MINUTES are excluded - only creatable from report edits */}
                                         </SelectContent>
                                     </Select>
@@ -708,6 +721,20 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 </div>
                             )}
 
+                            {formData.type === 'CUSTOM' && (
+                                <div>
+                                    <Label>Custom Exception Type Name *</Label>
+                                    <Input
+                                        placeholder="Enter custom type name (e.g. Training, Site Visit)"
+                                        value={formData.custom_type_name}
+                                        onChange={(e) => setFormData({ ...formData, custom_type_name: e.target.value })}
+                                    />
+                                    <p className="text-xs text-amber-600 mt-1">
+                                        ⚠️ Custom types are for record-keeping only and will never be used in analysis calculations
+                                    </p>
+                                </div>
+                            )}
+
                             <div>
                                 <Label>Details / Reason</Label>
                                 <Input
@@ -820,6 +847,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                 <SelectItem value="ANNUAL_LEAVE">Annual Leave</SelectItem>
                                 <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
+                                <SelectItem value="CUSTOM">Custom Type</SelectItem>
                             </SelectContent>
                         </Select>
                         </div>
@@ -892,8 +920,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 </span>
                                             </TableCell>
                                             <TableCell className="p-1">
-                                                <div className="text-sm">
-                                                    {exception.type.replace(/_/g, ' ')}
+                                                <div className="flex items-center gap-2">
+                                                    {exception.is_custom_type ? (
+                                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                                                            {exception.custom_type_name || 'Custom'}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-sm">{exception.type.replace(/_/g, ' ')}</span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="p-1 text-sm">
@@ -982,6 +1016,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                     <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+                                    <SelectItem value="CUSTOM">Custom Type</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -1031,16 +1066,22 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 </TableCell>
                                                 <TableCell className="p-1">
                                                 <div className="flex flex-col gap-1">
-                                                   <span className="text-sm">{exception.type.replace(/_/g, ' ')}</span>
-                                                   {exception.late_minutes > 0 && (
-                                                       <span className="text-xs text-orange-600">Late: {exception.late_minutes}m</span>
-                                                   )}
-                                                   {exception.early_checkout_minutes > 0 && (
-                                                       <span className="text-xs text-blue-600">Early: {exception.early_checkout_minutes}m</span>
-                                                   )}
-                                                   {exception.other_minutes > 0 && (
-                                                       <span className="text-xs text-purple-600">Other: {exception.other_minutes}m</span>
-                                                   )}
+                                                  {exception.is_custom_type ? (
+                                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300 inline-block w-fit">
+                                                          {exception.custom_type_name || 'Custom'}
+                                                      </span>
+                                                  ) : (
+                                                      <span className="text-sm">{exception.type.replace(/_/g, ' ')}</span>
+                                                  )}
+                                                  {exception.late_minutes > 0 && (
+                                                      <span className="text-xs text-orange-600">Late: {exception.late_minutes}m</span>
+                                                  )}
+                                                  {exception.early_checkout_minutes > 0 && (
+                                                      <span className="text-xs text-blue-600">Early: {exception.early_checkout_minutes}m</span>
+                                                  )}
+                                                  {exception.other_minutes > 0 && (
+                                                      <span className="text-xs text-purple-600">Other: {exception.other_minutes}m</span>
+                                                  )}
                                                 </div>
                                                 </TableCell>
                                             <TableCell className="p-1 text-sm">
@@ -1127,7 +1168,16 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 </div>
                                 <div>
                                     <Label className="text-slate-500 text-xs">Exception Type</Label>
-                                    <p className="font-medium text-slate-900">{viewingException.type.replace(/_/g, ' ')}</p>
+                                    {viewingException.is_custom_type ? (
+                                        <div>
+                                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300 inline-block">
+                                                {viewingException.custom_type_name || 'Custom'}
+                                            </span>
+                                            <p className="text-xs text-amber-600 mt-1">Not used in analysis</p>
+                                        </div>
+                                    ) : (
+                                        <p className="font-medium text-slate-900">{viewingException.type.replace(/_/g, ' ')}</p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label className="text-slate-500 text-xs">Created From Report</Label>
