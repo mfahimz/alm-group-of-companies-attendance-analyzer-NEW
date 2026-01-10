@@ -354,12 +354,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Validate custom type name
-        if (formData.type === 'CUSTOM' && !formData.custom_type_name.trim()) {
-            toast.error('Please enter a custom exception type name');
-            return;
-        }
-
         // For PUBLIC_HOLIDAY and ALLOWED_MINUTES (when set to ALL), attendance_id can be ALL
         if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && !formData.attendance_id) {
             toast.error('Please select an employee');
@@ -371,7 +365,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             formData.attendance_id = 'ALL';
         }
         
-        if (formData.type !== 'SINGLE_SHIFT' && (!formData.date_from || !formData.date_to)) {
+        // Date range is optional for CUSTOM type, required for others (except SINGLE_SHIFT)
+        if (formData.type !== 'SINGLE_SHIFT' && formData.type !== 'CUSTOM' && (!formData.date_from || !formData.date_to)) {
             toast.error('Please fill in date range');
             return;
         }
@@ -383,12 +378,17 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         
         // Clean up empty string values and convert early_checkout_minutes to number
         // For SINGLE_SHIFT, use project date range as placeholder
+        // For CUSTOM type with no dates, use project date range
         const cleanedData = {
             attendance_id: submitData.attendance_id,
-            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : submitData.date_from,
-            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : submitData.date_to,
+            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : 
+                       (submitData.type === 'CUSTOM' && !submitData.date_from) ? project.date_from :
+                       submitData.date_from,
+            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : 
+                     (submitData.type === 'CUSTOM' && !submitData.date_to) ? project.date_to :
+                     submitData.date_to,
             type: submitData.type,
-            custom_type_name: submitData.type === 'CUSTOM' ? submitData.custom_type_name.trim() : null,
+            custom_type_name: submitData.type === 'CUSTOM' ? (submitData.custom_type_name?.trim() || 'Custom') : null,
             details: submitData.details || null
         };
         
@@ -723,7 +723,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 
                             {formData.type === 'CUSTOM' && (
                                 <div>
-                                    <Label>Custom Exception Type Name *</Label>
+                                    <Label>Custom Exception Type Name (Optional)</Label>
                                     <Input
                                         placeholder="Enter custom type name (e.g. Training, Site Visit)"
                                         value={formData.custom_type_name}
