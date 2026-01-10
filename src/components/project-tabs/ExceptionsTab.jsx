@@ -951,6 +951,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
+                                                        onClick={() => setEditingException(exception)}
+                                                        title="Edit exception"
+                                                    >
+                                                        <Edit className="w-4 h-4 text-blue-600" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
                                                         onClick={() => deleteMutation.mutate(exception.id)}
                                                     >
                                                         <Trash2 className="w-4 h-4 text-red-600" />
