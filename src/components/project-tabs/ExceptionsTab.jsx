@@ -354,14 +354,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // For PUBLIC_HOLIDAY and ALLOWED_MINUTES (when set to ALL), attendance_id can be ALL
-        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && !formData.attendance_id) {
+        // For PUBLIC_HOLIDAY, ALLOWED_MINUTES, and CUSTOM types, attendance_id is optional
+        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'CUSTOM' && !formData.attendance_id) {
             toast.error('Please select an employee');
             return;
         }
 
-        // For ALLOWED_MINUTES, default to ALL if not selected
-        if (formData.type === 'ALLOWED_MINUTES' && !formData.attendance_id) {
+        // For ALLOWED_MINUTES and CUSTOM, default to ALL if not selected
+        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'CUSTOM') && !formData.attendance_id) {
             formData.attendance_id = 'ALL';
         }
         
@@ -505,14 +505,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && '*'}</Label>
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'CUSTOM' && '*'}</Label>
                                     {formData.type === 'PUBLIC_HOLIDAY' ? (
                                         <Input 
                                             value="All Employees" 
                                             disabled 
                                             className="bg-slate-50"
                                         />
-                                    ) : formData.type === 'ALLOWED_MINUTES' ? (
+                                    ) : (formData.type === 'ALLOWED_MINUTES' || formData.type === 'CUSTOM') ? (
                                         <Select
                                             value={formData.attendance_id || 'ALL'}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
