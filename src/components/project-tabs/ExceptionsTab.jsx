@@ -803,34 +803,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             <Download className="w-4 h-4 mr-2" />
                             Export
                         </Button>
-                        {!isUser && (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={downloadTemplate}
-                                >
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Template
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => document.getElementById('exception-import').click()}
-                                    disabled={uploadProgress !== null}
-                                >
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    {uploadProgress ? 'Importing...' : 'Import Excel'}
-                                </Button>
-                                <input
-                                    id="exception-import"
-                                    type="file"
-                                    accept=".xlsx,.xls,.csv"
-                                    onChange={handleFileImport}
-                                    className="hidden"
-                                />
-                            </>
-                        )}
                         {!showForm && (
                             <Button 
                                 onClick={() => setShowForm(true)}
