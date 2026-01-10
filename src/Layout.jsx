@@ -166,9 +166,49 @@ export default function Layout({ children, currentPageName }) {
       ...group,
       items: group.items.filter((item) => hasPageAccess(item.path))
     })).filter((group) => group.items.length > 0);
-  }, [currentUser, permissions, isAdmin, isSupervisor, userRole]);
+    }, [currentUser, permissions, isAdmin, isSupervisor, userRole, hasPageAccess]);
 
-  const toggleGroup = (groupId) => {
+    // AFTER all hooks, handle conditional rendering
+    // For public pages, render without layout
+    if (isPublicPage) {
+      return (
+          <>
+              {children}
+              <Toaster position="top-right" richColors />
+          </>
+      );
+    }
+
+    // For protected pages, show loading while checking auth
+    if (isLoading) {
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-slate-500">Loading...</div>
+          </div>
+      );
+    }
+
+    // If not loading but no user (error state), show loading while redirect happens
+    if (!currentUser) {
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-slate-500">Redirecting to login...</div>
+          </div>
+      );
+    }
+
+    // Check if user has a company assigned (not required for admin/supervisor)
+    if (!currentUser.company && userRole === 'user') {
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-slate-600 text-center">
+                  No company is assigned. Wait for the administrator to assign a company.
+              </div>
+          </div>
+      );
+    }
+
+    const toggleGroup = (groupId) => {
     setExpandedGroups((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(groupId)) {
