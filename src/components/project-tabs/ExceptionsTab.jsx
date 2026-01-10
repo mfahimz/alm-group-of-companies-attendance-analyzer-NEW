@@ -930,10 +930,14 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 </div>
                                             </TableCell>
                                             <TableCell className="p-1 text-sm">
-                                                {new Date(exception.date_from).toLocaleDateString()}
+                                                {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
+                                                    ? '—' 
+                                                    : new Date(exception.date_from).toLocaleDateString()}
                                             </TableCell>
                                             <TableCell className="p-1 text-sm">
-                                                {new Date(exception.date_to).toLocaleDateString()}
+                                                {exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) 
+                                                    ? '—' 
+                                                    : new Date(exception.date_to).toLocaleDateString()}
                                             </TableCell>
                                             <TableCell className="p-1 text-sm max-w-xs truncate">
                                                 {exception.details || '-'}
