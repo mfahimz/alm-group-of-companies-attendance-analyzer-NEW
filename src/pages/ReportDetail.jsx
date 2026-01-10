@@ -16,6 +16,11 @@ export default function ReportDetailPage() {
 
     const queryClient = useQueryClient();
 
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
     const { data: reportRun } = useQuery({
         queryKey: ['reportRun', reportRunId],
         queryFn: async () => {
@@ -33,6 +38,9 @@ export default function ReportDetailPage() {
         },
         enabled: !!projectId
     });
+
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
 
     if (!reportRun || !project) {
         return (
@@ -74,7 +82,7 @@ export default function ReportDetailPage() {
             {/* Report Detail View */}
             <ReportDetailView reportRun={reportRun} project={project} />
             
-            <ApprovalLinksHistory reportRunId={reportRun.id} projectId={project.id} />
+            {isAdmin && <ApprovalLinksHistory reportRunId={reportRun.id} projectId={project.id} />}
         </div>
     );
 }
