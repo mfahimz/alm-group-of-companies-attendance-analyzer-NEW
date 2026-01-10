@@ -365,8 +365,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             formData.attendance_id = 'ALL';
         }
         
-        // Date range is mandatory for all types except SINGLE_SHIFT
-        if (formData.type !== 'SINGLE_SHIFT' && (!formData.date_from || !formData.date_to)) {
+        // Date range is mandatory for all types except SINGLE_SHIFT and CUSTOM
+        if (formData.type !== 'SINGLE_SHIFT' && formData.type !== 'CUSTOM' && (!formData.date_from || !formData.date_to)) {
             toast.error('Please fill in date range');
             return;
         }
@@ -377,11 +377,15 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             : formData;
         
         // Clean up empty string values and convert early_checkout_minutes to number
-        // For SINGLE_SHIFT, use project date range as placeholder
+        // For SINGLE_SHIFT or CUSTOM (if no dates), use project date range as placeholder
         const cleanedData = {
             attendance_id: submitData.attendance_id,
-            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : submitData.date_from,
-            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : submitData.date_to,
+            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : 
+                       (submitData.type === 'CUSTOM' && !submitData.date_from) ? project.date_from :
+                       submitData.date_from,
+            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : 
+                     (submitData.type === 'CUSTOM' && !submitData.date_to) ? project.date_to :
+                     submitData.date_to,
             type: submitData.type,
             custom_type_name: submitData.type === 'CUSTOM' ? (submitData.custom_type_name?.trim() || 'Custom') : null,
             details: submitData.details || null
@@ -609,7 +613,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             {formData.type !== 'SINGLE_SHIFT' && (
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <Label>From Date <span className="text-red-500">*</span></Label>
+                                        <Label>From Date {formData.type !== 'CUSTOM' && <span className="text-red-500">*</span>}</Label>
                                         <Input
                                             type="date"
                                             value={formData.date_from}
@@ -617,7 +621,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                         />
                                     </div>
                                     <div>
-                                        <Label>To Date <span className="text-red-500">*</span></Label>
+                                        <Label>To Date {formData.type !== 'CUSTOM' && <span className="text-red-500">*</span>}</Label>
                                         <Input
                                             type="date"
                                             value={formData.date_to}
