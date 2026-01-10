@@ -39,6 +39,7 @@ export default function ReportDetailView({ reportRun, project }) {
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user';
+    const isAdmin = userRole === 'admin';
 
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
@@ -936,8 +937,8 @@ export default function ReportDetailView({ reportRun, project }) {
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
             
-            // Always try to generate approval links after save if there were edits
-            if (exceptionCount > 0) {
+            // Only admins can generate approval links
+            if (exceptionCount > 0 && isAdmin) {
                 try {
                     setSaveProgress({ current: 100, total: 100, status: 'Generating approval links...' });
                     
