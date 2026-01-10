@@ -232,18 +232,6 @@ export default function Layout({ children, currentPageName }) {
     });
   };
 
-  // Auto-expand category if current page is in it
-  React.useEffect(() => {
-    if (currentPageName) {
-      filteredMenuGroups.forEach((group) => {
-        const isCurrentPageInGroup = group.items.some((item) => item.path === currentPageName);
-        if (isCurrentPageInGroup) {
-          setExpandedGroups((prev) => new Set([...prev, group.id]));
-        }
-      });
-    }
-  }, [currentPageName, filteredMenuGroups]);
-
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40 flex text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
             {/* Mobile Sidebar Backdrop */}
