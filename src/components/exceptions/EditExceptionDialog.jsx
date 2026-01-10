@@ -92,6 +92,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
 
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
+    const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
