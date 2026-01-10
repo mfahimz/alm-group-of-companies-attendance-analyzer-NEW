@@ -16,6 +16,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
         date_from: '',
         date_to: '',
         details: '',
+        custom_type_name: '',
         new_am_start: '',
         new_am_end: '',
         new_pm_start: '',
@@ -35,6 +36,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 date_from: exception.date_from || '',
                 date_to: exception.date_to || '',
                 details: exception.details || '',
+                custom_type_name: exception.custom_type_name || '',
                 new_am_start: exception.new_am_start || '',
                 new_am_end: exception.new_am_end || '',
                 new_pm_start: exception.new_pm_start || '',
@@ -70,6 +72,12 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             details: formData.details || null
         };
 
+        if (formData.type === 'CUSTOM') {
+            cleanedData.custom_type_name = formData.custom_type_name?.trim() || 'Custom';
+            cleanedData.is_custom_type = true;
+            cleanedData.use_in_analysis = false;
+        }
+
         if (formData.type === 'SHIFT_OVERRIDE') {
             cleanedData.new_am_start = formData.new_am_start || null;
             cleanedData.new_am_end = formData.new_am_end || null;
@@ -77,8 +85,6 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.new_pm_end = formData.new_pm_end || null;
             cleanedData.include_friday = formData.include_friday || false;
         }
-
-
 
         if (formData.type === 'ALLOWED_MINUTES' && formData.allowed_minutes) {
             cleanedData.allowed_minutes = parseInt(formData.allowed_minutes);
@@ -126,7 +132,9 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                     <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
                                     <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                    <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                     <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
+                                    <SelectItem value="CUSTOM">Custom Type (Not used in analysis)</SelectItem>
                                     </SelectContent>
                             </Select>
                         </div>
@@ -150,6 +158,20 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                             />
                         </div>
                     </div>
+
+                    {formData.type === 'CUSTOM' && (
+                        <div className="border-t pt-4">
+                            <Label>Custom Exception Type Name</Label>
+                            <Input
+                                placeholder="Enter custom type name (e.g. Training, Site Visit)"
+                                value={formData.custom_type_name}
+                                onChange={(e) => setFormData({ ...formData, custom_type_name: e.target.value })}
+                            />
+                            <p className="text-xs text-amber-600 mt-1">
+                                ⚠️ Custom types are for record-keeping only and will never be used in analysis calculations
+                            </p>
+                        </div>
+                    )}
 
                     {needsShiftOverride && (
                         <div className="space-y-4 border-t pt-4">
