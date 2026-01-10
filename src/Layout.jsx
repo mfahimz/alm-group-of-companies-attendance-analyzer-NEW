@@ -106,59 +106,19 @@ export default function Layout({ children, currentPageName }) {
     const isSupervisor = userRole === 'supervisor';
     const canAccessAllCompanies = isAdmin || isSupervisor;
 
-    // AFTER all hooks, handle conditional rendering
-    // For public pages, render without layout
-    if (isPublicPage) {
-        return (
-            <>
-                {children}
-                <Toaster position="top-right" richColors />
-            </>
-        );
-    }
+    const hasPageAccess = React.useCallback((pageName) => {
+      if (!currentUser) return false;
+      const permission = permissions.find((p) => p.page_name === pageName);
+      if (!permission) return true;
+      const allowedRoles = permission.allowed_roles.split(',').map((r) => r.trim());
+      return allowedRoles.includes(userRole);
+    }, [currentUser, permissions, userRole]);
 
-    // For protected pages, show loading while checking auth
-    if (isLoading) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-500">Loading...</div>
-            </div>
-        );
-    }
+    // Filter menu items based on user permissions - MUST be before conditional returns
+    const filteredMenuGroups = React.useMemo(() => {
+      if (!currentUser) return [];
 
-    // If not loading but no user (error state), show loading while redirect happens
-    if (!currentUser) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-500">Redirecting to login...</div>
-            </div>
-        );
-    }
-
-  const hasPageAccess = (pageName) => {
-    if (!currentUser) return false;
-    const permission = permissions.find((p) => p.page_name === pageName);
-    if (!permission) return true; // If no permission configured, allow by default
-    const allowedRoles = permission.allowed_roles.split(',').map((r) => r.trim());
-    return allowedRoles.includes(userRole);
-  };
-
-  // Check if user has a company assigned (not required for admin/supervisor)
-  if (!currentUser.company && userRole === 'user') {
-      return (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-              <div className="text-slate-600 text-center">
-                  No company is assigned. Wait for the administrator to assign a company.
-              </div>
-          </div>
-      );
-  }
-
-  // Filter menu items based on user permissions
-  const filteredMenuGroups = React.useMemo(() => {
-    if (!currentUser) return [];
-
-    const menuGroups = [
+      const menuGroups = [
       {
         id: 'dashboard',
         name: 'Dashboard',
