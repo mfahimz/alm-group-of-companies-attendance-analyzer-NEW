@@ -23,6 +23,8 @@ export default function DepartmentHeadSettings() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCompany, setFilterCompany] = useState('all');
     const [filterDepartment, setFilterDepartment] = useState('all');
+    const [managedEmployeesSearch, setManagedEmployeesSearch] = useState('');
+    const [editManagedEmployeesSearch, setEditManagedEmployeesSearch] = useState('');
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -162,6 +164,7 @@ export default function DepartmentHeadSettings() {
             setSelectedManagedEmployees(managedIds);
         }
         setSelectedReportsTo(deptHead.reports_to || '');
+        setEditManagedEmployeesSearch('');
         setShowEditDialog(true);
     };
 
@@ -386,28 +389,48 @@ export default function DepartmentHeadSettings() {
                         <>
                             <div>
                                 <Label>Managed Employees (Optional)</Label>
-                                <div className="border rounded-lg p-3 max-h-48 overflow-y-auto bg-slate-50">
-                                    {availableEmployees.length === 0 ? (
-                                        <p className="text-sm text-slate-500">No employees available</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {availableEmployees.map(emp => (
-                                                <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedManagedEmployees.includes(emp.id)}
-                                                        onChange={() => toggleManagedEmployee(emp.id)}
-                                                        disabled={emp.id === selectedEmployee}
-                                                        className="rounded border-slate-300"
-                                                    />
-                                                    <span className={`text-sm ${emp.id === selectedEmployee ? 'text-slate-400' : ''}`}>
-                                                        {emp.name} ({emp.attendance_id})
-                                                        {emp.id === selectedEmployee && ' (Department Head)'}
-                                                    </span>
-                                                </label>
-                                            ))}
+                                <div className="border rounded-lg bg-slate-50">
+                                    <div className="p-2 border-b bg-white">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <Input
+                                                placeholder="Search employees..."
+                                                value={managedEmployeesSearch}
+                                                onChange={(e) => setManagedEmployeesSearch(e.target.value)}
+                                                className="pl-9 h-9"
+                                            />
                                         </div>
-                                    )}
+                                    </div>
+                                    <div className="p-3 max-h-48 overflow-y-auto">
+                                        {availableEmployees.length === 0 ? (
+                                            <p className="text-sm text-slate-500">No employees available</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {availableEmployees
+                                                    .filter(emp => {
+                                                        if (!managedEmployeesSearch) return true;
+                                                        const search = managedEmployeesSearch.toLowerCase();
+                                                        return emp.name.toLowerCase().includes(search) || 
+                                                               emp.attendance_id.toLowerCase().includes(search);
+                                                    })
+                                                    .map(emp => (
+                                                        <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedManagedEmployees.includes(emp.id)}
+                                                                onChange={() => toggleManagedEmployee(emp.id)}
+                                                                disabled={emp.id === selectedEmployee}
+                                                                className="rounded border-slate-300"
+                                                            />
+                                                            <span className={`text-sm ${emp.id === selectedEmployee ? 'text-slate-400' : ''}`}>
+                                                                {emp.name} ({emp.attendance_id})
+                                                                {emp.id === selectedEmployee && ' (Department Head)'}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-1">
                                     Select employees managed by this department head. Department head cannot manage themselves.
@@ -623,28 +646,49 @@ export default function DepartmentHeadSettings() {
 
                             <div>
                                 <Label>Managed Employees</Label>
-                                <div className="border rounded-lg p-3 max-h-64 overflow-y-auto bg-slate-50">
-                                    {employees.filter(e => e.company === editingHead.company && e.active).length === 0 ? (
-                                        <p className="text-sm text-slate-500">No employees available</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {employees.filter(e => e.company === editingHead.company && e.active).map(emp => (
-                                                <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedManagedEmployees.includes(emp.id)}
-                                                        onChange={() => toggleManagedEmployee(emp.id)}
-                                                        disabled={emp.id === editingHead.employee_id}
-                                                        className="rounded border-slate-300"
-                                                    />
-                                                    <span className={`text-sm ${emp.id === editingHead.employee_id ? 'text-slate-400' : ''}`}>
-                                                        {emp.name} ({emp.attendance_id})
-                                                        {emp.id === editingHead.employee_id && ' (Department Head)'}
-                                                    </span>
-                                                </label>
-                                            ))}
+                                <div className="border rounded-lg bg-slate-50">
+                                    <div className="p-2 border-b bg-white">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <Input
+                                                placeholder="Search employees..."
+                                                value={editManagedEmployeesSearch}
+                                                onChange={(e) => setEditManagedEmployeesSearch(e.target.value)}
+                                                className="pl-9 h-9"
+                                            />
                                         </div>
-                                    )}
+                                    </div>
+                                    <div className="p-3 max-h-64 overflow-y-auto">
+                                        {employees.filter(e => e.company === editingHead.company && e.active).length === 0 ? (
+                                            <p className="text-sm text-slate-500">No employees available</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {employees
+                                                    .filter(e => e.company === editingHead.company && e.active)
+                                                    .filter(emp => {
+                                                        if (!editManagedEmployeesSearch) return true;
+                                                        const search = editManagedEmployeesSearch.toLowerCase();
+                                                        return emp.name.toLowerCase().includes(search) || 
+                                                               emp.attendance_id.toLowerCase().includes(search);
+                                                    })
+                                                    .map(emp => (
+                                                        <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedManagedEmployees.includes(emp.id)}
+                                                                onChange={() => toggleManagedEmployee(emp.id)}
+                                                                disabled={emp.id === editingHead.employee_id}
+                                                                className="rounded border-slate-300"
+                                                            />
+                                                            <span className={`text-sm ${emp.id === editingHead.employee_id ? 'text-slate-400' : ''}`}>
+                                                                {emp.name} ({emp.attendance_id})
+                                                                {emp.id === editingHead.employee_id && ' (Department Head)'}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
