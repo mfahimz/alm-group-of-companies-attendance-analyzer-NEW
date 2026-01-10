@@ -168,6 +168,18 @@ export default function Layout({ children, currentPageName }) {
     })).filter((group) => group.items.length > 0);
     }, [currentUser, permissions, isAdmin, isSupervisor, userRole, hasPageAccess]);
 
+    // Auto-expand category if current page is in it (MUST be before conditional returns)
+    React.useEffect(() => {
+      if (currentPageName) {
+          filteredMenuGroups.forEach((group) => {
+              const isCurrentPageInGroup = group.items.some((item) => item.path === currentPageName);
+              if (isCurrentPageInGroup) {
+                  setExpandedGroups((prev) => new Set([...prev, group.id]));
+              }
+          });
+      }
+    }, [currentPageName, filteredMenuGroups]);
+
     // AFTER all hooks, handle conditional rendering
     // For public pages, render without layout
     if (isPublicPage) {
