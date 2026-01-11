@@ -29,6 +29,7 @@ export default function ShiftTimingsTab({ project }) {
     const [isSingleShift, setIsSingleShift] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [applicableDayFilter, setApplicableDayFilter] = useState('all');
+    const [shiftTypeFilter, setShiftTypeFilter] = useState('all');
     const [selectedBlock, setSelectedBlock] = useState('block1');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -90,6 +91,11 @@ export default function ShiftTimingsTab({ project }) {
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list(),
         enabled: showCopyDialog
+    });
+
+    const { data: companySettings = [] } = useQuery({
+        queryKey: ['companySettings', project.company],
+        queryFn: () => base44.entities.CompanySettings.filter({ company: project.company })
     });
 
     // Load date ranges from project configuration
@@ -635,6 +641,9 @@ export default function ShiftTimingsTab({ project }) {
                     shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
                 const matchesDept = departmentFilter === 'all' || employee?.department === departmentFilter;
+                const matchesShiftType = shiftTypeFilter === 'all' || 
+                    (shiftTypeFilter === 'single' && shift.is_single_shift) ||
+                    (shiftTypeFilter === 'regular' && !shift.is_single_shift);
                 
                 // Filter by applicable day
                 let matchesDay = true;
@@ -665,7 +674,7 @@ export default function ShiftTimingsTab({ project }) {
                     }
                 }
                 
-                return matchesSearch && matchesDept && matchesDay;
+                return matchesSearch && matchesDept && matchesShiftType && matchesDay;
             })
             .sort((a, b) => {
                 let aVal, bVal;
@@ -852,21 +861,43 @@ export default function ShiftTimingsTab({ project }) {
                                             </Button>
                                         )}
                                     </div>
-                                    <div className="flex gap-3">
+                                    <div className="flex gap-2 flex-wrap">
+                                        <div className="relative flex-1 min-w-[200px]">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <Input
+                                                placeholder="Search by ID or name..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-9"
+                                            />
+                                        </div>
                                         <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                                            <SelectTrigger className="w-40">
+                                            <SelectTrigger className="w-[160px]">
                                                 <SelectValue placeholder="Department" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">All Departments</SelectItem>
-                                                <SelectItem value="Admin">Admin</SelectItem>
-                                                <SelectItem value="Operations">Operations</SelectItem>
-                                                <SelectItem value="Front Office">Front Office</SelectItem>
-                                                <SelectItem value="Housekeeping">Housekeeping</SelectItem>
+                                                {companySettings[0]?.departments?.split(',').map(dept => dept.trim()).filter(Boolean).map(dept => (
+                                                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                                )) || [
+                                                    <SelectItem key="Admin" value="Admin">Admin</SelectItem>,
+                                                    <SelectItem key="Operations" value="Operations">Operations</SelectItem>,
+                                                    <SelectItem key="Front Office" value="Front Office">Front Office</SelectItem>
+                                                ]}
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={shiftTypeFilter} onValueChange={setShiftTypeFilter}>
+                                            <SelectTrigger className="w-[140px]">
+                                                <SelectValue placeholder="Shift Type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Types</SelectItem>
+                                                <SelectItem value="regular">Regular</SelectItem>
+                                                <SelectItem value="single">Single Shift</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <Select value={applicableDayFilter} onValueChange={setApplicableDayFilter}>
-                                            <SelectTrigger className="w-36">
+                                            <SelectTrigger className="w-[130px]">
                                                 <SelectValue placeholder="Day" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -880,15 +911,6 @@ export default function ShiftTimingsTab({ project }) {
                                                 <SelectItem value="Saturday">Saturday</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <div className="relative w-64">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                            <Input
-                                                placeholder="Search by ID or name..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-9"
-                                            />
-                                        </div>
                                     </div>
                                 </div>
                                 <div className="max-h-96 overflow-auto">
