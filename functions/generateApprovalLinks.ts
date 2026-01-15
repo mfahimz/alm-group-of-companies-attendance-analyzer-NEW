@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
         // Set link validity to 1 day (24 hours)
         const validityDays = 1;
 
-        // Get all exceptions for this report that need approval
+        // Get all exceptions for this report
         const exceptions = await base44.asServiceRole.entities.Exception.filter({
             report_run_id
         });
@@ -28,18 +28,24 @@ Deno.serve(async (req) => {
             e.approval_status === 'pending_dept_head' || e.approval_status === 'pending'
         );
 
-        if (pendingExceptions.length === 0) {
-            return Response.json({ 
-                success: true,
-                message: 'No exceptions require approval',
-                links: []
-            });
-        }
+        // ALWAYS generate links, even if there are no pending exceptions
+        // This allows department heads to verify and confirm that everything is correct
 
         // Get all employees to map attendance_id to departments
         const employees = await base44.asServiceRole.entities.Employee.filter({ company });
 
-        // Group exceptions by department
+        // Group employees by department (not exceptions)
+        const employeesByDept = {};
+        for (const employee of employees) {
+            if (employee.department && employee.department.trim() !== '') {
+                if (!employeesByDept[employee.department]) {
+                    employeesByDept[employee.department] = [];
+                }
+                employeesByDept[employee.department].push(employee);
+            }
+        }
+
+        // Also track pending exceptions by department for reference
         const exceptionsByDept = {};
         const skippedExceptions = [];
         
@@ -82,11 +88,17 @@ Deno.serve(async (req) => {
         const processedDeptHeads = new Set();
         const warnings = [];
 
-        for (const department of Object.keys(exceptionsByDept)) {
+        // Generate links for ALL departments with department heads, regardless of pending exceptions
+        const allDepartments = new Set([...Object.keys(employeesByDept), ...Object.keys(exceptionsByDept)]);
+
+        for (const department of allDepartments) {
             const deptHeadsForDept = deptHeads.filter(dh => dh.department === department);
             
             if (deptHeadsForDept.length === 0) {
-                warnings.push(`No department head assigned for ${department} department (${exceptionsByDept[department].length} exceptions skipped)`);
+                const exceptionCount = exceptionsByDept[department]?.length || 0;
+                if (exceptionCount > 0) {
+                    warnings.push(`No department head assigned for ${department} department (${exceptionCount} exceptions skipped)`);
+                }
                 continue;
             }
 
@@ -95,20 +107,20 @@ Deno.serve(async (req) => {
                 if (processedDeptHeads.has(deptHead.id)) continue;
                 processedDeptHeads.add(deptHead.id);
 
-                // Filter exceptions to only those for managed employees
-                let relevantExceptions = exceptionsByDept[department];
-                if (deptHead.managed_employee_ids) {
+                // Count relevant exceptions (if any)
+                const departmentExceptions = exceptionsByDept[department] || [];
+                let relevantExceptionCount = departmentExceptions.length;
+                
+                if (deptHead.managed_employee_ids && departmentExceptions.length > 0) {
                     const managedIds = deptHead.managed_employee_ids.split(',').filter(Boolean);
-                    relevantExceptions = exceptionsByDept[department].filter(exc => {
+                    relevantExceptionCount = departmentExceptions.filter(exc => {
                         const employee = employees.find(e => e.attendance_id === exc.attendance_id);
                         return employee && managedIds.includes(employee.id);
-                    });
+                    }).length;
                 }
 
-                if (relevantExceptions.length === 0) {
-                    warnings.push(`Department head for ${department} has no managed employees matching the exceptions`);
-                    continue;
-                }
+                // Generate link even if there are no pending exceptions
+                // This allows verification that everything is correct
 
             // Generate unique token
             const token = crypto.randomUUID();
@@ -152,7 +164,7 @@ Deno.serve(async (req) => {
                     department_head_name: deptHeadEmployee?.name || 'Unknown',
                     link_token: token,
                     verification_code: verificationCode,
-                    exception_count: relevantExceptions.length,
+                    exception_count: relevantExceptionCount,
                     expires_at: expiresAt.toISOString(),
                     full_link: `${appUrl}/DeptHeadApproval?token=${token}`
                 });
