@@ -16,12 +16,21 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
 
 const DEFAULT_PAGES = [
-    { page_name: 'Dashboard', description: 'Main dashboard and overview', allowed_roles: 'admin,supervisor,user' },
-    { page_name: 'Projects', description: 'Manage attendance projects', allowed_roles: 'admin,supervisor' },
-    { page_name: 'Employees', description: 'Manage employee master list', allowed_roles: 'admin,supervisor' },
-    { page_name: 'Users', description: 'Manage system users and roles', allowed_roles: 'admin' },
-    { page_name: 'RulesSettings', description: 'Configure attendance rules', allowed_roles: 'admin' },
-    { page_name: 'UserProfile', description: 'View user profile', allowed_roles: 'admin,supervisor,user' }
+    { page_name: 'Dashboard', description: 'Main dashboard with project overview', allowed_roles: 'admin,supervisor,user' },
+    { page_name: 'Projects', description: 'Project management and listing', allowed_roles: 'admin,supervisor' },
+    { page_name: 'ProjectDetail', description: 'Individual project details and management', allowed_roles: 'admin,supervisor' },
+    { page_name: 'Employees', description: 'Employee master data management', allowed_roles: 'admin,supervisor' },
+    { page_name: 'Salaries', description: 'Employee salary management', allowed_roles: 'admin,supervisor' },
+    { page_name: 'Users', description: 'User management and permissions', allowed_roles: 'admin' },
+    { page_name: 'RulesSettings', description: 'Attendance rules configuration', allowed_roles: 'admin' },
+    { page_name: 'RamadanSchedules', description: 'Ramadan shift schedule management', allowed_roles: 'admin' },
+    { page_name: 'Documentation', description: 'User guides and documentation', allowed_roles: 'admin,supervisor,user' },
+    { page_name: 'Training', description: 'Training guides and videos', allowed_roles: 'admin,supervisor,user' },
+    { page_name: 'UserProfile', description: 'User profile settings', allowed_roles: 'admin,supervisor,user' },
+    { page_name: 'EmployeeProfile', description: 'Employee profile details', allowed_roles: 'admin,supervisor' },
+    { page_name: 'ReportDetail', description: 'Detailed attendance report view', allowed_roles: 'admin,supervisor' },
+    { page_name: 'Reports', description: 'Reports and analytics', allowed_roles: 'admin,supervisor' },
+    { page_name: 'DepartmentHeadSettings', description: 'Department head configuration', allowed_roles: 'admin' }
 ];
 
 export default function Users() {
