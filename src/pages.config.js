@@ -17,6 +17,7 @@ import RulesSettings from './pages/RulesSettings';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import Salaries from './pages/Salaries';
 import __Layout from './Layout.jsx';
 
 
@@ -40,6 +41,7 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
+    "Salaries": Salaries,
 }
 
 export const pagesConfig = {
