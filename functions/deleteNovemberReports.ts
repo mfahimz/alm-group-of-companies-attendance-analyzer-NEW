@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
         // Find all projects for this company and department
         const allProjects = await base44.asServiceRole.entities.Project.list();
         const targetProjects = allProjects.filter(p => 
-            p.company === company && p.department === department
+            p.company === company && (p.department === department || p.name.includes("Al Maraghi Abu Dhabi"))
         );
         
         const projectIds = targetProjects.map(p => p.id);
