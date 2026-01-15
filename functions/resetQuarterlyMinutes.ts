@@ -17,7 +17,21 @@ Deno.serve(async (req) => {
         const targetCompany = "Al Maraghi Auto Repairs";
         const now = new Date();
         const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-12
+        const currentDay = now.getDate();
         const currentQuarter = getQuarter(now);
+
+        // Only run on quarter start dates (1st of Jan/Apr/Jul/Oct)
+        const isQuarterStart = currentDay === 1 && [1, 4, 7, 10].includes(currentMonth);
+        
+        if (!isQuarterStart) {
+            console.log(`Not a quarter start date. Current: ${now.toISOString()}`);
+            return Response.json({
+                success: true,
+                message: 'Not a quarter start date, skipping reset',
+                current_date: now.toISOString()
+            });
+        }
 
         console.log(`Starting quarterly reset for ${targetCompany} - Q${currentQuarter} ${currentYear}`);
 
