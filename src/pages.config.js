@@ -14,10 +14,10 @@ import RamadanSchedules from './pages/RamadanSchedules';
 import ReportDetail from './pages/ReportDetail';
 import Reports from './pages/Reports';
 import RulesSettings from './pages/RulesSettings';
+import Salaries from './pages/Salaries';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import Salaries from './pages/Salaries';
 import __Layout from './Layout.jsx';
 
 
@@ -38,10 +38,10 @@ export const PAGES = {
     "ReportDetail": ReportDetail,
     "Reports": Reports,
     "RulesSettings": RulesSettings,
+    "Salaries": Salaries,
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "Salaries": Salaries,
 }
 
 export const pagesConfig = {
