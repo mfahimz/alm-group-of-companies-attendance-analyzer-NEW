@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Edit, Trash2, DollarSign } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, DollarSign, Upload, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import SortableTableHead from '../components/ui/SortableTableHead';
@@ -19,6 +19,8 @@ export default function Salaries() {
     const [showDialog, setShowDialog] = useState(false);
     const [editingSalary, setEditingSalary] = useState(null);
     const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
+    const [uploadProgress, setUploadProgress] = useState(null);
+    const fileInputRef = React.useRef(null);
     
     const [formData, setFormData] = useState({
         employee_id: '',
@@ -223,6 +225,146 @@ export default function Salaries() {
         return !hasExistingSalary;
     });
 
+    const handleFileUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            setUploadProgress({ status: 'Reading file...', current: 0, total: 100 });
+
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (jsonData.length === 0) {
+                toast.error('No data found in file');
+                setUploadProgress(null);
+                return;
+            }
+
+            setUploadProgress({ status: 'Processing records...', current: 0, total: jsonData.length });
+
+            let successCount = 0;
+            let errorCount = 0;
+            const errors = [];
+
+            for (let i = 0; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                
+                try {
+                    // Map Excel columns
+                    const attendanceId = row['Attendance ID'] || row['attendance_id'];
+                    const name = row['Name'] || row['name'];
+                    const company = row['Company'] || row['company'];
+                    const workingHours = parseFloat(row['Working Hours'] || row['working_hours']) || 9;
+                    const basicSalary = parseFloat(row['Basic'] || row['basic_salary']) || 0;
+                    const allowance = parseFloat(row['Allowance'] || row['allowance']) || 0;
+
+                    if (!attendanceId || !name || !company) {
+                        errors.push(`Row ${i + 2}: Missing required fields`);
+                        errorCount++;
+                        continue;
+                    }
+
+                    // Find employee by attendance_id and company
+                    const employee = employees.find(e => 
+                        e.attendance_id === attendanceId && e.company === company
+                    );
+
+                    if (!employee) {
+                        errors.push(`Row ${i + 2}: Employee not found (${attendanceId} - ${company})`);
+                        errorCount++;
+                        continue;
+                    }
+
+                    // Check if salary record exists
+                    const existingSalary = salaries.find(s => 
+                        s.employee_id === employee.id && s.active
+                    );
+
+                    const allowances = {
+                        housing: 0,
+                        transport: 0,
+                        food: 0,
+                        others: allowance
+                    };
+
+                    const totalSalary = basicSalary + allowance;
+                    const deductionPerMinute = totalSalary / (30 * workingHours * 60);
+
+                    const salaryData = {
+                        employee_id: employee.id,
+                        attendance_id: attendanceId,
+                        name: name,
+                        company: company,
+                        working_hours: workingHours,
+                        basic_salary: basicSalary,
+                        allowances: JSON.stringify(allowances),
+                        total_salary: totalSalary,
+                        deduction_per_minute: deductionPerMinute
+                    };
+
+                    if (existingSalary) {
+                        await base44.entities.EmployeeSalary.update(existingSalary.id, salaryData);
+                    } else {
+                        await base44.entities.EmployeeSalary.create(salaryData);
+                    }
+
+                    successCount++;
+                } catch (error) {
+                    errors.push(`Row ${i + 2}: ${error.message}`);
+                    errorCount++;
+                }
+
+                setUploadProgress({ 
+                    status: 'Processing records...', 
+                    current: i + 1, 
+                    total: jsonData.length 
+                });
+            }
+
+            queryClient.invalidateQueries(['salaries']);
+            setUploadProgress(null);
+            
+            if (errorCount > 0) {
+                toast.warning(`Imported ${successCount} records. ${errorCount} errors occurred.`);
+                console.log('Import errors:', errors);
+            } else {
+                toast.success(`Successfully imported ${successCount} salary records`);
+            }
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        } catch (error) {
+            toast.error('Failed to process file: ' + error.message);
+            setUploadProgress(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const downloadTemplate = () => {
+        const template = [
+            {
+                'Attendance ID': 'EMP001',
+                'Name': 'John Doe',
+                'Company': 'Al Maraghi Auto Repairs',
+                'Working Hours': 9,
+                'Basic': 5000,
+                'Allowance': 2000
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(template);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Salary Template');
+        XLSX.writeFile(wb, 'salary_upload_template.xlsx');
+        toast.success('Template downloaded');
+    };
+
     return (
         <div className="space-y-6">
             <Breadcrumb items={[{ label: 'Salaries' }]} />
@@ -233,12 +375,50 @@ export default function Salaries() {
                     <p className="text-slate-600 mt-1">Manage employee salary and allowances</p>
                 </div>
                 {(isAdmin || isSupervisor) && (
-                    <Button onClick={() => setShowDialog(true)} className="bg-indigo-600 hover:bg-indigo-700">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Salary Record
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={downloadTemplate} variant="outline">
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Template
+                        </Button>
+                        <Button onClick={() => fileInputRef.current?.click()} variant="outline">
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Excel
+                        </Button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                        />
+                        <Button onClick={() => setShowDialog(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Salary Record
+                        </Button>
+                    </div>
                 )}
             </div>
+
+            {uploadProgress && (
+                <Card className="border-0 shadow-sm bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="flex-1">
+                                <p className="font-medium text-blue-900">{uploadProgress.status}</p>
+                                <p className="text-sm text-blue-700 mt-1">
+                                    {uploadProgress.current} / {uploadProgress.total} completed
+                                </p>
+                            </div>
+                        </div>
+                        <div className="w-full bg-blue-200 rounded-full h-2">
+                            <div 
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%` }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <Card className="border-0 shadow-sm">
                 <CardContent className="p-4">
