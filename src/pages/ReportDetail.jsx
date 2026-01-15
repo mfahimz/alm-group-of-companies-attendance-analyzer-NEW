@@ -21,7 +21,7 @@ export default function ReportDetailPage() {
         queryFn: () => base44.auth.me()
     });
 
-    const { data: reportRun } = useQuery({
+    const { data: reportRun, isLoading: reportLoading, error: reportError } = useQuery({
         queryKey: ['reportRun', reportRunId],
         queryFn: async () => {
             const runs = await base44.entities.ReportRun.filter({ id: reportRunId });
@@ -30,7 +30,7 @@ export default function ReportDetailPage() {
         enabled: !!reportRunId
     });
 
-    const { data: project } = useQuery({
+    const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
         queryKey: ['project', projectId],
         queryFn: async () => {
             const projects = await base44.entities.Project.filter({ id: projectId });
@@ -42,10 +42,26 @@ export default function ReportDetailPage() {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
 
-    if (!reportRun || !project) {
+    if (reportLoading || projectLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="text-slate-500">Loading report...</div>
+            </div>
+        );
+    }
+
+    if (reportError || projectError) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-red-600">Error loading report: {(reportError || projectError)?.message}</div>
+            </div>
+        );
+    }
+
+    if (!reportRun || !project) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-slate-600">Report not found</div>
             </div>
         );
     }
