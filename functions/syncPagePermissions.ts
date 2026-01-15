@@ -15,21 +15,35 @@ Deno.serve(async (req) => {
             { name: 'Projects', description: 'Project management and listing' },
             { name: 'ProjectDetail', description: 'Individual project details and management' },
             { name: 'Employees', description: 'Employee master data management' },
+            { name: 'Salaries', description: 'Employee salary management' },
             { name: 'Users', description: 'User management and permissions' },
             { name: 'ActivityLogs', description: 'User activity and login logs' },
             { name: 'RulesSettings', description: 'Attendance rules configuration' },
             { name: 'RamadanSchedules', description: 'Ramadan shift schedule management' },
-            { name: 'Diagnostics', description: 'System diagnostics and troubleshooting' },
             { name: 'Documentation', description: 'User guides and documentation' },
+            { name: 'Training', description: 'Training guides and videos' },
             { name: 'UserProfile', description: 'User profile settings' },
+            { name: 'EmployeeProfile', description: 'Employee profile details' },
             { name: 'ReportDetail', description: 'Detailed attendance report view' },
-            { name: 'AstraImport', description: 'Astra Auto Parts data import' },
-            { name: 'Home', description: 'Application home page' }
+            { name: 'Reports', description: 'Reports and analytics' },
+            { name: 'DepartmentHeadSettings', description: 'Department head configuration' },
+            { name: 'AuditTrail', description: 'System audit trail' },
+            { name: 'HRManagerApproval', description: 'HR Manager approval page' }
         ];
 
         // Fetch existing permissions
         const existingPermissions = await base44.asServiceRole.entities.PagePermission.list();
         const existingPageNames = existingPermissions.map(p => p.page_name);
+        const validPageNames = allPages.map(p => p.name);
+
+        // Delete permissions for pages that no longer exist
+        const deleted = [];
+        for (const existingPerm of existingPermissions) {
+            if (!validPageNames.includes(existingPerm.page_name)) {
+                await base44.asServiceRole.entities.PagePermission.delete(existingPerm.id);
+                deleted.push(existingPerm.page_name);
+            }
+        }
 
         // Find pages that don't have permissions yet
         const newPages = allPages.filter(page => !existingPageNames.includes(page.name));
@@ -48,7 +62,8 @@ Deno.serve(async (req) => {
         // Update descriptions for existing pages
         const updated = [];
         for (const existingPerm of existingPermissions) {
-            const pageInfo = allPages.find(p => p.page_name === existingPerm.page_name);
+            if (!validPageNames.includes(existingPerm.page_name)) continue; // Skip deleted pages
+            const pageInfo = allPages.find(p => p.name === existingPerm.page_name);
             if (pageInfo && existingPerm.description !== pageInfo.description) {
                 const updatedPerm = await base44.asServiceRole.entities.PagePermission.update(existingPerm.id, {
                     description: pageInfo.description
@@ -61,8 +76,10 @@ Deno.serve(async (req) => {
             success: true,
             created: created.length,
             updated: updated.length,
-            total: existingPermissions.length + created.length,
-            newPages: created.map(p => p.page_name)
+            deleted: deleted.length,
+            total: allPages.length,
+            newPages: created.map(p => p.page_name),
+            deletedPages: deleted
         });
     } catch (error) {
         return Response.json({ error: error.message }, { status: 500 });
