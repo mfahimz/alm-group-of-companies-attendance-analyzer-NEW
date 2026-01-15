@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     const [selectedLink, setSelectedLink] = useState(null);
     const [showLinkDetails, setShowLinkDetails] = useState(false);
+    const [customDomain, setCustomDomain] = useState('');
 
     const { data: approvalLinks = [] } = useQuery({
         queryKey: ['approvalLinks', reportRunId],
@@ -30,6 +31,29 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
         },
         enabled: !!reportRunId
     });
+
+    // Get custom domain from system settings
+    React.useEffect(() => {
+        const fetchCustomDomain = async () => {
+            try {
+                const settings = await base44.entities.SystemSettings.filter({ 
+                    setting_key: 'CUSTOM_DOMAIN' 
+                });
+                if (settings.length > 0 && settings[0].setting_value) {
+                    let domain = settings[0].setting_value;
+                    if (!domain.startsWith('http://') && !domain.startsWith('https://')) {
+                        domain = `https://${domain}`;
+                    }
+                    setCustomDomain(domain.replace(/\/$/, ''));
+                } else {
+                    setCustomDomain(window.location.origin);
+                }
+            } catch {
+                setCustomDomain(window.location.origin);
+            }
+        };
+        fetchCustomDomain();
+    }, []);
 
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
@@ -170,14 +194,14 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 <Label className="text-xs text-slate-600">Approval Link</Label>
                                 <div className="flex gap-2 mt-1">
                                     <Input
-                                        value={`${window.location.origin}/DeptHeadApproval?token=${selectedLink.link_token}`}
+                                        value={`${customDomain || window.location.origin}/DeptHeadApproval?token=${selectedLink.link_token}`}
                                         readOnly
                                         className="font-mono text-xs"
                                     />
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => copyToClipboard(`${window.location.origin}/DeptHeadApproval?token=${selectedLink.link_token}`)}
+                                        onClick={() => copyToClipboard(`${customDomain || window.location.origin}/DeptHeadApproval?token=${selectedLink.link_token}`)}
                                     >
                                         <Copy className="w-4 h-4" />
                                     </Button>
