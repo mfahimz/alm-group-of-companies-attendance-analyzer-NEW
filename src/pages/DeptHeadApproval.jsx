@@ -1,13 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, XCircle, AlertCircle, Lock, Clock, Save } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DeptHeadApproval() {
@@ -18,138 +16,193 @@ export default function DeptHeadApproval() {
     const [approvedMinutes, setApprovedMinutes] = useState({});
     const queryClient = useQueryClient();
 
-    // Set page title
-    React.useEffect(() => {
-        document.title = 'Department Head Approval - ALM Attendance';
-    }, []);
-
-    // Get token from URL
-    React.useEffect(() => {
+    useEffect(() => {
+        document.title = 'Department Head Approval - Attendance System';
         const urlParams = new URLSearchParams(window.location.search);
-        const urlToken = urlParams.get('token');
-        if (urlToken) {
-            setToken(urlToken);
+        const tokenParam = urlParams.get('token');
+        if (tokenParam) {
+            setToken(tokenParam);
         }
     }, []);
 
-    const { data: approvalLink, isLoading: linkLoading, error: linkError } = useQuery({
+    const { data: linkInfo, isLoading: linkLoading } = useQuery({
         queryKey: ['approvalLink', token],
         queryFn: async () => {
-            const response = await base44.functions.invoke('verifyApprovalLink', { token });
-            if (!response.data.success) {
-                throw new Error(response.data.error);
-            }
-            return response.data.link_data;
+            if (!token) return null;
+            const links = await base44.entities.ApprovalLink.filter({ link_token: token });
+            return links.length > 0 ? links[0] : null;
         },
-        enabled: !!token && !isVerified,
-        retry: false
+        enabled: !!token
     });
 
-    const { data: verifiedData, isLoading: dataLoading } = useQuery({
-        queryKey: ['verifiedData', token],
-        queryFn: async () => {
-            const response = await base44.functions.invoke('verifyApprovalLink', { 
-                token,
-                verification_code: verificationCode 
-            });
-            if (!response.data.success) {
-                throw new Error(response.data.error);
-            }
-            return response.data;
-        },
-        enabled: isVerified && !!token,
-        retry: false
+    const { data: project } = useQuery({
+        queryKey: ['project', linkInfo?.project_id],
+        queryFn: () => base44.entities.Project.filter({ id: linkInfo.project_id }).then(r => r[0]),
+        enabled: !!linkInfo?.project_id
     });
 
-    const analysisResults = verifiedData?.analysis_results || [];
-    const employees = verifiedData?.employees || [];
-    const reportRun = verifiedData?.report_run;
+    const { data: reportRun } = useQuery({
+        queryKey: ['reportRun', linkInfo?.report_run_id],
+        queryFn: () => base44.entities.ReportRun.filter({ id: linkInfo.report_run_id }).then(r => r[0]),
+        enabled: !!linkInfo?.report_run_id
+    });
+
+    const { data: allResults = [] } = useQuery({
+        queryKey: ['results', linkInfo?.report_run_id],
+        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: linkInfo.report_run_id }),
+        enabled: isVerified && !!linkInfo?.report_run_id
+    });
+
+    const { data: employees = [] } = useQuery({
+        queryKey: ['employees', linkInfo?.company],
+        queryFn: () => base44.entities.Employee.filter({ company: linkInfo.company }),
+        enabled: isVerified && !!linkInfo?.company
+    });
+
+    const { data: salaries = [] } = useQuery({
+        queryKey: ['salaries', linkInfo?.company],
+        queryFn: () => base44.entities.EmployeeSalary.filter({ company: linkInfo.company, active: true }),
+        enabled: isVerified && !!linkInfo?.company
+    });
+
+    const { data: quarterlyMinutes = [] } = useQuery({
+        queryKey: ['quarterlyMinutes', linkInfo?.company, linkInfo?.project_id],
+        queryFn: () => base44.entities.EmployeeQuarterlyMinutes.filter({ 
+            company: linkInfo.company,
+            project_id: linkInfo.project_id 
+        }),
+        enabled: isVerified && !!linkInfo?.company && !!linkInfo?.project_id
+    });
 
     const verifyMutation = useMutation({
-        mutationFn: async () => {
-            const response = await base44.functions.invoke('verifyApprovalLink', { 
+        mutationFn: async (code) => {
+            const response = await base44.functions.invoke('verifyApprovalLink', {
                 token,
-                verification_code: verificationCode 
+                verification_code: code
             });
-            
-            if (!response.data.success) {
-                throw new Error(response.data.error || 'Verification failed');
-            }
-            
-            return response.data.link_data;
+            return response.data;
         },
         onSuccess: (data) => {
-            setIsVerified(true);
-            setLinkData(data);
-            toast.success('Verification successful');
-        },
-        onError: (error) => {
-            toast.error(error.message);
-        }
-    });
-
-    const approveAllMutation = useMutation({
-        mutationFn: async () => {
-            const response = await base44.functions.invoke('approveExceptions', {
-                token,
-                approved_minutes: approvedMinutes
-            });
-            
-            if (!response.data.success) {
-                throw new Error(response.data.error || 'Approval failed');
+            if (data.valid) {
+                setIsVerified(true);
+                setLinkData(data);
+                toast.success('Verification successful');
+            } else {
+                toast.error(data.message || 'Invalid verification code');
             }
         },
-        onSuccess: () => {
-            toast.success('All approvals submitted successfully');
-            setTimeout(() => {
-                window.location.href = 'about:blank';
-            }, 2000);
-        },
         onError: (error) => {
-            toast.error('Failed to submit approvals: ' + error.message);
+            toast.error('Verification failed: ' + error.message);
         }
     });
 
-    const getEmployeeName = (attendanceId) => {
-        const employee = employees.find(e => 
-            e.attendance_id === attendanceId && 
-            e.company === linkData?.company
-        );
-        return employee?.name || attendanceId;
+    const approveMutation = useMutation({
+        mutationFn: async () => {
+            // Update approved minutes in AnalysisResult
+            const updates = Object.entries(approvedMinutes)
+                .filter(([_, minutes]) => minutes > 0)
+                .map(([attendance_id, minutes]) => {
+                    const result = allResults.find(r => r.attendance_id === attendance_id);
+                    if (!result) return null;
+                    return base44.entities.AnalysisResult.update(result.id, {
+                        approved_minutes: minutes
+                    });
+                })
+                .filter(Boolean);
+
+            await Promise.all(updates);
+
+            // Mark approval link as used
+            await base44.entities.ApprovalLink.update(linkInfo.id, {
+                used: true,
+                used_at: new Date().toISOString(),
+                approved: true
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['results']);
+            queryClient.invalidateQueries(['approvalLink']);
+            toast.success('Approval submitted successfully');
+        },
+        onError: (error) => {
+            toast.error('Approval failed: ' + error.message);
+        }
+    });
+
+    const handleVerify = (e) => {
+        e.preventDefault();
+        if (!verificationCode || verificationCode.length !== 6) {
+            toast.error('Please enter a valid 6-digit verification code');
+            return;
+        }
+        verifyMutation.mutate(verificationCode);
     };
 
-    const getEmployeeQuarterlyMinutes = (attendanceId) => {
-        const employee = employees.find(e => 
-            e.attendance_id === attendanceId && 
-            e.company === linkData?.company
-        );
-        return {
-            total: employee?.approved_other_minutes_limit || 120,
-            used: 0 // TODO: Fetch from EmployeeQuarterlyMinutes
-        };
-    };
+    const handleApprovedMinutesChange = (attendance_id, value) => {
+        const minutes = parseInt(value) || 0;
+        const employee = employees.find(e => e.attendance_id === attendance_id);
+        if (!employee) return;
 
-    const handleApprovedMinutesChange = (attendanceId, value) => {
+        const quarterlyRecord = quarterlyMinutes.find(q => q.employee_id === employee.id);
+        const remainingMinutes = quarterlyRecord?.remaining_minutes || 0;
+
+        if (minutes > remainingMinutes) {
+            toast.error(`Cannot exceed remaining quarterly minutes (${remainingMinutes} min)`);
+            return;
+        }
+
         setApprovedMinutes(prev => ({
             ...prev,
-            [attendanceId]: parseInt(value) || 0
+            [attendance_id]: minutes
         }));
     };
+
+    const handleSubmitAll = () => {
+        if (Object.keys(approvedMinutes).length === 0) {
+            if (!window.confirm('No approved minutes entered. Submit as verified with no changes?')) {
+                return;
+            }
+        }
+        approveMutation.mutate();
+    };
+
+    // Filter and prepare results for this department
+    const departmentResults = allResults
+        .map(result => {
+            const employee = employees.find(e => e.attendance_id === result.attendance_id);
+            if (!employee || employee.department !== linkInfo?.department) return null;
+
+            const salary = salaries.find(s => s.attendance_id === result.attendance_id);
+            const quarterlyRecord = quarterlyMinutes.find(q => q.employee_id === employee.id);
+
+            const totalDeductibleMinutes = (result.late_minutes || 0) + 
+                                          (result.early_checkout_minutes || 0) + 
+                                          (result.other_minutes || 0);
+            const finalDeductibleMinutes = Math.max(0, totalDeductibleMinutes - (result.grace_minutes || 0) - (result.approved_minutes || 0));
+
+            return {
+                ...result,
+                employee,
+                salary,
+                quarterlyRecord,
+                totalDeductibleMinutes,
+                finalDeductibleMinutes
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+            // Sort by most problematic first
+            const scoreA = (a.full_absence_count * 1000) + a.finalDeductibleMinutes;
+            const scoreB = (b.full_absence_count * 1000) + b.finalDeductibleMinutes;
+            return scoreB - scoreA;
+        });
 
     if (!token) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
                 <Card className="w-full max-w-md">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Lock className="w-5 h-5" />
-                            Department Head Approval
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-slate-600 text-center">
-                            No approval link provided. Please use the link sent to you.
-                        </p>
+                    <CardContent className="p-6">
+                        <p className="text-slate-600 text-center">No approval link provided</p>
                     </CardContent>
                 </Card>
             </div>
@@ -159,45 +212,63 @@ export default function DeptHeadApproval() {
     if (linkLoading) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-500">Loading...</div>
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
             </div>
         );
     }
 
-    // Handle link errors
-    if (linkError) {
-        const errorType = linkError.message;
-        let errorTitle = 'Link Error';
-        let errorMessage = 'This approval link is invalid or has expired.';
-        
-        if (errorType === 'LINK_EXPIRED') {
-            errorTitle = 'Link Expired';
-            errorMessage = 'This approval link has expired. Links are valid for 24 hours after generation. Please contact your administrator to generate a new approval link.';
-        } else if (errorType === 'LINK_USED') {
-            errorTitle = 'Link Already Used';
-            errorMessage = 'This approval link has already been used. Each link can only be used once for security reasons.';
-        } else if (errorType === 'LINK_NOT_FOUND') {
-            errorTitle = 'Invalid Link';
-            errorMessage = 'This approval link is invalid. Please check the link and try again, or contact your administrator.';
-        }
-        
+    if (!linkInfo) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
-                <Card className="w-full max-w-md border-red-200 bg-white shadow-xl">
-                    <CardHeader className="text-center pb-6">
-                        <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                            <XCircle className="w-10 h-10 text-red-600" />
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <Card className="w-full max-w-md border-red-200 bg-red-50">
+                    <CardContent className="p-6">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
+                            <div>
+                                <p className="font-medium text-red-900">Invalid Link</p>
+                                <p className="text-sm text-red-700 mt-1">This approval link is invalid or has expired.</p>
+                            </div>
                         </div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">{errorTitle}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center space-y-4">
-                        <p className="text-slate-600 leading-relaxed">
-                            {errorMessage}
-                        </p>
-                        <div className="pt-4 border-t">
-                            <p className="text-sm text-slate-500">
-                                ALM Attendance Management System
-                            </p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (linkInfo.used) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <Card className="w-full max-w-md border-green-200 bg-green-50">
+                    <CardContent className="p-6">
+                        <div className="flex items-start gap-3">
+                            <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
+                            <div>
+                                <p className="font-medium text-green-900">Already Approved</p>
+                                <p className="text-sm text-green-700 mt-1">
+                                    This report has already been approved on {new Date(linkInfo.used_at).toLocaleString()}.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    const expiryDate = new Date(linkInfo.expires_at);
+    if (expiryDate < new Date()) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <Card className="w-full max-w-md border-red-200 bg-red-50">
+                    <CardContent className="p-6">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
+                            <div>
+                                <p className="font-medium text-red-900">Link Expired</p>
+                                <p className="text-sm text-red-700 mt-1">
+                                    This approval link expired on {expiryDate.toLocaleString()}.
+                                </p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -210,33 +281,42 @@ export default function DeptHeadApproval() {
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
                 <Card className="w-full max-w-md">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Lock className="w-5 h-5" />
-                            Verify Your Identity
-                        </CardTitle>
+                        <CardTitle>Department Head Approval</CardTitle>
+                        <p className="text-sm text-slate-600 mt-2">Department: {linkInfo.department}</p>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-slate-600">
-                            Please enter the 6-digit verification code provided to you.
-                        </p>
-                        <div>
-                            <Label>Verification Code</Label>
-                            <Input
-                                type="text"
-                                placeholder="Enter 6-digit code"
-                                value={verificationCode}
-                                onChange={(e) => setVerificationCode(e.target.value)}
-                                maxLength={6}
-                                className="text-center text-xl font-mono"
-                            />
-                        </div>
-                        <Button
-                            onClick={() => verifyMutation.mutate()}
-                            disabled={verificationCode.length !== 6 || verifyMutation.isPending}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700"
-                        >
-                            {verifyMutation.isPending ? 'Verifying...' : 'Verify & Continue'}
-                        </Button>
+                    <CardContent>
+                        <form onSubmit={handleVerify} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Verification Code
+                                </label>
+                                <Input
+                                    type="text"
+                                    placeholder="Enter 6-digit code"
+                                    value={verificationCode}
+                                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    maxLength={6}
+                                    className="text-center text-2xl tracking-widest"
+                                />
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Enter the verification code sent to you
+                                </p>
+                            </div>
+                            <Button
+                                type="submit"
+                                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                                disabled={verifyMutation.isPending || verificationCode.length !== 6}
+                            >
+                                {verifyMutation.isPending ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Verifying...
+                                    </>
+                                ) : (
+                                    'Verify & Continue'
+                                )}
+                            </Button>
+                        </form>
                     </CardContent>
                 </Card>
             </div>
@@ -244,131 +324,132 @@ export default function DeptHeadApproval() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
-            <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <div className="min-h-screen bg-slate-50 p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
                 <Card className="border-0 shadow-md">
                     <CardHeader>
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-lg sm:text-xl">Department Head Approval</CardTitle>
-                                <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                                    Department: <strong>{linkData?.department}</strong>
+                                <CardTitle>Department Head Approval</CardTitle>
+                                <p className="text-sm text-slate-600 mt-1">
+                                    Department: <span className="font-medium">{linkInfo.department}</span>
                                 </p>
                                 {reportRun && (
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        Period: {new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}
+                                    <p className="text-sm text-slate-600">
+                                        Report: {reportRun.report_name} ({new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()})
                                     </p>
                                 )}
                             </div>
-                            <Badge className="bg-amber-100 text-amber-800 w-fit">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {analysisResults.length} Employees
-                            </Badge>
+                            {linkInfo.used && (
+                                <div className="flex items-center gap-2 text-green-600">
+                                    <Lock className="w-5 h-5" />
+                                    <span className="text-sm font-medium">Approved</span>
+                                </div>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {dataLoading ? (
-                            <div className="text-center py-12 text-slate-500">Loading employee data...</div>
-                        ) : analysisResults.length === 0 ? (
-                            <div className="text-center py-12">
-                                <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500" />
-                                <p className="text-slate-600">No employees found for approval</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <p className="text-sm text-blue-800">
-                                        <strong>Instructions:</strong> Review late minutes for each employee. Enter approved minutes (from quarterly allowance) for employees with late minutes exceeding 15 grace minutes. Employees who have exhausted their quarterly limit cannot receive additional approvals.
-                                    </p>
-                                </div>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Att ID</TableHead>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead className="text-center">Working Days</TableHead>
+                                        <TableHead className="text-center">Present</TableHead>
+                                        <TableHead className="text-center">LOP</TableHead>
+                                        <TableHead className="text-center">Half Day</TableHead>
+                                        <TableHead className="text-center">Late (min)</TableHead>
+                                        <TableHead className="text-center">Early (min)</TableHead>
+                                        <TableHead className="text-center">Other (min)</TableHead>
+                                        <TableHead className="text-center">Total Deductible</TableHead>
+                                        <TableHead className="text-center">Grace</TableHead>
+                                        <TableHead className="text-center">Quarterly Remaining</TableHead>
+                                        <TableHead className="text-center">Approve Minutes</TableHead>
+                                        <TableHead className="text-center">Final Deductible</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {departmentResults.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={14} className="text-center py-8 text-slate-500">
+                                                No employees found for this department
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        departmentResults.map((result) => {
+                                            const currentApproved = approvedMinutes[result.attendance_id] || result.approved_minutes || 0;
+                                            const remainingQuarterly = result.quarterlyRecord?.remaining_minutes || 0;
+                                            const finalDeductible = Math.max(0, result.totalDeductibleMinutes - (result.grace_minutes || 0) - currentApproved);
 
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>ID</TableHead>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Late Minutes</TableHead>
-                                                <TableHead>Grace</TableHead>
-                                                <TableHead>Deductible</TableHead>
-                                                <TableHead>Quarterly Allowance</TableHead>
-                                                <TableHead>Approve Minutes</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {analysisResults.map((result) => {
-                                                const employee = employees.find(e => e.attendance_id === result.attendance_id);
-                                                const lateMinutes = result.late_minutes || 0;
-                                                const earlyMinutes = result.early_checkout_minutes || 0;
-                                                const totalMinutes = lateMinutes + earlyMinutes;
-                                                const grace = result.grace_minutes || 15;
-                                                const exceedsGrace = totalMinutes > grace;
-                                                const quarterlyLimit = employee?.approved_other_minutes_limit || 120;
-                                                const quarterlyUsed = 0; // TODO: Fetch from EmployeeQuarterlyMinutes
-                                                const quarterlyRemaining = quarterlyLimit - quarterlyUsed;
-                                                const canApprove = exceedsGrace && quarterlyRemaining > 0;
-                                                
-                                                return (
-                                                    <TableRow key={result.id} className={exceedsGrace ? 'bg-amber-50' : ''}>
-                                                        <TableCell className="font-medium">{result.attendance_id}</TableCell>
-                                                        <TableCell>{getEmployeeName(result.attendance_id)}</TableCell>
-                                                        <TableCell>
-                                                            <span className={totalMinutes > 0 ? 'text-orange-600 font-semibold' : ''}>
-                                                                {totalMinutes} min
-                                                            </span>
-                                                        </TableCell>
-                                                        <TableCell>{grace} min</TableCell>
-                                                        <TableCell>
-                                                            <span className={`font-bold ${totalMinutes > grace ? 'text-red-600' : 'text-green-600'}`}>
-                                                                {Math.max(0, totalMinutes - grace)} min
-                                                            </span>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="text-sm">
-                                                                <div className="font-medium">
-                                                                    {quarterlyRemaining} / {quarterlyLimit}
-                                                                </div>
-                                                                <div className="text-xs text-slate-500">
-                                                                    {quarterlyUsed} used
-                                                                </div>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {canApprove ? (
-                                                                <Input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max={quarterlyRemaining}
-                                                                    value={approvedMinutes[result.attendance_id] || 0}
-                                                                    onChange={(e) => handleApprovedMinutesChange(result.attendance_id, e.target.value)}
-                                                                    className="w-24"
-                                                                    placeholder="0"
-                                                                />
-                                                            ) : quarterlyRemaining === 0 ? (
-                                                                <Badge variant="destructive" className="text-xs">
-                                                                    Limit Exceeded
-                                                                </Badge>
-                                                            ) : (
-                                                                <span className="text-sm text-slate-400">—</span>
-                                                            )}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                            return (
+                                                <TableRow key={result.attendance_id}>
+                                                    <TableCell className="font-medium">{result.attendance_id}</TableCell>
+                                                    <TableCell>{result.employee.name}</TableCell>
+                                                    <TableCell className="text-center">{result.working_days}</TableCell>
+                                                    <TableCell className="text-center">{result.present_days}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <span className={result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}>
+                                                            {result.full_absence_count}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">{result.half_absence_count}</TableCell>
+                                                    <TableCell className="text-center">{result.late_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center">{result.early_checkout_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center">{result.other_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <span className={result.totalDeductibleMinutes > 0 ? 'font-medium text-amber-600' : ''}>
+                                                            {result.totalDeductibleMinutes}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">{result.grace_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <span className="text-blue-600 font-medium">{remainingQuarterly}</span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            max={remainingQuarterly}
+                                                            value={currentApproved}
+                                                            onChange={(e) => handleApprovedMinutesChange(result.attendance_id, e.target.value)}
+                                                            className="w-20 text-center"
+                                                            disabled={linkInfo.used}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <span className={finalDeductible > 0 ? 'font-bold text-red-600' : 'text-green-600'}>
+                                                            {finalDeductible}
+                                                        </span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
 
-                                <div className="flex justify-end gap-3 pt-4 border-t">
-                                    <Button
-                                        onClick={() => approveAllMutation.mutate()}
-                                        disabled={approveAllMutation.isPending}
-                                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
-                                    >
-                                        <Save className="w-4 h-4 mr-2" />
-                                        {approveAllMutation.isPending ? 'Submitting...' : 'Submit All Approvals'}
-                                    </Button>
-                                </div>
+                        {!linkInfo.used && departmentResults.length > 0 && (
+                            <div className="mt-6 flex justify-end">
+                                <Button
+                                    onClick={handleSubmitAll}
+                                    disabled={approveMutation.isPending}
+                                    className="bg-green-600 hover:bg-green-700"
+                                    size="lg"
+                                >
+                                    {approveMutation.isPending ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-5 h-5 mr-2" />
+                                            Approve All & Submit
+                                        </>
+                                    )}
+                                </Button>
                             </div>
                         )}
                     </CardContent>
