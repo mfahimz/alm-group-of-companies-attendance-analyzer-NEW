@@ -30,7 +30,14 @@ export default function DeptHeadApproval() {
         queryFn: async () => {
             if (!token) return null;
             const links = await base44.entities.ApprovalLink.filter({ link_token: token });
-            return links.length > 0 ? links[0] : null;
+            if (links.length === 0) return null;
+            
+            // If admin override is enabled, auto-verify
+            if (links[0].admin_override_public) {
+                setIsVerified(true);
+            }
+            
+            return links[0];
         },
         enabled: !!token
     });
@@ -276,7 +283,7 @@ export default function DeptHeadApproval() {
         );
     }
 
-    if (!isVerified) {
+    if (!isVerified && !linkInfo?.admin_override_public) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
                 <Card className="w-full max-w-md">

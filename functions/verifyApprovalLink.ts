@@ -31,8 +31,15 @@ Deno.serve(async (req) => {
 
         // If verification code provided, verify it
         if (verification_code) {
-            if (verification_code !== link.verification_code) {
-                return Response.json({ error: 'Invalid verification code' }, { status: 400 });
+            // Convert both to strings and trim for comparison
+            const providedCode = String(verification_code).trim();
+            const storedCode = String(link.verification_code).trim();
+            
+            if (providedCode !== storedCode) {
+                return Response.json({ 
+                    valid: false,
+                    message: `Invalid verification code. Provided: ${providedCode}, Expected: ${storedCode}` 
+                }, { status: 200 });
             }
 
             // Get department head info
@@ -72,6 +79,7 @@ Deno.serve(async (req) => {
             }
 
             return Response.json({
+                valid: true,
                 success: true,
                 link_data: link,
                 dept_head: deptHead,
@@ -82,6 +90,7 @@ Deno.serve(async (req) => {
 
         // Just return link data without verification
         return Response.json({
+            valid: true,
             success: true,
             link_data: link
         });

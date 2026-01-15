@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Copy, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { Copy, CheckCircle, XCircle, Clock, Eye, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,12 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     const [selectedLink, setSelectedLink] = useState(null);
     const [showLinkDetails, setShowLinkDetails] = useState(false);
     const [customDomain, setCustomDomain] = useState('');
+    const queryClient = useQueryClient();
+
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
 
     const { data: approvalLinks = [] } = useQuery({
         queryKey: ['approvalLinks', reportRunId],
@@ -21,6 +27,22 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
             report_run_id: reportRunId 
         }, '-created_date'),
         enabled: !!reportRunId
+    });
+
+    const togglePublicMutation = useMutation({
+        mutationFn: async (linkId) => {
+            const link = approvalLinks.find(l => l.id === linkId);
+            await base44.entities.ApprovalLink.update(linkId, {
+                admin_override_public: !link.admin_override_public
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['approvalLinks']);
+            toast.success('Link access updated');
+        },
+        onError: (error) => {
+            toast.error('Failed to update: ' + error.message);
+        }
     });
 
     const { data: reportRun } = useQuery({
@@ -137,16 +159,29 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    setSelectedLink(link);
-                                                    setShowLinkDetails(true);
-                                                }}
-                                            >
-                                                <Eye className="w-4 h-4 text-indigo-600" />
-                                            </Button>
+                                            <div className="flex items-center gap-2 justify-end">
+                                                {currentUser?.role === 'admin' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant={link.admin_override_public ? "default" : "ghost"}
+                                                        onClick={() => togglePublicMutation.mutate(link.id)}
+                                                        disabled={togglePublicMutation.isPending || link.used}
+                                                        title={link.admin_override_public ? "Public (No verification needed)" : "Make public"}
+                                                    >
+                                                        <Unlock className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        setSelectedLink(link);
+                                                        setShowLinkDetails(true);
+                                                    }}
+                                                >
+                                                    <Eye className="w-4 h-4 text-indigo-600" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -183,6 +218,19 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                     </div>
                                 </div>
                                 <div>
+                                    <Label className="text-xs text-slate-600">Access Type</Label>
+                                    <div className="flex items-center gap-2">
+                                        {selectedLink.admin_override_public ? (
+                                            <>
+                                                <Unlock className="w-4 h-4 text-green-600" />
+                                                <span className="text-sm font-medium text-green-600">Public (No verification)</span>
+                                            </>
+                                        ) : (
+                                            <span className="text-sm text-slate-600">Requires verification</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div>
                                     <Label className="text-xs text-slate-600">Created</Label>
                                     <p className="text-sm">
                                         {new Date(selectedLink.created_date).toLocaleString()}
@@ -208,23 +256,25 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 </div>
                             </div>
 
-                            <div>
-                                <Label className="text-xs text-slate-600">Verification Code</Label>
-                                <div className="flex gap-2 mt-1">
-                                    <Input
-                                        value={selectedLink.verification_code}
-                                        readOnly
-                                        className="font-mono text-lg font-bold tracking-widest text-center"
-                                    />
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => copyToClipboard(selectedLink.verification_code)}
-                                    >
-                                        <Copy className="w-4 h-4" />
-                                    </Button>
+                            {!selectedLink.admin_override_public && (
+                                <div>
+                                    <Label className="text-xs text-slate-600">Verification Code</Label>
+                                    <div className="flex gap-2 mt-1">
+                                        <Input
+                                            value={selectedLink.verification_code}
+                                            readOnly
+                                            className="font-mono text-lg font-bold tracking-widest text-center"
+                                        />
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => copyToClipboard(selectedLink.verification_code)}
+                                        >
+                                            <Copy className="w-4 h-4" />
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {selectedLink.used && selectedLink.used_at && (
                                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
