@@ -16,7 +16,8 @@ import {
     Shield,
     Book,
     Calendar,
-    FileSpreadsheet
+    FileSpreadsheet,
+    Lock
 } from 'lucide-react';
 
 
@@ -116,6 +117,13 @@ export default function Layout({ children, currentPageName }) {
                     { title: 'Employees', url: 'Employees', icon: <Users className="w-5 h-5" /> },
                     { title: 'Salaries', url: 'Salaries', icon: <LayoutDashboard className="w-5 h-5" /> },
                     ...(isAdmin || isSupervisor ? [{ title: 'Reports & Analytics', url: 'Reports', icon: <BarChart3 className="w-5 h-5" /> }] : [])
+                ]
+            },
+            {
+                title: 'Data',
+                url: '#',
+                items: [
+                    { title: 'Private Files', url: 'PrivateFiles', icon: <Lock className="w-5 h-5" /> }
                 ]
             }
         ];
