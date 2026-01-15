@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from 'sonner';
 import NotificationCenter from './components/ui/NotificationCenter';
 import GlobalSearch from './components/ui/GlobalSearch';
@@ -6,6 +6,7 @@ import { useKeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Navbar1 } from '@/components/ui/Navbar1';
+import { formatInUAE } from './utils/timezone';
 import {
     BarChart3,
     FolderKanban,
@@ -141,6 +142,13 @@ export default function Layout({ children, currentPageName }) {
             return hasPageAccess(item.url);
         });
     }, [currentUser, permissions, isAdmin, isSupervisor, userRole, hasPageAccess]);
+
+    // Set UAE timezone for the entire app
+    useEffect(() => {
+        // Log timezone info for debugging
+        console.log('App Timezone: UAE (Asia/Dubai)');
+        console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
+    }, []);
 
     // AFTER all hooks, handle conditional rendering
     // For public pages, render without layout
