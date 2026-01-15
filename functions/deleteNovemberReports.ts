@@ -51,27 +51,30 @@ Deno.serve(async (req) => {
         let deletedAnalysis = 0;
         let deletedExceptions = 0;
 
-        // Delete AnalysisResults linked to these report runs
+        // Delete using bulk operations to avoid rate limits
         for (const reportRunId of reportRunIds) {
-            const analysisResults = await base44.asServiceRole.entities.AnalysisResult.filter({
+            // Use deleteMany instead of looping
+            await base44.asServiceRole.entities.AnalysisResult.deleteMany({
                 report_run_id: reportRunId
             });
-            for (const result of analysisResults) {
-                await base44.asServiceRole.entities.AnalysisResult.delete(result.id);
-                deletedAnalysis++;
-            }
+            
+            const count = await base44.asServiceRole.entities.AnalysisResult.filter({
+                report_run_id: reportRunId
+            });
+            deletedAnalysis += count.length || 0;
         }
 
-        // Delete Exceptions created from these reports
-        const allExceptions = await base44.asServiceRole.entities.Exception.list();
-        const reportExceptions = allExceptions.filter(exc => 
-            exc.created_from_report === true && 
-            reportRunIds.includes(exc.report_run_id)
-        );
-        
-        for (const exception of reportExceptions) {
-            await base44.asServiceRole.entities.Exception.delete(exception.id);
-            deletedExceptions++;
+        // Delete Exceptions using bulk delete
+        for (const reportRunId of reportRunIds) {
+            const exceptions = await base44.asServiceRole.entities.Exception.filter({
+                created_from_report: true,
+                report_run_id: reportRunId
+            });
+            
+            for (const exc of exceptions) {
+                await base44.asServiceRole.entities.Exception.delete(exc.id);
+                deletedExceptions++;
+            }
         }
 
         // Delete ReportRun records
