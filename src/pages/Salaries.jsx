@@ -257,7 +257,10 @@ export default function Salaries() {
                 const attendanceId = parseInt(row['Attendance ID'] || row['attendance_id']);
                 const name = String(row['Name'] || row['name'] || '').trim();
                 const company = String(row['Company'] || row['company'] || '').trim();
-                const workingHours = parseFloat(row['Working Hours'] || row['working_hours']) || 9;
+                const workingHoursRaw = row['Working Hours'] || row['working_hours'];
+                const workingHours = workingHoursRaw !== undefined && workingHoursRaw !== null && workingHoursRaw !== '' 
+                    ? parseFloat(workingHoursRaw) 
+                    : 9;
                 const basicSalary = parseFloat(row['Basic'] || row['basic_salary']) || 0;
                 const allowance = parseFloat(row['Allowance'] || row['allowance']) || 0;
 
