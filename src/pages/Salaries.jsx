@@ -254,9 +254,9 @@ export default function Salaries() {
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 
-                const attendanceId = row['Attendance ID'] || row['attendance_id'];
-                const name = row['Name'] || row['name'];
-                const company = row['Company'] || row['company'];
+                const attendanceId = String(row['Attendance ID'] || row['attendance_id'] || '').trim();
+                const name = String(row['Name'] || row['name'] || '').trim();
+                const company = String(row['Company'] || row['company'] || '').trim();
                 const workingHours = parseFloat(row['Working Hours'] || row['working_hours']) || 9;
                 const basicSalary = parseFloat(row['Basic'] || row['basic_salary']) || 0;
                 const allowance = parseFloat(row['Allowance'] || row['allowance']) || 0;
@@ -269,7 +269,8 @@ export default function Salaries() {
                     error = 'Missing required fields';
                 } else {
                     employee = employees.find(e => 
-                        e.attendance_id === attendanceId && e.company === company
+                        String(e.attendance_id).trim() === attendanceId && 
+                        String(e.company).trim() === company
                     );
 
                     if (!employee) {
