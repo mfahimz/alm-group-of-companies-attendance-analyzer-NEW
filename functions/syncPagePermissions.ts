@@ -17,7 +17,6 @@ Deno.serve(async (req) => {
             { name: 'Employees', description: 'Employee master data management' },
             { name: 'Salaries', description: 'Employee salary management' },
             { name: 'Users', description: 'User management and permissions' },
-            { name: 'ActivityLogs', description: 'User activity and login logs' },
             { name: 'RulesSettings', description: 'Attendance rules configuration' },
             { name: 'RamadanSchedules', description: 'Ramadan shift schedule management' },
             { name: 'Documentation', description: 'User guides and documentation' },
@@ -26,9 +25,7 @@ Deno.serve(async (req) => {
             { name: 'EmployeeProfile', description: 'Employee profile details' },
             { name: 'ReportDetail', description: 'Detailed attendance report view' },
             { name: 'Reports', description: 'Reports and analytics' },
-            { name: 'DepartmentHeadSettings', description: 'Department head configuration' },
-            { name: 'AuditTrail', description: 'System audit trail' },
-            { name: 'HRManagerApproval', description: 'HR Manager approval page' }
+            { name: 'DepartmentHeadSettings', description: 'Department head configuration' }
         ];
 
         // Fetch existing permissions
