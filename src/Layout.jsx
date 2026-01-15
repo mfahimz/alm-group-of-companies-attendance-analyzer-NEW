@@ -6,7 +6,7 @@ import { useKeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Navbar1 } from '@/components/ui/Navbar1';
-import { formatInUAE } from './utils/timezone';
+import { formatInUAE } from '@/components/ui/timezone';
 import {
     BarChart3,
     FolderKanban,
