@@ -22,6 +22,8 @@ export default function Salaries() {
     const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
     const fileInputRef = React.useRef(null);
+    const [previewData, setPreviewData] = useState(null);
+    const [showPreview, setShowPreview] = useState(false);
     
     const [formData, setFormData] = useState({
         employee_id: '',
@@ -244,96 +246,72 @@ export default function Salaries() {
                 return;
             }
 
-            setUploadProgress({ status: 'Processing records...', current: 0, total: jsonData.length });
+            setUploadProgress({ status: 'Validating records...', current: 0, total: jsonData.length });
 
-            let successCount = 0;
-            let errorCount = 0;
-            const errors = [];
+            const validRecords = [];
+            const errorRecords = [];
 
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 
-                try {
-                    // Map Excel columns
-                    const attendanceId = row['Attendance ID'] || row['attendance_id'];
-                    const name = row['Name'] || row['name'];
-                    const company = row['Company'] || row['company'];
-                    const workingHours = parseFloat(row['Working Hours'] || row['working_hours']) || 9;
-                    const basicSalary = parseFloat(row['Basic'] || row['basic_salary']) || 0;
-                    const allowance = parseFloat(row['Allowance'] || row['allowance']) || 0;
+                const attendanceId = row['Attendance ID'] || row['attendance_id'];
+                const name = row['Name'] || row['name'];
+                const company = row['Company'] || row['company'];
+                const workingHours = parseFloat(row['Working Hours'] || row['working_hours']) || 9;
+                const basicSalary = parseFloat(row['Basic'] || row['basic_salary']) || 0;
+                const allowance = parseFloat(row['Allowance'] || row['allowance']) || 0;
 
-                    if (!attendanceId || !name || !company) {
-                        errors.push(`Row ${i + 2}: Missing required fields`);
-                        errorCount++;
-                        continue;
-                    }
+                let error = null;
+                let employee = null;
+                let existingSalary = null;
 
-                    // Find employee by attendance_id and company
-                    const employee = employees.find(e => 
+                if (!attendanceId || !name || !company) {
+                    error = 'Missing required fields';
+                } else {
+                    employee = employees.find(e => 
                         e.attendance_id === attendanceId && e.company === company
                     );
 
                     if (!employee) {
-                        errors.push(`Row ${i + 2}: Employee not found (${attendanceId} - ${company})`);
-                        errorCount++;
-                        continue;
-                    }
-
-                    // Check if salary record exists
-                    const existingSalary = salaries.find(s => 
-                        s.employee_id === employee.id && s.active
-                    );
-
-                    const allowances = {
-                        housing: 0,
-                        transport: 0,
-                        food: 0,
-                        others: allowance
-                    };
-
-                    const totalSalary = basicSalary + allowance;
-                    const deductionPerMinute = totalSalary / (30 * workingHours * 60);
-
-                    const salaryData = {
-                        employee_id: employee.id,
-                        attendance_id: attendanceId,
-                        name: name,
-                        company: company,
-                        working_hours: workingHours,
-                        basic_salary: basicSalary,
-                        allowances: JSON.stringify(allowances),
-                        total_salary: totalSalary,
-                        deduction_per_minute: deductionPerMinute
-                    };
-
-                    if (existingSalary) {
-                        await base44.entities.EmployeeSalary.update(existingSalary.id, salaryData);
+                        error = 'Employee not found in master data';
                     } else {
-                        await base44.entities.EmployeeSalary.create(salaryData);
+                        existingSalary = salaries.find(s => 
+                            s.employee_id === employee.id && s.active
+                        );
                     }
+                }
 
-                    successCount++;
-                } catch (error) {
-                    errors.push(`Row ${i + 2}: ${error.message}`);
-                    errorCount++;
+                const record = {
+                    rowNumber: i + 2,
+                    attendanceId,
+                    name,
+                    company,
+                    workingHours,
+                    basicSalary,
+                    allowance,
+                    totalSalary: basicSalary + allowance,
+                    employee,
+                    existingSalary,
+                    action: existingSalary ? 'Update' : 'Create',
+                    error
+                };
+
+                if (error) {
+                    errorRecords.push(record);
+                } else {
+                    validRecords.push(record);
                 }
 
                 setUploadProgress({ 
-                    status: 'Processing records...', 
+                    status: 'Validating records...', 
                     current: i + 1, 
                     total: jsonData.length 
                 });
             }
 
-            queryClient.invalidateQueries(['salaries']);
             setUploadProgress(null);
-            
-            if (errorCount > 0) {
-                toast.warning(`Imported ${successCount} records. ${errorCount} errors occurred.`);
-                console.log('Import errors:', errors);
-            } else {
-                toast.success(`Successfully imported ${successCount} salary records`);
-            }
+            setPreviewData({ valid: validRecords, errors: errorRecords });
+            setShowPreview(true);
 
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
@@ -344,6 +322,74 @@ export default function Salaries() {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
+        }
+    };
+
+    const confirmImport = async () => {
+        if (!previewData || previewData.valid.length === 0) return;
+
+        try {
+            setUploadProgress({ status: 'Importing records...', current: 0, total: previewData.valid.length });
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < previewData.valid.length; i++) {
+                const record = previewData.valid[i];
+                
+                try {
+                    const allowances = {
+                        housing: 0,
+                        transport: 0,
+                        food: 0,
+                        others: record.allowance
+                    };
+
+                    const deductionPerMinute = record.totalSalary / (30 * record.workingHours * 60);
+
+                    const salaryData = {
+                        employee_id: record.employee.id,
+                        attendance_id: record.attendanceId,
+                        name: record.name,
+                        company: record.company,
+                        working_hours: record.workingHours,
+                        basic_salary: record.basicSalary,
+                        allowances: JSON.stringify(allowances),
+                        total_salary: record.totalSalary,
+                        deduction_per_minute: deductionPerMinute
+                    };
+
+                    if (record.existingSalary) {
+                        await base44.entities.EmployeeSalary.update(record.existingSalary.id, salaryData);
+                    } else {
+                        await base44.entities.EmployeeSalary.create(salaryData);
+                    }
+
+                    successCount++;
+                } catch (error) {
+                    errorCount++;
+                }
+
+                setUploadProgress({ 
+                    status: 'Importing records...', 
+                    current: i + 1, 
+                    total: previewData.valid.length 
+                });
+            }
+
+            queryClient.invalidateQueries(['salaries']);
+            setUploadProgress(null);
+            setShowPreview(false);
+            setPreviewData(null);
+            
+            if (errorCount > 0) {
+                toast.warning(`Imported ${successCount} records. ${errorCount} failed.`);
+            } else {
+                toast.success(`Successfully imported ${successCount} salary records`);
+            }
+        } catch (error) {
+            toast.error('Failed to import: ' + error.message);
+            setUploadProgress(null);
         }
     };
 
@@ -649,6 +695,119 @@ export default function Salaries() {
                             disabled={!formData.employee_id || formData.basic_salary <= 0}
                         >
                             {editingSalary ? 'Update' : 'Create'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showPreview} onOpenChange={setShowPreview}>
+                <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Import Preview</DialogTitle>
+                    </DialogHeader>
+                    
+                    {previewData && (
+                        <div className="space-y-4">
+                            <div className="flex gap-4 text-sm">
+                                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                                    <span className="font-semibold text-green-900">Valid: {previewData.valid.length}</span>
+                                </div>
+                                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+                                    <span className="font-semibold text-red-900">Errors: {previewData.errors.length}</span>
+                                </div>
+                            </div>
+
+                            {previewData.valid.length > 0 && (
+                                <div>
+                                    <h3 className="font-semibold mb-2 text-green-900">Valid Records ({previewData.valid.length})</h3>
+                                    <div className="border rounded-lg overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Row</TableHead>
+                                                    <TableHead>Attendance ID</TableHead>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Company</TableHead>
+                                                    <TableHead>Hours</TableHead>
+                                                    <TableHead>Basic</TableHead>
+                                                    <TableHead>Allowance</TableHead>
+                                                    <TableHead>Total</TableHead>
+                                                    <TableHead>Action</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {previewData.valid.map((record, idx) => (
+                                                    <TableRow key={idx}>
+                                                        <TableCell>{record.rowNumber}</TableCell>
+                                                        <TableCell className="font-medium">{record.attendanceId}</TableCell>
+                                                        <TableCell>{record.name}</TableCell>
+                                                        <TableCell>{record.company}</TableCell>
+                                                        <TableCell>{record.workingHours}</TableCell>
+                                                        <TableCell>AED {record.basicSalary}</TableCell>
+                                                        <TableCell>AED {record.allowance}</TableCell>
+                                                        <TableCell className="font-semibold">AED {record.totalSalary}</TableCell>
+                                                        <TableCell>
+                                                            <span className={`px-2 py-1 rounded text-xs ${
+                                                                record.action === 'Create' 
+                                                                    ? 'bg-blue-100 text-blue-700' 
+                                                                    : 'bg-amber-100 text-amber-700'
+                                                            }`}>
+                                                                {record.action}
+                                                            </span>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {previewData.errors.length > 0 && (
+                                <div>
+                                    <h3 className="font-semibold mb-2 text-red-900">Error Records ({previewData.errors.length})</h3>
+                                    <div className="border border-red-200 rounded-lg overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Row</TableHead>
+                                                    <TableHead>Attendance ID</TableHead>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Company</TableHead>
+                                                    <TableHead>Error</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {previewData.errors.map((record, idx) => (
+                                                    <TableRow key={idx} className="bg-red-50">
+                                                        <TableCell>{record.rowNumber}</TableCell>
+                                                        <TableCell>{record.attendanceId || '-'}</TableCell>
+                                                        <TableCell>{record.name || '-'}</TableCell>
+                                                        <TableCell>{record.company || '-'}</TableCell>
+                                                        <TableCell className="text-red-600">{record.error}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setShowPreview(false);
+                            setPreviewData(null);
+                        }}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={confirmImport}
+                            disabled={!previewData || previewData.valid.length === 0 || uploadProgress}
+                            className="bg-green-600 hover:bg-green-700"
+                        >
+                            {uploadProgress ? 'Importing...' : `Import ${previewData?.valid.length || 0} Records`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
