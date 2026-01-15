@@ -931,6 +931,7 @@ export default function ShiftTimingsTab({ project }) {
                                                         />
                                                     </TableHead>
                                                 )}
+                                                <TableHead className="w-24">ID</TableHead>
                                                 <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                                     Attendance ID
                                                 </SortableTableHead>
@@ -964,9 +965,12 @@ export default function ShiftTimingsTab({ project }) {
                                                                         }
                                                                     }}
                                                                 />
-                                                            </TableCell>
-                                                        )}
-                                                        <TableCell className="font-medium">{shift.attendance_id}</TableCell>
+                                                                </TableCell>
+                                                                )}
+                                                                <TableCell className="text-xs text-slate-500 font-mono">
+                                                                {shift.id.substring(0, 8)}
+                                                                </TableCell>
+                                                                <TableCell className="font-medium">{shift.attendance_id}</TableCell>
                                                         <TableCell>{employee?.name || '-'}</TableCell>
                                                         <TableCell>{employee?.department || '-'}</TableCell>
                                                         {project.company === 'Naser Mohsin Auto Parts' && (

@@ -884,8 +884,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 />
                                             </TableHead>
                                         )}
+                                        <TableHead className="w-24">ID</TableHead>
                                         <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                            ID
+                                            Attendance ID
                                         </SortableTableHead>
                                                                                       <TableHead>Name</TableHead>
                                         <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
@@ -1046,7 +1047,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-12">Use</TableHead>
-                                        <TableHead>ID</TableHead>
+                                        <TableHead className="w-24">ID</TableHead>
+                                        <TableHead>Attendance ID</TableHead>
                                         <TableHead>Name</TableHead>
                                         <TableHead>Type</TableHead>
                                         <TableHead>From</TableHead>
@@ -1074,12 +1076,15 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                         });
                                                     }}
                                                 />
-                                            </TableCell>
-                                            <TableCell className="p-1">
+                                                </TableCell>
+                                                <TableCell className="p-1 text-xs text-slate-500 font-mono">
+                                                {exception.id.substring(0, 8)}
+                                                </TableCell>
+                                                <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
                                                     {exception.attendance_id === 'ALL' ? 'ALL' : exception.attendance_id}
                                                 </span>
-                                            </TableCell>
+                                                </TableCell>
                                             <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
                                                    {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => e.attendance_id === exception.attendance_id && e.company === project.company)?.name || '—')}
