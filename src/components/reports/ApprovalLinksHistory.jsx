@@ -13,7 +13,6 @@ import { Label } from '@/components/ui/label';
 export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     const [selectedLink, setSelectedLink] = useState(null);
     const [showLinkDetails, setShowLinkDetails] = useState(false);
-    const [customDomain, setCustomDomain] = useState('');
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
@@ -54,9 +53,9 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
         enabled: !!reportRunId
     });
 
-    // Get custom domain from system settings
-    React.useEffect(() => {
-        const fetchCustomDomain = async () => {
+    const { data: customDomainData } = useQuery({
+        queryKey: ['customDomain'],
+        queryFn: async () => {
             try {
                 const settings = await base44.entities.SystemSettings.filter({ 
                     setting_key: 'CUSTOM_DOMAIN' 
@@ -66,16 +65,16 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                     if (!domain.startsWith('http://') && !domain.startsWith('https://')) {
                         domain = `https://${domain}`;
                     }
-                    setCustomDomain(domain.replace(/\/$/, ''));
-                } else {
-                    setCustomDomain(window.location.origin);
+                    return domain.replace(/\/$/, '');
                 }
+                return window.location.origin;
             } catch {
-                setCustomDomain(window.location.origin);
+                return window.location.origin;
             }
-        };
-        fetchCustomDomain();
-    }, []);
+        }
+    });
+
+    const linkDomain = customDomainData || window.location.origin;
 
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
@@ -242,14 +241,14 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 <Label className="text-xs text-slate-600">Approval Link</Label>
                                 <div className="flex gap-2 mt-1">
                                     <Input
-                                        value={`${customDomain || window.location.origin}/DeptHeadApproval?token=${selectedLink.link_token}`}
+                                        value={`${linkDomain}/DeptHeadApproval?token=${selectedLink.link_token}`}
                                         readOnly
                                         className="font-mono text-xs"
                                     />
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => copyToClipboard(`${customDomain || window.location.origin}/DeptHeadApproval?token=${selectedLink.link_token}`)}
+                                        onClick={() => copyToClipboard(`${linkDomain}/DeptHeadApproval?token=${selectedLink.link_token}`)}
                                     >
                                         <Copy className="w-4 h-4" />
                                     </Button>
