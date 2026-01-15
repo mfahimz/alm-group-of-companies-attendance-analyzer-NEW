@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, XCircle, AlertCircle, Lock, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Lock, Clock, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DeptHeadApproval() {
@@ -15,6 +15,7 @@ export default function DeptHeadApproval() {
     const [verificationCode, setVerificationCode] = useState('');
     const [isVerified, setIsVerified] = useState(false);
     const [linkData, setLinkData] = useState(null);
+    const [approvedMinutes, setApprovedMinutes] = useState({});
     const queryClient = useQueryClient();
 
     // Set page title
@@ -44,7 +45,7 @@ export default function DeptHeadApproval() {
         retry: false
     });
 
-    const { data: verifiedData, isLoading: exceptionsLoading } = useQuery({
+    const { data: verifiedData, isLoading: dataLoading } = useQuery({
         queryKey: ['verifiedData', token],
         queryFn: async () => {
             const response = await base44.functions.invoke('verifyApprovalLink', { 
@@ -60,9 +61,9 @@ export default function DeptHeadApproval() {
         retry: false
     });
 
-    const exceptions = verifiedData?.exceptions || [];
+    const analysisResults = verifiedData?.analysis_results || [];
     const employees = verifiedData?.employees || [];
-    const deptHead = verifiedData?.dept_head;
+    const reportRun = verifiedData?.report_run;
 
     const verifyMutation = useMutation({
         mutationFn: async () => {
@@ -87,34 +88,11 @@ export default function DeptHeadApproval() {
         }
     });
 
-    const approveMutation = useMutation({
-        mutationFn: async (exceptionId) => {
-            const response = await base44.functions.invoke('approveExceptions', {
-                token,
-                exception_ids: exceptionId,
-                approve_all: false
-            });
-            
-            if (!response.data.success) {
-                throw new Error(response.data.error || 'Approval failed');
-            }
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['verifiedData']);
-            toast.success('Exception approved');
-        },
-        onError: () => {
-            toast.error('Failed to approve exception');
-        }
-    });
-
     const approveAllMutation = useMutation({
         mutationFn: async () => {
-            const exceptionIds = exceptions.map(e => e.id);
             const response = await base44.functions.invoke('approveExceptions', {
                 token,
-                exception_ids: exceptionIds,
-                approve_all: true
+                approved_minutes: approvedMinutes
             });
             
             if (!response.data.success) {
@@ -122,14 +100,13 @@ export default function DeptHeadApproval() {
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['verifiedData']);
-            toast.success('All exceptions approved successfully');
+            toast.success('All approvals submitted successfully');
             setTimeout(() => {
                 window.location.href = 'about:blank';
             }, 2000);
         },
-        onError: () => {
-            toast.error('Failed to approve all exceptions');
+        onError: (error) => {
+            toast.error('Failed to submit approvals: ' + error.message);
         }
     });
 
@@ -139,6 +116,24 @@ export default function DeptHeadApproval() {
             e.company === linkData?.company
         );
         return employee?.name || attendanceId;
+    };
+
+    const getEmployeeQuarterlyMinutes = (attendanceId) => {
+        const employee = employees.find(e => 
+            e.attendance_id === attendanceId && 
+            e.company === linkData?.company
+        );
+        return {
+            total: employee?.approved_other_minutes_limit || 120,
+            used: 0 // TODO: Fetch from EmployeeQuarterlyMinutes
+        };
+    };
+
+    const handleApprovedMinutesChange = (attendanceId, value) => {
+        setApprovedMinutes(prev => ({
+            ...prev,
+            [attendanceId]: parseInt(value) || 0
+        }));
     };
 
     if (!token) {
@@ -169,7 +164,7 @@ export default function DeptHeadApproval() {
         );
     }
 
-    // Handle link errors with custom branding
+    // Handle link errors
     if (linkError) {
         const errorType = linkError.message;
         let errorTitle = 'Link Error';
@@ -250,7 +245,7 @@ export default function DeptHeadApproval() {
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
-            <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+            <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
                 <Card className="border-0 shadow-md">
                     <CardHeader>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -259,134 +254,109 @@ export default function DeptHeadApproval() {
                                 <p className="text-xs sm:text-sm text-slate-600 mt-1">
                                     Department: <strong>{linkData?.department}</strong>
                                 </p>
+                                {reportRun && (
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Period: {new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}
+                                    </p>
+                                )}
                             </div>
                             <Badge className="bg-amber-100 text-amber-800 w-fit">
                                 <Clock className="w-3 h-3 mr-1" />
-                                {exceptions.length} Pending
+                                {analysisResults.length} Employees
                             </Badge>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {exceptionsLoading ? (
-                            <div className="text-center py-12 text-slate-500">Loading exceptions...</div>
-                        ) : exceptions.length === 0 ? (
+                        {dataLoading ? (
+                            <div className="text-center py-12 text-slate-500">Loading employee data...</div>
+                        ) : analysisResults.length === 0 ? (
                             <div className="text-center py-12">
                                 <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500" />
-                                <p className="text-slate-600">All exceptions have been approved</p>
+                                <p className="text-slate-600">No employees found for approval</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {/* Desktop Table View */}
-                                <div className="hidden md:block overflow-x-auto">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p className="text-sm text-blue-800">
+                                        <strong>Instructions:</strong> Review late minutes for each employee. Enter approved minutes (from quarterly allowance) for employees with late minutes exceeding 15 grace minutes. Employees who have exhausted their quarterly limit cannot receive additional approvals.
+                                    </p>
+                                </div>
+
+                                <div className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Employee</TableHead>
-                                                <TableHead>Date Range</TableHead>
-                                                <TableHead>Type</TableHead>
-                                                <TableHead>Changes</TableHead>
-                                                <TableHead>Details</TableHead>
-                                                <TableHead>Action</TableHead>
+                                                <TableHead>ID</TableHead>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Late Minutes</TableHead>
+                                                <TableHead>Grace</TableHead>
+                                                <TableHead>Deductible</TableHead>
+                                                <TableHead>Quarterly Allowance</TableHead>
+                                                <TableHead>Approve Minutes</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {exceptions.map((exception) => (
-                                                <TableRow key={exception.id}>
-                                                    <TableCell className="font-medium">
-                                                        {getEmployeeName(exception.attendance_id)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {new Date(exception.date_from).toLocaleDateString('en-GB')} - {new Date(exception.date_to).toLocaleDateString('en-GB')}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline">{exception.type}</Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {exception.old_late_minutes !== undefined && (
-                                                            <div className="text-xs">
-                                                                Late: {exception.old_late_minutes} → {exception.late_minutes || 0} min
+                                            {analysisResults.map((result) => {
+                                                const employee = employees.find(e => e.attendance_id === result.attendance_id);
+                                                const lateMinutes = result.late_minutes || 0;
+                                                const earlyMinutes = result.early_checkout_minutes || 0;
+                                                const totalMinutes = lateMinutes + earlyMinutes;
+                                                const grace = result.grace_minutes || 15;
+                                                const exceedsGrace = totalMinutes > grace;
+                                                const quarterlyLimit = employee?.approved_other_minutes_limit || 120;
+                                                const quarterlyUsed = 0; // TODO: Fetch from EmployeeQuarterlyMinutes
+                                                const quarterlyRemaining = quarterlyLimit - quarterlyUsed;
+                                                const canApprove = exceedsGrace && quarterlyRemaining > 0;
+                                                
+                                                return (
+                                                    <TableRow key={result.id} className={exceedsGrace ? 'bg-amber-50' : ''}>
+                                                        <TableCell className="font-medium">{result.attendance_id}</TableCell>
+                                                        <TableCell>{getEmployeeName(result.attendance_id)}</TableCell>
+                                                        <TableCell>
+                                                            <span className={totalMinutes > 0 ? 'text-orange-600 font-semibold' : ''}>
+                                                                {totalMinutes} min
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell>{grace} min</TableCell>
+                                                        <TableCell>
+                                                            <span className={`font-bold ${totalMinutes > grace ? 'text-red-600' : 'text-green-600'}`}>
+                                                                {Math.max(0, totalMinutes - grace)} min
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="text-sm">
+                                                                <div className="font-medium">
+                                                                    {quarterlyRemaining} / {quarterlyLimit}
+                                                                </div>
+                                                                <div className="text-xs text-slate-500">
+                                                                    {quarterlyUsed} used
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                        {exception.old_early_checkout_minutes !== undefined && (
-                                                            <div className="text-xs">
-                                                                Early: {exception.old_early_checkout_minutes} → {exception.early_checkout_minutes || 0} min
-                                                            </div>
-                                                        )}
-                                                        {exception.old_other_minutes !== undefined && (
-                                                            <div className="text-xs">
-                                                                Other: {exception.old_other_minutes || 0} → {exception.other_minutes || 0} min
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-sm text-slate-600">
-                                                        {exception.details || '—'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => approveMutation.mutate(exception.id)}
-                                                            disabled={approveMutation.isPending}
-                                                            className="bg-green-600 hover:bg-green-700"
-                                                        >
-                                                            <CheckCircle className="w-4 h-4 mr-1" />
-                                                            Approve
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {canApprove ? (
+                                                                <Input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max={quarterlyRemaining}
+                                                                    value={approvedMinutes[result.attendance_id] || 0}
+                                                                    onChange={(e) => handleApprovedMinutesChange(result.attendance_id, e.target.value)}
+                                                                    className="w-24"
+                                                                    placeholder="0"
+                                                                />
+                                                            ) : quarterlyRemaining === 0 ? (
+                                                                <Badge variant="destructive" className="text-xs">
+                                                                    Limit Exceeded
+                                                                </Badge>
+                                                            ) : (
+                                                                <span className="text-sm text-slate-400">—</span>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
-                                </div>
-
-                                {/* Mobile Card View */}
-                                <div className="md:hidden space-y-3">
-                                    {exceptions.map((exception) => (
-                                        <Card key={exception.id} className="border shadow-sm">
-                                            <CardContent className="p-4 space-y-3">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-medium text-sm truncate">
-                                                            {getEmployeeName(exception.attendance_id)}
-                                                        </p>
-                                                        <p className="text-xs text-slate-500 mt-0.5">
-                                                            {new Date(exception.date_from).toLocaleDateString('en-GB')} - {new Date(exception.date_to).toLocaleDateString('en-GB')}
-                                                        </p>
-                                                    </div>
-                                                    <Badge variant="outline" className="text-xs flex-shrink-0">{exception.type}</Badge>
-                                                </div>
-                                                
-                                                {(exception.old_late_minutes !== undefined || 
-                                                  exception.old_early_checkout_minutes !== undefined || 
-                                                  exception.old_other_minutes !== undefined) && (
-                                                    <div className="text-xs space-y-1 bg-slate-50 p-2 rounded">
-                                                        {exception.old_late_minutes !== undefined && (
-                                                            <div>Late: {exception.old_late_minutes} → {exception.late_minutes || 0} min</div>
-                                                        )}
-                                                        {exception.old_early_checkout_minutes !== undefined && (
-                                                            <div>Early: {exception.old_early_checkout_minutes} → {exception.early_checkout_minutes || 0} min</div>
-                                                        )}
-                                                        {exception.old_other_minutes !== undefined && (
-                                                            <div>Other: {exception.old_other_minutes || 0} → {exception.other_minutes || 0} min</div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                
-                                                {exception.details && (
-                                                    <p className="text-xs text-slate-600">{exception.details}</p>
-                                                )}
-                                                
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() => approveMutation.mutate(exception.id)}
-                                                    disabled={approveMutation.isPending}
-                                                    className="w-full bg-green-600 hover:bg-green-700"
-                                                >
-                                                    <CheckCircle className="w-4 h-4 mr-1" />
-                                                    Approve
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
                                 </div>
 
                                 <div className="flex justify-end gap-3 pt-4 border-t">
@@ -395,8 +365,8 @@ export default function DeptHeadApproval() {
                                         disabled={approveAllMutation.isPending}
                                         className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
                                     >
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        {approveAllMutation.isPending ? 'Approving All...' : 'Approve All & Submit'}
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {approveAllMutation.isPending ? 'Submitting...' : 'Submit All Approvals'}
                                     </Button>
                                 </div>
                             </div>

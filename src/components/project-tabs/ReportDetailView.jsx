@@ -937,8 +937,8 @@ export default function ReportDetailView({ reportRun, project }) {
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
             
-            // Only admins can generate approval links
-            if (exceptionCount > 0 && isAdmin) {
+            // Always generate approval links for admins (regardless of edit count)
+            if (isAdmin) {
                 try {
                     setSaveProgress({ current: 100, total: 100, status: 'Generating approval links...' });
                     
