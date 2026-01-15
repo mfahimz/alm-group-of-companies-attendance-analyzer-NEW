@@ -25,6 +25,7 @@ export default function Salaries() {
         attendance_id: '',
         name: '',
         company: '',
+        working_hours: 9,
         basic_salary: 0,
         housing_allowance: 0,
         transport_allowance: 0,
@@ -77,10 +78,11 @@ export default function Salaries() {
                 attendance_id: data.attendance_id,
                 name: data.name,
                 company: data.company,
+                working_hours: data.working_hours || 9,
                 basic_salary: data.basic_salary,
                 allowances: JSON.stringify(allowances),
                 total_salary: total,
-                deduction_per_minute: total / (30 * 9 * 60) // Assuming 30 days, 9 hours per day
+                deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
             });
         },
         onSuccess: () => {
@@ -105,10 +107,11 @@ export default function Salaries() {
             const total = data.basic_salary + allowances.housing + allowances.transport + allowances.food + allowances.others;
             
             return base44.entities.EmployeeSalary.update(id, {
+                working_hours: data.working_hours || 9,
                 basic_salary: data.basic_salary,
                 allowances: JSON.stringify(allowances),
                 total_salary: total,
-                deduction_per_minute: total / (30 * 9 * 60)
+                deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
             });
         },
         onSuccess: () => {
@@ -139,6 +142,7 @@ export default function Salaries() {
             attendance_id: '',
             name: '',
             company: '',
+            working_hours: 9,
             basic_salary: 0,
             housing_allowance: 0,
             transport_allowance: 0,
@@ -168,6 +172,7 @@ export default function Salaries() {
             attendance_id: salary.attendance_id,
             name: salary.name,
             company: salary.company,
+            working_hours: salary.working_hours || 9,
             basic_salary: salary.basic_salary,
             housing_allowance: allowances.housing || 0,
             transport_allowance: allowances.transport || 0,
@@ -285,14 +290,13 @@ export default function Salaries() {
                                     <SortableTableHead sortKey="company" currentSort={sort} onSort={setSort}>
                                         Company
                                     </SortableTableHead>
+                                    <SortableTableHead sortKey="working_hours" currentSort={sort} onSort={setSort}>
+                                        Working Hours
+                                    </SortableTableHead>
                                     <SortableTableHead sortKey="basic_salary" currentSort={sort} onSort={setSort}>
-                                        Basic Salary
+                                        Basic
                                     </SortableTableHead>
-                                    <TableHead>Allowances</TableHead>
-                                    <SortableTableHead sortKey="total_salary" currentSort={sort} onSort={setSort}>
-                                        Total Salary
-                                    </SortableTableHead>
-                                    <TableHead>Per Minute</TableHead>
+                                    <TableHead>Allowance</TableHead>
                                     {(isAdmin || isSupervisor) && <TableHead className="text-right">Actions</TableHead>}
                                 </TableRow>
                             </TableHeader>
@@ -304,22 +308,14 @@ export default function Salaries() {
                                             <TableCell className="font-medium">{salary.attendance_id}</TableCell>
                                             <TableCell>{salary.name}</TableCell>
                                             <TableCell>{salary.company}</TableCell>
+                                            <TableCell>
+                                                {salary.working_hours || 9} hrs/day
+                                            </TableCell>
                                             <TableCell className="font-semibold">
                                                 AED {salary.basic_salary.toLocaleString()}
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="text-xs space-y-0.5">
-                                                    {allowances.housing > 0 && <div>Housing: AED {allowances.housing}</div>}
-                                                    {allowances.transport > 0 && <div>Transport: AED {allowances.transport}</div>}
-                                                    {allowances.food > 0 && <div>Food: AED {allowances.food}</div>}
-                                                    {allowances.others > 0 && <div>Others: AED {allowances.others}</div>}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="font-bold text-green-600">
-                                                AED {salary.total_salary.toLocaleString()}
-                                            </TableCell>
-                                            <TableCell className="text-xs text-slate-600">
-                                                AED {salary.deduction_per_minute.toFixed(4)}
+                                            <TableCell className="font-semibold">
+                                                AED {((allowances.housing || 0) + (allowances.transport || 0) + (allowances.food || 0) + (allowances.others || 0)).toLocaleString()}
                                             </TableCell>
                                             {(isAdmin || isSupervisor) && (
                                                 <TableCell className="text-right">
@@ -392,7 +388,16 @@ export default function Salaries() {
                             </>
                         )}
 
-                        <div className="col-span-2">
+                        <div>
+                            <Label>Working Hours per Day</Label>
+                            <Input
+                                type="number"
+                                value={formData.working_hours}
+                                onChange={(e) => setFormData({...formData, working_hours: parseFloat(e.target.value) || 9})}
+                            />
+                        </div>
+
+                        <div>
                             <Label>Basic Salary (AED)</Label>
                             <Input
                                 type="number"
