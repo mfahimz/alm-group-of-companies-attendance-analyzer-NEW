@@ -9,6 +9,7 @@ import { Copy, CheckCircle, XCircle, Clock, Eye, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { formatInUAE } from '@/components/ui/timezone';
 
 export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     const [selectedLink, setSelectedLink] = useState(null);
@@ -137,17 +138,10 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                         <TableCell className="font-medium">{link.department}</TableCell>
                                         <TableCell>{link.department_head_id || '-'}</TableCell>
                                         <TableCell className="text-sm">
-                                            {new Date(link.created_date).toLocaleDateString('en-US', {
-                                                day: '2-digit',
-                                                month: '2-digit',
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                                hour12: true
-                                            })}
+                                            {formatInUAE(link.created_date, 'MM/dd/yyyy hh:mm a')}
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {new Date(link.expires_at).toLocaleDateString()}
+                                            {formatInUAE(link.expires_at, 'MM/dd/yyyy')}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
@@ -232,7 +226,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 <div>
                                     <Label className="text-xs text-slate-600">Created</Label>
                                     <p className="text-sm">
-                                        {new Date(selectedLink.created_date).toLocaleString()}
+                                        {formatInUAE(selectedLink.created_date, 'PPpp')}
                                     </p>
                                 </div>
                             </div>
@@ -279,7 +273,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                                     <Label className="text-xs text-slate-600">Used At</Label>
                                     <p className="text-sm mt-1">
-                                        {new Date(selectedLink.used_at).toLocaleString()}
+                                        {formatInUAE(selectedLink.used_at, 'PPpp')}
                                     </p>
                                 </div>
                             )}

@@ -8,6 +8,7 @@ import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
 import ReportDetailView from '../components/project-tabs/ReportDetailView';
 import ApprovalLinksHistory from '../components/reports/ApprovalLinksHistory';
+import { formatInUAE } from '@/components/ui/timezone';
 
 export default function ReportDetailPage() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -79,17 +80,10 @@ export default function ReportDetailPage() {
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">
-                            Report: {new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}
+                            Report: {formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - {formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}
                         </h1>
                         <p className="text-sm text-slate-600 mt-1">
-                            Generated on {new Date(reportRun.created_date).toLocaleString('en-US', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                timeZone: 'Asia/Dubai'
-                            })}
+                            Generated on {formatInUAE(reportRun.created_date, 'MM/dd/yyyy hh:mm a')}
                         </p>
                     </div>
                 </div>
