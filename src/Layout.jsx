@@ -9,17 +9,18 @@ import { Navbar1 } from '@/components/ui/Navbar1';
 import { formatInUAE } from '@/components/ui/timezone';
 import { CompanyBadge } from '@/components/ui/CompanyBadge';
 import {
-    BarChart3,
-    FolderKanban,
-    Users,
-    Settings,
-    LayoutDashboard,
-    Shield,
-    Book,
-    Calendar,
-    FileSpreadsheet,
-    Lock
-} from 'lucide-react';
+          BarChart3,
+          FolderKanban,
+          Users,
+          Settings,
+          LayoutDashboard,
+          Shield,
+          Book,
+          Calendar,
+          FileSpreadsheet,
+          Lock,
+          Briefcase
+      } from 'lucide-react';
 
 
 export default function Layout({ children, currentPageName }) {
