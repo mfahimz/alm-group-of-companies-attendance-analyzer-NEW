@@ -44,8 +44,19 @@ Deno.serve(async (req) => {
                 continue;
             }
 
+            // Convert attendance_id to number for matching
+            const attendanceIdNum = Number(salaryRecord.attendance_id);
+            if (isNaN(attendanceIdNum)) {
+                mismatches.push({
+                    attendance_id: salaryRecord.attendance_id,
+                    salary_name: salaryRecord.employee_name,
+                    reason: 'Invalid attendance_id format'
+                });
+                continue;
+            }
+
             // Find matching employee by attendance_id
-            const employee = employees.find(e => e.attendance_id === salaryRecord.attendance_id);
+            const employee = employees.find(e => e.attendance_id === attendanceIdNum);
 
             if (!employee) {
                 mismatches.push({
