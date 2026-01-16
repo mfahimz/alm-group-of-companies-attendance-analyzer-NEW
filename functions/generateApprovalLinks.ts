@@ -34,6 +34,23 @@ Deno.serve(async (req) => {
         // Get all employees to map attendance_id to departments
         const employees = await base44.asServiceRole.entities.Employee.filter({ company });
 
+        // Get project details for date range
+        const project = await base44.asServiceRole.entities.Project.get(project_id);
+
+        // Pre-fetch all data needed for daily breakdown (to be cached in ApprovalLink)
+        const analysisResults = await base44.asServiceRole.entities.AnalysisResult.filter({
+            project_id
+        });
+        const punches = await base44.asServiceRole.entities.Punch.filter({
+            project_id
+        });
+        const shiftTimings = await base44.asServiceRole.entities.ShiftTiming.filter({
+            project_id
+        });
+        const allExceptions = await base44.asServiceRole.entities.Exception.filter({
+            project_id
+        });
+
         // Group employees by department (not exceptions)
         const employeesByDept = {};
         for (const employee of employees) {
@@ -128,7 +145,38 @@ Deno.serve(async (req) => {
             // Generate 6-digit verification code
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-            // Create approval link record
+            // Pre-calculate daily breakdown data for this department
+            const departmentEmployees = employeesByDept[department] || [];
+            const dailyBreakdownData = {};
+
+            for (const employee of departmentEmployees) {
+                const employeeAnalysis = analysisResults.find(a => a.attendance_id === employee.attendance_id);
+                const employeePunches = punches.filter(p => p.attendance_id === employee.attendance_id);
+                const employeeShifts = shiftTimings.filter(s => s.attendance_id === employee.attendance_id);
+                const employeeExceptions = allExceptions.filter(e => e.attendance_id === employee.attendance_id && e.use_in_analysis);
+
+                dailyBreakdownData[employee.attendance_id] = {
+                    employee_name: employee.name,
+                    employee_id: employee.id,
+                    analysis_summary: employeeAnalysis ? {
+                        late_minutes: employeeAnalysis.late_minutes,
+                        early_checkout_minutes: employeeAnalysis.early_checkout_minutes,
+                        other_minutes: employeeAnalysis.other_minutes,
+                        grace_minutes: employeeAnalysis.grace_minutes,
+                        approved_minutes: employeeAnalysis.approved_minutes,
+                        absent_days: employeeAnalysis.full_absence_count,
+                        half_absent_days: employeeAnalysis.half_absence_count,
+                        present_days: employeeAnalysis.present_days,
+                        notes: employeeAnalysis.notes,
+                        abnormal_dates: employeeAnalysis.abnormal_dates
+                    } : null,
+                    punches_count: employeePunches.length,
+                    shifts_count: employeeShifts.length,
+                    exceptions_count: employeeExceptions.length
+                };
+            }
+
+            // Create approval link record with pre-calculated data
             const linkRecord = await base44.asServiceRole.entities.ApprovalLink.create({
                 report_run_id,
                 project_id,
@@ -139,7 +187,8 @@ Deno.serve(async (req) => {
                 verification_code: verificationCode,
                 expires_at: expiresAt.toISOString(),
                 used: false,
-                approved: false
+                approved: false,
+                daily_breakdown_json: JSON.stringify(dailyBreakdownData)
             });
 
             // Get department head employee details
