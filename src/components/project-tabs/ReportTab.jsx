@@ -4,10 +4,11 @@ import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Trash2, CheckCircle } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
 export default function ReportTab({ project }) {
     const queryClient = useQueryClient();
@@ -53,9 +54,39 @@ export default function ReportTab({ project }) {
         }
     });
 
+    const markFinalMutation = useMutation({
+        mutationFn: async (reportRunId) => {
+            // First, unmark all other reports as final
+            const otherReports = allReportRuns.filter(r => r.id !== reportRunId);
+            await Promise.all(otherReports.map(r => 
+                base44.entities.ReportRun.update(r.id, { is_final: false })
+            ));
+            
+            // Mark this report as final
+            await base44.entities.ReportRun.update(reportRunId, { is_final: true });
+            
+            // Update project's last_saved_report_id
+            await base44.entities.Project.update(project.id, { last_saved_report_id: reportRunId });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['reportRuns', project.id]);
+            queryClient.invalidateQueries(['projects']);
+            toast.success('Report marked as final for salary calculation');
+        },
+        onError: () => {
+            toast.error('Failed to mark report as final');
+        }
+    });
+
     const handleDeleteReport = (reportRunId) => {
         if (window.confirm('Delete this report? This will permanently remove all analysis results from this run.')) {
             deleteReportMutation.mutate(reportRunId);
+        }
+    };
+
+    const handleMarkFinal = (reportRunId) => {
+        if (window.confirm('Mark this report as final for salary calculation? This will unmark any previously selected final report.')) {
+            markFinalMutation.mutate(reportRunId);
         }
     };
 
@@ -80,6 +111,7 @@ export default function ReportTab({ project }) {
                                         <TableHead>Period</TableHead>
                                         <TableHead>Employees</TableHead>
                                         <TableHead>Verified</TableHead>
+                                        <TableHead>Status</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -118,19 +150,39 @@ export default function ReportTab({ project }) {
                                                         )}
                                                     </div>
                                                 </TableCell>
+                                                <TableCell>
+                                                    {run.is_final && (
+                                                        <Badge className="bg-green-100 text-green-700 border-green-300">
+                                                            <Star className="w-3 h-3 mr-1 fill-green-700" />
+                                                            Final Report
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex gap-1 justify-end">
                                                         <Link to={createPageUrl('ReportDetail') + `?id=${run.id}&project_id=${project.id}`}>
-                                                            <Button size="sm" variant="ghost">
+                                                            <Button size="sm" variant="ghost" title="View report">
                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
                                                         </Link>
+                                                        {isAdminOrSupervisor && !run.is_final && (
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="ghost"
+                                                                onClick={() => handleMarkFinal(run.id)}
+                                                                disabled={markFinalMutation.isPending}
+                                                                title="Mark as final report for salary"
+                                                            >
+                                                                <Star className="w-4 h-4 text-amber-600" />
+                                                            </Button>
+                                                        )}
                                                         {isAdmin && (
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="ghost"
                                                                 onClick={() => handleDeleteReport(run.id)}
                                                                 disabled={deleteReportMutation.isPending}
+                                                                title="Delete report"
                                                             >
                                                                 <Trash2 className="w-4 h-4 text-red-600" />
                                                             </Button>
