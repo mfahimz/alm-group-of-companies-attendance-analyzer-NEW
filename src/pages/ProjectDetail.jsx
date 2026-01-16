@@ -217,7 +217,7 @@ export default function ProjectDetail() {
                                 value="salary" 
                                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300"
                             >
-                                Salary 💰
+                                Salary
                             </TabsTrigger>
                         )}
                     </TabsList>

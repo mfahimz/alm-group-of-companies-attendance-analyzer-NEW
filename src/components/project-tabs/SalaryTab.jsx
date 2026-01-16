@@ -39,8 +39,11 @@ export default function SalaryTab({ project }) {
     // Combine all data for each employee
     const salaryData = useMemo(() => {
         return employees.map(emp => {
-            const salary = salaries.find(s => s.employee_id === emp.hrms_id);
-            const result = analysisResults.find(r => r.attendance_id === emp.attendance_id);
+            const salary = salaries.find(s => String(s.employee_id) === String(emp.hrms_id));
+            const result = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
+
+            // Calculate half day not worked hours (half_absence_count * working_hours / 2)
+            const halfDayNotWorkedHours = (result?.half_absence_count || 0) * ((salary?.working_hours || 9) / 2);
 
             // Placeholder values (formulas to be implemented)
             const leaveDays = result?.annual_leave_count || 0;
@@ -68,7 +71,9 @@ export default function SalaryTab({ project }) {
                 attendance_id: emp.attendance_id,
                 name: emp.name,
                 department: emp.department,
-                // From salary master
+                company: emp.company,
+                // From salary master - ALL columns
+                employee_id: salary?.employee_id || emp.hrms_id,
                 basic_salary: salary?.basic_salary || 0,
                 allowances: salary?.allowances || '{}',
                 total_salary: salary?.total_salary || 0,
@@ -79,6 +84,7 @@ export default function SalaryTab({ project }) {
                 present_days: result?.present_days || 0,
                 full_absence_count: result?.full_absence_count || 0,
                 half_absence_count: result?.half_absence_count || 0,
+                halfDayNotWorkedHours,
                 late_minutes: result?.late_minutes || 0,
                 early_checkout_minutes: result?.early_checkout_minutes || 0,
                 other_minutes: result?.other_minutes || 0,
@@ -163,12 +169,16 @@ export default function SalaryTab({ project }) {
                                     <TableHead className="whitespace-nowrap">Attendance ID</TableHead>
                                     <TableHead className="whitespace-nowrap">Name</TableHead>
                                     <TableHead className="whitespace-nowrap">Department</TableHead>
+                                    <TableHead className="whitespace-nowrap">Company</TableHead>
+                                    <TableHead className="whitespace-nowrap">Working Hours/Day</TableHead>
+                                    <TableHead className="whitespace-nowrap">Deduction/Minute</TableHead>
                                     <TableHead className="whitespace-nowrap">Basic Salary</TableHead>
-                                    <TableHead className="whitespace-nowrap">Total Salary</TableHead>
+                                    <TableHead className="whitespace-nowrap">Total Salary (Master)</TableHead>
                                     <TableHead className="whitespace-nowrap">Working Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Present Days</TableHead>
                                     <TableHead className="whitespace-nowrap">LOP Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Half Days</TableHead>
+                                    <TableHead className="whitespace-nowrap">Half Day Not Worked Hours</TableHead>
                                     <TableHead className="whitespace-nowrap bg-amber-50">Leave Days</TableHead>
                                     <TableHead className="whitespace-nowrap bg-amber-50">Leave Pay</TableHead>
                                     <TableHead className="whitespace-nowrap bg-green-50">Salary Leave Days</TableHead>
@@ -193,12 +203,16 @@ export default function SalaryTab({ project }) {
                                         <TableCell>{row.attendance_id}</TableCell>
                                         <TableCell className="font-medium">{row.name}</TableCell>
                                         <TableCell>{row.department}</TableCell>
+                                        <TableCell>{row.company}</TableCell>
+                                        <TableCell>{row.working_hours}</TableCell>
+                                        <TableCell>{row.deduction_per_minute.toFixed(4)}</TableCell>
                                         <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
-                                        <TableCell>{row.total_salary.toFixed(2)}</TableCell>
+                                        <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
                                         <TableCell>{row.working_days}</TableCell>
                                         <TableCell>{row.present_days}</TableCell>
                                         <TableCell className="text-red-600 font-semibold">{row.full_absence_count}</TableCell>
                                         <TableCell>{row.half_absence_count}</TableCell>
+                                        <TableCell className="text-amber-600 font-medium">{row.halfDayNotWorkedHours.toFixed(2)}</TableCell>
                                         <TableCell className="bg-amber-50">{row.leaveDays}</TableCell>
                                         <TableCell className="bg-amber-50">{row.leavePay.toFixed(2)}</TableCell>
                                         <TableCell className="bg-green-50">{row.salaryLeaveDays}</TableCell>
