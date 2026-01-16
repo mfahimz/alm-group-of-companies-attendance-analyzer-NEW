@@ -50,7 +50,7 @@ export default function MaintenancePage() {
                         <p className="text-xs text-slate-500 mb-4">Serving</p>
                         <div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
                             <div className="bg-slate-50 rounded-lg p-3">
-                                <p className="font-medium">Almaragi Autogroup</p>
+                                <p className="font-medium">Al Maraghi Auto Repairs</p>
                             </div>
                             <div className="bg-slate-50 rounded-lg p-3">
                                 <p className="font-medium">Almaragi Automotive</p>
