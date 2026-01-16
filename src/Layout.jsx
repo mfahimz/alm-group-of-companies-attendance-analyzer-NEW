@@ -143,7 +143,7 @@ export default function Layout({ children, currentPageName }) {
                     }
             ];
 
-            if (isAdmin || isSupervisor) {
+            if (isAdmin) {
             menu.push({
                 title: 'Recruitment',
                 url: 'Recruitment',
