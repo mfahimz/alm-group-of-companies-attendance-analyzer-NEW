@@ -22,14 +22,16 @@ export default function Dashboard() {
 
     const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
         queryKey: ['projects'],
-        queryFn: () => base44.entities.Project.list('-created_date'),
-        enabled: !!currentUser
+        queryFn: () => base44.entities.Project.list('-created_date', 100),
+        enabled: !!currentUser,
+        staleTime: 5 * 60 * 1000
     });
 
     const { data: allEmployees = [], isLoading: employeesLoading } = useQuery({
         queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list(),
-        enabled: !!currentUser
+        queryFn: () => base44.entities.Employee.list('name', 500),
+        enabled: !!currentUser,
+        staleTime: 5 * 60 * 1000
     });
 
     // Filter data based on user access

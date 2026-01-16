@@ -9,12 +9,14 @@ import { createPageUrl } from '../../utils';
 export default function AdminDashboard({ projects, employees }) {
     const { data: exceptions = [] } = useQuery({
         queryKey: ['allExceptions'],
-        queryFn: () => base44.entities.Exception.list('-created_date', 10)
+        queryFn: () => base44.entities.Exception.list('-created_date', 10),
+        staleTime: 2 * 60 * 1000
     });
 
     const { data: auditLogs = [] } = useQuery({
         queryKey: ['recentAudit'],
-        queryFn: () => base44.entities.AuditLog.list('-created_date', 5)
+        queryFn: () => base44.entities.AuditLog.list('-created_date', 5),
+        staleTime: 1 * 60 * 1000
     });
 
     const systemStats = [
