@@ -356,6 +356,91 @@ export default function DeptHeadApproval() {
         );
     }
 
+    if (linkInfo.used && windowStatus.windowStatus === 'readonly') {
+        // Link was used, now in read-only mode
+        return (
+            <div className="min-h-screen bg-slate-50 p-6">
+                <div className="max-w-7xl mx-auto space-y-6">
+                    <Card className="border-0 shadow-md border-l-4 border-l-blue-600">
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Lock className="w-5 h-5 text-blue-600" />
+                                        Read-Only Access
+                                    </CardTitle>
+                                    <p className="text-sm text-slate-600 mt-1">
+                                        Department: <span className="font-medium">{linkInfo.department}</span>
+                                    </p>
+                                    <p className="text-xs text-blue-600 mt-2">
+                                        This link is now in read-only mode. You can view the report until {formatInUAE(windowStatus.deadline, 'PPpp')}
+                                    </p>
+                                </div>
+                                <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded">Read-Only</span>
+                            </div>
+                        </CardHeader>
+                    </Card>
+                    
+                    {/* Show same table but disabled */}
+                    <Card className="border-0 shadow-md">
+                        <CardHeader>
+                            <CardTitle>Attendance Report (Approved)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Att ID</TableHead>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead className="text-center">Working Days</TableHead>
+                                            <TableHead className="text-center">Late (min)</TableHead>
+                                            <TableHead className="text-center">Early (min)</TableHead>
+                                            <TableHead className="text-center">Grace</TableHead>
+                                            <TableHead className="text-center">Approved Minutes</TableHead>
+                                            <TableHead className="text-center">Final Deductible</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {departmentResults.map((result) => (
+                                            <TableRow key={result.attendance_id}>
+                                                <TableCell className="font-medium">{result.attendance_id}</TableCell>
+                                                <TableCell>{result.employee.name}</TableCell>
+                                                <TableCell className="text-center">{result.working_days}</TableCell>
+                                                <TableCell className="text-center">{result.late_minutes || 0}</TableCell>
+                                                <TableCell className="text-center">{result.early_checkout_minutes || 0}</TableCell>
+                                                <TableCell className="text-center">{result.grace_minutes || 0}</TableCell>
+                                                <TableCell className="text-center font-medium text-blue-600">{result.approved_minutes || 0}</TableCell>
+                                                <TableCell className="text-center">
+                                                    <span className={result.finalDeductibleMinutes > 0 ? 'font-bold text-red-600' : 'text-green-600'}>
+                                                        {result.finalDeductibleMinutes}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            setSelectedEmployeeForBreakdown(result);
+                                                            setShowBreakdownDialog(true);
+                                                        }}
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
+
     if (linkInfo.used) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -367,6 +452,9 @@ export default function DeptHeadApproval() {
                                 <p className="font-medium text-green-900">Already Approved</p>
                                 <p className="text-sm text-green-700 mt-1">
                                     This report has already been approved on {new Date(linkInfo.used_at).toLocaleString()}.
+                                </p>
+                                <p className="text-xs text-green-600 mt-2">
+                                    You can view the report in read-only mode until {formatInUAE(windowStatus.deadline, 'PPpp')}
                                 </p>
                             </div>
                         </div>
@@ -459,6 +547,22 @@ export default function DeptHeadApproval() {
     return (
         <div className="min-h-screen bg-slate-50 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
+                {windowStatus.windowStatus === 'approval' && (
+                    <Card className="border-0 shadow-md border-l-4 border-l-green-600 bg-green-50">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium text-green-900">✓ Approval Window Active</p>
+                                    <p className="text-sm text-green-700 mt-1">
+                                        You can approve exceptions until {formatInUAE(windowStatus.deadline, 'PPpp')}
+                                    </p>
+                                </div>
+                                <Clock className="w-5 h-5 text-green-600" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+                
                 <Card className="border-0 shadow-md">
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -500,12 +604,13 @@ export default function DeptHeadApproval() {
                                         <TableHead className="text-center">Quarterly Remaining</TableHead>
                                         <TableHead className="text-center">Approve Minutes</TableHead>
                                         <TableHead className="text-center">Final Deductible</TableHead>
+                                        <TableHead className="text-right">Daily Breakdown</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {departmentResults.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={14} className="text-center py-8 text-slate-500">
+                                            <TableCell colSpan={15} className="text-center py-8 text-slate-500">
                                                 No employees found for this department
                                             </TableCell>
                                         </TableRow>
@@ -547,7 +652,7 @@ export default function DeptHeadApproval() {
                                                             value={currentApproved}
                                                             onChange={(e) => handleApprovedMinutesChange(result.attendance_id, e.target.value)}
                                                             className="w-20 text-center"
-                                                            disabled={linkInfo.used}
+                                                            disabled={linkInfo.used || windowStatus.windowStatus !== 'approval'}
                                                         />
                                                     </TableCell>
                                                     <TableCell className="text-center">
@@ -555,7 +660,19 @@ export default function DeptHeadApproval() {
                                                             {finalDeductible}
                                                         </span>
                                                     </TableCell>
-                                                </TableRow>
+                                                    <TableCell className="text-right">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                setSelectedEmployeeForBreakdown(result);
+                                                                setShowBreakdownDialog(true);
+                                                            }}
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                    </TableRow>
                                             );
                                         })
                                     )}
@@ -563,7 +680,7 @@ export default function DeptHeadApproval() {
                             </Table>
                         </div>
 
-                        {!linkInfo.used && departmentResults.length > 0 && (
+                        {windowStatus.windowStatus === 'approval' && !linkInfo.used && departmentResults.length > 0 && (
                             <div className="mt-6 flex justify-end">
                                 <Button
                                     onClick={handleSubmitAll}
@@ -587,6 +704,96 @@ export default function DeptHeadApproval() {
                         )}
                     </CardContent>
                 </Card>
+
+                {/* Daily Breakdown Dialog */}
+                <Dialog open={showBreakdownDialog} onOpenChange={setShowBreakdownDialog}>
+                    <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>
+                                Daily Breakdown: {selectedEmployeeForBreakdown?.attendance_id} - {selectedEmployeeForBreakdown?.employee?.name}
+                            </DialogTitle>
+                        </DialogHeader>
+                        {selectedEmployeeForBreakdown && (
+                            <div className="mt-4">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Punches</TableHead>
+                                            <TableHead>Shift</TableHead>
+                                            <TableHead>Exception</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Late Min</TableHead>
+                                            <TableHead>Early Min</TableHead>
+                                            <TableHead>Abnormal</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {(() => {
+                                            const breakdown = [];
+                                            const startDate = new Date(reportRun.date_from);
+                                            const endDate = new Date(reportRun.date_to);
+                                            
+                                            const dayNameToNumber = {
+                                                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                                                'Thursday': 4, 'Friday': 5, 'Saturday': 6
+                                            };
+
+                                            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                                                const currentDate = new Date(d);
+                                                const dateStr = currentDate.toISOString().split('T')[0];
+                                                const dayOfWeek = currentDate.getDay();
+
+                                                const dayPunches = punches.filter(p => 
+                                                    p.attendance_id === selectedEmployeeForBreakdown.attendance_id &&
+                                                    p.punch_date === dateStr
+                                                );
+
+                                                const dayException = exceptions.find(e =>
+                                                    (e.attendance_id === selectedEmployeeForBreakdown.attendance_id || e.attendance_id === 'ALL') &&
+                                                    new Date(e.date_from) <= currentDate && currentDate <= new Date(e.date_to) &&
+                                                    e.approval_status === 'approved'
+                                                );
+
+                                                breakdown.push({
+                                                    date: currentDate.toLocaleDateString(),
+                                                    punches: dayPunches.length,
+                                                    shift: shifts.find(s => s.attendance_id === selectedEmployeeForBreakdown.attendance_id) ? 'Configured' : 'None',
+                                                    exception: dayException?.type || '-',
+                                                    status: dayPunches.length > 0 ? 'Present' : dayException ? dayException.type : 'Absent',
+                                                    lateMin: dayException?.late_minutes || 0,
+                                                    earlyMin: dayException?.early_checkout_minutes || 0,
+                                                    abnormal: false
+                                                });
+                                            }
+
+                                            return breakdown.map((day, idx) => (
+                                                <TableRow key={idx}>
+                                                    <TableCell className="font-medium">{day.date}</TableCell>
+                                                    <TableCell>{day.punches}</TableCell>
+                                                    <TableCell className="text-xs">{day.shift}</TableCell>
+                                                    <TableCell className="text-xs">{day.exception}</TableCell>
+                                                    <TableCell>
+                                                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                                                            day.status === 'Present' ? 'bg-green-100 text-green-700' : 
+                                                            day.status === 'Absent' ? 'bg-red-100 text-red-700' : 
+                                                            'bg-slate-100 text-slate-700'
+                                                        }`}>
+                                                            {day.status}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">{day.lateMin > 0 ? day.lateMin : '-'}</TableCell>
+                                                    <TableCell className="text-center">{day.earlyMin > 0 ? day.earlyMin : '-'}</TableCell>
+                                                    <TableCell>{day.abnormal ? 'Yes' : '-'}</TableCell>
+                                                </TableRow>
+                                            ));
+                                        })()}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );
