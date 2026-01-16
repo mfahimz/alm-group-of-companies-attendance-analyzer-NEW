@@ -142,6 +142,18 @@ export default function Layout({ children, currentPageName }) {
                     }
             ];
 
+            if (isAdmin || isSupervisor) {
+            menu.push({
+                title: 'Recruitment',
+                url: 'Recruitment',
+                items: [
+                    { title: 'Recruitment Hub', url: 'Recruitment', icon: <Users className="w-5 h-5" /> },
+                    { title: 'Job Positions', url: 'JobPositions', icon: <Briefcase className="w-5 h-5" /> },
+                    { title: 'Candidate Screening', url: 'CandidateScreening', icon: <FileSpreadsheet className="w-5 h-5" /> }
+                ]
+            });
+            }
+
             if (isAdmin) {
             menu.push({
                 title: 'Data',
