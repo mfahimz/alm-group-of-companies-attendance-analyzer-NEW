@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
@@ -67,7 +67,15 @@ export default function ExceptionsTab({ project }) {
         include_friday: false,
         other_minutes: ''
     });
-    const [filter, setFilter] = useState({ search: '', type: 'all' });
+    const [filter, setFilter] = useState({ 
+        search: '', 
+        type: 'all',
+        dateFrom: '',
+        dateTo: '',
+        department: 'all',
+        createdFromReport: 'all',
+        useInAnalysis: 'all'
+    });
     const [reportFilter, setReportFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
@@ -79,6 +87,9 @@ export default function ExceptionsTab({ project }) {
     const [editingException, setEditingException] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [importPreview, setImportPreview] = useState(null);
+    const [showImportPreview, setShowImportPreview] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: allExceptions = [] } = useQuery({
@@ -146,6 +157,36 @@ export default function ExceptionsTab({ project }) {
         onError: (error) => {
             console.error('Delete exception error:', error);
             toast.error('Failed to delete exception: ' + (error.message || 'Unknown error'));
+        }
+    });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (ids) => {
+            await Promise.all(ids.map(id => base44.entities.Exception.delete(id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['exceptions', project.id]);
+            setSelectedExceptions([]);
+            toast.success('Selected exceptions deleted');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete exceptions: ' + error.message);
+        }
+    });
+
+    const bulkToggleUseMutation = useMutation({
+        mutationFn: async ({ ids, use_in_analysis }) => {
+            await Promise.all(ids.map(id => 
+                base44.entities.Exception.update(id, { use_in_analysis })
+            ));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['exceptions', project.id]);
+            setSelectedExceptions([]);
+            toast.success('Selected exceptions updated');
+        },
+        onError: (error) => {
+            toast.error('Failed to update exceptions: ' + error.message);
         }
     });
 
@@ -230,6 +271,7 @@ export default function ExceptionsTab({ project }) {
 
                 const exceptions = [];
                 const errors = [];
+                const warnings = [];
 
                 jsonData.forEach((row, index) => {
                     const rowNum = index + 2; // Excel row (header is row 1)
@@ -290,22 +332,11 @@ export default function ExceptionsTab({ project }) {
                     return;
                 }
 
-                setUploadProgress({ current: 0, total: exceptions.length, status: 'Importing exceptions...' });
-                
-                const batchSize = 20;
-                for (let i = 0; i < exceptions.length; i += batchSize) {
-                    const batch = exceptions.slice(i, i + batchSize);
-                    await base44.entities.Exception.bulkCreate(batch);
-                    setUploadProgress({ 
-                        current: Math.min(i + batchSize, exceptions.length), 
-                        total: exceptions.length,
-                        status: `Importing ${Math.min(i + batchSize, exceptions.length)}/${exceptions.length}...`
-                    });
-                }
+                // Show preview instead of directly importing
+                setImportPreview({ exceptions, warnings });
+                setShowImportPreview(true);
 
-                queryClient.invalidateQueries(['exceptions', project.id]);
-                toast.success(`Imported ${exceptions.length} exceptions successfully`);
-                setUploadProgress(null);
+                // Removed direct import - now shows preview
             } catch (error) {
                 toast.error('Failed to import file: ' + error.message);
                 setUploadProgress(null);
@@ -314,6 +345,62 @@ export default function ExceptionsTab({ project }) {
         reader.readAsArrayBuffer(file);
         e.target.value = '';
     };
+
+    const confirmImport = async () => {
+        if (!importPreview) return;
+
+        setUploadProgress({ current: 0, total: importPreview.exceptions.length, status: 'Importing exceptions...' });
+        setShowImportPreview(false);
+        
+        const batchSize = 20;
+        for (let i = 0; i < importPreview.exceptions.length; i += batchSize) {
+            const batch = importPreview.exceptions.slice(i, i + batchSize);
+            await base44.entities.Exception.bulkCreate(batch);
+            setUploadProgress({ 
+                current: Math.min(i + batchSize, importPreview.exceptions.length), 
+                total: importPreview.exceptions.length,
+                status: `Importing ${Math.min(i + batchSize, importPreview.exceptions.length)}/${importPreview.exceptions.length}...`
+            });
+        }
+
+        queryClient.invalidateQueries(['exceptions', project.id]);
+        toast.success(`Imported ${importPreview.exceptions.length} exceptions successfully`);
+        setUploadProgress(null);
+        setImportPreview(null);
+    };
+
+    const handleBulkDelete = () => {
+        if (selectedExceptions.length === 0) return;
+        
+        if (window.confirm(`Delete ${selectedExceptions.length} selected exception${selectedExceptions.length > 1 ? 's' : ''}? This action cannot be undone.`)) {
+            bulkDeleteMutation.mutate(selectedExceptions.map(e => e.id));
+        }
+    };
+
+    const handleBulkToggleUse = (use_in_analysis) => {
+        if (selectedExceptions.length === 0) return;
+        
+        bulkToggleUseMutation.mutate({
+            ids: selectedExceptions.map(e => e.id),
+            use_in_analysis
+        });
+    };
+
+    const clearFilters = () => {
+        setFilter({
+            search: '',
+            type: 'all',
+            dateFrom: '',
+            dateTo: '',
+            department: 'all',
+            createdFromReport: 'all',
+            useInAnalysis: 'all'
+        });
+    };
+
+    const hasActiveFilters = filter.search || filter.type !== 'all' || filter.dateFrom || 
+                             filter.dateTo || filter.department !== 'all' || 
+                             filter.createdFromReport !== 'all' || filter.useInAnalysis !== 'all';
 
     const downloadTemplate = () => {
         const template = `attendance_id,name,date_from,date_to,type,details,other_minutes
@@ -341,10 +428,13 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                 return {
                     'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
                     'Employee Name': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
+                    'Department': ex.attendance_id === 'ALL' ? '—' : (employee?.department || '—'),
                     'Type': ex.is_custom_type ? ex.custom_type_name || 'Custom' : ex.type.replace(/_/g, ' '),
                     'From Date': ex.is_custom_type && (!ex.date_from || ex.date_from === project.date_from) ? '—' : new Date(ex.date_from).toLocaleDateString(),
                     'To Date': ex.is_custom_type && (!ex.date_to || ex.date_to === project.date_to) ? '—' : new Date(ex.date_to).toLocaleDateString(),
                     'Details': ex.details || '',
+                    'Use in Analysis': ex.use_in_analysis !== false ? 'Yes' : 'No',
+                    'From Report': ex.created_from_report ? 'Yes' : 'No',
                     'Created Date': new Date(ex.created_date).toLocaleDateString(),
                     'Created By': ex.created_by || ''
                 };
@@ -353,12 +443,31 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             const worksheet = XLSX.utils.json_to_sheet(exportData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Exceptions');
-            XLSX.writeFile(workbook, `exceptions_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
             
-            toast.success(`Exported ${exportData.length} exceptions`);
+            const filename = hasActiveFilters 
+                ? `exceptions_filtered_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`
+                : `exceptions_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            
+            XLSX.writeFile(workbook, filename);
+            
+            toast.success(`Exported ${exportData.length} exceptions${hasActiveFilters ? ' (filtered)' : ''}`);
         } catch (error) {
             toast.error('Failed to export: ' + error.message);
         }
+    };
+
+    const getTypeColor = (type) => {
+        const colors = {
+            'PUBLIC_HOLIDAY': 'bg-purple-100 text-purple-700 border-purple-200',
+            'SICK_LEAVE': 'bg-red-100 text-red-700 border-red-200',
+            'ANNUAL_LEAVE': 'bg-blue-100 text-blue-700 border-blue-200',
+            'SHIFT_OVERRIDE': 'bg-orange-100 text-orange-700 border-orange-200',
+            'MANUAL_PRESENT': 'bg-green-100 text-green-700 border-green-200',
+            'MANUAL_ABSENT': 'bg-red-100 text-red-700 border-red-200',
+            'MANUAL_HALF': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+            'ALLOWED_MINUTES': 'bg-indigo-100 text-indigo-700 border-indigo-200'
+        };
+        return colors[type] || 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
     const resetForm = () => {
@@ -468,16 +577,62 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             return 0;
         });
 
+    // Get unique departments
+    const departments = [...new Set(employees.map(e => e.department).filter(Boolean))].sort();
+
+    // Calculate statistics
+    const exceptionStats = {
+        total: exceptions.length,
+        publicHolidays: exceptions.filter(e => e.type === 'PUBLIC_HOLIDAY').length,
+        sickLeave: exceptions.filter(e => e.type === 'SICK_LEAVE').length,
+        annualLeave: exceptions.filter(e => e.type === 'ANNUAL_LEAVE').length,
+        reportGenerated: reportExceptions.length
+    };
+
     const filteredExceptions = exceptions
         .filter(ex => {
+            // Search filter
             if (filter.search) {
                 const searchLower = filter.search.toLowerCase();
                 const matchesId = ex.attendance_id.toLowerCase().includes(searchLower);
                 const employee = employees.find(e => e.attendance_id === ex.attendance_id);
                 const matchesName = employee?.name.toLowerCase().includes(searchLower);
-                if (!matchesId && !matchesName) return false;
+                const matchesDetails = ex.details?.toLowerCase().includes(searchLower);
+                if (!matchesId && !matchesName && !matchesDetails) return false;
             }
+            
+            // Type filter
             if (filter.type && filter.type !== 'all' && ex.type !== filter.type) return false;
+            
+            // Date range filter
+            if (filter.dateFrom) {
+                if (new Date(ex.date_from) < new Date(filter.dateFrom)) return false;
+            }
+            if (filter.dateTo) {
+                if (new Date(ex.date_to) > new Date(filter.dateTo)) return false;
+            }
+            
+            // Department filter
+            if (filter.department && filter.department !== 'all') {
+                if (ex.attendance_id === 'ALL') return false;
+                const employee = employees.find(e => e.attendance_id === ex.attendance_id);
+                if (employee?.department !== filter.department) return false;
+            }
+            
+            // Created from report filter
+            if (filter.createdFromReport !== 'all') {
+                const isFromReport = ex.created_from_report === true;
+                if (filter.createdFromReport === 'yes' && !isFromReport) return false;
+                if (filter.createdFromReport === 'no' && isFromReport) return false;
+            }
+            
+            // Use in analysis filter
+            if (filter.useInAnalysis !== 'all') {
+                const isUsed = ex.use_in_analysis !== false;
+                if (filter.useInAnalysis === 'yes' && !isUsed) return false;
+                if (filter.useInAnalysis === 'no' && isUsed) return false;
+            }
+            
             return true;
         })
         .sort((a, b) => {
@@ -788,11 +943,45 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                 </Card>
             )}
 
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="text-sm text-slate-600">Total</div>
+                        <div className="text-2xl font-bold text-slate-900">{exceptionStats.total}</div>
+                    </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="text-sm text-slate-600">Public Holidays</div>
+                        <div className="text-2xl font-bold text-purple-600">{exceptionStats.publicHolidays}</div>
+                    </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="text-sm text-slate-600">Sick Leave</div>
+                        <div className="text-2xl font-bold text-red-600">{exceptionStats.sickLeave}</div>
+                    </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="text-sm text-slate-600">Annual Leave</div>
+                        <div className="text-2xl font-bold text-blue-600">{exceptionStats.annualLeave}</div>
+                    </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="text-sm text-slate-600">From Reports</div>
+                        <div className="text-2xl font-bold text-indigo-600">{exceptionStats.reportGenerated}</div>
+                    </CardContent>
+                </Card>
+            </div>
+
             {/* Exceptions List */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <div className="flex items-center justify-between">
-                        <CardTitle>Exceptions</CardTitle>
+                        <CardTitle>Exceptions ({filteredExceptions.length})</CardTitle>
                         <div className="flex gap-2">
                         <Button
                             variant="outline"
@@ -818,48 +1007,150 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex gap-4 flex-1">
-                            {selectedExceptions.length > 0 && currentUser?.role !== 'user' && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                            {selectedExceptions.length > 0 && !isUser && (
+                                <div className="flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setShowBulkEdit(true)}
+                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        Edit ({selectedExceptions.length})
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleBulkToggleUse(true)}
+                                    >
+                                        Enable Use
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleBulkToggleUse(false)}
+                                    >
+                                        Disable Use
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={handleBulkDelete}
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="relative flex-1 max-w-xs">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                    placeholder="Search ID, name, or details..."
+                                    value={filter.search}
+                                    onChange={(e) => setFilter({ ...filter, search: e.target.value })}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                            >
+                                <Filter className="w-4 h-4 mr-2" />
+                                {showAdvancedFilters ? 'Hide' : 'Show'} Filters
+                            </Button>
+                            {hasActiveFilters && (
                                 <Button
                                     size="sm"
-                                    onClick={() => setShowBulkEdit(true)}
-                                    className="bg-indigo-600 hover:bg-indigo-700"
+                                    variant="ghost"
+                                    onClick={clearFilters}
+                                    className="text-red-600 hover:text-red-700"
                                 >
-                                    <Edit className="w-4 h-4 mr-2" />
-                                    Bulk Edit ({selectedExceptions.length})
+                                    Clear All
                                 </Button>
                             )}
-                        <div className="relative flex-1 max-w-xs">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input
-                                placeholder="Search by ID or name..."
-                                value={filter.search}
-                                onChange={(e) => setFilter({ ...filter, search: e.target.value })}
-                                className="pl-9"
-                            />
                         </div>
-                        <Select
-                            value={filter.type}
-                            onValueChange={(value) => setFilter({ ...filter, type: value })}
-                        >
-                            <SelectTrigger className="max-w-xs">
-                                <SelectValue placeholder="All types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All types</SelectItem>
-                                <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
-                                <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
-                                <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
-                                <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-                                <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
-                                <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                <SelectItem value="ANNUAL_LEAVE">Annual Leave</SelectItem>
-                                <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
-                                <SelectItem value="CUSTOM">Custom Type</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        </div>
+
+                        {/* Advanced Filters */}
+                        {showAdvancedFilters && (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 bg-slate-50 rounded-lg border">
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Type</Label>
+                                    <Select
+                                        value={filter.type}
+                                        onValueChange={(value) => setFilter({ ...filter, type: value })}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="All types" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All types</SelectItem>
+                                            <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
+                                            <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
+                                            <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
+                                            <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
+                                            <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+                                            <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
+                                            <SelectItem value="ANNUAL_LEAVE">Annual Leave</SelectItem>
+                                            <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
+                                            <SelectItem value="CUSTOM">Custom Type</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Department</Label>
+                                    <Select
+                                        value={filter.department}
+                                        onValueChange={(value) => setFilter({ ...filter, department: value })}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="All departments" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All departments</SelectItem>
+                                            {departments.map(dept => (
+                                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">From Date</Label>
+                                    <Input
+                                        type="date"
+                                        value={filter.dateFrom}
+                                        onChange={(e) => setFilter({ ...filter, dateFrom: e.target.value })}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">To Date</Label>
+                                    <Input
+                                        type="date"
+                                        value={filter.dateTo}
+                                        onChange={(e) => setFilter({ ...filter, dateTo: e.target.value })}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">From Report</Label>
+                                    <Select
+                                        value={filter.createdFromReport}
+                                        onValueChange={(value) => setFilter({ ...filter, createdFromReport: value })}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="yes">Yes</SelectItem>
+                                            <SelectItem value="no">No</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Table */}
@@ -930,15 +1221,15 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 </span>
                                             </TableCell>
                                             <TableCell className="p-1">
-                                                <div className="flex items-center gap-2">
-                                                    {exception.is_custom_type ? (
-                                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                                                            {exception.custom_type_name || 'Custom'}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-sm">{exception.type.replace(/_/g, ' ')}</span>
-                                                    )}
-                                                </div>
+                                                {exception.is_custom_type ? (
+                                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                                                        {exception.custom_type_name || 'Custom'}
+                                                    </span>
+                                                ) : (
+                                                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(exception.type)}`}>
+                                                        {exception.type.replace(/_/g, ' ')}
+                                                    </span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="p-1 text-sm">
                                                 {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
@@ -1309,6 +1600,81 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                     <div className="flex justify-end">
                         <Button onClick={() => setViewingException(null)}>Close</Button>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Import Preview Dialog */}
+            <Dialog open={showImportPreview} onOpenChange={setShowImportPreview}>
+                <DialogContent className="max-w-4xl max-h-[80vh]">
+                    <DialogHeader>
+                        <DialogTitle>Import Preview - Review Before Importing</DialogTitle>
+                    </DialogHeader>
+                    {importPreview && (
+                        <div className="space-y-4 overflow-y-auto">
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <p className="text-sm text-blue-800">
+                                    Ready to import <strong>{importPreview.exceptions.length}</strong> exception{importPreview.exceptions.length > 1 ? 's' : ''}.
+                                    {importPreview.warnings.length > 0 && (
+                                        <span className="block mt-2 text-amber-700">
+                                            ⚠️ {importPreview.warnings.length} warning{importPreview.warnings.length > 1 ? 's' : ''} found
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+
+                            <div className="border rounded-lg overflow-hidden">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Attendance ID</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>From</TableHead>
+                                            <TableHead>To</TableHead>
+                                            <TableHead>Details</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {importPreview.exceptions.slice(0, 10).map((ex, idx) => (
+                                            <TableRow key={idx}>
+                                                <TableCell className="text-sm">{ex.attendance_id}</TableCell>
+                                                <TableCell className="text-sm">
+                                                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(ex.type)}`}>
+                                                        {ex.type.replace(/_/g, ' ')}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-sm">{new Date(ex.date_from).toLocaleDateString()}</TableCell>
+                                                <TableCell className="text-sm">{new Date(ex.date_to).toLocaleDateString()}</TableCell>
+                                                <TableCell className="text-sm">{ex.details || '—'}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                {importPreview.exceptions.length > 10 && (
+                                    <div className="p-3 bg-slate-50 text-center text-sm text-slate-600 border-t">
+                                        ... and {importPreview.exceptions.length - 10} more
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 justify-end">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setShowImportPreview(false);
+                                        setImportPreview(null);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700"
+                                    onClick={confirmImport}
+                                >
+                                    Confirm & Import {importPreview.exceptions.length} Exception{importPreview.exceptions.length > 1 ? 's' : ''}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>
