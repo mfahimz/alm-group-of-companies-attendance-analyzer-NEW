@@ -44,15 +44,17 @@ export default function ReportDetailView({ reportRun, project }) {
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
-        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-        retry: false // Disable retries to prevent rate limit amplification
+        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
+        retry: false,
+        gcTime: 60 * 60 * 1000 // Keep in cache for 60 minutes
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company }),
-        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-        retry: false
+        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
+        retry: false,
+        gcTime: 60 * 60 * 1000
     });
 
     // Only fetch punches and shifts if project is NOT closed (data is deleted on close)
@@ -60,23 +62,26 @@ export default function ReportDetailView({ reportRun, project }) {
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
         enabled: project.status !== 'closed',
-        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-        retry: false
+        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
+        retry: false,
+        gcTime: 60 * 60 * 1000
     });
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
         enabled: project.status !== 'closed',
-        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-        retry: false
+        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
+        retry: false,
+        gcTime: 60 * 60 * 1000
     });
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-        retry: false
+        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
+        retry: false,
+        gcTime: 60 * 60 * 1000
     });
 
     // Load verified employees from report
