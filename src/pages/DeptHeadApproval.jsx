@@ -135,15 +135,39 @@ export default function DeptHeadApproval() {
 
     const approveMutation = useMutation({
         mutationFn: async () => {
-            // Update approved minutes in AnalysisResult
+            // Update approved minutes in AnalysisResult and EmployeeQuarterlyMinutes
             const updates = Object.entries(approvedMinutes)
                 .filter(([_, minutes]) => minutes > 0)
                 .map(([attendance_id, minutes]) => {
                     const result = allResults.find(r => r.attendance_id === attendance_id);
-                    if (!result) return null;
-                    return base44.entities.AnalysisResult.update(result.id, {
-                        approved_minutes: minutes
-                    });
+                    const employee = employees.find(e => e.attendance_id === attendance_id);
+                    if (!result || !employee) return null;
+                    
+                    const promises = [
+                        base44.entities.AnalysisResult.update(result.id, {
+                            approved_minutes: minutes
+                        })
+                    ];
+
+                    // Also update EmployeeQuarterlyMinutes to track used minutes
+                    const quarterlyRecord = quarterlyMinutes.find(q => 
+                        (q.employee_id === employee.hrms_id || q.employee_id === employee.id) && 
+                        (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && q.year === 2025 && q.quarter === 4))
+                    );
+
+                    if (quarterlyRecord) {
+                        const newUsedMinutes = (quarterlyRecord.used_minutes || 0) + minutes;
+                        const newRemainingMinutes = Math.max(0, quarterlyRecord.total_minutes - newUsedMinutes);
+                        
+                        promises.push(
+                            base44.entities.EmployeeQuarterlyMinutes.update(quarterlyRecord.id, {
+                                used_minutes: newUsedMinutes,
+                                remaining_minutes: newRemainingMinutes
+                            })
+                        );
+                    }
+
+                    return Promise.all(promises);
                 })
                 .filter(Boolean);
 
