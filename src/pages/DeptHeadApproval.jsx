@@ -164,7 +164,11 @@ export default function DeptHeadApproval() {
         const employee = employees.find(e => e.attendance_id === attendance_id);
         if (!employee) return;
 
-        const quarterlyRecord = quarterlyMinutes.find(q => q.employee_id === employee.id);
+        // Use same logic as display to find quarterly record
+        const quarterlyRecord = quarterlyMinutes.find(q => 
+            (q.employee_id === employee.hrms_id || q.employee_id === employee.id) && 
+            (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && q.year === 2025 && q.quarter === 4))
+        );
         const remainingMinutes = quarterlyRecord?.remaining_minutes || 0;
 
         if (minutes > remainingMinutes) {
