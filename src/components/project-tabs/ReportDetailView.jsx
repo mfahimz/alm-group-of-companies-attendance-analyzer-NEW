@@ -1039,11 +1039,12 @@ export default function ReportDetailView({ reportRun, project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'Deductible', 'Notes'];
+        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'Grace', 'Approved Minutes', 'Deductible', 'Notes'];
         const rows = filteredResults.map(r => {
-            const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
+            const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0) + (r.other_minutes || 0);
             const grace = r.grace_minutes ?? 15;
-            const deductible = Math.max(0, total - grace);
+            const approved = r.approved_minutes || 0;
+            const deductible = Math.max(0, total - grace - approved);
 
             return [
                 r.attendance_id,
@@ -1055,6 +1056,8 @@ export default function ReportDetailView({ reportRun, project }) {
                 r.late_minutes,
                 r.early_checkout_minutes || 0,
                 r.other_minutes || 0,
+                grace,
+                approved,
                 deductible,
                 r.notes || ''
             ];
@@ -1658,6 +1661,9 @@ export default function ReportDetailView({ reportRun, project }) {
                                         Other Minutes
                                     </SortableTableHead>
                                     <TableHead>Grace</TableHead>
+                                    <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort}>
+                                        Approved Minutes
+                                    </SortableTableHead>
                                     <TableHead>Deductible</TableHead>
                                     <TableHead>Notes</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -1727,17 +1733,23 @@ export default function ReportDetailView({ reportRun, project }) {
                                             </div>
                                         </TableCell>
                                         <TableCell>
+                                            <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
+                                                {result.approved_minutes || 0}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
                                             {(() => {
-                                                const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
+                                                const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0) + (result.other_minutes || 0);
                                                 const grace = result.grace_minutes ?? 15;
-                                                const deductible = Math.max(0, total - grace);
+                                                const approved = result.approved_minutes || 0;
+                                                const deductible = Math.max(0, total - grace - approved);
                                                 return (
                                                     <div className="flex flex-col">
                                                         <span className={`font-bold ${deductible > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                                             {deductible} min
                                                         </span>
                                                         <span className="text-[10px] text-slate-500">
-                                                            {total} - {grace}
+                                                            {total} - {grace} - {approved}
                                                         </span>
                                                     </div>
                                                 );
