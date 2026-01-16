@@ -5,6 +5,7 @@ import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
 import Home from './pages/Home';
+import PrivateFiles from './pages/PrivateFiles';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
 import RamadanSchedules from './pages/RamadanSchedules';
@@ -15,7 +16,6 @@ import Salaries from './pages/Salaries';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import PrivateFiles from './pages/PrivateFiles';
 import __Layout from './Layout.jsx';
 
 
@@ -27,6 +27,7 @@ export const PAGES = {
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
     "Home": Home,
+    "PrivateFiles": PrivateFiles,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
     "RamadanSchedules": RamadanSchedules,
@@ -37,7 +38,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "PrivateFiles": PrivateFiles,
 }
 
 export const pagesConfig = {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Copy, CheckCircle, XCircle, Clock, Eye, Unlock } from 'lucide-react';
+import { Copy, CheckCircle, XCircle, Clock, Eye, Unlock, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,34 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
         },
         onError: (error) => {
             toast.error('Failed to update: ' + error.message);
+        }
+    });
+
+    const deleteLinkMutation = useMutation({
+        mutationFn: async (linkId) => {
+            await base44.entities.ApprovalLink.update(linkId, {
+                deleted: true,
+                deleted_at: new Date().toISOString(),
+                deleted_by: currentUser?.email
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['approvalLinks']);
+            toast.success('Link deleted successfully');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete: ' + error.message);
+        }
+    });
+
+    const { data: employeesMap = {} } = useQuery({
+        queryKey: ['employeesMap'],
+        queryFn: async () => {
+            const employees = await base44.entities.Employee.list();
+            return employees.reduce((acc, emp) => {
+                acc[emp.id] = emp.name;
+                return acc;
+            }, {});
         }
     });
 
@@ -83,6 +111,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     };
 
     const getStatusIcon = (link) => {
+        if (link.deleted) return <Trash2 className="w-4 h-4 text-red-600" />;
         if (link.used && link.approved) return <CheckCircle className="w-4 h-4 text-green-600" />;
         if (link.used && !link.approved) return <XCircle className="w-4 h-4 text-red-600" />;
         if (new Date(link.expires_at) < new Date()) return <Clock className="w-4 h-4 text-slate-400" />;
@@ -90,6 +119,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     };
 
     const getStatusText = (link) => {
+        if (link.deleted) return 'Deleted';
         if (link.used && link.approved) return 'Approved';
         if (link.used && !link.approved) return 'Rejected';
         if (new Date(link.expires_at) < new Date()) return 'Expired';
@@ -97,6 +127,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
     };
 
     const getStatusColor = (link) => {
+        if (link.deleted) return 'text-red-600';
         if (link.used && link.approved) return 'text-green-600';
         if (link.used && !link.approved) return 'text-red-600';
         if (new Date(link.expires_at) < new Date()) return 'text-slate-400';
@@ -136,7 +167,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 {approvalLinks.map((link) => (
                                     <TableRow key={link.id}>
                                         <TableCell className="font-medium">{link.department}</TableCell>
-                                        <TableCell>{link.department_head_id || '-'}</TableCell>
+                                        <TableCell>{employeesMap[link.department_head_id] || link.department_head_id || '-'}</TableCell>
                                         <TableCell className="text-sm">
                                             {formatInUAE(link.created_date, 'MM/dd/yyyy hh:mm a')}
                                         </TableCell>
@@ -153,16 +184,31 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center gap-2 justify-end">
-                                                {currentUser?.role === 'admin' && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant={link.admin_override_public ? "default" : "ghost"}
-                                                        onClick={() => togglePublicMutation.mutate(link.id)}
-                                                        disabled={togglePublicMutation.isPending || link.used}
-                                                        title={link.admin_override_public ? "Public (No verification needed)" : "Make public"}
-                                                    >
-                                                        <Unlock className="w-4 h-4" />
-                                                    </Button>
+                                                {currentUser?.role === 'admin' && !link.deleted && !link.used && (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant={link.admin_override_public ? "default" : "ghost"}
+                                                            onClick={() => togglePublicMutation.mutate(link.id)}
+                                                            disabled={togglePublicMutation.isPending}
+                                                            title={link.admin_override_public ? "Public (No verification needed)" : "Make public"}
+                                                        >
+                                                            <Unlock className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                if (confirm('Delete this approval link? It will become invalid.')) {
+                                                                    deleteLinkMutation.mutate(link.id);
+                                                                }
+                                                            }}
+                                                            disabled={deleteLinkMutation.isPending}
+                                                            title="Delete link"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </Button>
+                                                    </>
                                                 )}
                                                 <Button
                                                     size="sm"
@@ -199,7 +245,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 </div>
                                 <div>
                                     <Label className="text-xs text-slate-600">Department Head</Label>
-                                    <p className="font-medium">{selectedLink.department_head_id || '-'}</p>
+                                    <p className="font-medium">{employeesMap[selectedLink.department_head_id] || selectedLink.department_head_id || '-'}</p>
                                 </div>
                                 <div>
                                     <Label className="text-xs text-slate-600">Status</Label>

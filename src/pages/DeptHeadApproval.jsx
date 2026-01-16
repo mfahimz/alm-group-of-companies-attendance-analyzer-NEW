@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, AlertCircle, Loader2, Lock } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Lock, Clock } from 'lucide-react';
+import { formatInUAE } from '@/components/ui/timezone';
 import { toast } from 'sonner';
 
 export default function DeptHeadApproval() {
@@ -226,14 +227,59 @@ export default function DeptHeadApproval() {
 
     if (!linkInfo) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-                <Card className="w-full max-w-md border-red-200 bg-red-50">
-                    <CardContent className="p-6">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
+            <div className="min-h-screen bg-gradient-to-br from-red-50 to-slate-50 flex items-center justify-center p-6">
+                <Card className="w-full max-w-md border-0 shadow-2xl">
+                    <CardHeader className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-t-lg">
+                        <CardTitle className="flex items-center gap-2">
+                            <AlertCircle className="w-6 h-6" />
+                            Invalid Approval Link
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                        <div className="text-center space-y-4">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                                <AlertCircle className="w-8 h-8 text-red-600" />
+                            </div>
                             <div>
-                                <p className="font-medium text-red-900">Invalid Link</p>
-                                <p className="text-sm text-red-700 mt-1">This approval link is invalid or has expired.</p>
+                                <p className="text-lg font-semibold text-slate-900 mb-2">Link Not Found</p>
+                                <p className="text-slate-600">This approval link is invalid, has expired, or has been deleted by an administrator.</p>
+                            </div>
+                            <div className="pt-4">
+                                <p className="text-sm text-slate-500">Please contact your HR department if you believe this is an error.</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (linkInfo.deleted) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-red-50 to-slate-50 flex items-center justify-center p-6">
+                <Card className="w-full max-w-md border-0 shadow-2xl">
+                    <CardHeader className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-t-lg">
+                        <CardTitle className="flex items-center gap-2">
+                            <AlertCircle className="w-6 h-6" />
+                            Link Deleted
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                        <div className="text-center space-y-4">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                                <AlertCircle className="w-8 h-8 text-red-600" />
+                            </div>
+                            <div>
+                                <p className="text-lg font-semibold text-slate-900 mb-2">Link No Longer Valid</p>
+                                <p className="text-slate-600">This approval link has been deleted by an administrator and is no longer accessible.</p>
+                            </div>
+                            {linkInfo.deleted_at && (
+                                <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
+                                    Deleted on: {formatInUAE(linkInfo.deleted_at, 'PPpp')}
+                                </div>
+                            )}
+                            <div className="pt-4">
+                                <p className="text-sm text-slate-500">Please contact your HR department for a new approval link.</p>
                             </div>
                         </div>
                     </CardContent>
@@ -265,16 +311,28 @@ export default function DeptHeadApproval() {
     const expiryDate = new Date(linkInfo.expires_at);
     if (expiryDate < new Date()) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-                <Card className="w-full max-w-md border-red-200 bg-red-50">
-                    <CardContent className="p-6">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 to-slate-50 flex items-center justify-center p-6">
+                <Card className="w-full max-w-md border-0 shadow-2xl">
+                    <CardHeader className="bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-t-lg">
+                        <CardTitle className="flex items-center gap-2">
+                            <Clock className="w-6 h-6" />
+                            Link Expired
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                        <div className="text-center space-y-4">
+                            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
+                                <Clock className="w-8 h-8 text-amber-600" />
+                            </div>
                             <div>
-                                <p className="font-medium text-red-900">Link Expired</p>
-                                <p className="text-sm text-red-700 mt-1">
-                                    This approval link expired on {expiryDate.toLocaleString()}.
-                                </p>
+                                <p className="text-lg font-semibold text-slate-900 mb-2">Link Has Expired</p>
+                                <p className="text-slate-600">This approval link is no longer valid as it has passed its expiration date.</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
+                                Expired on: {formatInUAE(expiryDate, 'PPpp')}
+                            </div>
+                            <div className="pt-4">
+                                <p className="text-sm text-slate-500">Please request a new approval link from your HR department.</p>
                             </div>
                         </div>
                     </CardContent>
