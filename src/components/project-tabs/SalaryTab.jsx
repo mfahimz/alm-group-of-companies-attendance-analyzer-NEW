@@ -39,7 +39,10 @@ export default function SalaryTab({ project }) {
     // Combine all data for each employee
     const salaryData = useMemo(() => {
         return employees.map(emp => {
-            const salary = salaries.find(s => String(s.employee_id) === String(emp.hrms_id));
+            const salary = salaries.find(s => 
+                String(s.employee_id) === String(emp.hrms_id) || 
+                String(s.attendance_id) === String(emp.attendance_id)
+            );
             const result = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
 
             // Calculate half day not worked hours (half_absence_count * working_hours / 2)
@@ -169,7 +172,6 @@ export default function SalaryTab({ project }) {
                                     <TableHead className="whitespace-nowrap">Attendance ID</TableHead>
                                     <TableHead className="whitespace-nowrap">Name</TableHead>
                                     <TableHead className="whitespace-nowrap">Department</TableHead>
-                                    <TableHead className="whitespace-nowrap">Company</TableHead>
                                     <TableHead className="whitespace-nowrap">Working Hours/Day</TableHead>
                                     <TableHead className="whitespace-nowrap">Deduction/Minute</TableHead>
                                     <TableHead className="whitespace-nowrap">Basic Salary</TableHead>
@@ -203,9 +205,8 @@ export default function SalaryTab({ project }) {
                                         <TableCell>{row.attendance_id}</TableCell>
                                         <TableCell className="font-medium">{row.name}</TableCell>
                                         <TableCell>{row.department}</TableCell>
-                                        <TableCell>{row.company}</TableCell>
-                                        <TableCell>{row.working_hours}</TableCell>
-                                        <TableCell>{row.deduction_per_minute.toFixed(4)}</TableCell>
+                                        <TableCell>{row.working_hours.toFixed(2)}</TableCell>
+                                        <TableCell>{row.deduction_per_minute.toFixed(2)}</TableCell>
                                         <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
                                         <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
                                         <TableCell>{row.working_days}</TableCell>
