@@ -284,7 +284,8 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                                 <Label className="text-xs text-slate-600 mb-2 block">Complete Message</Label>
                                 {(() => {
                                     const linkUrl = `${linkDomain}/DeptHeadApproval?token=${selectedLink.link_token}`;
-                                    const messageText = `Dear Department Head,
+                                    const deptHeadName = employeesMap[selectedLink.department_head_id] || 'Department Head';
+                                    const messageText = `Dear ${deptHeadName},
 
 Please find the verification link below to review and approve the attendance exceptions for ${selectedLink.department}:
 
