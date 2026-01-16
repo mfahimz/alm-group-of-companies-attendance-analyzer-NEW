@@ -281,42 +281,40 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                             </div>
 
                             <div>
-                                <Label className="text-xs text-slate-600">Approval Link</Label>
-                                <div className="flex gap-2 mt-1">
-                                    <Input
-                                        value={`${linkDomain}/DeptHeadApproval?token=${selectedLink.link_token}`}
-                                        readOnly
-                                        className="font-mono text-xs"
-                                    />
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => copyToClipboard(`${linkDomain}/DeptHeadApproval?token=${selectedLink.link_token}`)}
-                                    >
-                                        <Copy className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </div>
+                                <Label className="text-xs text-slate-600 mb-2 block">Complete Message</Label>
+                                {(() => {
+                                    const linkUrl = `${linkDomain}/DeptHeadApproval?token=${selectedLink.link_token}`;
+                                    const messageText = `Dear Department Head,
 
-                            {!selectedLink.admin_override_public && (
-                                <div>
-                                    <Label className="text-xs text-slate-600">Verification Code</Label>
-                                    <div className="flex gap-2 mt-1">
-                                        <Input
-                                            value={selectedLink.verification_code}
-                                            readOnly
-                                            className="font-mono text-lg font-bold tracking-widest text-center"
-                                        />
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => copyToClipboard(selectedLink.verification_code)}
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
+Please find the verification link below to review and approve the attendance exceptions for ${selectedLink.department}:
+
+${linkUrl}
+
+Verification Code: ${selectedLink.verification_code}
+
+This link will expire on ${formatInUAE(selectedLink.expires_at, 'MM/dd/yyyy')}.
+
+Thank you.`;
+                                    return (
+                                        <>
+                                            <div className="bg-white rounded-lg p-3 border border-slate-200 mb-2">
+                                                <pre className="text-xs whitespace-pre-wrap font-sans text-slate-700">{messageText}</pre>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                className="w-full"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(messageText);
+                                                    toast.success('Message copied to clipboard');
+                                                }}
+                                            >
+                                                <Copy className="w-4 h-4 mr-2" />
+                                                Copy Complete Message
+                                            </Button>
+                                        </>
+                                    );
+                                })()}
+                            </div>
 
                             {selectedLink.used && selectedLink.used_at && (
                                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
