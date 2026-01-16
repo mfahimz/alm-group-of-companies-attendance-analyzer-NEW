@@ -194,7 +194,11 @@ export default function DeptHeadApproval() {
             if (!employee || employee.department !== linkInfo?.department) return null;
 
             const salary = salaries.find(s => s.attendance_id === result.attendance_id);
-            const quarterlyRecord = quarterlyMinutes.find(q => q.employee_id === employee.id);
+            // Find quarterly record: first try project-based, then calendar-based
+            const quarterlyRecord = quarterlyMinutes.find(q => 
+                (q.employee_id === employee.hrms_id || q.employee_id === employee.id) && 
+                (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && q.year === 2025 && q.quarter === 4))
+            );
 
             const totalDeductibleMinutes = (result.late_minutes || 0) + 
                                           (result.early_checkout_minutes || 0) + 
