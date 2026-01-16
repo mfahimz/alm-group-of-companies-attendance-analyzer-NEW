@@ -19,7 +19,13 @@ export default function CandidateScreening() {
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
+        queryFn: async () => {
+            const user = await base44.auth.me();
+            if (user.role !== 'admin') {
+                throw new Error('Access denied');
+            }
+            return user;
+        }
     });
 
     const { data: jobPositions = [] } = useQuery({

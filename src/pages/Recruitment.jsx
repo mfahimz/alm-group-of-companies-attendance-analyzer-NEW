@@ -34,10 +34,10 @@ export default function Recruitment() {
     });
 
     // Check access
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.extended_role !== 'supervisor')) {
+    if (!currentUser || currentUser.role !== 'admin') {
         return (
             <div className="text-center py-12">
-                <p className="text-slate-600">Access restricted to admins and supervisors only.</p>
+                <p className="text-slate-600">Access restricted to admins only.</p>
             </div>
         );
     }
