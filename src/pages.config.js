@@ -19,6 +19,9 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import Recruitment from './pages/Recruitment';
+import JobPositions from './pages/JobPositions';
+import CandidateScreening from './pages/CandidateScreening';
 import __Layout from './Layout.jsx';
 
 
@@ -44,6 +47,9 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
+    "Recruitment": Recruitment,
+    "JobPositions": JobPositions,
+    "CandidateScreening": CandidateScreening,
 }
 
 export const pagesConfig = {
