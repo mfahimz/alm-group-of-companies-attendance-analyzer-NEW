@@ -754,37 +754,51 @@ export default function ReportDetailView({ reportRun, project }) {
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
             verified_employees: verifiedList.join(',')
         }),
-        onSuccess: () => {
+        onError: () => {
+            // Only invalidate on error to refetch correct state
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
+            toast.error('Failed to update verification');
         }
     });
 
     // Debounce verification updates to prevent rate limiting
     const debounceTimeoutRef = React.useRef(null);
+    const pendingVerifiedRef = React.useRef(null);
     
     const toggleVerification = (attendanceId) => {
         const newVerified = verifiedEmployees.includes(attendanceId) 
             ? verifiedEmployees.filter(id => id !== attendanceId)
             : [...verifiedEmployees, attendanceId];
         
+        // Update local state immediately for instant UI feedback
         setVerifiedEmployees(newVerified);
+        
+        // Store pending changes
+        pendingVerifiedRef.current = newVerified;
         
         // Clear existing timeout
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
         }
         
-        // Debounce the API call by 1 second to batch multiple clicks
+        // Debounce the API call by 1.5 seconds to batch multiple clicks
         debounceTimeoutRef.current = setTimeout(() => {
-            updateVerificationMutation.mutate(newVerified);
-        }, 1000);
+            if (pendingVerifiedRef.current) {
+                updateVerificationMutation.mutate(pendingVerifiedRef.current);
+                pendingVerifiedRef.current = null;
+            }
+        }, 1500);
     };
 
-    // Cleanup timeout on unmount
+    // Cleanup timeout on unmount and save pending changes
     React.useEffect(() => {
         return () => {
             if (debounceTimeoutRef.current) {
                 clearTimeout(debounceTimeoutRef.current);
+            }
+            // Save any pending changes before unmount
+            if (pendingVerifiedRef.current) {
+                updateVerificationMutation.mutate(pendingVerifiedRef.current);
             }
         };
     }, []);
