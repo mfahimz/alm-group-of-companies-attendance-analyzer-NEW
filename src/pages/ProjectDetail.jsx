@@ -13,6 +13,7 @@ import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
 import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import RunAnalysisTab from '../components/project-tabs/RunAnalysisTab';
 import ReportTab from '../components/project-tabs/ReportTab';
+import SalaryTab from '../components/project-tabs/SalaryTab';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function ProjectDetail() {
@@ -36,7 +37,8 @@ export default function ProjectDetail() {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
-    const isAdminOrSupervisor = isAdmin || isSupervisor;
+    const isCEO = userRole === 'ceo';
+    const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO;
     const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
 
     const reopenProjectMutation = useMutation({
@@ -210,6 +212,14 @@ export default function ProjectDetail() {
                         >
                             Report
                         </TabsTrigger>
+                        {(isAdmin || isCEO) && (
+                            <TabsTrigger 
+                                value="salary" 
+                                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300"
+                            >
+                                Salary 💰
+                            </TabsTrigger>
+                        )}
                     </TabsList>
                 </div>
 
@@ -235,6 +245,10 @@ export default function ProjectDetail() {
 
                 <TabsContent value="report">
                     <ReportTab project={project} />
+                </TabsContent>
+
+                <TabsContent value="salary">
+                    <SalaryTab project={project} />
                 </TabsContent>
             </Tabs>
         </div>
