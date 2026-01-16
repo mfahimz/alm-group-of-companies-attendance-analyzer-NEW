@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, AlertCircle, Loader2, Lock, Clock } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle, AlertCircle, Loader2, Lock, Clock, Eye, Edit } from 'lucide-react';
 import { formatInUAE } from '@/components/ui/timezone';
 import { toast } from 'sonner';
 
@@ -15,6 +16,8 @@ export default function DeptHeadApproval() {
     const [isVerified, setIsVerified] = useState(false);
     const [linkData, setLinkData] = useState(null);
     const [approvedMinutes, setApprovedMinutes] = useState({});
+    const [selectedEmployeeForBreakdown, setSelectedEmployeeForBreakdown] = useState(null);
+    const [showBreakdownDialog, setShowBreakdownDialog] = useState(false);
     const queryClient = useQueryClient();
 
     useEffect(() => {
@@ -93,6 +96,24 @@ export default function DeptHeadApproval() {
             return [...projectBased, ...calendarBased];
         },
         enabled: isVerified && !!linkInfo?.company
+    });
+
+    const { data: punches = [] } = useQuery({
+        queryKey: ['punches', project?.id],
+        queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
+        enabled: isVerified && !!project?.id && project.status !== 'closed'
+    });
+
+    const { data: shifts = [] } = useQuery({
+        queryKey: ['shifts', project?.id],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
+        enabled: isVerified && !!project?.id && project.status !== 'closed'
+    });
+
+    const { data: exceptions = [] } = useQuery({
+        queryKey: ['exceptions', project?.id],
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        enabled: isVerified && !!project?.id
     });
 
     const verifyMutation = useMutation({
@@ -191,6 +212,31 @@ export default function DeptHeadApproval() {
         }
         approveMutation.mutate();
     };
+
+    // Calculate approval window status
+    const getApprovalWindowStatus = () => {
+        if (!linkInfo?.created_date) return { canApprove: false, windowStatus: 'unknown' };
+        
+        const createdAt = new Date(linkInfo.created_date);
+        const now = new Date();
+        
+        // 24-hour approval window
+        const approvalDeadline = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+        
+        if (now < approvalDeadline) {
+            return { canApprove: true, windowStatus: 'approval', deadline: approvalDeadline };
+        }
+        
+        // 7-day read-only window
+        const readonlyDeadline = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+        if (now < readonlyDeadline) {
+            return { canApprove: false, windowStatus: 'readonly', deadline: readonlyDeadline };
+        }
+        
+        return { canApprove: false, windowStatus: 'expired', deadline: readonlyDeadline };
+    };
+
+    const windowStatus = getApprovalWindowStatus();
 
     // Filter and prepare results for this department
     const departmentResults = allResults
