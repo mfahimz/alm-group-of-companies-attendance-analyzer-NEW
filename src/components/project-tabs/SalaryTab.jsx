@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, FileSpreadsheet, Save } from 'lucide-react';
+import { DollarSign, FileSpreadsheet, Save, Filter } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 export default function SalaryTab({ project }) {
@@ -41,6 +42,8 @@ export default function SalaryTab({ project }) {
     // State for editable values
     const [editableData, setEditableData] = useState({});
     const [isSaving, setIsSaving] = useState(false);
+    const [departmentFilter, setDepartmentFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('department');
 
     // Combine all data for each employee
     const salaryData = useMemo(() => {
@@ -121,10 +124,34 @@ export default function SalaryTab({ project }) {
         });
     }, [employees, salaries, analysisResults]);
 
-    // Sort by department
-    const sortedSalaryData = useMemo(() => {
-        return [...salaryData].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+    // Get unique departments for filter
+    const departments = useMemo(() => {
+        const depts = [...new Set(salaryData.map(item => item.department).filter(Boolean))];
+        return depts.sort();
     }, [salaryData]);
+
+    // Filter and sort salary data
+    const filteredSalaryData = useMemo(() => {
+        let filtered = salaryData;
+        
+        // Apply department filter
+        if (departmentFilter !== 'all') {
+            filtered = filtered.filter(item => item.department === departmentFilter);
+        }
+
+        // Apply sorting
+        return [...filtered].sort((a, b) => {
+            if (sortBy === 'department') {
+                return (a.department || '').localeCompare(b.department || '') || 
+                       a.name.localeCompare(b.name);
+            } else if (sortBy === 'name') {
+                return a.name.localeCompare(b.name);
+            } else if (sortBy === 'attendance') {
+                return Number(a.attendance_id) - Number(b.attendance_id);
+            }
+            return 0;
+        });
+    }, [salaryData, departmentFilter, sortBy]);
 
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
@@ -219,27 +246,63 @@ export default function SalaryTab({ project }) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="bg-white rounded-lg p-4 mb-4 flex items-center justify-between">
-                        <p className="text-sm text-slate-600">
-                            <strong>Note:</strong> Salary calculations are based on the latest saved report. 
-                            Data from salary master is read-only. Edit the highlighted fields as needed.
-                        </p>
-                        <Button 
-                            onClick={handleSave} 
-                            disabled={isSaving || Object.keys(editableData).length === 0}
-                            className="bg-green-600 hover:bg-green-700"
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                        </Button>
+                    <div className="space-y-4 mb-4">
+                        <div className="bg-white rounded-lg p-4">
+                            <p className="text-sm text-slate-600 mb-4">
+                                <strong>Note:</strong> Salary calculations based on latest saved report. Data from salary master is read-only.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Department</label>
+                                    <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Departments</SelectItem>
+                                            {departments.map(dept => (
+                                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Sort By</label>
+                                    <Select value={sortBy} onValueChange={setSortBy}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="department">Department (then Name)</SelectItem>
+                                            <SelectItem value="name">Employee Name</SelectItem>
+                                            <SelectItem value="attendance">Attendance ID</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex items-end">
+                                    <Button 
+                                        onClick={handleSave} 
+                                        disabled={isSaving || Object.keys(editableData).length === 0}
+                                        className="w-full bg-green-600 hover:bg-green-700"
+                                    >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {isSaving ? 'Saving...' : 'Save Changes'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                            <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
+                        </div>
                     </div>
 
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="whitespace-nowrap">Attendance ID</TableHead>
-                                    <TableHead className="whitespace-nowrap">Name</TableHead>
+                                    <TableHead className="whitespace-nowrap sticky left-0 bg-white z-10">Attendance ID</TableHead>
+                                    <TableHead className="whitespace-nowrap sticky left-16 bg-white z-10">Name</TableHead>
+                                    <TableHead className="whitespace-nowrap">Department</TableHead>
                                     <TableHead className="whitespace-nowrap">Working Hours/Day</TableHead>
                                     <TableHead className="whitespace-nowrap">Basic Salary</TableHead>
                                     <TableHead className="whitespace-nowrap">Total Salary</TableHead>
@@ -266,13 +329,14 @@ export default function SalaryTab({ project }) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedSalaryData.map((row) => {
+                                {filteredSalaryData.map((row) => {
                                     const { total, wpsPay, balance } = calculateTotals(row);
                                     return (
                                         <TableRow key={row.hrms_id}>
-                                            <TableCell>{row.attendance_id}</TableCell>
-                                            <TableCell className="font-medium">{row.name}</TableCell>
-                                            <TableCell>{row.working_hours.toFixed(2)}</TableCell>
+                                             <TableCell className="sticky left-0 bg-white z-10 font-medium">{row.attendance_id}</TableCell>
+                                             <TableCell className="sticky left-16 bg-white z-10 font-medium">{row.name.split(' ').slice(0, 2).join(' ')}</TableCell>
+                                             <TableCell className="text-sm text-slate-600">{row.department || '-'}</TableCell>
+                                             <TableCell>{row.working_hours.toFixed(2)}</TableCell>
                                             <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
                                             <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
                                             <TableCell>{row.working_days}</TableCell>
