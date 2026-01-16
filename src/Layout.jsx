@@ -150,7 +150,7 @@ export default function Layout({ children, currentPageName }) {
             }
             return hasPageAccess(item.url);
         });
-    }, [currentUser, permissions, isAdmin, isSupervisor, userRole, hasPageAccess]);
+    }, [currentUser, permissions, isAdmin, isSupervisor, isCEO, userRole, hasPageAccess]);
 
     // Set UAE timezone for the entire app
     useEffect(() => {
@@ -188,7 +188,7 @@ export default function Layout({ children, currentPageName }) {
       );
     }
 
-    // Check if user has a company assigned (not required for admin/supervisor)
+    // Check if user has a company assigned (not required for admin/supervisor/ceo)
     if (!currentUser.company && userRole === 'user') {
       return (
           <div className="min-h-screen bg-slate-50 flex items-center justify-center">
