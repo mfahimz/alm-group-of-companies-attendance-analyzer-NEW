@@ -1593,6 +1593,9 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort}>
                                         LOP Days
                                     </SortableTableHead>
+                                    <SortableTableHead sortKey="half_absence_count" currentSort={sort} onSort={setSort}>
+                                        Half Days
+                                    </SortableTableHead>
                                     <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort}>
                                         Late Minutes
                                     </SortableTableHead>
@@ -1634,6 +1637,11 @@ export default function ReportDetailView({ reportRun, project }) {
                                         <TableCell>
                                             <span className={`${result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}`}>
                                                 {result.full_absence_count}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className={`${result.half_absence_count > 0 ? 'text-amber-600 font-medium' : ''}`}>
+                                                {result.half_absence_count || 0}
                                             </span>
                                         </TableCell>
                                         <TableCell>
