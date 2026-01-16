@@ -98,23 +98,18 @@ export default function DeptHeadApproval() {
         enabled: isVerified && !!linkInfo?.company
     });
 
-    const { data: punches = [] } = useQuery({
-        queryKey: ['punches', project?.id],
-        queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
-        enabled: isVerified && !!project?.id && project.status !== 'closed'
-    });
+    // Use pre-cached daily breakdown data from ApprovalLink instead of fetching real-time data
+    const [dailyBreakdownData, setDailyBreakdownData] = React.useState({});
 
-    const { data: shifts = [] } = useQuery({
-        queryKey: ['shifts', project?.id],
-        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
-        enabled: isVerified && !!project?.id && project.status !== 'closed'
-    });
-
-    const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions', project?.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        enabled: isVerified && !!project?.id
-    });
+    React.useEffect(() => {
+        if (linkInfo?.daily_breakdown_json) {
+            try {
+                setDailyBreakdownData(JSON.parse(linkInfo.daily_breakdown_json));
+            } catch (err) {
+                console.error('Failed to parse daily breakdown data:', err);
+            }
+        }
+    }, [linkInfo?.daily_breakdown_json]);
 
     const verifyMutation = useMutation({
         mutationFn: async (code) => {
@@ -714,82 +709,59 @@ export default function DeptHeadApproval() {
                             </DialogTitle>
                         </DialogHeader>
                         {selectedEmployeeForBreakdown && (
-                            <div className="mt-4">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Punches</TableHead>
-                                            <TableHead>Shift</TableHead>
-                                            <TableHead>Exception</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Late Min</TableHead>
-                                            <TableHead>Early Min</TableHead>
-                                            <TableHead>Abnormal</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {(() => {
-                                            const breakdown = [];
-                                            const startDate = new Date(reportRun.date_from);
-                                            const endDate = new Date(reportRun.date_to);
-                                            
-                                            const dayNameToNumber = {
-                                                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-                                                'Thursday': 4, 'Friday': 5, 'Saturday': 6
-                                            };
+                            <div className="space-y-4">
+                                {/* Summary Card */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-slate-50 p-3 rounded-lg">
+                                        <p className="text-xs text-slate-600">Late Minutes</p>
+                                        <p className="text-lg font-bold text-slate-900">{selectedEmployeeForBreakdown.late_minutes || 0}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-lg">
+                                        <p className="text-xs text-slate-600">Early Checkout</p>
+                                        <p className="text-lg font-bold text-slate-900">{selectedEmployeeForBreakdown.early_checkout_minutes || 0}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-lg">
+                                        <p className="text-xs text-slate-600">Present Days</p>
+                                        <p className="text-lg font-bold text-green-600">{selectedEmployeeForBreakdown.present_days || 0}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-lg">
+                                        <p className="text-xs text-slate-600">Absences</p>
+                                        <p className="text-lg font-bold text-red-600">{(selectedEmployeeForBreakdown.full_absence_count || 0) + (selectedEmployeeForBreakdown.half_absence_count || 0)}</p>
+                                    </div>
+                                </div>
 
-                                            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                                                const currentDate = new Date(d);
-                                                const dateStr = currentDate.toISOString().split('T')[0];
-                                                const dayOfWeek = currentDate.getDay();
+                                {/* Notes */}
+                                {selectedEmployeeForBreakdown.notes && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                        <p className="text-xs font-medium text-amber-900 mb-1">Critical Issues:</p>
+                                        <p className="text-sm text-amber-800">{selectedEmployeeForBreakdown.notes}</p>
+                                    </div>
+                                )}
 
-                                                const dayPunches = punches.filter(p => 
-                                                    p.attendance_id === selectedEmployeeForBreakdown.attendance_id &&
-                                                    p.punch_date === dateStr
-                                                );
+                                {/* Abnormal Dates */}
+                                {selectedEmployeeForBreakdown.abnormal_dates && (
+                                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                                        <p className="text-xs font-medium text-orange-900 mb-1">Dates with Abnormalities:</p>
+                                        <p className="text-sm text-orange-800">{selectedEmployeeForBreakdown.abnormal_dates}</p>
+                                    </div>
+                                )}
 
-                                                const dayException = exceptions.find(e =>
-                                                    (e.attendance_id === selectedEmployeeForBreakdown.attendance_id || e.attendance_id === 'ALL') &&
-                                                    new Date(e.date_from) <= currentDate && currentDate <= new Date(e.date_to) &&
-                                                    e.approval_status === 'approved'
-                                                );
+                                {/* Pre-cached breakdown info */}
+                                {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id] && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                        <p className="text-xs font-medium text-blue-900 mb-2">Summary from Report:</p>
+                                        <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
+                                            <div>Punches Recorded: {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].punches_count}</div>
+                                            <div>Shifts Configured: {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].shifts_count}</div>
+                                            <div>Exceptions: {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].exceptions_count}</div>
+                                            <div>Grace Minutes: {selectedEmployeeForBreakdown.grace_minutes || 0}</div>
+                                        </div>
+                                    </div>
+                                )}
 
-                                                breakdown.push({
-                                                    date: currentDate.toLocaleDateString(),
-                                                    punches: dayPunches.length,
-                                                    shift: shifts.find(s => s.attendance_id === selectedEmployeeForBreakdown.attendance_id) ? 'Configured' : 'None',
-                                                    exception: dayException?.type || '-',
-                                                    status: dayPunches.length > 0 ? 'Present' : dayException ? dayException.type : 'Absent',
-                                                    lateMin: dayException?.late_minutes || 0,
-                                                    earlyMin: dayException?.early_checkout_minutes || 0,
-                                                    abnormal: false
-                                                });
-                                            }
-
-                                            return breakdown.map((day, idx) => (
-                                                <TableRow key={idx}>
-                                                    <TableCell className="font-medium">{day.date}</TableCell>
-                                                    <TableCell>{day.punches}</TableCell>
-                                                    <TableCell className="text-xs">{day.shift}</TableCell>
-                                                    <TableCell className="text-xs">{day.exception}</TableCell>
-                                                    <TableCell>
-                                                        <span className={`text-xs px-2 py-1 rounded font-medium ${
-                                                            day.status === 'Present' ? 'bg-green-100 text-green-700' : 
-                                                            day.status === 'Absent' ? 'bg-red-100 text-red-700' : 
-                                                            'bg-slate-100 text-slate-700'
-                                                        }`}>
-                                                            {day.status}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell className="text-center">{day.lateMin > 0 ? day.lateMin : '-'}</TableCell>
-                                                    <TableCell className="text-center">{day.earlyMin > 0 ? day.earlyMin : '-'}</TableCell>
-                                                    <TableCell>{day.abnormal ? 'Yes' : '-'}</TableCell>
-                                                </TableRow>
-                                            ));
-                                        })()}
-                                    </TableBody>
-                                </Table>
+                                <p className="text-xs text-slate-500 italic">
+                                    This data is cached from the report generation time for fast loading. For detailed daily-by-day breakdown, contact your HR administrator.
+                                </p>
                             </div>
                         )}
                     </DialogContent>
