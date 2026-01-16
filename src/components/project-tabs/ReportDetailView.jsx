@@ -1661,10 +1661,10 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
                                         Early Checkout
                                     </SortableTableHead>
-                                    <TableHead>Grace</TableHead>
                                     <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort}>
                                         Approved Minutes
                                     </SortableTableHead>
+                                    <TableHead>Grace</TableHead>
                                     <TableHead>Deductible</TableHead>
                                     <TableHead>Notes</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -1714,6 +1714,11 @@ export default function ReportDetailView({ reportRun, project }) {
                                             </span>
                                         </TableCell>
                                         <TableCell>
+                                            <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
+                                                {result.approved_minutes || 0}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex items-center gap-2 group">
                                                 <span>{result.grace_minutes ?? 15}</span>
                                                 {!isUser && (
@@ -1727,11 +1732,6 @@ export default function ReportDetailView({ reportRun, project }) {
                                                     </Button>
                                                 )}
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
-                                                {result.approved_minutes || 0}
-                                            </span>
                                         </TableCell>
                                         <TableCell>
                                             {(() => {
