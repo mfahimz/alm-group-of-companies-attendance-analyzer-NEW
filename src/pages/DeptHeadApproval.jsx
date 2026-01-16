@@ -75,11 +75,24 @@ export default function DeptHeadApproval() {
 
     const { data: quarterlyMinutes = [] } = useQuery({
         queryKey: ['quarterlyMinutes', linkInfo?.company, linkInfo?.project_id],
-        queryFn: () => base44.entities.EmployeeQuarterlyMinutes.filter({ 
-            company: linkInfo.company,
-            project_id: linkInfo.project_id 
-        }),
-        enabled: isVerified && !!linkInfo?.company && !!linkInfo?.project_id
+        queryFn: async () => {
+            // Fetch both project-based and calendar-based quarterly minutes
+            const projectBased = await base44.entities.EmployeeQuarterlyMinutes.filter({ 
+                company: linkInfo.company,
+                project_id: linkInfo.project_id 
+            });
+            
+            const calendarBased = await base44.entities.EmployeeQuarterlyMinutes.filter({ 
+                company: linkInfo.company,
+                allocation_type: 'calendar_quarter',
+                year: 2025,
+                quarter: 4
+            });
+            
+            // Merge both, prioritizing project-based if exists
+            return [...projectBased, ...calendarBased];
+        },
+        enabled: isVerified && !!linkInfo?.company
     });
 
     const verifyMutation = useMutation({
