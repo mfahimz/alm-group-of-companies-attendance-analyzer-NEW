@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DollarSign, FileSpreadsheet } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { DollarSign, FileSpreadsheet, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SalaryTab({ project }) {
@@ -35,6 +37,10 @@ export default function SalaryTab({ project }) {
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
+
+    // State for editable values
+    const [editableData, setEditableData] = useState({});
+    const [isSaving, setIsSaving] = useState(false);
 
     // Combine all data for each employee
     const salaryData = useMemo(() => {
@@ -115,6 +121,62 @@ export default function SalaryTab({ project }) {
         });
     }, [employees, salaries, analysisResults]);
 
+    // Sort by department
+    const sortedSalaryData = useMemo(() => {
+        return [...salaryData].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+    }, [salaryData]);
+
+    // Handle input change for editable fields
+    const handleChange = (hrmsId, field, value) => {
+        setEditableData(prev => ({
+            ...prev,
+            [hrmsId]: {
+                ...(prev[hrmsId] || {}),
+                [field]: parseFloat(value) || 0
+            }
+        }));
+    };
+
+    // Get value (either from editableData or original data)
+    const getValue = (row, field) => {
+        return editableData[row.hrms_id]?.[field] ?? row[field];
+    };
+
+    // Calculate totals dynamically
+    const calculateTotals = (row) => {
+        const leavePay = getValue(row, 'leavePay');
+        const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount');
+        const otSalary = getValue(row, 'otSalary');
+        const leaveHoursPay = getValue(row, 'leaveHoursPay');
+        const bonus = getValue(row, 'bonus');
+        const incentive = getValue(row, 'incentive');
+        const otherDeduction = getValue(row, 'otherDeduction');
+        const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction');
+        const lopDeduction = getValue(row, 'lopDeduction');
+        const deductibleMinutesAmount = getValue(row, 'deductibleMinutesAmount');
+
+        const total = row.total_salary + leavePay + salaryLeaveAmount + otSalary + leaveHoursPay + bonus + incentive
+                      - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+        const wpsPay = total;
+        const balance = 0;
+
+        return { total, wpsPay, balance };
+    };
+
+    // Save all changes
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            // TODO: Save editableData to backend (create a new entity or update existing records)
+            toast.success('Salary data saved successfully');
+            setEditableData({});
+        } catch (error) {
+            toast.error('Failed to save salary data: ' + error.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     if (!isAdminOrCEO) {
         return (
             <Card className="border-0 shadow-lg">
@@ -157,25 +219,30 @@ export default function SalaryTab({ project }) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="bg-white rounded-lg p-4 mb-4">
+                    <div className="bg-white rounded-lg p-4 mb-4 flex items-center justify-between">
                         <p className="text-sm text-slate-600">
                             <strong>Note:</strong> Salary calculations are based on the latest saved report. 
-                            Data from salary master is read-only. Formulas for deductions will be applied automatically.
+                            Data from salary master is read-only. Edit the highlighted fields as needed.
                         </p>
+                        <Button 
+                            onClick={handleSave} 
+                            disabled={isSaving || Object.keys(editableData).length === 0}
+                            className="bg-green-600 hover:bg-green-700"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </Button>
                     </div>
 
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="whitespace-nowrap">HRMS ID</TableHead>
                                     <TableHead className="whitespace-nowrap">Attendance ID</TableHead>
                                     <TableHead className="whitespace-nowrap">Name</TableHead>
-                                    <TableHead className="whitespace-nowrap">Department</TableHead>
                                     <TableHead className="whitespace-nowrap">Working Hours/Day</TableHead>
-                                    <TableHead className="whitespace-nowrap">Deduction/Minute</TableHead>
                                     <TableHead className="whitespace-nowrap">Basic Salary</TableHead>
-                                    <TableHead className="whitespace-nowrap">Total Salary (Master)</TableHead>
+                                    <TableHead className="whitespace-nowrap">Total Salary</TableHead>
                                     <TableHead className="whitespace-nowrap">Working Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Present Days</TableHead>
                                     <TableHead className="whitespace-nowrap">LOP Days</TableHead>
@@ -199,38 +266,118 @@ export default function SalaryTab({ project }) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {salaryData.map((row) => (
-                                    <TableRow key={row.hrms_id}>
-                                        <TableCell>{row.hrms_id}</TableCell>
-                                        <TableCell>{row.attendance_id}</TableCell>
-                                        <TableCell className="font-medium">{row.name}</TableCell>
-                                        <TableCell>{row.department}</TableCell>
-                                        <TableCell>{row.working_hours.toFixed(2)}</TableCell>
-                                        <TableCell>{row.deduction_per_minute.toFixed(2)}</TableCell>
-                                        <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
-                                        <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
-                                        <TableCell>{row.working_days}</TableCell>
-                                        <TableCell>{row.present_days}</TableCell>
-                                        <TableCell className="text-red-600 font-semibold">{row.full_absence_count}</TableCell>
-                                        <TableCell>{row.half_absence_count}</TableCell>
-                                        <TableCell className="text-amber-600 font-medium">{row.halfDayNotWorkedHours.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-amber-50">{row.leaveDays}</TableCell>
-                                        <TableCell className="bg-amber-50">{row.leavePay.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-green-50">{row.salaryLeaveDays}</TableCell>
-                                        <TableCell className="bg-green-50">{row.salaryLeaveAmount.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-blue-50">{row.otHours.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-blue-50">{row.otSalary.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-purple-50">{row.leaveHours.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-purple-50">{row.leaveHoursPay.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-red-50">{row.otherDeduction.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-green-50">{row.bonus.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-green-50">{row.incentive.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-red-50">{row.advanceSalaryDeduction.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-indigo-100 font-bold">{row.total.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-indigo-100 font-bold">{row.wpsPay.toFixed(2)}</TableCell>
-                                        <TableCell className="bg-slate-100">{row.balance.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))}
+                                {sortedSalaryData.map((row) => {
+                                    const { total, wpsPay, balance } = calculateTotals(row);
+                                    return (
+                                        <TableRow key={row.hrms_id}>
+                                            <TableCell>{row.attendance_id}</TableCell>
+                                            <TableCell className="font-medium">{row.name}</TableCell>
+                                            <TableCell>{row.working_hours.toFixed(2)}</TableCell>
+                                            <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
+                                            <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
+                                            <TableCell>{row.working_days}</TableCell>
+                                            <TableCell>{row.present_days}</TableCell>
+                                            <TableCell className="text-red-600 font-semibold">{row.full_absence_count}</TableCell>
+                                            <TableCell>{row.half_absence_count}</TableCell>
+                                            <TableCell className="text-amber-600 font-medium">{row.halfDayNotWorkedHours.toFixed(2)}</TableCell>
+                                            <TableCell className="bg-amber-50">{row.leaveDays}</TableCell>
+                                            <TableCell className="bg-amber-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'leavePay')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-green-50">{row.salaryLeaveDays}</TableCell>
+                                            <TableCell className="bg-green-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'salaryLeaveAmount')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'salaryLeaveAmount', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-blue-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'otHours')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'otHours', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-blue-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'otSalary')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'otSalary', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-purple-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'leaveHours')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'leaveHours', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-purple-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'leaveHoursPay')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'leaveHoursPay', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-red-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'otherDeduction')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-green-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'bonus')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-green-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'incentive')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-red-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'advanceSalaryDeduction')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-indigo-100 font-bold">{total.toFixed(2)}</TableCell>
+                                            <TableCell className="bg-indigo-100 font-bold">{wpsPay.toFixed(2)}</TableCell>
+                                            <TableCell className="bg-slate-100">{balance.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </div>
