@@ -31,8 +31,8 @@ export default function GlobalSearch({ open, onOpenChange }) {
 
     const filteredEmployees = employees.filter(e =>
         e.name.toLowerCase().includes(query.toLowerCase()) ||
-        e.hrms_id.toLowerCase().includes(query.toLowerCase()) ||
-        e.attendance_id.toLowerCase().includes(query.toLowerCase())
+        String(e.hrms_id).includes(query) ||
+        String(e.attendance_id).includes(query)
     ).slice(0, 5);
 
     const pages = [
