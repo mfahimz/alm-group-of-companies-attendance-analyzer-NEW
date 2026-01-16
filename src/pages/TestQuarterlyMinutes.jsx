@@ -54,8 +54,17 @@ export default function TestQuarterlyMinutes() {
     });
 
     const getEmployeeName = (employeeId) => {
-        const employee = employees.find(e => e.hrms_id === employeeId);
-        return employee ? employee.name : employeeId;
+        const employee = employees.find(e => 
+            e.hrms_id === employeeId || String(e.id) === String(employeeId)
+        );
+        return employee ? employee.name : 'Unknown';
+    };
+
+    const getEmployeeAttendanceId = (employeeId) => {
+        const employee = employees.find(e => 
+            e.hrms_id === employeeId || String(e.id) === String(employeeId)
+        );
+        return employee ? employee.attendance_id : '-';
     };
 
     if (currentUser?.role !== 'admin') {
@@ -117,31 +126,33 @@ export default function TestQuarterlyMinutes() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Employee ID</TableHead>
-                                            <TableHead>Employee Name</TableHead>
-                                            <TableHead>Year</TableHead>
-                                            <TableHead>Quarter</TableHead>
-                                            <TableHead>Total Minutes</TableHead>
-                                            <TableHead>Used Minutes</TableHead>
-                                            <TableHead>Remaining Minutes</TableHead>
-                                            <TableHead>Type</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
+                                             <TableHead>Employee ID</TableHead>
+                                             <TableHead>Attendance ID</TableHead>
+                                             <TableHead>Employee Name</TableHead>
+                                             <TableHead>Year</TableHead>
+                                             <TableHead>Quarter</TableHead>
+                                             <TableHead>Total Minutes</TableHead>
+                                             <TableHead>Used Minutes</TableHead>
+                                             <TableHead>Remaining Minutes</TableHead>
+                                             <TableHead>Type</TableHead>
+                                         </TableRow>
+                                     </TableHeader>
                                     <TableBody>
                                         {testRecords.map((record) => (
-                                            <TableRow key={record.id}>
-                                                <TableCell>{record.employee_id}</TableCell>
-                                                <TableCell>{getEmployeeName(record.employee_id)}</TableCell>
-                                                <TableCell>{record.year}</TableCell>
-                                                <TableCell>Q{record.quarter}</TableCell>
-                                                <TableCell>{record.total_minutes}</TableCell>
-                                                <TableCell>{record.used_minutes}</TableCell>
-                                                <TableCell>{record.remaining_minutes}</TableCell>
-                                                <TableCell className="text-xs text-slate-500">
-                                                    {record.allocation_type}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                             <TableRow key={record.id}>
+                                                 <TableCell className="font-medium">{record.employee_id}</TableCell>
+                                                 <TableCell className="font-medium">{getEmployeeAttendanceId(record.employee_id)}</TableCell>
+                                                 <TableCell>{getEmployeeName(record.employee_id)}</TableCell>
+                                                 <TableCell>{record.year}</TableCell>
+                                                 <TableCell>Q{record.quarter}</TableCell>
+                                                 <TableCell>{record.total_minutes}</TableCell>
+                                                 <TableCell className="font-semibold text-blue-600">{record.used_minutes}</TableCell>
+                                                 <TableCell className={record.remaining_minutes <= 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>{record.remaining_minutes}</TableCell>
+                                                 <TableCell className="text-xs text-slate-500">
+                                                     {record.allocation_type}
+                                                 </TableCell>
+                                             </TableRow>
+                                         ))}
                                     </TableBody>
                                 </Table>
                             </div>
