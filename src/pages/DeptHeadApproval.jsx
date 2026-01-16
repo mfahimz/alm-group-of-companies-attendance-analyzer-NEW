@@ -161,10 +161,13 @@ export default function DeptHeadApproval() {
                 approved: true
             });
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['results', linkInfo?.report_run_id] });
-            queryClient.invalidateQueries({ queryKey: ['approvalLink'] });
-            queryClient.invalidateQueries({ queryKey: ['approvalLinks'] });
+        onSuccess: async () => {
+            // Invalidate and refetch the approval link to get updated used status
+            await queryClient.invalidateQueries({ queryKey: ['approvalLink', token] });
+            await queryClient.refetchQueries({ queryKey: ['approvalLink', token] });
+            // Also refetch results to get updated approved_minutes
+            await queryClient.invalidateQueries({ queryKey: ['results', linkInfo?.report_run_id] });
+            await queryClient.refetchQueries({ queryKey: ['results', linkInfo?.report_run_id] });
             toast.success('Approval submitted successfully');
         },
         onError: (error) => {
