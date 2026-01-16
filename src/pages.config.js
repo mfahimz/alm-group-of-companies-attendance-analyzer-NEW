@@ -15,10 +15,10 @@ import ReportDetail from './pages/ReportDetail';
 import Reports from './pages/Reports';
 import RulesSettings from './pages/RulesSettings';
 import Salaries from './pages/Salaries';
+import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import __Layout from './Layout.jsx';
 
 
@@ -40,10 +40,10 @@ export const PAGES = {
     "Reports": Reports,
     "RulesSettings": RulesSettings,
     "Salaries": Salaries,
+    "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "TestQuarterlyMinutes": TestQuarterlyMinutes,
 }
 
 export const pagesConfig = {

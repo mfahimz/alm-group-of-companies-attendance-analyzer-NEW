@@ -141,8 +141,9 @@ export default function DeptHeadApproval() {
             });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['results']);
-            queryClient.invalidateQueries(['approvalLink']);
+            queryClient.invalidateQueries({ queryKey: ['results', linkInfo?.report_run_id] });
+            queryClient.invalidateQueries({ queryKey: ['approvalLink'] });
+            queryClient.invalidateQueries({ queryKey: ['approvalLinks'] });
             toast.success('Approval submitted successfully');
         },
         onError: (error) => {
