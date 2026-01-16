@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Navbar1 } from '@/components/ui/Navbar1';
 import { formatInUAE } from '@/components/ui/timezone';
+import { CompanyBadge } from '@/components/ui/CompanyBadge';
 import {
     BarChart3,
     FolderKanban,
@@ -89,6 +90,25 @@ export default function Layout({ children, currentPageName }) {
         staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
+    const { data: maintenanceMode } = useQuery({
+        queryKey: ['maintenanceMode'],
+        queryFn: async () => {
+            try {
+                const settings = await base44.entities.SystemSettings.filter({ 
+                    setting_key: 'MAINTENANCE_MODE' 
+                });
+                if (settings.length > 0) {
+                    return settings[0].setting_value === 'true';
+                }
+                return false;
+            } catch {
+                return false;
+            }
+        },
+        enabled: !!currentUser && !isPublicPage,
+        staleTime: 1 * 60 * 1000 // Cache for 1 minute
+    });
+
     // Calculate user role BEFORE any conditional returns
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
@@ -138,6 +158,7 @@ export default function Layout({ children, currentPageName }) {
                     { title: 'Department Heads', url: 'DepartmentHeadSettings', icon: <Users className="w-5 h-5" /> },
                     { title: 'Rules Settings', url: 'RulesSettings', icon: <Settings className="w-5 h-5" /> },
                     { title: 'Ramadan Schedules', url: 'RamadanSchedules', icon: <Calendar className="w-5 h-5" /> },
+                    { title: 'Maintenance Mode', url: 'MaintenanceSettings', icon: <Settings className="w-5 h-5" /> },
                     { title: 'Documentation', url: 'Documentation', icon: <Book className="w-5 h-5" /> },
                     { title: 'Training Guide', url: 'Training', icon: <Book className="w-5 h-5" /> }
                 ]
@@ -188,15 +209,21 @@ export default function Layout({ children, currentPageName }) {
       );
     }
 
+    // Check maintenance mode (skip for admin users)
+    if (maintenanceMode && userRole !== 'admin' && currentPageName !== 'Maintenance') {
+        window.location.href = '/Maintenance';
+        return null;
+    }
+
     // Check if user has a company assigned (not required for admin/supervisor/ceo)
     if (!currentUser.company && userRole === 'user') {
-      return (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-              <div className="text-slate-600 text-center">
-                  No company is assigned. Wait for the administrator to assign a company.
-              </div>
-          </div>
-      );
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-600 text-center">
+                    No company is assigned. Wait for the administrator to assign a company.
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -219,8 +246,13 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Main Content */}
             <main className="container mx-auto px-4 py-6">
-                <div className="flex justify-end mb-4">
-                    <NotificationCenter />
+                <div className="flex justify-between items-center mb-4">
+                    {currentUser?.company && (
+                        <CompanyBadge company={currentUser.company} className="text-sm" />
+                    )}
+                    <div className="ml-auto">
+                        <NotificationCenter />
+                    </div>
                 </div>
                 {children}
             </main>

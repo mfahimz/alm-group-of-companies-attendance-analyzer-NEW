@@ -16,6 +16,8 @@ import Salaries from './pages/Salaries';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import Maintenance from './pages/Maintenance';
+import MaintenanceSettings from './pages/MaintenanceSettings';
 import __Layout from './Layout.jsx';
 
 
@@ -38,6 +40,8 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
+    "Maintenance": Maintenance,
+    "MaintenanceSettings": MaintenanceSettings,
 }
 
 export const pagesConfig = {
