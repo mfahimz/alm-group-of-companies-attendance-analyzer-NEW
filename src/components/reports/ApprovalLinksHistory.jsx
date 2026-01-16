@@ -21,13 +21,16 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
         queryFn: () => base44.auth.me()
     });
 
-    const { data: approvalLinks = [] } = useQuery({
+    const { data: allApprovalLinks = [] } = useQuery({
         queryKey: ['approvalLinks', reportRunId],
         queryFn: () => base44.entities.ApprovalLink.filter({ 
             report_run_id: reportRunId 
         }, '-created_date'),
         enabled: !!reportRunId
     });
+
+    // Filter out deleted links from UI
+    const approvalLinks = allApprovalLinks.filter(link => !link.deleted);
 
     const togglePublicMutation = useMutation({
         mutationFn: async (linkId) => {
