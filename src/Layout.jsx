@@ -139,15 +139,18 @@ export default function Layout({ children, currentPageName }) {
                     { title: 'Salaries', url: 'Salaries', icon: <LayoutDashboard className="w-5 h-5" /> },
                     ...(isAdmin || isSupervisor || isCEO ? [{ title: 'Reports & Analytics', url: 'Reports', icon: <BarChart3 className="w-5 h-5" /> }] : [])
                     ]
-                    },
-            {
+                    }
+            ];
+
+            if (isAdmin) {
+            menu.push({
                 title: 'Data',
                 url: '#',
                 items: [
                     { title: 'Private Files', url: 'PrivateFiles', icon: <Lock className="w-5 h-5" /> }
                 ]
+            });
             }
-        ];
 
         if (isAdmin || isCEO) {
             menu.push({

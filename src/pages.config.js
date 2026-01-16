@@ -5,6 +5,8 @@ import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
 import Home from './pages/Home';
+import Maintenance from './pages/Maintenance';
+import MaintenanceSettings from './pages/MaintenanceSettings';
 import PrivateFiles from './pages/PrivateFiles';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
@@ -16,8 +18,6 @@ import Salaries from './pages/Salaries';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import Maintenance from './pages/Maintenance';
-import MaintenanceSettings from './pages/MaintenanceSettings';
 import __Layout from './Layout.jsx';
 
 
@@ -29,6 +29,8 @@ export const PAGES = {
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
     "Home": Home,
+    "Maintenance": Maintenance,
+    "MaintenanceSettings": MaintenanceSettings,
     "PrivateFiles": PrivateFiles,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
@@ -40,8 +42,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "Maintenance": Maintenance,
-    "MaintenanceSettings": MaintenanceSettings,
 }
 
 export const pagesConfig = {
