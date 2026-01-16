@@ -43,30 +43,35 @@ export default function ReportDetailView({ reportRun, project }) {
 
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id })
+        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
+        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
-        queryFn: () => base44.entities.Employee.filter({ company: project.company })
+        queryFn: () => base44.entities.Employee.filter({ company: project.company }),
+        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
     // Only fetch punches and shifts if project is NOT closed (data is deleted on close)
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
-        enabled: project.status !== 'closed'
+        enabled: project.status !== 'closed',
+        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
-        enabled: project.status !== 'closed'
+        enabled: project.status !== 'closed',
+        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     });
 
     // Load verified employees from report
@@ -645,7 +650,8 @@ export default function ReportDetailView({ reportRun, project }) {
         };
     };
 
-    const enrichedResults = React.useMemo(() => {
+    // Separate calculation from verification state to prevent unnecessary recalculations
+    const baseEnrichedResults = React.useMemo(() => {
         return results.map(result => {
             const employee = employees.find(e => e.attendance_id === result.attendance_id);
             
@@ -662,8 +668,7 @@ export default function ReportDetailView({ reportRun, project }) {
                     annual_leave_count: result.annual_leave_count || 0,
                     late_minutes: result.late_minutes || 0,
                     early_checkout_minutes: result.early_checkout_minutes || 0,
-                    other_minutes: result.other_minutes || 0,
-                    isVerified: verifiedEmployees.includes(result.attendance_id)
+                    other_minutes: result.other_minutes || 0
                 };
             }
             
@@ -691,11 +696,18 @@ export default function ReportDetailView({ reportRun, project }) {
                 annual_leave_count: annualLeaveCount,
                 late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout),
-                other_minutes: Math.max(0, totalOtherMinutes),
-                isVerified: verifiedEmployees.includes(result.attendance_id)
+                other_minutes: Math.max(0, totalOtherMinutes)
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, verifiedEmployees, project.status]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, project.status]);
+
+    // Add verification state separately to avoid expensive recalculations
+    const enrichedResults = React.useMemo(() => {
+        return baseEnrichedResults.map(result => ({
+            ...result,
+            isVerified: verifiedEmployees.includes(result.attendance_id)
+        }));
+    }, [baseEnrichedResults, verifiedEmployees]);
 
     const filteredResults = React.useMemo(() => {
         return enrichedResults
@@ -742,14 +754,35 @@ export default function ReportDetailView({ reportRun, project }) {
         }
     });
 
+    // Debounce verification updates to prevent rate limiting
+    const debounceTimeoutRef = React.useRef(null);
+    
     const toggleVerification = (attendanceId) => {
         const newVerified = verifiedEmployees.includes(attendanceId) 
             ? verifiedEmployees.filter(id => id !== attendanceId)
             : [...verifiedEmployees, attendanceId];
         
         setVerifiedEmployees(newVerified);
-        updateVerificationMutation.mutate(newVerified);
+        
+        // Clear existing timeout
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+        
+        // Debounce the API call by 500ms
+        debounceTimeoutRef.current = setTimeout(() => {
+            updateVerificationMutation.mutate(newVerified);
+        }, 500);
     };
+
+    // Cleanup timeout on unmount
+    React.useEffect(() => {
+        return () => {
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const verifyAllClean = () => {
         const cleanEmployees = enrichedResults
