@@ -44,13 +44,15 @@ export default function ReportDetailView({ reportRun, project }) {
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+        retry: false // Disable retries to prevent rate limit amplification
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company }),
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+        retry: false
     });
 
     // Only fetch punches and shifts if project is NOT closed (data is deleted on close)
@@ -58,20 +60,23 @@ export default function ReportDetailView({ reportRun, project }) {
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
         enabled: project.status !== 'closed',
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+        retry: false
     });
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
         enabled: project.status !== 'closed',
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+        retry: false
     });
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+        retry: false
     });
 
     // Load verified employees from report
@@ -769,10 +774,10 @@ export default function ReportDetailView({ reportRun, project }) {
             clearTimeout(debounceTimeoutRef.current);
         }
         
-        // Debounce the API call by 500ms
+        // Debounce the API call by 1 second to batch multiple clicks
         debounceTimeoutRef.current = setTimeout(() => {
             updateVerificationMutation.mutate(newVerified);
-        }, 500);
+        }, 1000);
     };
 
     // Cleanup timeout on unmount
