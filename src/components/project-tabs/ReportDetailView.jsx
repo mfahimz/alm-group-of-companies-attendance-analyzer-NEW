@@ -1039,7 +1039,7 @@ export default function ReportDetailView({ reportRun, project }) {
             return;
         }
 
-        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Other Minutes', 'Grace', 'Approved Minutes', 'Deductible', 'Notes'];
+        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Grace', 'Approved Minutes', 'Deductible', 'Notes'];
         const rows = filteredResults.map(r => {
             const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0) + (r.other_minutes || 0);
             const grace = r.grace_minutes ?? 15;
@@ -1055,7 +1055,6 @@ export default function ReportDetailView({ reportRun, project }) {
                 r.full_absence_count,
                 r.late_minutes,
                 r.early_checkout_minutes || 0,
-                r.other_minutes || 0,
                 grace,
                 approved,
                 deductible,
@@ -1657,9 +1656,6 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
                                         Early Checkout
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}>
-                                        Other Minutes
-                                    </SortableTableHead>
                                     <TableHead>Grace</TableHead>
                                     <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort}>
                                         Approved Minutes
@@ -1710,11 +1706,6 @@ export default function ReportDetailView({ reportRun, project }) {
                                         <TableCell>
                                             <span className={`${result.early_checkout_minutes > 0 ? 'text-blue-600 font-medium' : ''}`}>
                                                 {result.early_checkout_minutes || 0}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className={`${result.other_minutes > 0 ? 'text-purple-600 font-medium' : ''}`}>
-                                                {result.other_minutes || 0}
                                             </span>
                                         </TableCell>
                                         <TableCell>
@@ -1799,7 +1790,6 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <TableHead>Status</TableHead>
                                     <TableHead>Late Min</TableHead>
                                     <TableHead>Early Min</TableHead>
-                                    <TableHead>Other Min</TableHead>
                                     <TableHead>Abnormal</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -1879,13 +1869,6 @@ export default function ReportDetailView({ reportRun, project }) {
                                         <TableCell className="text-xs">
                                             {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
                                                 <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
-                                            ) : (
-                                                <span className="text-slate-400">-</span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                            {day.otherMinutes > 0 ? (
-                                                <span className="text-purple-600 font-medium">{day.otherMinutes} min</span>
                                             ) : (
                                                 <span className="text-slate-400">-</span>
                                             )}
