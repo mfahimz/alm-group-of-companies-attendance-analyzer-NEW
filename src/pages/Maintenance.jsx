@@ -53,7 +53,7 @@ export default function MaintenancePage() {
                                 <p className="font-medium">Al Maraghi Auto Repairs</p>
                             </div>
                             <div className="bg-slate-50 rounded-lg p-3">
-                                <p className="font-medium">Almaragi Automotive</p>
+                                <p className="font-medium">Al Maraghi Automotive</p>
                             </div>
                             <div className="bg-slate-50 rounded-lg p-3">
                                 <p className="font-medium">Nasanos Autoparts</p>
