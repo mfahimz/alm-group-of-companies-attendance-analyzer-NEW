@@ -38,7 +38,7 @@ export default function Dashboard() {
     const projects = React.useMemo(() => {
         if (!currentUser) return [];
         const userRole = currentUser.extended_role || currentUser.role || 'user';
-        const canAccessAll = userRole === 'admin' || userRole === 'supervisor';
+        const canAccessAll = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo';
         if (canAccessAll) return allProjects;
         return allProjects.filter(p => p.company === currentUser.company);
     }, [allProjects, currentUser]);
@@ -46,7 +46,7 @@ export default function Dashboard() {
     const employees = React.useMemo(() => {
         if (!currentUser) return [];
         const userRole = currentUser.extended_role || currentUser.role || 'user';
-        const canAccessAll = userRole === 'admin' || userRole === 'supervisor';
+        const canAccessAll = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo';
         if (canAccessAll) return allEmployees;
         return allEmployees.filter(e => e.company === currentUser.company);
     }, [allEmployees, currentUser]);
@@ -54,7 +54,8 @@ export default function Dashboard() {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
-    const isAdminOrSupervisor = isAdmin || isSupervisor;
+    const isCEO = userRole === 'ceo';
+    const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO;
 
     const stats = [
         {
@@ -112,12 +113,12 @@ export default function Dashboard() {
     }
 
     // Role-based dashboard rendering
-    if (isAdmin) {
+    if (isAdmin || isCEO) {
         return (
             <div className="space-y-6 animate-in fade-in duration-500">
                 <div className="animate-in slide-in-from-top-4 duration-700">
                     <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-                        Welcome back, {currentUser?.full_name || 'Admin'}
+                        Welcome back, {currentUser?.full_name || (isCEO ? 'CEO' : 'Admin')}
                     </h1>
                     <p className="text-slate-600 mt-2 text-lg">System administration and monitoring</p>
                 </div>
