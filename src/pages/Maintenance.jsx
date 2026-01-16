@@ -59,7 +59,7 @@ export default function MaintenancePage() {
                                 <p className="font-medium">Naser Mohsin Auto Parts</p>
                             </div>
                             <div className="bg-slate-50 rounded-lg p-3">
-                                <p className="font-medium">Astra Autoparts</p>
+                                <p className="font-medium">Astra Auto Parts</p>
                             </div>
                         </div>
                     </div>
