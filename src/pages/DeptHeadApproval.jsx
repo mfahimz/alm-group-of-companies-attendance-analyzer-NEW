@@ -441,20 +441,17 @@ export default function DeptHeadApproval() {
         );
     }
 
-    if (linkInfo.used) {
+    if (linkInfo.used && windowStatus.windowStatus === 'expired') {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-                <Card className="w-full max-w-md border-green-200 bg-green-50">
+                <Card className="w-full max-w-md border-red-200 bg-red-50">
                     <CardContent className="p-6">
                         <div className="flex items-start gap-3">
-                            <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
+                            <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
                             <div>
-                                <p className="font-medium text-green-900">Already Approved</p>
-                                <p className="text-sm text-green-700 mt-1">
-                                    This report has already been approved on {new Date(linkInfo.used_at).toLocaleString()}.
-                                </p>
-                                <p className="text-xs text-green-600 mt-2">
-                                    You can view the report in read-only mode until {formatInUAE(windowStatus.deadline, 'PPpp')}
+                                <p className="font-medium text-red-900">Access Expired</p>
+                                <p className="text-sm text-red-700 mt-1">
+                                    The read-only access for this approval link expired on {formatInUAE(windowStatus.deadline, 'PPpp')}.
                                 </p>
                             </div>
                         </div>
