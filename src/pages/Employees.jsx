@@ -283,7 +283,7 @@ export default function Employees() {
                 try {
                     // Find employee by attendance_id
                     const existingEmployee = employees.find(emp => 
-                        String(emp.attendance_id || '').toLowerCase() === String(item.attendance_id || '').toLowerCase()
+                        Number(emp.attendance_id) === Number(item.attendance_id)
                     );
                     
                     if (existingEmployee) {

@@ -272,17 +272,18 @@ export default function RunAnalysisTab({ project }) {
     };
 
     const analyzeEmployee = async (attendance_id) => {
+        const attendanceIdNum = Number(attendance_id);
         const employeePunches = punches.filter(p => 
-            p.attendance_id === attendance_id && 
+            Number(p.attendance_id) === attendanceIdNum && 
             p.punch_date >= dateFrom && 
             p.punch_date <= dateTo
         );
-        const employeeShifts = shifts.filter(s => s.attendance_id === attendance_id);
+        const employeeShifts = shifts.filter(s => Number(s.attendance_id) === attendanceIdNum);
 
         // Safely filter exceptions with try/catch for each exception
         const employeeExceptions = exceptions.filter(e => {
             try {
-                return (e.attendance_id === attendance_id || e.attendance_id === 'ALL') &&
+                return (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
                        e.use_in_analysis !== false &&
                        e.is_custom_type !== true &&
                        ['approved', 'approved_dept_head', 'pending_hr'].includes(e.approval_status);
@@ -293,7 +294,7 @@ export default function RunAnalysisTab({ project }) {
         });
         
         // Get employee to determine weekly off day
-        const employee = employees.find(e => e.attendance_id === attendance_id);
+        const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
         
         // Enable seconds parsing for Al Maraghi Automotive only
         const includeSeconds = project.company === 'Al Maraghi Automotive';
@@ -348,7 +349,7 @@ export default function RunAnalysisTab({ project }) {
                         const exFrom = new Date(ex.date_from);
                         const exTo = new Date(ex.date_to);
                         return currentDate >= exFrom && currentDate <= exTo && 
-                               (ex.attendance_id === attendance_id || ex.attendance_id === 'ALL');
+                               (Number(ex.attendance_id) === attendanceIdNum || ex.attendance_id === 'ALL');
                     } catch (error) {
                         console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
                         return false;
@@ -716,7 +717,7 @@ export default function RunAnalysisTab({ project }) {
         
         // Check for employees without shifts
         const employeesWithoutShifts = employees.filter(emp => {
-            const hasShift = shifts.some(s => s.attendance_id === emp.attendance_id);
+            const hasShift = shifts.some(s => Number(s.attendance_id) === Number(emp.attendance_id));
             return !hasShift;
         });
         
@@ -857,7 +858,7 @@ export default function RunAnalysisTab({ project }) {
 
             for (let i = 0; i < uniqueEmployeeIds.length; i++) {
                 const attendance_id = uniqueEmployeeIds[i];
-                const employee = employees.find(e => e.attendance_id === attendance_id);
+                const employee = employees.find(e => Number(e.attendance_id) === Number(attendance_id));
                 const employeeName = employee?.name || attendance_id;
                 setProgress({ 
                     current: i + 1, 

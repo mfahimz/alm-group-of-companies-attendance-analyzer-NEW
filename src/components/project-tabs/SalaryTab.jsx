@@ -50,9 +50,9 @@ export default function SalaryTab({ project }) {
         return employees.map(emp => {
             const salary = salaries.find(s => 
                 s.employee_id === emp.hrms_id || 
-                s.attendance_id === emp.attendance_id
+                Number(s.attendance_id) === Number(emp.attendance_id)
             );
-            const result = analysisResults.find(r => r.attendance_id === emp.attendance_id);
+            const result = analysisResults.find(r => Number(r.attendance_id) === Number(emp.attendance_id));
 
             // Calculate half day not worked hours (half_absence_count * working_hours / 2)
             const halfDayNotWorkedHours = (result?.half_absence_count || 0) * ((salary?.working_hours || 9) / 2);

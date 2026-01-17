@@ -274,7 +274,7 @@ export default function Salaries() {
                     error = 'Missing required fields';
                 } else {
                     employee = employees.find(e => 
-                        e.attendance_id === attendanceId && 
+                        Number(e.attendance_id) === attendanceId && 
                         e.company === company
                     );
 
