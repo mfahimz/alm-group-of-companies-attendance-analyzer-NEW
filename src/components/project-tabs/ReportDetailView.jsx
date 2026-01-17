@@ -1798,8 +1798,9 @@ export default function ReportDetailView({ reportRun, project }) {
                                     <TableHead>Exception</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Late Min</TableHead>
-                                    <TableHead>Early Min</TableHead>
-                                    <TableHead>Abnormal</TableHead>
+                                     <TableHead>Early Min</TableHead>
+                                     <TableHead>Other Min</TableHead>
+                                     <TableHead>Abnormal</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
