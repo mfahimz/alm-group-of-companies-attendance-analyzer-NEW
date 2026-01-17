@@ -1176,14 +1176,13 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 />
                                             </TableHead>
                                         )}
-                                        <TableHead className="w-24">ID</TableHead>
-                                         <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                             Att ID
-                                         </SortableTableHead>
-                                        <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
-                                             Type
-                                         </SortableTableHead>
-                                        <TableHead>Name</TableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                              Att ID
+                                          </SortableTableHead>
+                                         <TableHead>Name</TableHead>
+                                         <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
+                                              Type
+                                          </SortableTableHead>
                                         <SortableTableHead sortKey="date_from" currentSort={sort} onSort={setSort}>
                                             From
                                         </SortableTableHead>
