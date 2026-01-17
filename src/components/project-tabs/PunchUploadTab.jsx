@@ -210,7 +210,7 @@ export default function PunchUploadTab({ project }) {
                     }
 
                     // Check if employee exists
-                    const employeeExists = employees.some(e => e.attendance_id === attendance_id);
+                    const employeeExists = employees.some(e => e.attendance_id === Number(attendance_id));
                     if (!employeeExists && !newWarnings.includes(`Row ${i + 1}: Unknown employee ${attendance_id}`)) {
                         newWarnings.push(`Row ${i + 1}: Unknown employee ${attendance_id}`);
                     }
@@ -223,7 +223,7 @@ export default function PunchUploadTab({ project }) {
                     }
 
                     data.push({
-                        attendance_id,
+                        attendance_id: Number(attendance_id),
                         timestamp_raw,
                         punch_date,
                         employeeExists,

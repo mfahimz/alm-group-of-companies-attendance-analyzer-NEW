@@ -254,7 +254,7 @@ export default function ShiftTimingsTab({ project }) {
                         applicableDays = '';
                     }
 
-                    const employeeExists = employees.some(e => e.attendance_id === attendance_id);
+                    const employeeExists = employees.some(e => e.attendance_id === Number(attendance_id));
                     if (!employeeExists) {
                         newWarnings.push(`Unknown employee: ${attendance_id}`);
                     }
@@ -277,7 +277,7 @@ export default function ShiftTimingsTab({ project }) {
                     }
 
                     data.push({
-                        attendance_id,
+                        attendance_id: Number(attendance_id),
                         date: null,
                         is_friday_shift,
                         applicable_days: applicableDays,

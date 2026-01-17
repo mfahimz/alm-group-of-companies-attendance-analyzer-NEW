@@ -277,7 +277,8 @@ export default function ExceptionsTab({ project }) {
                     const rowNum = index + 2; // Excel row (header is row 1)
                     
                     // Get attendance_id (support multiple column names)
-                    const attendance_id = row.attendance_id || row.employee_id || row.id || row.AttendanceID || row.EmployeeID || '';
+                    const attendance_id_raw = row.attendance_id || row.employee_id || row.id || row.AttendanceID || row.EmployeeID || '';
+                    const attendance_id = attendance_id_raw === 'ALL' ? 'ALL' : (attendance_id_raw ? Number(attendance_id_raw) : '');
                     
                     // Get dates
                     const date_from = parseDate(row.date_from || row.from || row.start_date || row.DateFrom || '');
@@ -307,7 +308,7 @@ export default function ExceptionsTab({ project }) {
 
                     exceptions.push({
                         project_id: project.id,
-                        attendance_id: finalAttendanceId,
+                        attendance_id: finalAttendanceId === 'ALL' ? 'ALL' : Number(finalAttendanceId),
                         date_from,
                         date_to: date_to || date_from,
                         type,
@@ -517,7 +518,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         // Clean up empty string values and convert early_checkout_minutes to number
         // For SINGLE_SHIFT or CUSTOM (if no dates), use project date range as placeholder
         const cleanedData = {
-            attendance_id: submitData.attendance_id,
+            attendance_id: submitData.attendance_id === 'ALL' ? 'ALL' : Number(submitData.attendance_id),
             date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : 
                        (submitData.type === 'CUSTOM' && !submitData.date_from) ? project.date_from :
                        submitData.date_from,
