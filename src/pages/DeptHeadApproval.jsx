@@ -159,8 +159,8 @@ export default function DeptHeadApproval() {
 
                     // Also update EmployeeQuarterlyMinutes to track used minutes
                     const quarterlyRecord = quarterlyMinutes.find(q => 
-                        (q.employee_id === employee.hrms_id || q.employee_id === employee.id) && 
-                        (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && q.year === 2025 && q.quarter === 4))
+                        (String(q.employee_id) === String(employee.hrms_id) || String(q.employee_id) === String(employee.id)) && 
+                        (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && Number(q.year) === 2025 && Number(q.quarter) === 4))
                     );
 
                     if (quarterlyRecord) {
@@ -220,8 +220,8 @@ export default function DeptHeadApproval() {
 
         // Use same logic as display to find quarterly record
         const quarterlyRecord = quarterlyMinutes.find(q => 
-            (q.employee_id === employee.hrms_id || q.employee_id === employee.id) && 
-            (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && q.year === 2025 && q.quarter === 4))
+            (String(q.employee_id) === String(employee.hrms_id) || String(q.employee_id) === String(employee.id)) && 
+            (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && Number(q.year) === 2025 && Number(q.quarter) === 4))
         );
         const remainingMinutes = quarterlyRecord?.remaining_minutes || 0;
 
@@ -279,8 +279,8 @@ export default function DeptHeadApproval() {
             const salary = salaries.find(s => Number(s.attendance_id) === Number(result.attendance_id));
             // Find quarterly record: first try project-based, then calendar-based
             const quarterlyRecord = quarterlyMinutes.find(q => 
-                (q.employee_id === employee.hrms_id || q.employee_id === employee.id) && 
-                (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && q.year === 2025 && q.quarter === 4))
+                (String(q.employee_id) === String(employee.hrms_id) || String(q.employee_id) === String(employee.id)) && 
+                (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && Number(q.year) === 2025 && Number(q.quarter) === 4))
             );
 
             const totalDeductibleMinutes = (result.late_minutes || 0) + 
