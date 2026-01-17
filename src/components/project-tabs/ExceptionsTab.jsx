@@ -1200,82 +1200,83 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                         return (
                                             <TableRow key={exception.id}>
                                             {!isUser && (
-                                                <TableCell className="p-1">
-                                                    <Checkbox
-                                                        checked={selectedExceptions.some(e => e.id === exception.id)}
-                                                        onCheckedChange={(checked) => {
-                                                            if (checked) {
-                                                                setSelectedExceptions([...selectedExceptions, exception]);
-                                                            } else {
-                                                                setSelectedExceptions(selectedExceptions.filter(e => e.id !== exception.id));
-                                                            }
-                                                        }}
-                                                    />
-                                                </TableCell>
-                                            )}
-                                             <TableCell className="p-1 text-sm font-mono">
-                                                 <span className="text-slate-900">
-                                                     {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
-                                                 </span>
+                                                 <TableCell className="p-1">
+                                                     <Checkbox
+                                                         checked={selectedExceptions.some(e => e.id === exception.id)}
+                                                         onCheckedChange={(checked) => {
+                                                             if (checked) {
+                                                                 setSelectedExceptions([...selectedExceptions, exception]);
+                                                             } else {
+                                                                 setSelectedExceptions(selectedExceptions.filter(e => e.id !== exception.id));
+                                                             }
+                                                         }}
+                                                     />
+                                                 </TableCell>
+                                             )}
+                                              <TableCell className="p-1 text-sm font-mono">
+                                                  <span className="text-slate-900">
+                                                      {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
+                                                  </span>
+                                              </TableCell>
+                                              <TableCell className="p-1">
+                                                  {exception.is_custom_type ? (
+                                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                                                          {exception.custom_type_name || 'Custom'}
+                                                      </span>
+                                                  ) : (
+                                                      <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(exception.type)}`}>
+                                                          {exception.type.replace(/_/g, ' ')}
+                                                      </span>
+                                                  )}
+                                              </TableCell>
+                                              <TableCell className="p-1 text-sm">
+                                                  <span className="text-slate-900">
+                                                      {exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}
+                                                  </span>
+                                              </TableCell>
+                                              <TableCell className="p-1 text-sm">
+                                                  {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
+                                                      ? '—' 
+                                                      : new Date(exception.date_from).toLocaleDateString()}
+                                              </TableCell>
+                                              <TableCell className="p-1 text-sm">
+                                                  {exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) 
+                                                      ? '—' 
+                                                      : new Date(exception.date_to).toLocaleDateString()}
+                                              </TableCell>
+                                              <TableCell className="p-1 text-sm max-w-xs truncate">
+                                                  {exception.details || '-'}
+                                              </TableCell>
+                                             <TableCell className="text-right p-1">
+                                                 <div className="flex gap-1 justify-end">
+                                                     <Button
+                                                         size="sm"
+                                                         variant="ghost"
+                                                         onClick={() => setViewingException(exception)}
+                                                         title="View exception"
+                                                     >
+                                                         <Eye className="w-4 h-4 text-indigo-600" />
+                                                     </Button>
+                                                     <Button
+                                                         size="sm"
+                                                         variant="ghost"
+                                                         onClick={() => setEditingException(exception)}
+                                                         title="Edit exception"
+                                                     >
+                                                         <Edit className="w-4 h-4 text-blue-600" />
+                                                     </Button>
+                                                     <Button
+                                                         size="sm"
+                                                         variant="ghost"
+                                                         onClick={() => deleteMutation.mutate(exception.id)}
+                                                     >
+                                                         <Trash2 className="w-4 h-4 text-red-600" />
+                                                     </Button>
+                                                 </div>
                                              </TableCell>
-                                             <TableCell className="p-1">
-                                                 {exception.is_custom_type ? (
-                                                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                                                         {exception.custom_type_name || 'Custom'}
-                                                     </span>
-                                                 ) : (
-                                                     <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(exception.type)}`}>
-                                                         {exception.type.replace(/_/g, ' ')}
-                                                     </span>
-                                                 )}
-                                             </TableCell>
-                                             <TableCell className="p-1 text-sm">
-                                                 <span className="text-slate-900">
-                                                     {exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}
-                                                 </span>
-                                             </TableCell>
-                                             <TableCell className="p-1 text-sm">
-                                                 {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
-                                                     ? '—' 
-                                                     : new Date(exception.date_from).toLocaleDateString()}
-                                             </TableCell>
-                                             <TableCell className="p-1 text-sm">
-                                                 {exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) 
-                                                     ? '—' 
-                                                     : new Date(exception.date_to).toLocaleDateString()}
-                                             </TableCell>
-                                             <TableCell className="p-1 text-sm max-w-xs truncate">
-                                                 {exception.details || '-'}
-                                             </TableCell>
-                                            <TableCell className="text-right p-1">
-                                                <div className="flex gap-1 justify-end">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setViewingException(exception)}
-                                                        title="View exception"
-                                                    >
-                                                        <Eye className="w-4 h-4 text-indigo-600" />
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setEditingException(exception)}
-                                                        title="Edit exception"
-                                                    >
-                                                        <Edit className="w-4 h-4 text-blue-600" />
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => deleteMutation.mutate(exception.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-red-600" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                            </TableRow>
+                                            );
+                                            })}
                                 </TableBody>
                             </Table>
                         </div>
