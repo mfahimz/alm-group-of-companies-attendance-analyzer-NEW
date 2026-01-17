@@ -34,6 +34,9 @@ export default function RunAnalysisTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
+
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
@@ -815,7 +818,12 @@ export default function RunAnalysisTab({ project }) {
         const issues = performDataQualityCheck();
         const hasErrors = issues.some(i => i.type === 'error');
         
-        if (hasErrors) {
+        if (hasErrors && !isAdmin) {
+            setShowQualityCheck(true);
+            return;
+        }
+        
+        if (hasErrors && isAdmin) {
             setShowQualityCheck(true);
             return;
         }
@@ -1140,11 +1148,19 @@ export default function RunAnalysisTab({ project }) {
                         </div>
                     )}
 
-                    {dataQualityIssues.some(i => i.type === 'error') && (
+                    {dataQualityIssues.some(i => i.type === 'error') && !isAdmin && (
                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                             <p className="text-sm text-slate-700">
                                 <strong>Action Required:</strong> Please fix the errors above before running analysis. 
                                 Go to the Shifts tab to add missing shift timings.
+                            </p>
+                        </div>
+                    )}
+                    {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                            <p className="text-sm text-amber-700">
+                                <strong>Admin Override Available:</strong> Errors detected, but as an admin you can proceed anyway. 
+                                Results may be inaccurate for affected employees.
                             </p>
                         </div>
                     )}
@@ -1157,11 +1173,22 @@ export default function RunAnalysisTab({ project }) {
                         <Button 
                             onClick={() => {
                                 setShowQualityCheck(false);
-                                handleAnalyze();
+                                runAnalysis();
                             }}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
                             Proceed with Analysis
+                        </Button>
+                    )}
+                    {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
+                        <Button 
+                            onClick={() => {
+                                setShowQualityCheck(false);
+                                runAnalysis();
+                            }}
+                            className="bg-amber-600 hover:bg-amber-700"
+                        >
+                            Proceed Anyway (Admin Override)
                         </Button>
                     )}
                 </div>
