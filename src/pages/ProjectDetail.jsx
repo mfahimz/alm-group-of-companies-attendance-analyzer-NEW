@@ -99,7 +99,7 @@ export default function ProjectDetail() {
                 { label: project.name }
             ]} />
             {/* Header */}
-            <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-xl p-6 sm:p-8 border border-slate-200 animate-in slide-in-from-top-4 duration-700">
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-xl p-4 sm:p-6 border border-slate-200 animate-in slide-in-from-top-4 duration-700">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3">
