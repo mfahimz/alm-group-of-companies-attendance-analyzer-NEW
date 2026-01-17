@@ -380,12 +380,12 @@ export default function RunAnalysisTab({ project }) {
                     present_days++;
                     half_absence_count++;
                 } else if (dateException.type === 'SICK_LEAVE') {
-                    // Sick leave counts regardless of punches
+                    // Sick leave is separate from LOP - don't count as working day
                     working_days--;
                     sick_leave_count++;
                     continue;
                 } else if (dateException.type === 'ANNUAL_LEAVE') {
-                    // Annual leave counts if no punches, otherwise mark as present
+                    // Annual leave is separate from LOP - don't count as working day
                     if (filteredPunches.length === 0) {
                         working_days--;
                         annual_leave_count++;

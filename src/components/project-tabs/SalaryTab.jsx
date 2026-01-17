@@ -55,26 +55,33 @@ export default function SalaryTab({ project }) {
             const result = analysisResults.find(r => Number(r.attendance_id) === Number(emp.attendance_id));
 
             // Calculate half day not worked hours (half_absence_count * working_hours / 2)
-            const halfDayNotWorkedHours = (result?.half_absence_count || 0) * ((salary?.working_hours || 9) / 2);
+             const halfDayNotWorkedHours = (result?.half_absence_count || 0) * ((salary?.working_hours || 9) / 2);
 
-            // Placeholder values (formulas to be implemented)
-            const leaveDays = result?.annual_leave_count || 0;
-            const leavePay = 0; // To be calculated with formula
-            const salaryLeaveDays = result?.sick_leave_count || 0;
-            const salaryLeaveAmount = 0; // To be calculated with formula
-            const otHours = 0; // To be calculated
-            const otSalary = 0; // To be calculated
-            const leaveHours = 0; // To be calculated
-            const leaveHoursPay = 0; // To be calculated
-            const otherDeduction = 0; // To be set manually
-            const bonus = 0; // To be set manually
-            const incentive = 0; // To be set manually
-            const advanceSalaryDeduction = 0; // To be set manually
-            const lopDeduction = 0; // To be calculated based on LOP days
-            const deductibleMinutesAmount = 0; // To be calculated based on deductible minutes
-            
-            const totalSalary = (salary?.total_salary || 0) + leavePay + otSalary + leaveHoursPay + bonus + incentive 
-                                - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+             // Annual leave (paid leave) - separate from LOP
+             const leaveDays = result?.annual_leave_count || 0;
+             const leavePay = 0; // To be calculated with formula
+
+             // Sick leave (paid leave) - separate from LOP
+             const salaryLeaveDays = result?.sick_leave_count || 0;
+             const salaryLeaveAmount = 0; // To be calculated with formula
+
+             // Only full_absence_count counts as LOP (Loss of Pay) - not sick leave or annual leave
+             const lopDays = result?.full_absence_count || 0;
+             const lopDeduction = 0; // To be calculated based on lopDays only
+
+             // Other calculations
+             const otHours = 0; // To be calculated
+             const otSalary = 0; // To be calculated
+             const leaveHours = 0; // To be calculated
+             const leaveHoursPay = 0; // To be calculated
+             const otherDeduction = 0; // To be set manually
+             const bonus = 0; // To be set manually
+             const incentive = 0; // To be set manually
+             const advanceSalaryDeduction = 0; // To be set manually
+             const deductibleMinutesAmount = 0; // To be calculated based on deductible minutes
+
+             const totalSalary = (salary?.total_salary || 0) + leavePay + salaryLeaveAmount + otSalary + leaveHoursPay + bonus + incentive 
+                                 - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
             const wpsPay = totalSalary; // WPS is typically the total
             const balance = 0; // Balance = Total - WPS Pay
 
@@ -94,8 +101,10 @@ export default function SalaryTab({ project }) {
                 // Analysis results
                 working_days: result?.working_days || 0,
                 present_days: result?.present_days || 0,
-                full_absence_count: result?.full_absence_count || 0,
+                full_absence_count: result?.full_absence_count || 0, // LOP days only
                 half_absence_count: result?.half_absence_count || 0,
+                annual_leave_count: result?.annual_leave_count || 0, // Separate from LOP
+                sick_leave_count: result?.sick_leave_count || 0, // Separate from LOP
                 halfDayNotWorkedHours,
                 late_minutes: result?.late_minutes || 0,
                 early_checkout_minutes: result?.early_checkout_minutes || 0,
@@ -116,6 +125,7 @@ export default function SalaryTab({ project }) {
                 incentive,
                 advanceSalaryDeduction,
                 lopDeduction,
+                lopDays,
                 deductibleMinutesAmount,
                 total: totalSalary,
                 wpsPay,
@@ -309,6 +319,8 @@ export default function SalaryTab({ project }) {
                                     <TableHead className="whitespace-nowrap">Working Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Present Days</TableHead>
                                     <TableHead className="whitespace-nowrap">LOP Days</TableHead>
+                                    <TableHead className="whitespace-nowrap">Annual Leave Days</TableHead>
+                                    <TableHead className="whitespace-nowrap">Sick Leave Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Half Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Half Day Not Worked Hours</TableHead>
                                     <TableHead className="whitespace-nowrap bg-amber-50">Leave Days</TableHead>
@@ -342,6 +354,8 @@ export default function SalaryTab({ project }) {
                                             <TableCell>{row.working_days}</TableCell>
                                             <TableCell>{row.present_days}</TableCell>
                                             <TableCell className="text-red-600 font-semibold">{row.full_absence_count}</TableCell>
+                                            <TableCell className="text-green-600 font-medium">{row.annual_leave_count}</TableCell>
+                                            <TableCell className="text-blue-600 font-medium">{row.sick_leave_count}</TableCell>
                                             <TableCell>{row.half_absence_count}</TableCell>
                                             <TableCell className="text-amber-600 font-medium">{row.halfDayNotWorkedHours.toFixed(2)}</TableCell>
                                             <TableCell className="bg-amber-50">{row.leaveDays}</TableCell>
