@@ -283,13 +283,12 @@ export default function RunAnalysisTab({ project }) {
         );
         const employeeShifts = shifts.filter(s => Number(s.attendance_id) === attendanceIdNum);
 
-        // Safely filter exceptions with try/catch for each exception
+        // Filter exceptions - no approval workflow needed, use immediately
          const employeeExceptions = exceptions.filter(e => {
              try {
                  return (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
                         e.use_in_analysis !== false &&
-                        e.is_custom_type !== true &&
-                        (!e.approval_status || ['pending_dept_head', 'approved_dept_head', 'pending_hr', 'approved'].includes(e.approval_status));
+                        e.is_custom_type !== true;
              } catch (error) {
                  console.error(`Error filtering exception ${e.id}:`, error);
                  return false;
