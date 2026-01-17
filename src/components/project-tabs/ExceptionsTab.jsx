@@ -1217,6 +1217,11 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                       {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
                                                   </span>
                                               </TableCell>
+                                              <TableCell className="p-1 text-sm">
+                                                  <span className="text-slate-900">
+                                                      {exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}
+                                                  </span>
+                                              </TableCell>
                                               <TableCell className="p-1">
                                                   {exception.is_custom_type ? (
                                                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
@@ -1227,11 +1232,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                           {exception.type.replace(/_/g, ' ')}
                                                       </span>
                                                   )}
-                                              </TableCell>
-                                              <TableCell className="p-1 text-sm">
-                                                  <span className="text-slate-900">
-                                                      {exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}
-                                                  </span>
                                               </TableCell>
                                               <TableCell className="p-1 text-sm">
                                                   {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
