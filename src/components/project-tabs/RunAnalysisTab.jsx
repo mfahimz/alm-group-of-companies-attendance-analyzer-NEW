@@ -1018,6 +1018,7 @@ export default function RunAnalysisTab({ project }) {
                                     min={project.date_from}
                                     max={project.date_to}
                                     disabled={isAnalyzing}
+                                    title="Date range must be within project period"
                                 />
                             </div>
                             <div>
@@ -1025,10 +1026,17 @@ export default function RunAnalysisTab({ project }) {
                                 <Input
                                     type="date"
                                     value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
+                                    onChange={(e) => {
+                                        // Ensure to date is not before from date and within project range
+                                        const newDate = e.target.value;
+                                        if (newDate >= dateFrom && newDate <= project.date_to) {
+                                            setDateTo(newDate);
+                                        }
+                                    }}
                                     min={dateFrom}
                                     max={project.date_to}
                                     disabled={isAnalyzing}
+                                    title="Date range must be within project period"
                                 />
                             </div>
                         </div>

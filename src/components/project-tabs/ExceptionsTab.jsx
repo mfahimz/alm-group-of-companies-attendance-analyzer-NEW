@@ -802,7 +802,15 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                         <Input
                                             type="date"
                                             value={formData.date_from}
-                                            onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                                            onChange={(e) => {
+                                                const newDate = e.target.value;
+                                                if (newDate >= project.date_from && newDate <= project.date_to) {
+                                                    setFormData({ ...formData, date_from: newDate });
+                                                }
+                                            }}
+                                            min={project.date_from}
+                                            max={project.date_to}
+                                            title="Date must be within project period"
                                         />
                                     </div>
                                     <div>
@@ -810,7 +818,15 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                         <Input
                                             type="date"
                                             value={formData.date_to}
-                                            onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                                            onChange={(e) => {
+                                                const newDate = e.target.value;
+                                                if (newDate >= formData.date_from && newDate <= project.date_to && newDate >= project.date_from) {
+                                                    setFormData({ ...formData, date_to: newDate });
+                                                }
+                                            }}
+                                            min={formData.date_from}
+                                            max={project.date_to}
+                                            title="Date must be within project period"
                                         />
                                     </div>
                                 </div>
@@ -1121,8 +1137,16 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     <Input
                                         type="date"
                                         value={filter.dateFrom}
-                                        onChange={(e) => setFilter({ ...filter, dateFrom: e.target.value })}
+                                        onChange={(e) => {
+                                            const newDate = e.target.value;
+                                            if (!newDate || (newDate >= project.date_from && newDate <= project.date_to)) {
+                                                setFilter({ ...filter, dateFrom: newDate });
+                                            }
+                                        }}
+                                        min={project.date_from}
+                                        max={project.date_to}
                                         className="h-9"
+                                        title="Date must be within project period"
                                     />
                                 </div>
                                 <div>
@@ -1130,8 +1154,16 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     <Input
                                         type="date"
                                         value={filter.dateTo}
-                                        onChange={(e) => setFilter({ ...filter, dateTo: e.target.value })}
+                                        onChange={(e) => {
+                                            const newDate = e.target.value;
+                                            if (!newDate || (newDate >= project.date_from && newDate <= project.date_to && (!filter.dateFrom || newDate >= filter.dateFrom))) {
+                                                setFilter({ ...filter, dateTo: newDate });
+                                            }
+                                        }}
+                                        min={filter.dateFrom || project.date_from}
+                                        max={project.date_to}
                                         className="h-9"
+                                        title="Date must be within project period"
                                     />
                                 </div>
                                 <div>

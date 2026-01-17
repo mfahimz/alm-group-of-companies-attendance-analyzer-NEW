@@ -529,16 +529,32 @@ export default function PunchUploadTab({ project }) {
                                     <Input
                                         type="date"
                                         value={dateFrom}
-                                        onChange={(e) => setDateFrom(e.target.value)}
+                                        onChange={(e) => {
+                                            const newDate = e.target.value;
+                                            if (newDate >= project.date_from && newDate <= project.date_to) {
+                                                setDateFrom(newDate);
+                                            }
+                                        }}
+                                        min={project.date_from}
+                                        max={project.date_to}
                                         className="w-40"
                                         placeholder="From date"
+                                        title="Date range must be within project period"
                                     />
                                     <Input
                                         type="date"
                                         value={dateTo}
-                                        onChange={(e) => setDateTo(e.target.value)}
+                                        onChange={(e) => {
+                                            const newDate = e.target.value;
+                                            if (newDate >= dateFrom && newDate <= project.date_to && newDate >= project.date_from) {
+                                                setDateTo(newDate);
+                                            }
+                                        }}
+                                        min={dateFrom}
+                                        max={project.date_to}
                                         className="w-40"
                                         placeholder="To date"
+                                        title="Date range must be within project period"
                                     />
                                     <div className="relative w-64">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
