@@ -62,7 +62,7 @@ export default function UserDialog({ open, onClose, user }) {
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        if (!formData.full_name || !formData.email) {
+        if (!formData.full_name || !formData.email || !formData.display_name) {
             toast.error('Please fill in all required fields');
             return;
         }
