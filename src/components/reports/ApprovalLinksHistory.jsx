@@ -262,7 +262,7 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                             <div>
                                 <Label className="text-xs text-slate-600 mb-2 block">Approval Link & Message</Label>
                                 {(() => {
-                                    const deptHeadName = employeesMap[selectedLink.department_head_id] || 'Department Head';
+                                    const deptHeadName = employeesMap[selectedLink.department_head_id] || selectedLink.department_head_id || 'Department Head';
                                     // Use shortened URL if available, fall back to full URL, then to placeholder
                                     const linkToUse = selectedLink.shortened_link_url || selectedLink.approval_link_url || '(Link not available)';
                                     const messageText = `Dear ${deptHeadName},
