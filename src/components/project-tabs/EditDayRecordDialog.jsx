@@ -37,9 +37,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const isUser = userRole === 'user';
 
     const { data: punches = [] } = useQuery({
-        queryKey: ['punches', project?.id],
-        queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
-        enabled: !!dayRecord && !!project?.id
+       queryKey: ['punches', project?.id, attendanceId],
+       queryFn: () => base44.entities.Punch.filter({ project_id: project.id, attendance_id: attendanceId }),
+       enabled: !!dayRecord && !!project?.id && !!attendanceId,
+       staleTime: 0
     });
 
     const { data: shifts = [] } = useQuery({
