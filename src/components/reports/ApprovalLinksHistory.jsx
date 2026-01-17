@@ -262,47 +262,12 @@ export default function ApprovalLinksHistory({ reportRunId, projectId }) {
                             <div>
                                 <Label className="text-xs text-slate-600 mb-2 block">Approval Link & Message</Label>
                                 {(() => {
-                                    // Fetch the generated link from backend function to get proper domain
-                                    const [generatedLink, setGeneratedLink] = React.useState(null);
-                                    const [isLoadingLink, setIsLoadingLink] = React.useState(false);
-                                    
-                                    React.useEffect(() => {
-                                        const fetchLink = async () => {
-                                            setIsLoadingLink(true);
-                                            try {
-                                                const response = await base44.functions.invoke('generateApprovalLinks', {
-                                                    report_run_id: reportRunId,
-                                                    project_id: projectId,
-                                                    company: reportRun?.company
-                                                });
-                                                
-                                                if (response.data.success && response.data.links) {
-                                                    const matchingLink = response.data.links.find(l => 
-                                                        l.link_token === selectedLink.link_token
-                                                    );
-                                                    if (matchingLink) {
-                                                        setGeneratedLink(matchingLink.full_link);
-                                                    }
-                                                }
-                                            } catch (error) {
-                                                console.error('Failed to get link:', error);
-                                            } finally {
-                                                setIsLoadingLink(false);
-                                            }
-                                        };
-                                        
-                                        if (reportRunId && projectId && reportRun?.company) {
-                                            fetchLink();
-                                        }
-                                    }, [reportRunId, projectId, reportRun?.company, selectedLink.link_token]);
-                                    
-                                    const linkUrl = generatedLink || `${window.location.origin}/DeptHeadApproval?token=${selectedLink.link_token}`;
                                     const deptHeadName = employeesMap[selectedLink.department_head_id] || 'Department Head';
                                     const messageText = `Dear ${deptHeadName},
 
 Please find the verification link below to review and approve the attendance exceptions for ${selectedLink.department}:
 
-${linkUrl}
+${selectedLink.approval_link_url || '(Link not available)'}
 
 Verification Code: ${selectedLink.verification_code}
 
@@ -311,9 +276,6 @@ This link will expire on ${formatInUAE(selectedLink.expires_at, 'MM/dd/yyyy')}.
 Thank you.`;
                                     return (
                                         <>
-                                            {isLoadingLink && (
-                                                <div className="text-xs text-slate-500 mb-2">Loading link...</div>
-                                            )}
                                             <div className="bg-white rounded-lg p-3 border border-slate-200 mb-2">
                                                 <pre className="text-xs whitespace-pre-wrap font-sans text-slate-700">{messageText}</pre>
                                             </div>
@@ -324,7 +286,6 @@ Thank you.`;
                                                     navigator.clipboard.writeText(messageText);
                                                     toast.success('Message copied to clipboard');
                                                 }}
-                                                disabled={isLoadingLink}
                                             >
                                                 <Copy className="w-4 h-4 mr-2" />
                                                 Copy Complete Message

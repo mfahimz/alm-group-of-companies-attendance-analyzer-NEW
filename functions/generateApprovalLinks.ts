@@ -328,7 +328,23 @@ Deno.serve(async (req) => {
                 };
             }
 
-            // Create approval link record with pre-calculated data
+            // Get app URL from custom domain - DO THIS BEFORE creating the link record
+            let appUrl = Deno.env.get('CUSTOM_DOMAIN');
+            if (!appUrl) {
+                const appId = Deno.env.get('BASE44_APP_ID');
+                appUrl = appId ? `https://${appId}.base44.app` : 'https://app.base44.com';
+            } else {
+                // Ensure CUSTOM_DOMAIN has proper protocol
+                if (!appUrl.startsWith('http://') && !appUrl.startsWith('https://')) {
+                    appUrl = `https://${appUrl}`;
+                }
+                // Remove trailing slash if present
+                appUrl = appUrl.replace(/\/$/, '');
+            }
+
+            const fullLinkUrl = `${appUrl}/DeptHeadApproval?token=${token}`;
+
+            // Create approval link record with pre-calculated data AND the full URL
             const linkRecord = await base44.asServiceRole.entities.ApprovalLink.create({
                 report_run_id,
                 project_id,
@@ -340,25 +356,12 @@ Deno.serve(async (req) => {
                 expires_at: expiresAt.toISOString(),
                 used: false,
                 approved: false,
-                daily_breakdown_json: JSON.stringify(dailyBreakdownData)
+                daily_breakdown_json: JSON.stringify(dailyBreakdownData),
+                approval_link_url: fullLinkUrl  // STORE THE COMPLETE URL IN DATABASE
             });
 
             // Get department head employee details
             const deptHeadEmployee = employees.find(e => e.id === deptHead.employee_id);
-
-                // Get app URL from custom domain
-                let appUrl = Deno.env.get('CUSTOM_DOMAIN');
-                if (!appUrl) {
-                    const appId = Deno.env.get('BASE44_APP_ID');
-                    appUrl = appId ? `https://${appId}.base44.app` : 'https://app.base44.com';
-                } else {
-                    // Ensure CUSTOM_DOMAIN has proper protocol
-                    if (!appUrl.startsWith('http://') && !appUrl.startsWith('https://')) {
-                        appUrl = `https://${appUrl}`;
-                    }
-                    // Remove trailing slash if present
-                    appUrl = appUrl.replace(/\/$/, '');
-                }
 
                 links.push({
                     department,
@@ -367,7 +370,7 @@ Deno.serve(async (req) => {
                     verification_code: verificationCode,
                     exception_count: relevantExceptionCount,
                     expires_at: expiresAt.toISOString(),
-                    full_link: `${appUrl}/DeptHeadApproval?token=${token}`
+                    full_link: fullLinkUrl
                 });
             }
         }
