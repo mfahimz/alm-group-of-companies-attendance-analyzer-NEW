@@ -88,6 +88,7 @@ export default function UserDialog({ open, onClose, user }) {
         // Only submit fields that should be updated
         const dataToSubmit = {
             full_name: formData.full_name,
+            display_name: formData.display_name,
             extended_role: formData.extended_role
         };
         
