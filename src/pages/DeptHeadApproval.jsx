@@ -584,72 +584,73 @@ export default function DeptHeadApproval() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6">
-            <div className="max-w-7xl mx-auto space-y-6">
+        <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
+            <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
                 {windowStatus.windowStatus === 'approval' && (
                     <Card className="border-0 shadow-md border-l-4 border-l-green-600 bg-green-50">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-medium text-green-900">✓ Approval Window Active</p>
-                                    <p className="text-sm text-green-700 mt-1">
-                                        You can approve exceptions until {formatInUAE(windowStatus.deadline, 'PPpp')}
-                                    </p>
-                                </div>
-                                <Clock className="w-5 h-5 text-green-600" />
-                            </div>
-                        </CardContent>
-                    </Card>
+                         <CardContent className="p-3 sm:p-4">
+                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                 <div>
+                                     <p className="font-medium text-green-900 text-sm sm:text-base">✓ Approval Window Active</p>
+                                     <p className="text-xs sm:text-sm text-green-700 mt-1">
+                                         You can approve exceptions until {formatInUAE(windowStatus.deadline, 'PPpp')}
+                                     </p>
+                                 </div>
+                                 <Clock className="w-4 sm:w-5 h-4 sm:h-5 text-green-600 flex-shrink-0" />
+                             </div>
+                         </CardContent>
+                     </Card>
                 )}
                 
                 <Card className="border-0 shadow-md">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>Department Head Approval</CardTitle>
-                                <p className="text-sm text-slate-600 mt-1">
-                                    Department: <span className="font-medium">{linkInfo.department}</span>
-                                </p>
-                                {reportRun && (
-                                    <p className="text-sm text-slate-600">
-                                        Report: {reportRun.report_name} ({new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()})
-                                    </p>
-                                )}
-                            </div>
-                            {linkInfo.used && (
-                                <div className="flex items-center gap-2 text-green-600">
-                                    <Lock className="w-5 h-5" />
-                                    <span className="text-sm font-medium">Approved</span>
-                                </div>
-                            )}
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Att ID</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead className="text-center">Working Days</TableHead>
-                                        <TableHead className="text-center">Present</TableHead>
-                                        <TableHead className="text-center">LOP</TableHead>
-                                        <TableHead className="text-center">Half Day</TableHead>
-                                        <TableHead className="text-center">Late (min)</TableHead>
-                                        <TableHead className="text-center">Early (min)</TableHead>
-                                        <TableHead className="text-center">Other (min)</TableHead>
-                                        <TableHead className="text-center">Total Deductible</TableHead>
-                                        <TableHead className="text-center">Grace</TableHead>
-                                        <TableHead className="text-center">Quarterly Remaining</TableHead>
-                                        <TableHead className="text-center">Approve Minutes</TableHead>
-                                        <TableHead className="text-center">Final Deductible</TableHead>
-                                        <TableHead className="text-right">Daily Breakdown</TableHead>
-                                    </TableRow>
-                                </TableHeader>
+                     <CardHeader>
+                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                             <div>
+                                 <CardTitle className="text-xl sm:text-2xl">Department Head Approval</CardTitle>
+                                 <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                                     Department: <span className="font-medium">{linkInfo.department}</span>
+                                 </p>
+                                 {reportRun && (
+                                     <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                                         Report: {reportRun.report_name} ({new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()})
+                                     </p>
+                                 )}
+                             </div>
+                             {linkInfo.used && (
+                                 <div className="flex items-center gap-2 text-green-600 flex-shrink-0">
+                                     <Lock className="w-4 sm:w-5 h-4 sm:h-5" />
+                                     <span className="text-xs sm:text-sm font-medium">Approved</span>
+                                 </div>
+                             )}
+                         </div>
+                     </CardHeader>
+                    <CardContent className="p-3 sm:p-6 overflow-x-auto">
+                         <div className="overflow-x-auto -mx-3 -mb-3 sm:mx-0 sm:mb-0">
+                             <div className="min-w-max sm:min-w-full">
+                             <Table>
+                                 <TableHeader>
+                                     <TableRow>
+                                         <TableHead className="text-xs sm:text-sm">Att ID</TableHead>
+                                         <TableHead className="text-xs sm:text-sm">Name</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Working Days</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden sm:table-cell">Present</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">LOP</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden md:table-cell">Half Day</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Late</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Early</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden lg:table-cell">Other</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden lg:table-cell">Total Ded</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden md:table-cell">Grace</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Q. Rem</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Approve</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden sm:table-cell">Final</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">View</TableHead>
+                                     </TableRow>
+                                 </TableHeader>
                                 <TableBody>
                                     {departmentResults.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={15} className="text-center py-8 text-slate-500">
+                                            <TableCell colSpan={15} className="text-center py-6 sm:py-8 text-xs sm:text-sm text-slate-500">
                                                 No employees found for this department
                                             </TableCell>
                                         </TableRow>
@@ -661,54 +662,55 @@ export default function DeptHeadApproval() {
 
                                             return (
                                                 <TableRow key={result.attendance_id}>
-                                                    <TableCell className="font-medium">{result.attendance_id}</TableCell>
-                                                    <TableCell>{result.employee.name}</TableCell>
-                                                    <TableCell className="text-center">{result.working_days}</TableCell>
-                                                    <TableCell className="text-center">{result.present_days}</TableCell>
-                                                    <TableCell className="text-center">
+                                                    <TableCell className="font-medium text-xs sm:text-sm">{result.attendance_id}</TableCell>
+                                                    <TableCell className="text-xs sm:text-sm">{result.employee.name}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">{result.working_days}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden sm:table-cell">{result.present_days}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">
                                                         <span className={result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}>
                                                             {result.full_absence_count}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell className="text-center">{result.half_absence_count}</TableCell>
-                                                    <TableCell className="text-center">{result.late_minutes || 0}</TableCell>
-                                                    <TableCell className="text-center">{result.early_checkout_minutes || 0}</TableCell>
-                                                    <TableCell className="text-center">{result.other_minutes || 0}</TableCell>
-                                                    <TableCell className="text-center">
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden md:table-cell">{result.half_absence_count}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">{result.late_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">{result.early_checkout_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden lg:table-cell">{result.other_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden lg:table-cell">
                                                         <span className={result.totalDeductibleMinutes > 0 ? 'font-medium text-amber-600' : ''}>
                                                             {result.totalDeductibleMinutes}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell className="text-center">{result.grace_minutes || 0}</TableCell>
-                                                    <TableCell className="text-center">
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden md:table-cell">{result.grace_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">
                                                         <span className="text-blue-600 font-medium">{remainingQuarterly}</span>
                                                     </TableCell>
-                                                    <TableCell className="text-center">
+                                                    <TableCell className="text-center text-xs sm:text-sm">
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             max={remainingQuarterly}
                                                             value={currentApproved}
                                                             onChange={(e) => handleApprovedMinutesChange(result.attendance_id, e.target.value)}
-                                                            className="w-20 text-center"
+                                                            className="w-16 sm:w-20 text-center text-xs"
                                                             disabled={linkInfo.used || windowStatus.windowStatus !== 'approval'}
                                                         />
                                                     </TableCell>
-                                                    <TableCell className="text-center">
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden sm:table-cell">
                                                         <span className={finalDeductible > 0 ? 'font-bold text-red-600' : 'text-green-600'}>
                                                             {finalDeductible}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell className="text-right">
+                                                    <TableCell className="text-center">
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
+                                                            className="p-1 h-auto"
                                                             onClick={() => {
                                                                 setSelectedEmployeeForBreakdown(result);
                                                                 setShowBreakdownDialog(true);
                                                             }}
                                                         >
-                                                            <Eye className="w-4 h-4" />
+                                                            <Eye className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                                                         </Button>
                                                     </TableCell>
                                                     </TableRow>
@@ -748,7 +750,7 @@ export default function DeptHeadApproval() {
                 <Dialog open={showBreakdownDialog} onOpenChange={setShowBreakdownDialog}>
                     <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
-                            <DialogTitle>
+                            <DialogTitle className="text-base sm:text-lg">
                                 Daily Breakdown: {selectedEmployeeForBreakdown?.attendance_id} - {selectedEmployeeForBreakdown?.employee?.name}
                             </DialogTitle>
                         </DialogHeader>
@@ -756,18 +758,18 @@ export default function DeptHeadApproval() {
                             <div className="space-y-4">
                                 {/* Daily breakdown table */}
                                 {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id]?.daily_details && (
-                                    <div className="border rounded-lg overflow-hidden">
+                                    <div className="border rounded-lg overflow-hidden overflow-x-auto">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Date</TableHead>
-                                                    <TableHead>Punches</TableHead>
-                                                    <TableHead>Punch Times</TableHead>
-                                                    <TableHead>Shift</TableHead>
-                                                    <TableHead>Exception</TableHead>
-                                                    <TableHead>Status</TableHead>
-                                                    <TableHead className="text-right">Late Min</TableHead>
-                                                    <TableHead className="text-right">Early Min</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm">Date</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm">Punches</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm hidden md:table-cell">Punch Times</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Shift</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Exception</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm">Status</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm text-right">Late</TableHead>
+                                                    <TableHead className="text-xs sm:text-sm text-right">Early</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -775,9 +777,9 @@ export default function DeptHeadApproval() {
                                                     .filter(([date, details]) => details.status !== 'Off')
                                                     .map(([date, details]) => (
                                                     <TableRow key={date}>
-                                                        <TableCell className="font-medium">{new Date(date).toLocaleDateString()}</TableCell>
-                                                        <TableCell className="text-center">{details.punch_count || 0}</TableCell>
-                                                        <TableCell className="text-xs">
+                                                        <TableCell className="font-medium text-xs sm:text-sm">{new Date(date).toLocaleDateString()}</TableCell>
+                                                        <TableCell className="text-center text-xs sm:text-sm">{details.punch_count || 0}</TableCell>
+                                                        <TableCell className="text-xs hidden md:table-cell">
                                                             {details.punches && details.punches.length > 0 ? (
                                                                 <div className="space-y-0.5">
                                                                     {details.punches.map((p, i) => (
@@ -786,15 +788,15 @@ export default function DeptHeadApproval() {
                                                                 </div>
                                                             ) : '-'}
                                                         </TableCell>
-                                                        <TableCell className="text-xs">
+                                                        <TableCell className="text-xs hidden lg:table-cell">
                                                             {details.shift ? 
                                                                 `${details.shift.am_start} - ${details.shift.am_end} / ${details.shift.pm_start} - ${details.shift.pm_end}` 
                                                                 : '-'}
                                                         </TableCell>
-                                                        <TableCell className="text-xs">{details.exception || '-'}</TableCell>
+                                                        <TableCell className="text-xs hidden sm:table-cell">{details.exception || '-'}</TableCell>
                                                         <TableCell>
                                                             <span className={`
-                                                                px-2 py-1 rounded text-xs font-medium
+                                                                px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap
                                                                 ${details.status === 'Present' ? 'bg-green-100 text-green-700' : ''}
                                                                 ${details.status === 'Absent' ? 'bg-red-100 text-red-700' : ''}
                                                                 ${details.status?.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
@@ -804,13 +806,13 @@ export default function DeptHeadApproval() {
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-right">
-                                                            <span className={details.late_minutes > 0 ? 'text-orange-600 font-medium' : 'text-slate-400'}>
-                                                                {details.late_minutes > 0 ? `${details.late_minutes} min` : '-'}
+                                                            <span className={`text-xs ${details.late_minutes > 0 ? 'text-orange-600 font-medium' : 'text-slate-400'}`}>
+                                                                {details.late_minutes > 0 ? `${details.late_minutes}m` : '-'}
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-right">
-                                                            <span className={details.early_minutes > 0 ? 'text-indigo-600 font-medium' : 'text-slate-400'}>
-                                                                {details.early_minutes > 0 ? `${details.early_minutes} min` : '-'}
+                                                            <span className={`text-xs ${details.early_minutes > 0 ? 'text-indigo-600 font-medium' : 'text-slate-400'}`}>
+                                                                {details.early_minutes > 0 ? `${details.early_minutes}m` : '-'}
                                                             </span>
                                                         </TableCell>
                                                     </TableRow>
