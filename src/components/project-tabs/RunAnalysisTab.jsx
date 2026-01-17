@@ -285,19 +285,19 @@ export default function RunAnalysisTab({ project }) {
 
         // Filter exceptions - no approval workflow needed, use immediately
          const employeeExceptions = exceptions.filter(e => {
-             try {
-                 const matches = (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
-                        e.use_in_analysis !== false &&
-                        e.is_custom_type !== true;
-                 if (matches && e.type === 'SICK_LEAVE') {
-                     console.log(`Found SICK_LEAVE exception for attendance_id ${attendanceIdNum}:`, e);
-                 }
-                 return matches;
-             } catch (error) {
-                 console.error(`Error filtering exception ${e.id}:`, error);
-                 return false;
-             }
-         });
+                       try {
+                           const matches = (String(e.attendance_id) === 'ALL' || Number(e.attendance_id) === attendanceIdNum) &&
+                                  e.use_in_analysis !== false &&
+                                  e.is_custom_type !== true;
+                           if (matches && e.type === 'SICK_LEAVE') {
+                               console.log(`Found SICK_LEAVE exception for attendance_id ${attendanceIdNum}:`, e);
+                           }
+                           return matches;
+                       } catch (error) {
+                           console.error(`Error filtering exception ${e.id}:`, error);
+                           return false;
+                       }
+                   });
          console.log(`Employee ${attendanceIdNum} - Total exceptions: ${employeeExceptions.length}, SICK_LEAVE: ${employeeExceptions.filter(e => e.type === 'SICK_LEAVE').length}`);
         
         // Get employee to determine weekly off day
@@ -356,7 +356,7 @@ export default function RunAnalysisTab({ project }) {
                          const exFrom = new Date(ex.date_from);
                          const exTo = new Date(ex.date_to);
                          return currentDate >= exFrom && currentDate <= exTo && 
-                                (Number(ex.attendance_id) === attendanceIdNum || ex.attendance_id === 'ALL');
+                                (String(ex.attendance_id) === 'ALL' || Number(ex.attendance_id) === attendanceIdNum);
                      } catch (error) {
                          console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
                          return false;
