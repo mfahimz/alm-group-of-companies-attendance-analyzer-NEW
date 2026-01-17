@@ -13,6 +13,7 @@ export default function UserDialog({ open, onClose, user }) {
     const [formData, setFormData] = useState({
         full_name: '',
         email: '',
+        display_name: '',
         extended_role: 'user',
         company: ''
     });
