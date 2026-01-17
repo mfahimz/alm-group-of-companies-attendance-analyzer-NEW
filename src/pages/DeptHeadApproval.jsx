@@ -26,11 +26,7 @@ export default function DeptHeadApproval() {
         const tokenParam = urlParams.get('token');
         if (tokenParam) {
             setToken(tokenParam);
-            // Check if already verified in sessionStorage
-            const storedVerification = sessionStorage.getItem(`verified_${tokenParam}`);
-            if (storedVerification === 'true') {
-                setIsVerified(true);
-            }
+            // Always require fresh verification - no session persistence
         }
     }, []);
 
@@ -44,7 +40,6 @@ export default function DeptHeadApproval() {
             // If admin override is enabled, auto-verify
             if (links[0].admin_override_public) {
                 setIsVerified(true);
-                sessionStorage.setItem(`verified_${token}`, 'true');
             }
             
             return links[0];
@@ -129,8 +124,7 @@ export default function DeptHeadApproval() {
             if (data.valid) {
                 setIsVerified(true);
                 setLinkData(data);
-                // Store verification in sessionStorage
-                sessionStorage.setItem(`verified_${token}`, 'true');
+                // No sessionStorage - always require fresh verification
                 toast.success('Verification successful');
             } else {
                 toast.error(data.message || 'Invalid verification code');
