@@ -311,7 +311,7 @@ export default function ReportDetailView({ reportRun, project }) {
             e.approval_status === 'approved'
         );
 
-        const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
+        const employee = employees.find(e => e.attendance_id === result.attendance_id);
         
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
@@ -663,7 +663,7 @@ export default function ReportDetailView({ reportRun, project }) {
     // Separate calculation from verification state to prevent unnecessary recalculations
     const baseEnrichedResults = React.useMemo(() => {
         return results.map(result => {
-            const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
+            const employee = employees.find(e => e.attendance_id === result.attendance_id);
             
             // For closed projects, use saved data from AnalysisResult (punches are deleted)
             if (project.status === 'closed') {
@@ -860,7 +860,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
 
                 // Check if this result's employee belongs to the current user
-                const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
+                const employee = employees.find(e => e.attendance_id === result.attendance_id);
                 const isOwnRecord = isCurrentUserRegular && currentUser && employee?.company === currentUser.company;
 
                 const datesByType = {};
@@ -1118,7 +1118,7 @@ export default function ReportDetailView({ reportRun, project }) {
             e.approval_status === 'approved'
         );
 
-        const employee = employees.find(e => String(e.attendance_id) === String(currentResult.attendance_id));
+        const employee = employees.find(e => e.attendance_id === currentResult.attendance_id);
         
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';

@@ -358,7 +358,7 @@ export default function PunchUploadTab({ project }) {
         return filtered
             .map(punch => ({
                 ...punch,
-                employee_name: employees.find(e => String(e.attendance_id) === String(punch.attendance_id))?.name || '-'
+                employee_name: employees.find(e => e.attendance_id === punch.attendance_id)?.name || '-'
             }))
             .sort((a, b) => {
                 let aVal = a[sort.key];
@@ -599,7 +599,7 @@ export default function PunchUploadTab({ project }) {
                                                 </TableCell>
                                                 <TableCell>
                                                     {editingPunch?.id === punch.id 
-                                                        ? employees.find(e => String(e.attendance_id) === String(editingPunch.attendance_id))?.name || '-'
+                                                        ? employees.find(e => e.attendance_id === editingPunch.attendance_id)?.name || '-'
                                                         : punch.employee_name
                                                     }
                                                 </TableCell>
@@ -689,7 +689,7 @@ export default function PunchUploadTab({ project }) {
                                 </TableHeader>
                                 <TableBody>
                                     {parsedData.map((row, index) => {
-                                        const employee = employees.find(e => String(e.attendance_id) === String(row.attendance_id));
+                                        const employee = employees.find(e => e.attendance_id === row.attendance_id);
                                         const rowClass = !row.employeeExists ? 'bg-red-50' : row.hasInvalidTimestamp ? 'bg-amber-50' : '';
                                         
                                         return (
