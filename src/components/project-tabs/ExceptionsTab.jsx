@@ -726,16 +726,16 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                                    String(emp.attendance_id).toLowerCase().includes(search);
                                                         })
                                                         .map(emp => (
-                                                            <SelectItem key={emp.id} value={emp.attendance_id}>
-                                                                {emp.attendance_id} - {emp.name}
-                                                            </SelectItem>
+                                                           <SelectItem key={emp.id} value={String(emp.attendance_id)}>
+                                                               {emp.attendance_id} - {emp.name}
+                                                           </SelectItem>
                                                         ))}
-                                                </div>
-                                            </SelectContent>
-                                        </Select>
-                                    ) : (
-                                        <Select
-                                            value={formData.attendance_id}
+                                                        </div>
+                                                        </SelectContent>
+                                                        </Select>
+                                                        ) : (
+                                                        <Select
+                                                        value={formData.attendance_id}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                         >
                                             <SelectTrigger>
@@ -761,17 +761,17 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                                    String(emp.attendance_id).toLowerCase().includes(search);
                                                         })
                                                         .map(emp => (
-                                                            <SelectItem key={emp.id} value={emp.attendance_id}>
-                                                                {emp.attendance_id} - {emp.name}
-                                                            </SelectItem>
+                                                           <SelectItem key={emp.id} value={String(emp.attendance_id)}>
+                                                               {emp.attendance_id} - {emp.name}
+                                                           </SelectItem>
                                                         ))}
-                                                </div>
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                </div>
-                                <div>
-                                    <Label>Exception Type *</Label>
+                                                        </div>
+                                                        </SelectContent>
+                                                        </Select>
+                                                        )}
+                                                        </div>
+                                                        <div>
+                                                        <Label>Exception Type *</Label>
                                     <Select
                                         value={formData.type}
                                         onValueChange={(value) => setFormData({ ...formData, type: value })}
