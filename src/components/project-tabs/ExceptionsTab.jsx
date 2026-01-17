@@ -1195,7 +1195,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {paginatedExceptions.map((exception) => (
+                                    {paginatedExceptions.map((exception) => {
+                                        const employeeName = employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id) && e.company === project.company)?.name || '—';
+                                        return (
                                         <TableRow key={exception.id}>
                                             {!isUser && (
                                                 <TableCell className="p-1">
@@ -1211,8 +1213,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                     />
                                                 </TableCell>
                                             )}
-                                            <TableCell className="p-1">
-                                                 <span className="text-sm text-slate-900">
+                                             <TableCell className="p-1 text-sm font-mono">
+                                                 <span className="text-slate-900">
                                                      {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
                                                  </span>
                                              </TableCell>
@@ -1227,24 +1229,24 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                      </span>
                                                  )}
                                              </TableCell>
-                                             <TableCell className="p-1">
-                                                 <span className="text-sm text-slate-900">
-                                                     {exception.type === 'PUBLIC_HOLIDAY' ? '—' : (employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id) && e.company === project.company)?.name || '—')}
+                                             <TableCell className="p-1 text-sm">
+                                                 <span className="text-slate-900">
+                                                     {exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}
                                                  </span>
                                              </TableCell>
-                                            <TableCell className="p-1 text-sm">
-                                                {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
-                                                    ? '—' 
-                                                    : new Date(exception.date_from).toLocaleDateString()}
-                                            </TableCell>
-                                            <TableCell className="p-1 text-sm">
-                                                {exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) 
-                                                    ? '—' 
-                                                    : new Date(exception.date_to).toLocaleDateString()}
-                                            </TableCell>
-                                            <TableCell className="p-1 text-sm max-w-xs truncate">
-                                                {exception.details || '-'}
-                                            </TableCell>
+                                             <TableCell className="p-1 text-sm">
+                                                 {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
+                                                     ? '—' 
+                                                     : new Date(exception.date_from).toLocaleDateString()}
+                                             </TableCell>
+                                             <TableCell className="p-1 text-sm">
+                                                 {exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) 
+                                                     ? '—' 
+                                                     : new Date(exception.date_to).toLocaleDateString()}
+                                             </TableCell>
+                                             <TableCell className="p-1 text-sm max-w-xs truncate">
+                                                 {exception.details || '-'}
+                                             </TableCell>
                                             <TableCell className="text-right p-1">
                                                 <div className="flex gap-1 justify-end">
                                                     <Button
