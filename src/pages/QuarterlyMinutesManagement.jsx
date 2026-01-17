@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Search, Save, RefreshCw, Edit2, AlertCircle } from 'lucide-react';
-import { SortableTableHead } from '@/components/ui/SortableTableHead';
+import SortableTableHead from '@/components/ui/SortableTableHead';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
