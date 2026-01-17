@@ -1198,7 +1198,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     {paginatedExceptions.map((exception) => {
                                         const employeeName = employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id) && e.company === project.company)?.name || '—';
                                         return (
-                                        <TableRow key={exception.id}>
+                                            <TableRow key={exception.id}>
                                             {!isUser && (
                                                 <TableCell className="p-1">
                                                     <Checkbox
