@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Save, Filter, Copy } from 'lucide-react';
+import { Download, Search, Eye, Edit, Save, Filter, Copy, Loader2, CheckCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -823,6 +823,24 @@ export default function ReportDetailView({ reportRun, project }) {
         toast.success(`${cleanEmployees.length} employees verified`);
     };
 
+    const finalizeReportMutation = useMutation({
+        mutationFn: async () => {
+            const response = await base44.functions.invoke('adminFinalizeReport', {
+                report_run_id: reportRun.id,
+                project_id: project.id
+            });
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['reportRun', reportRun.id]);
+            queryClient.invalidateQueries(['project', project.id]);
+            toast.success('Report finalized successfully - Ready for salary calculation');
+        },
+        onError: (error) => {
+            toast.error('Failed to finalize report: ' + error.message);
+        }
+    });
+
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
@@ -1571,14 +1589,36 @@ export default function ReportDetailView({ reportRun, project }) {
                                Export
                            </Button>
                            {project.status !== 'closed' && (
-                               <Button
-                                   onClick={() => setShowSaveConfirmation(true)}
-                                   disabled={isSaving}
-                                   className="bg-green-600 hover:bg-green-700"
-                               >
-                                   <Save className="w-4 h-4 mr-2" />
-                                   {isSaving ? 'Saving...' : 'Save Report'}
-                               </Button>
+                               <>
+                                   <Button
+                                       onClick={() => setShowSaveConfirmation(true)}
+                                       disabled={isSaving}
+                                       className="bg-green-600 hover:bg-green-700"
+                                   >
+                                       <Save className="w-4 h-4 mr-2" />
+                                       {isSaving ? 'Saving...' : 'Save Report'}
+                                   </Button>
+                                   {isAdmin && (
+                                       <Button
+                                           onClick={() => finalizeReportMutation.mutate()}
+                                           disabled={finalizeReportMutation.isPending}
+                                           className="bg-purple-600 hover:bg-purple-700"
+                                           title="Finalize report without generating approval links"
+                                       >
+                                           {finalizeReportMutation.isPending ? (
+                                               <>
+                                                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                   Finalizing...
+                                               </>
+                                           ) : (
+                                               <>
+                                                   <CheckCircle className="w-4 h-4 mr-2" />
+                                                   Finalize Report
+                                               </>
+                                           )}
+                                       </Button>
+                                   )}
+                               </>
                            )}
                         </div>
                     </div>
