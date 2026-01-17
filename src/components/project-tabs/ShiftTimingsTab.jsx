@@ -546,7 +546,7 @@ export default function ShiftTimingsTab({ project }) {
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
             
             const data = shifts.map(shift => {
-                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
                 return {
                     'Attendance ID': shift.attendance_id,
                     'Employee Name': employee?.name || '-',
@@ -595,7 +595,7 @@ export default function ShiftTimingsTab({ project }) {
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
             
             const data = blockShifts.map(shift => {
-                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
                 return {
                     'Attendance ID': shift.attendance_id,
                     'Employee Name': employee?.name || '-',
@@ -636,9 +636,9 @@ export default function ShiftTimingsTab({ project }) {
         
         const filteredShifts = blockShifts
             .filter(shift => {
-                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
                 const matchesSearch = !searchTerm || 
-                    shift.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    String(shift.attendance_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                     employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
                 const matchesDept = departmentFilter === 'all' || employee?.department === departmentFilter;
                 const matchesShiftType = shiftTypeFilter === 'all' || 
@@ -679,8 +679,8 @@ export default function ShiftTimingsTab({ project }) {
             .sort((a, b) => {
                 let aVal, bVal;
                 if (sort.key === 'name') {
-                    aVal = employees.find(e => e.attendance_id === a.attendance_id)?.name || '';
-                    bVal = employees.find(e => e.attendance_id === b.attendance_id)?.name || '';
+                    aVal = employees.find(e => Number(e.attendance_id) === Number(a.attendance_id))?.name || '';
+                    bVal = employees.find(e => Number(e.attendance_id) === Number(b.attendance_id))?.name || '';
                 } else {
                     aVal = a[sort.key];
                     bVal = b[sort.key];
@@ -950,7 +950,7 @@ export default function ShiftTimingsTab({ project }) {
                                         </TableHeader>
                                         <TableBody>
                                             {paginatedShifts.map((shift) => {
-                                                const employee = employees.find(e => e.attendance_id === shift.attendance_id);
+                                                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
                                                 return (
                                                     <TableRow key={shift.id}>
                                                         {!isUser && (
@@ -1106,7 +1106,7 @@ export default function ShiftTimingsTab({ project }) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {employees.map(emp => (
-                                            <SelectItem key={emp.id} value={emp.attendance_id}>
+                                            <SelectItem key={emp.id} value={String(emp.attendance_id)}>
                                                 {emp.attendance_id} - {emp.name}
                                             </SelectItem>
                                         ))}
@@ -1376,7 +1376,7 @@ export default function ShiftTimingsTab({ project }) {
                                 </TableHeader>
                                 <TableBody>
                                     {parsedData.map((row, index) => {
-                                        const employee = employees.find(e => e.attendance_id === row.attendance_id);
+                                        const employee = employees.find(e => Number(e.attendance_id) === Number(row.attendance_id));
                                         const rowClass = !row.employeeExists ? 'bg-red-50' : row.hasInvalidTime ? 'bg-amber-50' : '';
 
                                         return (

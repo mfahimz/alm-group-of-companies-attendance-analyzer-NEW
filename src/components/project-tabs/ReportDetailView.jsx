@@ -299,19 +299,20 @@ export default function ReportDetailView({ reportRun, project }) {
     };
 
     const calculateEmployeeTotals = (result, dateFrom, dateTo) => {
+        const attendanceIdNum = Number(result.attendance_id);
         const employeePunches = punches.filter(p => 
-            p.attendance_id === result.attendance_id &&
+            Number(p.attendance_id) === attendanceIdNum &&
             p.punch_date >= dateFrom && 
             p.punch_date <= dateTo
         );
-        const employeeShifts = shifts.filter(s => s.attendance_id === result.attendance_id);
+        const employeeShifts = shifts.filter(s => Number(s.attendance_id) === attendanceIdNum);
         const employeeExceptions = exceptions.filter(e => 
-            (e.attendance_id === result.attendance_id || e.attendance_id === 'ALL') &&
+            (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
             e.use_in_analysis !== false &&
             e.approval_status === 'approved'
         );
 
-        const employee = employees.find(e => e.attendance_id === result.attendance_id);
+        const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
         
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
@@ -663,7 +664,7 @@ export default function ReportDetailView({ reportRun, project }) {
     // Separate calculation from verification state to prevent unnecessary recalculations
     const baseEnrichedResults = React.useMemo(() => {
         return results.map(result => {
-            const employee = employees.find(e => e.attendance_id === result.attendance_id);
+            const employee = employees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
             
             // For closed projects, use saved data from AnalysisResult (punches are deleted)
             if (project.status === 'closed') {
@@ -861,7 +862,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 }
 
                 // Check if this result's employee belongs to the current user
-                const employee = employees.find(e => e.attendance_id === result.attendance_id);
+                const employee = employees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
                 const isOwnRecord = isCurrentUserRegular && currentUser && employee?.company === currentUser.company;
 
                 const datesByType = {};
@@ -1107,19 +1108,20 @@ export default function ReportDetailView({ reportRun, project }) {
             }
         }
         
+        const attendanceIdNum = Number(currentResult.attendance_id);
         const employeePunches = punches.filter(p => 
-            p.attendance_id === currentResult.attendance_id &&
+            Number(p.attendance_id) === attendanceIdNum &&
             p.punch_date >= reportRun.date_from && 
             p.punch_date <= reportRun.date_to
         );
-        const employeeShifts = shifts.filter(s => s.attendance_id === currentResult.attendance_id);
+        const employeeShifts = shifts.filter(s => Number(s.attendance_id) === attendanceIdNum);
         const employeeExceptions = exceptions.filter(e => 
-            (e.attendance_id === currentResult.attendance_id || e.attendance_id === 'ALL') &&
+            (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
             e.use_in_analysis !== false &&
             e.approval_status === 'approved'
         );
 
-        const employee = employees.find(e => e.attendance_id === currentResult.attendance_id);
+        const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
         
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
