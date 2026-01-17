@@ -715,7 +715,7 @@ export default function ReportDetailView({ reportRun, project }) {
     const enrichedResults = React.useMemo(() => {
         return baseEnrichedResults.map(result => ({
             ...result,
-            isVerified: verifiedEmployees.includes(result.attendance_id)
+            isVerified: verifiedEmployees.includes(String(result.attendance_id))
         }));
     }, [baseEnrichedResults, verifiedEmployees]);
 
@@ -771,9 +771,10 @@ export default function ReportDetailView({ reportRun, project }) {
     const pendingVerifiedRef = React.useRef(null);
     
     const toggleVerification = (attendanceId) => {
-        const newVerified = verifiedEmployees.includes(attendanceId) 
-            ? verifiedEmployees.filter(id => id !== attendanceId)
-            : [...verifiedEmployees, attendanceId];
+        const attendanceIdStr = String(attendanceId);
+        const newVerified = verifiedEmployees.includes(attendanceIdStr) 
+            ? verifiedEmployees.filter(id => id !== attendanceIdStr)
+            : [...verifiedEmployees, attendanceIdStr];
         
         // Update local state immediately for instant UI feedback
         setVerifiedEmployees(newVerified);
@@ -814,7 +815,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
                 return r.full_absence_count === 0 && total === 0;
             })
-            .map(r => r.attendance_id);
+            .map(r => String(r.attendance_id));
         
         const newVerified = [...new Set([...verifiedEmployees, ...cleanEmployees])];
         setVerifiedEmployees(newVerified);
