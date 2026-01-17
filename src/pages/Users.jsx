@@ -313,7 +313,12 @@ export default function Users() {
                             <TableBody>
                                 {paginatedUsers.map((user) => (
                                     <TableRow key={user.id}>
-                                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                                        <TableCell>
+                                            <div>
+                                                <p className="font-medium">{user.full_name}</p>
+                                                <p className="text-xs text-slate-500">{user.display_name}</p>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>{user.email}</TableCell>
                                         <TableCell>
                                             {(() => {
