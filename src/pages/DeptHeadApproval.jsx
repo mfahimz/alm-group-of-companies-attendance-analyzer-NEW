@@ -137,45 +137,56 @@ export default function DeptHeadApproval() {
 
     const approveMutation = useMutation({
         mutationFn: async () => {
-            // Update approved minutes in AnalysisResult and EmployeeQuarterlyMinutes
-            const updates = Object.entries(approvedMinutes)
-                .filter(([_, minutes]) => minutes > 0)
+            // Collect all result IDs with their approved minutes
+            const resultUpdates = Object.entries(approvedMinutes)
+                .filter(([attendance_id, minutes]) => {
+                    const result = allResults.find(r => String(r.attendance_id) === String(attendance_id));
+                    return result && Number(minutes) >= 0;
+                })
                 .map(([attendance_id, minutes]) => {
-                    const result = allResults.find(r => r.attendance_id === attendance_id);
-                    const employee = employees.find(e => e.attendance_id === attendance_id);
-                    if (!result || !employee) return null;
-                    
-                    const promises = [
-                        base44.entities.AnalysisResult.update(result.id, {
-                            approved_minutes: Number(minutes)
-                        })
-                    ];
+                    const result = allResults.find(r => String(r.attendance_id) === String(attendance_id));
+                    return {
+                        id: result.id,
+                        attendance_id: attendance_id,
+                        approved_minutes: Number(minutes)
+                    };
+                });
 
-                    // Also update EmployeeQuarterlyMinutes to track used minutes
+            // Update ALL AnalysisResult records first
+            const analysisPromises = resultUpdates.map(update => 
+                base44.entities.AnalysisResult.update(update.id, {
+                    approved_minutes: update.approved_minutes
+                })
+            );
+            await Promise.all(analysisPromises);
+
+            // Then update quarterly minutes for those with approved minutes > 0
+            const quarterlyPromises = resultUpdates
+                .filter(update => update.approved_minutes > 0)
+                .map(update => {
+                    const employee = employees.find(e => String(e.attendance_id) === String(update.attendance_id));
+                    if (!employee) return null;
+
                     const quarterlyRecord = quarterlyMinutes.find(q => 
                         (String(q.employee_id) === String(employee.hrms_id) || String(q.employee_id) === String(employee.id)) && 
                         (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && Number(q.year) === 2025 && Number(q.quarter) === 4))
                     );
 
-                    if (quarterlyRecord) {
-                        const newUsedMinutes = (quarterlyRecord.used_minutes || 0) + minutes;
-                        const newRemainingMinutes = Math.max(0, quarterlyRecord.total_minutes - newUsedMinutes);
-                        
-                        promises.push(
-                            base44.entities.EmployeeQuarterlyMinutes.update(quarterlyRecord.id, {
-                                used_minutes: newUsedMinutes,
-                                remaining_minutes: newRemainingMinutes
-                            })
-                        );
-                    }
+                    if (!quarterlyRecord) return null;
 
-                    return Promise.all(promises);
+                    const newUsedMinutes = (quarterlyRecord.used_minutes || 0) + update.approved_minutes;
+                    const newRemainingMinutes = Math.max(0, quarterlyRecord.total_minutes - newUsedMinutes);
+                    
+                    return base44.entities.EmployeeQuarterlyMinutes.update(quarterlyRecord.id, {
+                        used_minutes: newUsedMinutes,
+                        remaining_minutes: newRemainingMinutes
+                    });
                 })
                 .filter(Boolean);
 
-            await Promise.all(updates);
+            await Promise.all(quarterlyPromises);
 
-            // Mark approval link as used
+            // Mark approval link as used and approved
             await base44.entities.ApprovalLink.update(linkInfo.id, {
                 used: true,
                 used_at: new Date().toISOString(),
@@ -266,11 +277,14 @@ export default function DeptHeadApproval() {
 
     const windowStatus = getApprovalWindowStatus();
 
-    // Filter and prepare results for this department
+    // Filter and prepare results for this department, excluding department head's own record
     const departmentResults = allResults
         .map(result => {
             const employee = employees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
             if (!employee || employee.department !== linkInfo?.department) return null;
+            
+            // Exclude department head's own record - they should not approve their own minutes
+            if (String(employee.hrms_id) === String(linkInfo?.department_head_id)) return null;
 
             const salary = salaries.find(s => Number(s.attendance_id) === Number(result.attendance_id));
             // Find quarterly record: first try project-based, then calendar-based
