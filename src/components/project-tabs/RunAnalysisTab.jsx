@@ -349,27 +349,34 @@ export default function RunAnalysisTab({ project }) {
             working_days++;
 
             // Find all matching exceptions and get the latest one by created_date (with error handling)
-            let dateException = null;
-            try {
-                const matchingExceptions = employeeExceptions.filter(ex => {
-                    try {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return currentDate >= exFrom && currentDate <= exTo && 
-                               (Number(ex.attendance_id) === attendanceIdNum || ex.attendance_id === 'ALL');
-                    } catch (error) {
-                        console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
-                        return false;
-                    }
-                });
+             let dateException = null;
+             try {
+                 const matchingExceptions = employeeExceptions.filter(ex => {
+                     try {
+                         const exFrom = new Date(ex.date_from);
+                         const exTo = new Date(ex.date_to);
+                         const matches = currentDate >= exFrom && currentDate <= exTo && 
+                                (Number(ex.attendance_id) === attendanceIdNum || ex.attendance_id === 'ALL');
+                         if (ex.type === 'SICK_LEAVE') {
+                             console.log(`SICK_LEAVE check for ${dateStr}: currentDate=${currentDate.toISOString()}, exFrom=${ex.date_from}, exTo=${ex.date_to}, matches=${matches}`);
+                         }
+                         return matches;
+                     } catch (error) {
+                         console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
+                         return false;
+                     }
+                 });
 
-                dateException = matchingExceptions.length > 0
-                    ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
-                    : null;
-            } catch (error) {
-                console.error(`Error processing exceptions for date ${dateStr}:`, error);
-                dateException = null;
-            }
+                 dateException = matchingExceptions.length > 0
+                     ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                     : null;
+                 if (dateException?.type === 'SICK_LEAVE') {
+                     console.log(`Applied SICK_LEAVE exception for ${dateStr}`);
+                 }
+             } catch (error) {
+                 console.error(`Error processing exceptions for date ${dateStr}:`, error);
+                 dateException = null;
+             }
 
             if (dateException) {
                 if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
