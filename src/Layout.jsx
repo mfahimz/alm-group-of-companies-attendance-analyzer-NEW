@@ -67,7 +67,11 @@ export default function Layout({ children, currentPageName }) {
         },
         enabled: !isPublicPage,
         retry: false,
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        gcTime: 20 * 60 * 1000, // Keep in cache for 20 minutes
+        refetchOnWindowFocus: false, // Don't refetch on window focus
+        refetchOnReconnect: false, // Don't refetch on reconnect
+        refetchOnMount: false // Don't refetch on component mount
     });
 
     // Redirect to login if not authenticated on protected pages
@@ -89,7 +93,12 @@ export default function Layout({ children, currentPageName }) {
             }
         },
         enabled: !!currentUser && !isPublicPage,
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+        staleTime: 30 * 60 * 1000, // Cache for 30 minutes (permissions rarely change)
+        gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false,
+        retry: 1 // Only retry once on failure
     });
 
     const { data: maintenanceMode } = useQuery({
@@ -108,7 +117,12 @@ export default function Layout({ children, currentPageName }) {
             }
         },
         enabled: !!currentUser && !isPublicPage,
-        staleTime: 1 * 60 * 1000 // Cache for 1 minute
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false,
+        retry: 1
     });
 
     // Calculate user role BEFORE any conditional returns

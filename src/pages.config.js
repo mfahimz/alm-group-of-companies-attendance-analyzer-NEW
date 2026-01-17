@@ -12,6 +12,7 @@ import MaintenanceSettings from './pages/MaintenanceSettings';
 import PrivateFiles from './pages/PrivateFiles';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
+import QuarterlyMinutesManagement from './pages/QuarterlyMinutesManagement';
 import RamadanSchedules from './pages/RamadanSchedules';
 import Recruitment from './pages/Recruitment';
 import ReportDetail from './pages/ReportDetail';
@@ -22,7 +23,6 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import QuarterlyMinutesManagement from './pages/QuarterlyMinutesManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -41,6 +41,7 @@ export const PAGES = {
     "PrivateFiles": PrivateFiles,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
+    "QuarterlyMinutesManagement": QuarterlyMinutesManagement,
     "RamadanSchedules": RamadanSchedules,
     "Recruitment": Recruitment,
     "ReportDetail": ReportDetail,
@@ -51,7 +52,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "QuarterlyMinutesManagement": QuarterlyMinutesManagement,
 }
 
 export const pagesConfig = {
