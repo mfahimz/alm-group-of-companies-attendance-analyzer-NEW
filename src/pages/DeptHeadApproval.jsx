@@ -187,7 +187,9 @@ export default function DeptHeadApproval() {
             // Also refetch results to get updated approved_minutes
             await queryClient.invalidateQueries({ queryKey: ['results', linkInfo?.report_run_id] });
             await queryClient.refetchQueries({ queryKey: ['results', linkInfo?.report_run_id] });
-            toast.success('Approval submitted successfully');
+            // Invalidate quarterly minutes to reflect the updated used minutes
+            await queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes', linkInfo?.company, linkInfo?.project_id] });
+            toast.success('Approval submitted successfully - Quarterly minutes updated');
         },
         onError: (error) => {
             toast.error('Approval failed: ' + error.message);
