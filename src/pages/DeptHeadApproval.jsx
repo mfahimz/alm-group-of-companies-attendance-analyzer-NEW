@@ -761,60 +761,54 @@ export default function DeptHeadApproval() {
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Date</TableHead>
-                                                    <TableHead>Shift Times</TableHead>
+                                                    <TableHead>Punches</TableHead>
                                                     <TableHead>Punch Times</TableHead>
-                                                    <TableHead className="text-right">Late (min)</TableHead>
-                                                    <TableHead className="text-right">Early (min)</TableHead>
+                                                    <TableHead>Shift</TableHead>
+                                                    <TableHead>Exception</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead className="text-right">Late Min</TableHead>
+                                                    <TableHead className="text-right">Early Min</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
                                                 {Object.entries(dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].daily_details).map(([date, details]) => (
                                                     <TableRow key={date}>
                                                         <TableCell className="font-medium">{new Date(date).toLocaleDateString()}</TableCell>
-                                                        <TableCell className="text-xs">
-                                                            {details.shift ? (
-                                                                <div>
-                                                                    {details.shift.am_start} - {details.shift.am_end}<br/>
-                                                                    {details.shift.pm_start} - {details.shift.pm_end}
-                                                                </div>
-                                                            ) : 'No shift'}
-                                                        </TableCell>
+                                                        <TableCell className="text-center">{details.punch_count || 0}</TableCell>
                                                         <TableCell className="text-xs">
                                                             {details.punches && details.punches.length > 0 ? (
-                                                                (() => {
-                                                                    // Sort punches by time
-                                                                    const parseTimeForSort = (timeStr) => {
-                                                                        const match = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)/i);
-                                                                        if (!match) return null;
-                                                                        let hours = parseInt(match[1]);
-                                                                        const minutes = parseInt(match[2]);
-                                                                        const period = match[4].toUpperCase();
-                                                                        if (period === 'PM' && hours !== 12) hours += 12;
-                                                                        if (period === 'AM' && hours === 12) hours = 0;
-                                                                        return hours * 60 + minutes;
-                                                                    };
-
-                                                                    const sorted = [...details.punches].sort((a, b) => {
-                                                                        const timeA = parseTimeForSort(a);
-                                                                        const timeB = parseTimeForSort(b);
-                                                                        if (timeA === null || timeB === null) return 0;
-                                                                        return timeA - timeB;
-                                                                    });
-
-                                                                    return sorted.map((p, i) => (
+                                                                <div className="space-y-0.5">
+                                                                    {details.punches.map((p, i) => (
                                                                         <div key={i}>{p}</div>
-                                                                    ));
-                                                                })()
-                                                            ) : 'No punches'}
+                                                                    ))}
+                                                                </div>
+                                                            ) : '-'}
                                                         </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <span className={details.late_minutes > 0 ? 'text-red-600 font-medium' : ''}>
-                                                                {details.late_minutes || 0}
+                                                        <TableCell className="text-xs">
+                                                            {details.shift ? 
+                                                                `${details.shift.am_start} - ${details.shift.am_end} / ${details.shift.pm_start} - ${details.shift.pm_end}` 
+                                                                : '-'}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs">{details.exception || '-'}</TableCell>
+                                                        <TableCell>
+                                                            <span className={`
+                                                                px-2 py-1 rounded text-xs font-medium
+                                                                ${details.status === 'Present' ? 'bg-green-100 text-green-700' : ''}
+                                                                ${details.status === 'Absent' ? 'bg-red-100 text-red-700' : ''}
+                                                                ${details.status?.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
+                                                                ${details.status === 'Off' ? 'bg-slate-100 text-slate-700' : ''}
+                                                            `}>
+                                                                {details.status}
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-right">
-                                                            <span className={details.early_minutes > 0 ? 'text-amber-600 font-medium' : ''}>
-                                                                {details.early_minutes || 0}
+                                                            <span className={details.late_minutes > 0 ? 'text-orange-600 font-medium' : 'text-slate-400'}>
+                                                                {details.late_minutes > 0 ? `${details.late_minutes} min` : '-'}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <span className={details.early_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}>
+                                                                {details.early_minutes > 0 ? `${details.early_minutes} min` : '-'}
                                                             </span>
                                                         </TableCell>
                                                     </TableRow>

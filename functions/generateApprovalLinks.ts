@@ -147,9 +147,15 @@ Deno.serve(async (req) => {
 
             // Pre-calculate daily breakdown data for this department
             const departmentEmployees = employeesByDept[department] || [];
+            
+            // Filter out the department head from the employee list they manage
+            const filteredDepartmentEmployees = departmentEmployees.filter(emp => 
+                emp.id !== deptHead.employee_id
+            );
+            
             const dailyBreakdownData = {};
 
-            for (const employee of departmentEmployees) {
+            for (const employee of filteredDepartmentEmployees) {
                 const employeeAnalysis = analysisResults.find(a => Number(a.attendance_id) === Number(employee.attendance_id));
                 const employeePunches = punches.filter(p => Number(p.attendance_id) === Number(employee.attendance_id));
                 const employeeShifts = shiftTimings.filter(s => Number(s.attendance_id) === Number(employee.attendance_id));
@@ -259,6 +265,31 @@ Deno.serve(async (req) => {
                         }
                     }
 
+                    // Find exception for this date
+                    const matchingExc = employeeExceptions.filter(ex => {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        const curr = new Date(dateStr);
+                        return curr >= exFrom && curr <= exTo;
+                    });
+                    const dayException = matchingExc.length > 0 
+                        ? matchingExc.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                        : null;
+                    
+                    // Determine status
+                    let status = 'Absent';
+                    if (dayException) {
+                        if (dayException.type === 'OFF' || dayException.type === 'PUBLIC_HOLIDAY') status = 'Off';
+                        else if (dayException.type === 'MANUAL_PRESENT') status = 'Present';
+                        else if (dayException.type === 'MANUAL_ABSENT') status = 'Absent';
+                        else if (dayException.type === 'MANUAL_HALF') status = 'Half Day';
+                        else if (dayException.type === 'SICK_LEAVE') status = 'Sick Leave';
+                        else if (dayException.type === 'ANNUAL_LEAVE') status = filteredDayPunches.length > 0 ? 'Present' : 'Annual Leave';
+                        else if (filteredDayPunches.length > 0) status = 'Present';
+                    } else if (filteredDayPunches.length > 0) {
+                        status = filteredDayPunches.length >= 2 ? 'Present' : 'Half Day';
+                    }
+
                     dailyDetails[dateStr] = {
                         shift: dayShift ? {
                             am_start: dayShift.am_start || '',
@@ -267,8 +298,11 @@ Deno.serve(async (req) => {
                             pm_end: dayShift.pm_end || ''
                         } : null,
                         punches: punchTimes,
+                        punch_count: filteredDayPunches.length,
                         late_minutes: late_minutes,
-                        early_minutes: early_minutes
+                        early_minutes: early_minutes,
+                        exception: dayException ? dayException.type : null,
+                        status: status
                     };
                 }
 
