@@ -96,7 +96,7 @@ export default function SalaryTab({ project, finalReport }) {
                 working_hours: salary?.working_hours || 9,
                 deduction_per_minute: salary?.deduction_per_minute || 0,
                 // Analysis results
-                working_days: result?.working_days || 0,
+                working_days: result?.working_days || 30,
                 present_days: result?.present_days || 0,
                 full_absence_count: result?.full_absence_count || 0, // LOP days only
                 annual_leave_count: result?.annual_leave_count || 0, // Separate from LOP
