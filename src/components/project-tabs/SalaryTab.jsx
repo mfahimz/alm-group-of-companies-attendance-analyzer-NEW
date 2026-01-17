@@ -54,8 +54,8 @@ export default function SalaryTab({ project, finalReport }) {
             );
             const result = analysisResults.find(r => Number(r.attendance_id) === Number(emp.attendance_id));
 
-             // Annual leave (paid leave) - separate from LOP
-             const leaveDays = result?.annual_leave_count || 0;
+             // Leave Days in salary table = LOP days from the report
+             const leaveDays = result?.full_absence_count || 0;
              const leavePay = 0; // To be calculated with formula
 
              // Sick leave (paid leave) - separate from LOP
@@ -96,7 +96,7 @@ export default function SalaryTab({ project, finalReport }) {
                 working_hours: salary?.working_hours || 9,
                 deduction_per_minute: salary?.deduction_per_minute || 0,
                 // Analysis results
-                working_days: result?.working_days || 30,
+                working_days: 30,
                 present_days: result?.present_days || 0,
                 full_absence_count: result?.full_absence_count || 0, // LOP days only
                 annual_leave_count: result?.annual_leave_count || 0, // Separate from LOP
