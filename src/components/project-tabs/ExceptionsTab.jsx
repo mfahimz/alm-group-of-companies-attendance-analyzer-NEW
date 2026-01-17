@@ -557,9 +557,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         .filter(ex => {
             if (reportFilter.search) {
                 const searchLower = reportFilter.search.toLowerCase();
-                const matchesId = ex.attendance_id.toLowerCase().includes(searchLower);
+                const matchesId = String(ex.attendance_id).toLowerCase().includes(searchLower);
                 const employee = employees.find(e => e.attendance_id === ex.attendance_id);
-                const matchesName = employee?.name.toLowerCase().includes(searchLower);
+                const matchesName = employee?.name?.toLowerCase().includes(searchLower);
                 if (!matchesId && !matchesName) return false;
             }
             if (reportFilter.type && reportFilter.type !== 'all' && ex.type !== reportFilter.type) return false;
@@ -594,9 +594,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             // Search filter
             if (filter.search) {
                 const searchLower = filter.search.toLowerCase();
-                const matchesId = ex.attendance_id.toLowerCase().includes(searchLower);
+                const matchesId = String(ex.attendance_id).toLowerCase().includes(searchLower);
                 const employee = employees.find(e => e.attendance_id === ex.attendance_id);
-                const matchesName = employee?.name.toLowerCase().includes(searchLower);
+                const matchesName = employee?.name?.toLowerCase().includes(searchLower);
                 const matchesDetails = ex.details?.toLowerCase().includes(searchLower);
                 if (!matchesId && !matchesName && !matchesDetails) return false;
             }
