@@ -164,17 +164,34 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
     const getDayPunches = () => {
         if (!dayRecord) return [];
+        
+        // First priority: use pre-cached daily breakdown data (most reliable)
+        if (dailyBreakdownData && dailyBreakdownData[attendanceId]?.daily_details) {
+            const breakdownDetails = dailyBreakdownData[attendanceId].daily_details;
+            const dayKey = Object.keys(breakdownDetails).find(date => {
+                const breakdownDate = new Date(date).toLocaleDateString();
+                const recordDate = new Date(dayRecord.date).toLocaleDateString();
+                return breakdownDate === recordDate;
+            });
+            
+            if (dayKey && breakdownDetails[dayKey]?.punches) {
+                return breakdownDetails[dayKey].punches.map((punchStr, idx) => ({
+                    id: `${dayKey}-${idx}`,
+                    timestamp_raw: punchStr,
+                    punch_date: dayKey
+                }));
+            }
+        }
+        
+        // Fallback: try to match from punches array
         const [day, month, year] = dayRecord.date.split('/');
-        // Try both date formats - punch_date might be stored as DD/MM/YYYY or YYYY-MM-DD
         const dateStrYMD = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dateStrDMY = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
         
         const dayPunches = punches.filter(p => {
-            // Match date in either format
             const dateMatch = p.punch_date === dateStrYMD || p.punch_date === dateStrDMY;
             return dateMatch;
         }).sort((a, b) => {
-            // Sort by timestamp, handling various date formats
             let timeA, timeB;
             try {
                 timeA = new Date(a.timestamp_raw);
