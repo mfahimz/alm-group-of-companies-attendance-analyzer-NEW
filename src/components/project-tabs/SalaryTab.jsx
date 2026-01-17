@@ -49,10 +49,10 @@ export default function SalaryTab({ project }) {
     const salaryData = useMemo(() => {
         return employees.map(emp => {
             const salary = salaries.find(s => 
-                String(s.employee_id) === String(emp.hrms_id) || 
-                String(s.attendance_id) === String(emp.attendance_id)
+                s.employee_id === emp.hrms_id || 
+                s.attendance_id === emp.attendance_id
             );
-            const result = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
+            const result = analysisResults.find(r => r.attendance_id === emp.attendance_id);
 
             // Calculate half day not worked hours (half_absence_count * working_hours / 2)
             const halfDayNotWorkedHours = (result?.half_absence_count || 0) * ((salary?.working_hours || 9) / 2);
