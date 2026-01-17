@@ -371,7 +371,11 @@ export default function RunAnalysisTab({ project }) {
                      ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
                      : null;
                  if (dateException?.type === 'SICK_LEAVE') {
-                     console.log(`Applied SICK_LEAVE exception for ${dateStr}`);
+                     console.log(`Applied SICK_LEAVE exception for ${dateStr}, incrementing sick_leave_count`);
+                 } else if (employeeExceptions.some(e => e.type === 'SICK_LEAVE') && !matchingExceptions.some(m => m.type === 'SICK_LEAVE')) {
+                     // Exceptions exist but didn't match date range
+                     const sickLeaveExceptions = employeeExceptions.filter(e => e.type === 'SICK_LEAVE');
+                     console.log(`SICK_LEAVE found but date not matching for ${dateStr}. Exceptions: `, sickLeaveExceptions.map(e => ({ from: e.date_from, to: e.date_to })));
                  }
              } catch (error) {
                  console.error(`Error processing exceptions for date ${dateStr}:`, error);
