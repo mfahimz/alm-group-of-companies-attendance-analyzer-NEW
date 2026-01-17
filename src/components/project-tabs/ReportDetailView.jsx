@@ -310,7 +310,7 @@ export default function ReportDetailView({ reportRun, project }) {
         const employeeExceptions = exceptions.filter(e => 
             (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
             e.use_in_analysis !== false &&
-            e.approval_status === 'approved'
+            ['pending_dept_head', 'approved_dept_head', 'pending_hr', 'approved'].includes(e.approval_status)
         );
 
         const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
@@ -1119,7 +1119,7 @@ export default function ReportDetailView({ reportRun, project }) {
         const employeeExceptions = exceptions.filter(e => 
             (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
             e.use_in_analysis !== false &&
-            e.approval_status === 'approved'
+            ['pending_dept_head', 'approved_dept_head', 'pending_hr', 'approved'].includes(e.approval_status)
         );
 
         const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
