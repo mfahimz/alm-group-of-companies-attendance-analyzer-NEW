@@ -342,19 +342,19 @@ export default function SalaryTab({ project, finalReport }) {
                                              <TableCell className="sticky left-16 bg-white z-10 font-medium">{row.name.split(' ').slice(0, 2).join(' ')}</TableCell>
                                              <TableCell className="text-sm text-slate-600">{row.department || '-'}</TableCell>
                                              <TableCell>{row.working_hours.toFixed(2)}</TableCell>
-                                            <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
-                                            <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
-                                            <TableCell>{row.working_days}</TableCell>
-                                            <TableCell>{row.present_days}</TableCell>
-                                            <TableCell className="text-red-600 font-semibold">{row.full_absence_count}</TableCell>
-                                            <TableCell className="text-green-600 font-medium">{row.annual_leave_count}</TableCell>
-                                            <TableCell className="text-blue-600 font-medium">{row.sick_leave_count}</TableCell>
-                                            <TableCell className="bg-amber-50">{row.leaveDays}</TableCell>
+                                             <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
+                                             <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
+                                             <TableCell>{row.working_days.toFixed(2)}</TableCell>
+                                             <TableCell>{row.present_days.toFixed(2)}</TableCell>
+                                             <TableCell className="text-red-600 font-semibold">{row.full_absence_count.toFixed(2)}</TableCell>
+                                             <TableCell className="text-green-600 font-medium">{row.annual_leave_count.toFixed(2)}</TableCell>
+                                             <TableCell className="text-blue-600 font-medium">{row.sick_leave_count.toFixed(2)}</TableCell>
+                                             <TableCell className="bg-amber-50">{row.leaveDays.toFixed(2)}</TableCell>
                                             <TableCell className="bg-amber-50 p-1">
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'leavePay')}
+                                                    value={getValue(row, 'leavePay').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -364,7 +364,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'salaryLeaveAmount')}
+                                                    value={getValue(row, 'salaryLeaveAmount').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'salaryLeaveAmount', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -373,7 +373,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'otHours')}
+                                                    value={getValue(row, 'otHours').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'otHours', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -382,7 +382,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'otSalary')}
+                                                    value={getValue(row, 'otSalary').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'otSalary', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -391,7 +391,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'leaveHours')}
+                                                    value={getValue(row, 'leaveHours').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'leaveHours', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -400,7 +400,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'leaveHoursPay')}
+                                                    value={getValue(row, 'leaveHoursPay').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'leaveHoursPay', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -409,7 +409,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'otherDeduction')}
+                                                    value={getValue(row, 'otherDeduction').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -418,7 +418,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'bonus')}
+                                                    value={getValue(row, 'bonus').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -427,7 +427,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'incentive')}
+                                                    value={getValue(row, 'incentive').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -436,7 +436,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'advanceSalaryDeduction')}
+                                                    value={getValue(row, 'advanceSalaryDeduction').toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
