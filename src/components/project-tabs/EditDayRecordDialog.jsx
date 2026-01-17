@@ -165,14 +165,14 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const getDayPunches = () => {
         if (!dayRecord) return [];
         const [day, month, year] = dayRecord.date.split('/');
-        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        // Try both date formats - punch_date might be stored as DD/MM/YYYY or YYYY-MM-DD
+        const dateStrYMD = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateStrDMY = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
         
         const dayPunches = punches.filter(p => {
-            // Match both attendance_id formats (number or string)
-            const attendanceMatch = String(p.attendance_id) === String(attendanceId);
-            // Match date in YYYY-MM-DD format
-            const dateMatch = p.punch_date === dateStr;
-            return attendanceMatch && dateMatch;
+            // Match date in either format
+            const dateMatch = p.punch_date === dateStrYMD || p.punch_date === dateStrDMY;
+            return dateMatch;
         }).sort((a, b) => {
             // Sort by timestamp, handling various date formats
             let timeA, timeB;
