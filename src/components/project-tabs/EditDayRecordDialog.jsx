@@ -164,13 +164,27 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const getDayPunches = () => {
         if (!dayRecord) return [];
         const [day, month, year] = dayRecord.date.split('/');
-        const dateStr = `${year}-${month}-${day}`;
-        return punches.filter(p => p.punch_date === dateStr && p.attendance_id === attendanceId)
-            .sort((a, b) => {
-                const timeA = new Date(a.timestamp_raw);
-                const timeB = new Date(b.timestamp_raw);
-                return timeA - timeB;
-            });
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        const dayPunches = punches.filter(p => {
+            // Match both attendance_id formats (number or string)
+            const attendanceMatch = String(p.attendance_id) === String(attendanceId);
+            // Match date in YYYY-MM-DD format
+            const dateMatch = p.punch_date === dateStr;
+            return attendanceMatch && dateMatch;
+        }).sort((a, b) => {
+            // Sort by timestamp, handling various date formats
+            let timeA, timeB;
+            try {
+                timeA = new Date(a.timestamp_raw);
+                timeB = new Date(b.timestamp_raw);
+            } catch {
+                return 0;
+            }
+            return timeA - timeB;
+        });
+        
+        return dayPunches;
     };
 
     useEffect(() => {
