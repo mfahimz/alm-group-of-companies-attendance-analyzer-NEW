@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
                     } catch (e) {}
                 }
                 
-                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                for (let d = new Date(startDate); d <= endDate; d = new Date(d.getTime() + 24 * 60 * 60 * 1000)) {
                     const dateStr = d.toISOString().split('T')[0];
                     const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
                     const dayOverride = dayOverrides[dateStr];

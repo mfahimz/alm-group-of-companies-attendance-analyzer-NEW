@@ -86,11 +86,15 @@ export default function DeptHeadApproval() {
                 project_id: linkInfo.project_id 
             });
             
+            const currentYear = new Date().getFullYear();
+            const currentMonth = new Date().getMonth() + 1;
+            const currentQuarter = Math.ceil(currentMonth / 3);
+            
             const calendarBased = await base44.entities.EmployeeQuarterlyMinutes.filter({ 
                 company: linkInfo.company,
                 allocation_type: 'calendar_quarter',
-                year: 2025,
-                quarter: 4
+                year: currentYear,
+                quarter: currentQuarter
             });
             
             // Merge both, prioritizing project-based if exists

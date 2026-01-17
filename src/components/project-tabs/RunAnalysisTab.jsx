@@ -386,7 +386,9 @@ export default function RunAnalysisTab({ project }) {
                     continue;
                 } else if (dateException.type === 'ANNUAL_LEAVE') {
                     // Annual leave is separate from LOP - don't count as working day
-                    if (filteredPunches.length === 0) {
+                    // Check punches for this day to determine if employee worked
+                    const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
+                    if (dayPunchesForLeave.length === 0) {
                         working_days--;
                         annual_leave_count++;
                         continue;
@@ -526,7 +528,7 @@ export default function RunAnalysisTab({ project }) {
                     present_days++;
                 }
 
-                if (rules.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
+                if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
                     if (filteredPunches.length < 2 && !isSingleShift) {
                         half_absence_count++;
                     }
