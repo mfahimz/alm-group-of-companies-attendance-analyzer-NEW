@@ -49,7 +49,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 active: employee.active ?? true,
                 carried_grace_minutes: employee.carried_grace_minutes || 0
             });
-        } else {
+        } else if (open && !employee) {
             // Auto-generate HRMS ID for new employees
             const generateHrmsId = async () => {
                 setGeneratingHrmsId(true);
@@ -83,7 +83,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             };
             generateHrmsId();
         }
-    }, [employee?.id, open]);
+    }, [employee, open]);
 
     const { data: existingEmployees = [] } = useQuery({
         queryKey: ['employees'],
@@ -96,9 +96,14 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     });
 
     const selectedCompanySettings = companySettings.find(cs => cs.company === formData.company);
-    const departments = selectedCompanySettings 
+    let departments = selectedCompanySettings 
         ? selectedCompanySettings.departments.split(',').map(d => d.trim()).filter(Boolean)
         : ['Admin'];
+    
+    // Ensure current department is in the list (in case it was saved but not in settings)
+    if (formData.department && !departments.includes(formData.department)) {
+        departments = [...departments, formData.department];
+    }
 
     const createDepartmentMutation = useMutation({
         mutationFn: async (deptName) => {
