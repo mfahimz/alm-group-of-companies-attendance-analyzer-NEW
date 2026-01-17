@@ -355,12 +355,8 @@ export default function RunAnalysisTab({ project }) {
                      try {
                          const exFrom = new Date(ex.date_from);
                          const exTo = new Date(ex.date_to);
-                         const matches = currentDate >= exFrom && currentDate <= exTo && 
+                         return currentDate >= exFrom && currentDate <= exTo && 
                                 (Number(ex.attendance_id) === attendanceIdNum || ex.attendance_id === 'ALL');
-                         if (ex.type === 'SICK_LEAVE') {
-                             console.log(`SICK_LEAVE check for ${dateStr}: currentDate=${currentDate.toISOString()}, exFrom=${ex.date_from}, exTo=${ex.date_to}, matches=${matches}`);
-                         }
-                         return matches;
                      } catch (error) {
                          console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
                          return false;
@@ -370,13 +366,6 @@ export default function RunAnalysisTab({ project }) {
                  dateException = matchingExceptions.length > 0
                      ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
                      : null;
-                 if (dateException?.type === 'SICK_LEAVE') {
-                     console.log(`Applied SICK_LEAVE exception for ${dateStr}, incrementing sick_leave_count`);
-                 } else if (employeeExceptions.some(e => e.type === 'SICK_LEAVE') && !matchingExceptions.some(m => m.type === 'SICK_LEAVE')) {
-                     // Exceptions exist but didn't match date range
-                     const sickLeaveExceptions = employeeExceptions.filter(e => e.type === 'SICK_LEAVE');
-                     console.log(`SICK_LEAVE found but date not matching for ${dateStr}. Exceptions: `, sickLeaveExceptions.map(e => ({ from: e.date_from, to: e.date_to })));
-                 }
              } catch (error) {
                  console.error(`Error processing exceptions for date ${dateStr}:`, error);
                  dateException = null;
