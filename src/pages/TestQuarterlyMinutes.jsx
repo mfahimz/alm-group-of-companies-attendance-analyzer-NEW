@@ -55,14 +55,14 @@ export default function TestQuarterlyMinutes() {
 
     const getEmployeeName = (employeeId) => {
         const employee = employees.find(e => 
-            e.hrms_id === employeeId || String(e.id) === String(employeeId)
+            String(e.hrms_id) === String(employeeId) || String(e.id) === String(employeeId)
         );
         return employee ? employee.name : 'Unknown';
     };
 
     const getEmployeeAttendanceId = (employeeId) => {
         const employee = employees.find(e => 
-            e.hrms_id === employeeId || String(e.id) === String(employeeId)
+            String(e.hrms_id) === String(employeeId) || String(e.id) === String(employeeId)
         );
         return employee ? employee.attendance_id : '-';
     };
