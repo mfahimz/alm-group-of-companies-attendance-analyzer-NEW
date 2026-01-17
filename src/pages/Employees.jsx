@@ -155,7 +155,7 @@ export default function Employees() {
     const hrmsIdCounts = {};
     
     employees.forEach(emp => {
-        const hrmsId = emp.hrms_id?.toLowerCase();
+        const hrmsId = String(emp.hrms_id || '').toLowerCase();
         if (hrmsId) {
             hrmsIdCounts[hrmsId] = (hrmsIdCounts[hrmsId] || 0) + 1;
         }
@@ -166,13 +166,13 @@ export default function Employees() {
     });
 
     const isDuplicate = (emp) => {
-        return emp.hrms_id && duplicateHrmsIds.has(emp.hrms_id?.toLowerCase());
+        return emp.hrms_id && duplicateHrmsIds.has(String(emp.hrms_id || '').toLowerCase());
     };
 
     const filteredEmployees = employees
         .filter(emp => {
             const matchesSearch = emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                emp.attendance_id?.toLowerCase().includes(searchTerm.toLowerCase());
+                                String(emp.attendance_id || '').includes(searchTerm);
             const matchesDuplicateFilter = !showOnlyDuplicates || isDuplicate(emp);
             const matchesCompany = companyFilter === 'all' || emp.company === companyFilter;
             return matchesSearch && matchesDuplicateFilter && matchesCompany;
@@ -283,7 +283,7 @@ export default function Employees() {
                 try {
                     // Find employee by attendance_id
                     const existingEmployee = employees.find(emp => 
-                        emp.attendance_id?.toLowerCase() === item.attendance_id?.toLowerCase()
+                        String(emp.attendance_id || '').toLowerCase() === String(item.attendance_id || '').toLowerCase()
                     );
                     
                     if (existingEmployee) {
@@ -633,7 +633,7 @@ export default function Employees() {
                                             <TableCell className="font-medium text-slate-600">
                                                <div className="flex items-center gap-2">
                                                    {employee.hrms_id || '-'}
-                                                   {employee.hrms_id && duplicateHrmsIds.has(employee.hrms_id?.toLowerCase()) && (
+                                                   {employee.hrms_id && duplicateHrmsIds.has(String(employee.hrms_id || '').toLowerCase()) && (
                                                        <AlertCircle className="w-4 h-4 text-amber-600" title="Duplicate HRMS ID" />
                                                    )}
                                                </div>
