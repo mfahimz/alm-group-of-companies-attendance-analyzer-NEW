@@ -722,7 +722,7 @@ export default function ReportDetailView({ reportRun, project }) {
     const filteredResults = React.useMemo(() => {
         return enrichedResults
             .filter(result => {
-                const matchesSearch = result.attendance_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                const matchesSearch = String(result.attendance_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                     result.name.toLowerCase().includes(searchTerm.toLowerCase());
                 
                 if (!matchesSearch) return false;
