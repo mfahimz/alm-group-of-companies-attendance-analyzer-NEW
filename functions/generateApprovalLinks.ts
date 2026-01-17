@@ -179,8 +179,22 @@ Deno.serve(async (req) => {
                 for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                     const dateStr = d.toISOString().split('T')[0];
                     const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
-                    const dayShift = employeeShifts.find(s => s.date === dateStr) || employeeShifts.find(s => !s.date);
                     const dayOverride = dayOverrides[dateStr];
+                    
+                    // Find matching shift: first try specific date, then try date ranges, then fallback to generic shift
+                    let dayShift = employeeShifts.find(s => s.date === dateStr);
+                    if (!dayShift) {
+                        dayShift = employeeShifts.find(s => {
+                            if (!s.effective_from || !s.effective_to) return false;
+                            const curr = new Date(dateStr);
+                            const from = new Date(s.effective_from);
+                            const to = new Date(s.effective_to);
+                            return curr >= from && curr <= to;
+                        });
+                    }
+                    if (!dayShift) {
+                        dayShift = employeeShifts.find(s => !s.date && !s.effective_from && !s.effective_to);
+                    }
                     
                     // Helper functions for punch filtering (same as ReportDetailView)
                     const parseTimeHelper = (timeStr) => {
