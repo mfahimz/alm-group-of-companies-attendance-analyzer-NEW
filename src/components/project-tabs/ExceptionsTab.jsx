@@ -1177,13 +1177,13 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                             </TableHead>
                                         )}
                                         <TableHead className="w-24">ID</TableHead>
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                            Attendance ID
-                                        </SortableTableHead>
-                                                                                      <TableHead>Name</TableHead>
+                                         <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                             Att ID
+                                         </SortableTableHead>
                                         <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>
-                                            Type
-                                        </SortableTableHead>
+                                             Type
+                                         </SortableTableHead>
+                                        <TableHead>Name</TableHead>
                                         <SortableTableHead sortKey="date_from" currentSort={sort} onSort={setSort}>
                                             From
                                         </SortableTableHead>
@@ -1212,26 +1212,26 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 </TableCell>
                                             )}
                                             <TableCell className="p-1">
-                                                <span className="text-sm text-slate-900">
-                                                    {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="p-1">
-                                                <span className="text-sm text-slate-900">
-                                                    {exception.type === 'PUBLIC_HOLIDAY' ? '—' : (employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id) && e.company === project.company)?.name || '—')}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="p-1">
-                                                {exception.is_custom_type ? (
-                                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                                                        {exception.custom_type_name || 'Custom'}
-                                                    </span>
-                                                ) : (
-                                                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(exception.type)}`}>
-                                                        {exception.type.replace(/_/g, ' ')}
-                                                    </span>
-                                                )}
-                                            </TableCell>
+                                                 <span className="text-sm text-slate-900">
+                                                     {exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}
+                                                 </span>
+                                             </TableCell>
+                                             <TableCell className="p-1">
+                                                 {exception.is_custom_type ? (
+                                                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                                                         {exception.custom_type_name || 'Custom'}
+                                                     </span>
+                                                 ) : (
+                                                     <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(exception.type)}`}>
+                                                         {exception.type.replace(/_/g, ' ')}
+                                                     </span>
+                                                 )}
+                                             </TableCell>
+                                             <TableCell className="p-1">
+                                                 <span className="text-sm text-slate-900">
+                                                     {exception.type === 'PUBLIC_HOLIDAY' ? '—' : (employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id) && e.company === project.company)?.name || '—')}
+                                                 </span>
+                                             </TableCell>
                                             <TableCell className="p-1 text-sm">
                                                 {exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) 
                                                     ? '—' 
