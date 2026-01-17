@@ -771,7 +771,9 @@ export default function DeptHeadApproval() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {Object.entries(dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].daily_details).map(([date, details]) => (
+                                                {Object.entries(dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].daily_details)
+                                                    .filter(([date, details]) => details.status !== 'Off')
+                                                    .map(([date, details]) => (
                                                     <TableRow key={date}>
                                                         <TableCell className="font-medium">{new Date(date).toLocaleDateString()}</TableCell>
                                                         <TableCell className="text-center">{details.punch_count || 0}</TableCell>
@@ -807,7 +809,7 @@ export default function DeptHeadApproval() {
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-right">
-                                                            <span className={details.early_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}>
+                                                            <span className={details.early_minutes > 0 ? 'text-indigo-600 font-medium' : 'text-slate-400'}>
                                                                 {details.early_minutes > 0 ? `${details.early_minutes} min` : '-'}
                                                             </span>
                                                         </TableCell>
