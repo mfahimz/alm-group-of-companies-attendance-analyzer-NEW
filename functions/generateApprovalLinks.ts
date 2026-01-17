@@ -175,8 +175,49 @@ Deno.serve(async (req) => {
                     const dayShift = employeeShifts.find(s => s.date === dateStr) || employeeShifts.find(s => !s.date);
                     const dayOverride = dayOverrides[dateStr];
                     
-                    // Extract punch times from timestamp_raw
-                    const punchTimes = dayPunches.map(p => {
+                    // Helper functions for punch filtering (same as ReportDetailView)
+                    const parseTimeHelper = (timeStr) => {
+                        if (!timeStr) return null;
+                        const match = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)/i);
+                        if (!match) return null;
+                        let hours = parseInt(match[1]);
+                        const minutes = parseInt(match[2]);
+                        const period = match[4]?.toUpperCase();
+                        if (period === 'PM' && hours !== 12) hours += 12;
+                        if (period === 'AM' && hours === 12) hours = 0;
+                        const date = new Date();
+                        date.setHours(hours, minutes, 0, 0);
+                        return date;
+                    };
+                    
+                    const filterMultiplePunches = (punchList, shift) => {
+                        if (punchList.length <= 1) return punchList;
+                        
+                        const punchesWithTime = punchList.map(p => ({
+                            ...p,
+                            time: parseTimeHelper(p.timestamp_raw)
+                        })).filter(p => p.time);
+                        
+                        if (punchesWithTime.length === 0) return punchList;
+                        
+                        const deduped = [];
+                        for (let i = 0; i < punchesWithTime.length; i++) {
+                            const current = punchesWithTime[i];
+                            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
+                            if (!isDuplicate) {
+                                deduped.push(current);
+                            }
+                        }
+                        
+                        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
+                        return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+                    };
+                    
+                    // Filter and sort punches just like ReportDetailView does
+                    const filteredDayPunches = filterMultiplePunches(dayPunches, dayShift);
+                    
+                    // Extract punch times from filtered and sorted punches
+                    const punchTimes = filteredDayPunches.map(p => {
                         const match = p.timestamp_raw.match(/(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)/i);
                         return match ? match[0] : p.timestamp_raw;
                     });
@@ -190,35 +231,20 @@ Deno.serve(async (req) => {
                         late_minutes = dayOverride.lateMinutes || 0;
                         early_minutes = dayOverride.earlyCheckoutMinutes || 0;
                     } else {
-                        // Otherwise calculate from punches and shifts (simplified calculation)
-                        // This matches the basic logic from ReportDetailView
-                        if (dayShift && dayPunches.length > 0) {
-                            const parseTime = (timeStr) => {
-                                if (!timeStr) return null;
-                                const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-                                if (!match) return null;
-                                let hours = parseInt(match[1]);
-                                const minutes = parseInt(match[2]);
-                                const period = match[3].toUpperCase();
-                                if (period === 'PM' && hours !== 12) hours += 12;
-                                if (period === 'AM' && hours === 12) hours = 0;
-                                const date = new Date();
-                                date.setHours(hours, minutes, 0, 0);
-                                return date;
-                            };
-
-                            // Sort punches by time
-                            const punchesWithTime = dayPunches.map(p => ({
+                        // Otherwise calculate from FILTERED punches (same as ReportDetailView)
+                        if (dayShift && filteredDayPunches.length > 0) {
+                            // Use the filtered punches for calculation
+                            const punchesWithTime = filteredDayPunches.map(p => ({
                                 ...p,
-                                time: parseTime(p.timestamp_raw)
+                                time: parseTimeHelper(p.timestamp_raw)
                             })).filter(p => p.time).sort((a, b) => a.time - b.time);
 
                             if (punchesWithTime.length >= 2) {
                                 const firstPunch = punchesWithTime[0].time;
                                 const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
                                 
-                                const amStart = parseTime(dayShift.am_start);
-                                const pmEnd = parseTime(dayShift.pm_end);
+                                const amStart = parseTimeHelper(dayShift.am_start);
+                                const pmEnd = parseTimeHelper(dayShift.pm_end);
                                 
                                 // Calculate late minutes (first punch vs AM start)
                                 if (amStart && firstPunch > amStart) {

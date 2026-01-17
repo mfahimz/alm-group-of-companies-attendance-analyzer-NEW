@@ -147,7 +147,7 @@ export default function DeptHeadApproval() {
                     
                     const promises = [
                         base44.entities.AnalysisResult.update(result.id, {
-                            approved_minutes: minutes
+                            approved_minutes: Number(minutes)
                         })
                     ];
 
@@ -183,15 +183,17 @@ export default function DeptHeadApproval() {
             });
         },
         onSuccess: async () => {
-            // Invalidate and refetch the approval link to get updated used status
+            // Invalidate all related queries
             await queryClient.invalidateQueries({ queryKey: ['approvalLink', token] });
+            await queryClient.invalidateQueries({ queryKey: ['results'] });
+            await queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
+            await queryClient.invalidateQueries({ queryKey: ['reportRun'] });
+            
+            // Force refetch to get latest data
             await queryClient.refetchQueries({ queryKey: ['approvalLink', token] });
-            // Also refetch results to get updated approved_minutes
-            await queryClient.invalidateQueries({ queryKey: ['results', linkInfo?.report_run_id] });
-            await queryClient.refetchQueries({ queryKey: ['results', linkInfo?.report_run_id] });
-            // Invalidate quarterly minutes to reflect the updated used minutes
-            await queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes', linkInfo?.company, linkInfo?.project_id] });
-            toast.success('Approval submitted successfully - Quarterly minutes updated');
+            await queryClient.refetchQueries({ queryKey: ['results'] });
+            
+            toast.success('Approval submitted successfully - Minutes updated in all reports');
         },
         onError: (error) => {
             toast.error('Approval failed: ' + error.message);
@@ -765,9 +767,30 @@ export default function DeptHeadApproval() {
                                                         </TableCell>
                                                         <TableCell className="text-xs">
                                                             {details.punches && details.punches.length > 0 ? (
-                                                                details.punches.map((p, i) => (
-                                                                    <div key={i}>{p}</div>
-                                                                ))
+                                                                (() => {
+                                                                    // Sort punches by time
+                                                                    const parseTimeForSort = (timeStr) => {
+                                                                        const match = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)/i);
+                                                                        if (!match) return null;
+                                                                        let hours = parseInt(match[1]);
+                                                                        const minutes = parseInt(match[2]);
+                                                                        const period = match[4].toUpperCase();
+                                                                        if (period === 'PM' && hours !== 12) hours += 12;
+                                                                        if (period === 'AM' && hours === 12) hours = 0;
+                                                                        return hours * 60 + minutes;
+                                                                    };
+
+                                                                    const sorted = [...details.punches].sort((a, b) => {
+                                                                        const timeA = parseTimeForSort(a);
+                                                                        const timeB = parseTimeForSort(b);
+                                                                        if (timeA === null || timeB === null) return 0;
+                                                                        return timeA - timeB;
+                                                                    });
+
+                                                                    return sorted.map((p, i) => (
+                                                                        <div key={i}>{p}</div>
+                                                                    ));
+                                                                })()
                                                             ) : 'No punches'}
                                                         </TableCell>
                                                         <TableCell className="text-right">
