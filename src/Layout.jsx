@@ -268,12 +268,16 @@ export default function Layout({ children, currentPageName }) {
                     title: 'ALM Attendance'
                 }}
                 menu={navbarMenu}
-                auth={{
-                    logout: {
-                        text: 'Logout',
-                        onClick: () => base44.auth.logout()
-                    }
-                }}
+                    auth={{
+                        user: currentUser ? {
+                            name: currentUser.display_name || currentUser.full_name,
+                            email: currentUser.email
+                        } : null,
+                        logout: {
+                            text: 'Logout',
+                            onClick: () => base44.auth.logout()
+                        }
+                    }}
             />
 
             {/* Main Content */}
