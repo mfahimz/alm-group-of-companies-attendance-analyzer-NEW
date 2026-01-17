@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
             // Filter exceptions by department
             let relevantExceptions = allExceptions.filter(exc => {
                 const employee = employees.find(e => 
-                    e.attendance_id === exc.attendance_id && 
+                    Number(e.attendance_id) === Number(exc.attendance_id) && 
                     e.company === link.company
                 );
                 return employee?.department === link.department;
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
             if (deptHead?.managed_employee_ids) {
                 const managedIds = deptHead.managed_employee_ids.split(',').filter(Boolean);
                 relevantExceptions = relevantExceptions.filter(exc => {
-                    const employee = employees.find(e => e.attendance_id === exc.attendance_id);
+                    const employee = employees.find(e => Number(e.attendance_id) === Number(exc.attendance_id));
                     return employee && managedIds.includes(employee.id);
                 });
             }

@@ -26,6 +26,11 @@ export default function DeptHeadApproval() {
         const tokenParam = urlParams.get('token');
         if (tokenParam) {
             setToken(tokenParam);
+            // Check if already verified in sessionStorage
+            const storedVerification = sessionStorage.getItem(`verified_${tokenParam}`);
+            if (storedVerification === 'true') {
+                setIsVerified(true);
+            }
         }
     }, []);
 
@@ -39,6 +44,7 @@ export default function DeptHeadApproval() {
             // If admin override is enabled, auto-verify
             if (links[0].admin_override_public) {
                 setIsVerified(true);
+                sessionStorage.setItem(`verified_${token}`, 'true');
             }
             
             return links[0];
@@ -123,6 +129,8 @@ export default function DeptHeadApproval() {
             if (data.valid) {
                 setIsVerified(true);
                 setLinkData(data);
+                // Store verification in sessionStorage
+                sessionStorage.setItem(`verified_${token}`, 'true');
                 toast.success('Verification successful');
             } else {
                 toast.error(data.message || 'Invalid verification code');
@@ -207,7 +215,7 @@ export default function DeptHeadApproval() {
 
     const handleApprovedMinutesChange = (attendance_id, value) => {
         const minutes = parseInt(value) || 0;
-        const employee = employees.find(e => e.attendance_id === attendance_id);
+        const employee = employees.find(e => Number(e.attendance_id) === Number(attendance_id));
         if (!employee) return;
 
         // Use same logic as display to find quarterly record
@@ -265,10 +273,10 @@ export default function DeptHeadApproval() {
     // Filter and prepare results for this department
     const departmentResults = allResults
         .map(result => {
-            const employee = employees.find(e => e.attendance_id === result.attendance_id);
+            const employee = employees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
             if (!employee || employee.department !== linkInfo?.department) return null;
 
-            const salary = salaries.find(s => s.attendance_id === result.attendance_id);
+            const salary = salaries.find(s => Number(s.attendance_id) === Number(result.attendance_id));
             // Find quarterly record: first try project-based, then calendar-based
             const quarterlyRecord = quarterlyMinutes.find(q => 
                 (q.employee_id === employee.hrms_id || q.employee_id === employee.id) && 
@@ -772,22 +780,54 @@ export default function DeptHeadApproval() {
                                     </div>
                                 )}
 
-                                {/* Pre-cached breakdown info */}
-                                {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id] && (
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                        <p className="text-xs font-medium text-blue-900 mb-2">Summary from Report:</p>
-                                        <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
-                                            <div>Punches Recorded: {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].punches_count}</div>
-                                            <div>Shifts Configured: {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].shifts_count}</div>
-                                            <div>Exceptions: {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].exceptions_count}</div>
-                                            <div>Grace Minutes: {selectedEmployeeForBreakdown.grace_minutes || 0}</div>
-                                        </div>
+                                {/* Daily breakdown table */}
+                                {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id]?.daily_details && (
+                                    <div className="border rounded-lg overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Shift Times</TableHead>
+                                                    <TableHead>Punch Times</TableHead>
+                                                    <TableHead className="text-right">Late (min)</TableHead>
+                                                    <TableHead className="text-right">Early (min)</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {Object.entries(dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id].daily_details).map(([date, details]) => (
+                                                    <TableRow key={date}>
+                                                        <TableCell className="font-medium">{new Date(date).toLocaleDateString()}</TableCell>
+                                                        <TableCell className="text-xs">
+                                                            {details.shift ? (
+                                                                <div>
+                                                                    {details.shift.am_start} - {details.shift.am_end}<br/>
+                                                                    {details.shift.pm_start} - {details.shift.pm_end}
+                                                                </div>
+                                                            ) : 'No shift'}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs">
+                                                            {details.punches && details.punches.length > 0 ? (
+                                                                details.punches.map((p, i) => (
+                                                                    <div key={i}>{p}</div>
+                                                                ))
+                                                            ) : 'No punches'}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <span className={details.late_minutes > 0 ? 'text-red-600 font-medium' : ''}>
+                                                                {details.late_minutes || 0}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <span className={details.early_minutes > 0 ? 'text-amber-600 font-medium' : ''}>
+                                                                {details.early_minutes || 0}
+                                                            </span>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
                                     </div>
                                 )}
-
-                                <p className="text-xs text-slate-500 italic">
-                                    This data is cached from the report generation time for fast loading. For detailed daily-by-day breakdown, contact your HR administrator.
-                                </p>
                             </div>
                         )}
                     </DialogContent>

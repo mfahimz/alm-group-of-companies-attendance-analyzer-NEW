@@ -15,8 +15,8 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
         }
 
-        // Set link validity to 1 day (24 hours)
-        const validityDays = 1;
+        // Set link validity to 7 days total (24 hours approval + 6 days read-only)
+        const validityDays = 7;
 
         // Get all exceptions for this report
         const exceptions = await base44.asServiceRole.entities.Exception.filter({
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
         const skippedExceptions = [];
         
         for (const exception of pendingExceptions) {
-            const employee = employees.find(e => e.attendance_id === exception.attendance_id);
+            const employee = employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id));
             if (!employee) {
                 skippedExceptions.push({ 
                     exception_id: exception.id, 
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
                 if (deptHead.managed_employee_ids && departmentExceptions.length > 0) {
                     const managedIds = deptHead.managed_employee_ids.split(',').filter(Boolean);
                     relevantExceptionCount = departmentExceptions.filter(exc => {
-                        const employee = employees.find(e => e.attendance_id === exc.attendance_id);
+                        const employee = employees.find(e => Number(e.attendance_id) === Number(exc.attendance_id));
                         return employee && managedIds.includes(employee.id);
                     }).length;
                 }
@@ -150,10 +150,39 @@ Deno.serve(async (req) => {
             const dailyBreakdownData = {};
 
             for (const employee of departmentEmployees) {
-                const employeeAnalysis = analysisResults.find(a => a.attendance_id === employee.attendance_id);
-                const employeePunches = punches.filter(p => p.attendance_id === employee.attendance_id);
-                const employeeShifts = shiftTimings.filter(s => s.attendance_id === employee.attendance_id);
-                const employeeExceptions = allExceptions.filter(e => e.attendance_id === employee.attendance_id && e.use_in_analysis);
+                const employeeAnalysis = analysisResults.find(a => Number(a.attendance_id) === Number(employee.attendance_id));
+                const employeePunches = punches.filter(p => Number(p.attendance_id) === Number(employee.attendance_id));
+                const employeeShifts = shiftTimings.filter(s => Number(s.attendance_id) === Number(employee.attendance_id));
+                const employeeExceptions = allExceptions.filter(e => Number(e.attendance_id) === Number(employee.attendance_id) && e.use_in_analysis);
+
+                // Build daily details with shift times, punch times, and late/early minutes
+                const dailyDetails = {};
+                const startDate = new Date(project.date_from);
+                const endDate = new Date(project.date_to);
+                
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+                    const dayShift = employeeShifts.find(s => s.date === dateStr) || employeeShifts.find(s => !s.date);
+                    
+                    // Extract punch times from timestamp_raw
+                    const punchTimes = dayPunches.map(p => {
+                        const match = p.timestamp_raw.match(/(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)/i);
+                        return match ? match[0] : p.timestamp_raw;
+                    });
+
+                    dailyDetails[dateStr] = {
+                        shift: dayShift ? {
+                            am_start: dayShift.am_start || '',
+                            am_end: dayShift.am_end || '',
+                            pm_start: dayShift.pm_start || '',
+                            pm_end: dayShift.pm_end || ''
+                        } : null,
+                        punches: punchTimes,
+                        late_minutes: 0, // Will be calculated if needed
+                        early_minutes: 0 // Will be calculated if needed
+                    };
+                }
 
                 dailyBreakdownData[employee.attendance_id] = {
                     employee_name: employee.name,
@@ -172,7 +201,8 @@ Deno.serve(async (req) => {
                     } : null,
                     punches_count: employeePunches.length,
                     shifts_count: employeeShifts.length,
-                    exceptions_count: employeeExceptions.length
+                    exceptions_count: employeeExceptions.length,
+                    daily_details: dailyDetails
                 };
             }
 
