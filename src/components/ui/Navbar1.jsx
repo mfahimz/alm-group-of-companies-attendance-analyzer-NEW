@@ -79,7 +79,7 @@ const Navbar1 = ({
     return (
       <Link
         key={item.title}
-        className="group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-accent-foreground"
+        className="group inline-flex h-8 w-max items-center justify-center rounded-md bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-accent-foreground"
         to={createPageUrl(item.url)}
       >
         {item.title}
@@ -129,13 +129,13 @@ const Navbar1 = ({
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <div className="container mx-auto px-4">
-        <nav className="hidden h-16 items-center justify-between lg:flex">
+        <nav className="hidden h-12 items-center justify-between lg:flex">
           <div className="flex items-center gap-6">
             <Link to={createPageUrl(logo.url)} className="flex items-center gap-2 flex-shrink-0">
-              <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-2 rounded-xl">
-                <LogoIcon className="w-5 h-5 text-white" />
+              <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-1.5 rounded-lg">
+                <LogoIcon className="w-4 h-4 text-white" />
               </div>
-              <span className="text-lg font-semibold whitespace-nowrap">{logo.title}</span>
+              <span className="text-base font-semibold whitespace-nowrap">{logo.title}</span>
             </Link>
             <div className="flex items-center">
               <NavigationMenu>
@@ -155,12 +155,12 @@ const Navbar1 = ({
             </Button>
           </div>
         </nav>
-        <div className="flex h-16 items-center justify-between lg:hidden">
+        <div className="flex h-12 items-center justify-between lg:hidden">
           <Link to={createPageUrl(logo.url)} className="flex items-center gap-2 flex-shrink-0">
-            <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-2 rounded-xl">
-              <LogoIcon className="w-5 h-5 text-white" />
+            <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-1.5 rounded-lg">
+              <LogoIcon className="w-4 h-4 text-white" />
             </div>
-            <span className="text-lg font-semibold">{logo.title}</span>
+            <span className="text-base font-semibold">{logo.title}</span>
           </Link>
           <Sheet>
             <SheetTrigger asChild>
