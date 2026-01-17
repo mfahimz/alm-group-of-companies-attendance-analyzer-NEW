@@ -516,9 +516,9 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             : formData;
         
         // Clean up empty string values and convert early_checkout_minutes to number
-        // For SINGLE_SHIFT or CUSTOM (if no dates), use project date range as placeholder
-        const cleanedData = {
-            attendance_id: submitData.attendance_id === 'ALL' ? 'ALL' : Number(submitData.attendance_id),
+         // For SINGLE_SHIFT or CUSTOM (if no dates), use project date range as placeholder
+         const cleanedData = {
+             attendance_id: submitData.attendance_id === 'ALL' ? 'ALL' : String(submitData.attendance_id),
             date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : 
                        (submitData.type === 'CUSTOM' && !submitData.date_from) ? project.date_from :
                        submitData.date_from,
