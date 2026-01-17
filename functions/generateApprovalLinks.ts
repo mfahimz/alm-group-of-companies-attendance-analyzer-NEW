@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { shortenUrl } from './shortenUrl.js';
 
 Deno.serve(async (req) => {
     try {
@@ -343,8 +344,12 @@ Deno.serve(async (req) => {
             }
 
             const fullLinkUrl = `${appUrl}/DeptHeadApproval?token=${token}`;
+            
+            // Generate shortened URL (with fallback to full URL if shortening fails)
+            const shortUrl = await shortenUrl(fullLinkUrl);
+            const finalShortUrl = shortUrl || fullLinkUrl; // Fallback to full URL if shortening fails
 
-            // Create approval link record with pre-calculated data AND the full URL
+            // Create approval link record with pre-calculated data AND both full and shortened URLs
             const linkRecord = await base44.asServiceRole.entities.ApprovalLink.create({
                 report_run_id,
                 project_id,
@@ -357,7 +362,8 @@ Deno.serve(async (req) => {
                 used: false,
                 approved: false,
                 daily_breakdown_json: JSON.stringify(dailyBreakdownData),
-                approval_link_url: fullLinkUrl  // STORE THE COMPLETE URL IN DATABASE
+                approval_link_url: fullLinkUrl,  // STORE THE COMPLETE URL IN DATABASE
+                shortened_link_url: finalShortUrl  // STORE THE SHORTENED URL IN DATABASE
             });
 
             // Get department head employee details
