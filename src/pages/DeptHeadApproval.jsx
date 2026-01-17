@@ -719,9 +719,10 @@ export default function DeptHeadApproval() {
                                     )}
                                 </TableBody>
                             </Table>
-                        </div>
+                            </div>
+                            </div>
 
-                        {windowStatus.windowStatus === 'approval' && !linkInfo.used && departmentResults.length > 0 && (
+                            {windowStatus.windowStatus === 'approval' && !linkInfo.used && departmentResults.length > 0 && (
                             <div className="mt-6 flex justify-end">
                                 <Button
                                     onClick={handleSubmitAll}
