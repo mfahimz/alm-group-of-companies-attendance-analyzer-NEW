@@ -155,21 +155,83 @@ Deno.serve(async (req) => {
                 const employeeShifts = shiftTimings.filter(s => Number(s.attendance_id) === Number(employee.attendance_id));
                 const employeeExceptions = allExceptions.filter(e => Number(e.attendance_id) === Number(employee.attendance_id) && e.use_in_analysis);
 
-                // Build daily details with shift times, punch times, and late/early minutes
+                // Build daily details with shift times, punch times, and calculated late/early minutes
                 const dailyDetails = {};
                 const startDate = new Date(project.date_from);
                 const endDate = new Date(project.date_to);
+                
+                // Get analysis result for this employee to access day_overrides
+                const employeeAnalysisResult = analysisResults.find(a => Number(a.attendance_id) === Number(employee.attendance_id));
+                let dayOverrides = {};
+                if (employeeAnalysisResult?.day_overrides) {
+                    try {
+                        dayOverrides = JSON.parse(employeeAnalysisResult.day_overrides);
+                    } catch (e) {}
+                }
                 
                 for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                     const dateStr = d.toISOString().split('T')[0];
                     const dayPunches = employeePunches.filter(p => p.punch_date === dateStr);
                     const dayShift = employeeShifts.find(s => s.date === dateStr) || employeeShifts.find(s => !s.date);
+                    const dayOverride = dayOverrides[dateStr];
                     
                     // Extract punch times from timestamp_raw
                     const punchTimes = dayPunches.map(p => {
                         const match = p.timestamp_raw.match(/(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)/i);
                         return match ? match[0] : p.timestamp_raw;
                     });
+
+                    // Calculate late/early minutes
+                    let late_minutes = 0;
+                    let early_minutes = 0;
+                    
+                    // If there's a day override with manual minutes, use those
+                    if (dayOverride) {
+                        late_minutes = dayOverride.lateMinutes || 0;
+                        early_minutes = dayOverride.earlyCheckoutMinutes || 0;
+                    } else {
+                        // Otherwise calculate from punches and shifts (simplified calculation)
+                        // This matches the basic logic from ReportDetailView
+                        if (dayShift && dayPunches.length > 0) {
+                            const parseTime = (timeStr) => {
+                                if (!timeStr) return null;
+                                const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+                                if (!match) return null;
+                                let hours = parseInt(match[1]);
+                                const minutes = parseInt(match[2]);
+                                const period = match[3].toUpperCase();
+                                if (period === 'PM' && hours !== 12) hours += 12;
+                                if (period === 'AM' && hours === 12) hours = 0;
+                                const date = new Date();
+                                date.setHours(hours, minutes, 0, 0);
+                                return date;
+                            };
+
+                            // Sort punches by time
+                            const punchesWithTime = dayPunches.map(p => ({
+                                ...p,
+                                time: parseTime(p.timestamp_raw)
+                            })).filter(p => p.time).sort((a, b) => a.time - b.time);
+
+                            if (punchesWithTime.length >= 2) {
+                                const firstPunch = punchesWithTime[0].time;
+                                const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
+                                
+                                const amStart = parseTime(dayShift.am_start);
+                                const pmEnd = parseTime(dayShift.pm_end);
+                                
+                                // Calculate late minutes (first punch vs AM start)
+                                if (amStart && firstPunch > amStart) {
+                                    late_minutes = Math.round((firstPunch - amStart) / (1000 * 60));
+                                }
+                                
+                                // Calculate early checkout minutes (last punch vs PM end)
+                                if (pmEnd && lastPunch < pmEnd) {
+                                    early_minutes = Math.round((pmEnd - lastPunch) / (1000 * 60));
+                                }
+                            }
+                        }
+                    }
 
                     dailyDetails[dateStr] = {
                         shift: dayShift ? {
@@ -179,8 +241,8 @@ Deno.serve(async (req) => {
                             pm_end: dayShift.pm_end || ''
                         } : null,
                         punches: punchTimes,
-                        late_minutes: 0, // Will be calculated if needed
-                        early_minutes: 0 // Will be calculated if needed
+                        late_minutes: late_minutes,
+                        early_minutes: early_minutes
                     };
                 }
 

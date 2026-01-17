@@ -744,42 +744,6 @@ export default function DeptHeadApproval() {
                         </DialogHeader>
                         {selectedEmployeeForBreakdown && (
                             <div className="space-y-4">
-                                {/* Summary Card */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <p className="text-xs text-slate-600">Late Minutes</p>
-                                        <p className="text-lg font-bold text-slate-900">{selectedEmployeeForBreakdown.late_minutes || 0}</p>
-                                    </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <p className="text-xs text-slate-600">Early Checkout</p>
-                                        <p className="text-lg font-bold text-slate-900">{selectedEmployeeForBreakdown.early_checkout_minutes || 0}</p>
-                                    </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <p className="text-xs text-slate-600">Present Days</p>
-                                        <p className="text-lg font-bold text-green-600">{selectedEmployeeForBreakdown.present_days || 0}</p>
-                                    </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <p className="text-xs text-slate-600">Absences</p>
-                                        <p className="text-lg font-bold text-red-600">{(selectedEmployeeForBreakdown.full_absence_count || 0) + (selectedEmployeeForBreakdown.half_absence_count || 0)}</p>
-                                    </div>
-                                </div>
-
-                                {/* Notes */}
-                                {selectedEmployeeForBreakdown.notes && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                        <p className="text-xs font-medium text-amber-900 mb-1">Critical Issues:</p>
-                                        <p className="text-sm text-amber-800">{selectedEmployeeForBreakdown.notes}</p>
-                                    </div>
-                                )}
-
-                                {/* Abnormal Dates */}
-                                {selectedEmployeeForBreakdown.abnormal_dates && (
-                                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                                        <p className="text-xs font-medium text-orange-900 mb-1">Dates with Abnormalities:</p>
-                                        <p className="text-sm text-orange-800">{selectedEmployeeForBreakdown.abnormal_dates}</p>
-                                    </div>
-                                )}
-
                                 {/* Daily breakdown table */}
                                 {dailyBreakdownData[selectedEmployeeForBreakdown.attendance_id]?.daily_details && (
                                     <div className="border rounded-lg overflow-hidden">
