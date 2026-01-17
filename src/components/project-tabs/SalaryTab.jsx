@@ -9,7 +9,7 @@ import { DollarSign, FileSpreadsheet, Save, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
-export default function SalaryTab({ project }) {
+export default function SalaryTab({ project, finalReport }) {
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
@@ -28,12 +28,12 @@ export default function SalaryTab({ project }) {
     });
 
     const { data: analysisResults = [], isLoading: loadingResults } = useQuery({
-        queryKey: ['results', project.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({ 
+        queryKey: ['results', project.id, finalReport?.id],
+        queryFn: () => base44.entities.AnalysisResult.filter({
             project_id: project.id,
-            report_run_id: project.last_saved_report_id 
+            report_run_id: finalReport.id
         }),
-        enabled: !!project.id && !!project.last_saved_report_id
+        enabled: !!project.id && !!finalReport?.id
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
@@ -235,12 +235,12 @@ export default function SalaryTab({ project }) {
         );
     }
 
-    if (!project.last_saved_report_id) {
+    if (!finalReport) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
                     <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600">No saved report available. Please run analysis first.</p>
+                    <p className="text-slate-600">The Salary tab is only available after a report has been marked as final.</p>
                 </CardContent>
             </Card>
         );

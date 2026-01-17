@@ -41,6 +41,14 @@ export default function ProjectDetail() {
   const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO;
   const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
 
+  const { data: reportRuns = [] } = useQuery({
+    queryKey: ['reportRuns', projectId],
+    queryFn: () => base44.entities.ReportRun.filter({ project_id: projectId }),
+    enabled: !!projectId,
+  });
+
+  const finalReport = reportRuns.find(r => r.is_final);
+
   const reopenProjectMutation = useMutation({
     mutationFn: async () => {
       await base44.entities.Project.update(project.id, { status: 'analyzed' });
@@ -215,9 +223,10 @@ export default function ProjectDetail() {
                         {(isAdmin || isCEO) &&
             <TabsTrigger
               value="salary"
+              disabled={!finalReport}
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
 
-                                Salary
+                                Salary {!finalReport && '🔒'}
                             </TabsTrigger>
             }
                     </TabsList>
@@ -248,7 +257,7 @@ export default function ProjectDetail() {
                 </TabsContent>
 
                 <TabsContent value="salary">
-                    <SalaryTab project={project} />
+                    <SalaryTab project={project} finalReport={finalReport} />
                 </TabsContent>
             </Tabs>
         </div>);
