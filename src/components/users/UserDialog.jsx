@@ -127,6 +127,17 @@ export default function UserDialog({ open, onClose, user }) {
                         </div>
 
                         <div>
+                            <Label htmlFor="display_name">Display Name *</Label>
+                            <Input
+                                id="display_name"
+                                value={formData.display_name}
+                                onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                                placeholder="e.g., John D. or J. Doe"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Short name shown in system</p>
+                        </div>
+
+                        <div>
                             <Label htmlFor="email">Email *</Label>
                             <Input
                                 id="email"
