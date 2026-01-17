@@ -928,7 +928,7 @@ export default function ReportDetailView({ reportRun, project }) {
 
                         const exceptionData = {
                             project_id: project.id,
-                            attendance_id: group.attendance_id,
+                            attendance_id: String(group.attendance_id),
                             date_from: range.start,
                             date_to: range.end,
                             type: group.data.type,
