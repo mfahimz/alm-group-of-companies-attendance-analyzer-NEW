@@ -110,7 +110,7 @@ export default function ProjectDetail() {
               'from-red-400 to-red-600'}`
               } />
                             <div>
-                                <h1 className="bg-clip-text text-transparent text-xl font-bold sm:text-4xl from-slate-900 to-slate-600">
+                                <h1 className="bg-clip-text text-slate-950 text-xl font-bold sm:text-4xl from-slate-900 to-slate-600">
                                     {project.name}
                                 </h1>
                                 <p className="text-slate-600 mt-1 text-xs font-semibold">{project.company}</p>
