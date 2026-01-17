@@ -38,7 +38,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
     useEffect(() => {
-        if (employee) {
+        if (employee && open) {
             setFormData({
                 hrms_id: employee.hrms_id || '',
                 attendance_id: employee.attendance_id || '',
@@ -83,7 +83,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             };
             generateHrmsId();
         }
-    }, [employee, open]);
+    }, [employee?.id, open]);
 
     const { data: existingEmployees = [] } = useQuery({
         queryKey: ['employees'],
