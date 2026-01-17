@@ -24,10 +24,9 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'LINK_EXPIRED' }, { status: 400 });
         }
 
-        // Check if already used
-        if (link.used) {
-            return Response.json({ error: 'LINK_USED' }, { status: 400 });
-        }
+        // Allow re-verification even if link is used (read-only access)
+        // Only block if verification code is being checked for the first time
+        // (verification_code will be provided on actual verification attempts)
 
         // If verification code provided, verify it
         if (verification_code) {
