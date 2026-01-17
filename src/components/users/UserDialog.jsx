@@ -30,6 +30,7 @@ export default function UserDialog({ open, onClose, user }) {
             setFormData({
                 full_name: user.full_name || '',
                 email: user.email || '',
+                display_name: user.display_name || '',
                 extended_role: user.extended_role || user.role || 'user',
                 company: user.company || ''
             });
@@ -37,6 +38,7 @@ export default function UserDialog({ open, onClose, user }) {
             setFormData({
                 full_name: '',
                 email: '',
+                display_name: '',
                 extended_role: 'user',
                 company: ''
             });
