@@ -284,7 +284,7 @@ export default function DeptHeadApproval() {
             if (!employee || employee.department !== linkInfo?.department) return null;
             
             // Exclude department head's own record - they should not approve their own minutes
-            if (String(employee.hrms_id) === String(linkInfo?.department_head_id)) return null;
+            if (String(employee.id) === String(linkInfo?.department_head_id)) return null;
 
             const salary = salaries.find(s => Number(s.attendance_id) === Number(result.attendance_id));
             // Find quarterly record: first try project-based, then calendar-based
