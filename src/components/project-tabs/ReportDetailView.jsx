@@ -41,12 +41,13 @@ export default function ReportDetailView({ reportRun, project }) {
     const isUser = userRole === 'user';
     const isAdmin = userRole === 'admin';
 
-    const { data: results = [] } = useQuery({
+    const { data: results = [], refetch: refetchResults } = useQuery({
         queryKey: ['results', reportRun.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
-        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
+        staleTime: 30 * 1000, // Cache for 30 seconds only - results change frequently
         retry: false,
-        gcTime: 60 * 60 * 1000 // Keep in cache for 60 minutes
+        gcTime: 5 * 60 * 1000 // Keep in cache for 5 minutes,
+        refetchInterval: 5 * 60 * 1000 // Auto-refetch every 5 minutes
     });
 
     const { data: employees = [] } = useQuery({

@@ -194,15 +194,15 @@ export default function DeptHeadApproval() {
             });
         },
         onSuccess: async () => {
-            // Invalidate all related queries
-            await queryClient.invalidateQueries({ queryKey: ['approvalLink', token] });
+            // Invalidate ALL result queries to ensure report page gets latest data
             await queryClient.invalidateQueries({ queryKey: ['results'] });
+            await queryClient.invalidateQueries({ queryKey: ['approvalLink'] });
             await queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
             await queryClient.invalidateQueries({ queryKey: ['reportRun'] });
             
-            // Force refetch to get latest data
+            // Force hard refetch with fresh network data
+            await queryClient.refetchQueries({ queryKey: ['results'], type: 'active' });
             await queryClient.refetchQueries({ queryKey: ['approvalLink', token] });
-            await queryClient.refetchQueries({ queryKey: ['results'] });
             
             toast.success('Approval submitted successfully - Minutes updated in all reports');
         },
