@@ -14,7 +14,6 @@ import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import * as XLSX from 'xlsx';
-import { CheckCircle } from 'lucide-react';
 
 export default function ReportDetailView({ reportRun, project }) {
     const [searchTerm, setSearchTerm] = useState('');
