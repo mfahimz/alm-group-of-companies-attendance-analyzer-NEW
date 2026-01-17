@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import TimePicker from '../ui/TimePicker';
 
-export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult }) {
+export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult, dailyBreakdownData }) {
     const [formData, setFormData] = useState({
         type: 'MANUAL_PRESENT',
         details: '',
