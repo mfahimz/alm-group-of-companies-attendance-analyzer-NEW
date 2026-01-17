@@ -56,7 +56,7 @@ export default function SalaryTab({ project, finalReport }) {
 
              // Leave Days in salary table = LOP days from the report
              const leaveDays = result?.full_absence_count || 0;
-             const leavePay = 0; // To be calculated with formula
+              const leavePay = (salary?.total_salary || 0) / 30 * leaveDays;
 
              // Sick leave (paid leave) - separate from LOP
              const salaryLeaveDays = result?.sick_leave_count || 0;
