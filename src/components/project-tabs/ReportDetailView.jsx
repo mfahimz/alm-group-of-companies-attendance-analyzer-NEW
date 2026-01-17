@@ -369,14 +369,12 @@ export default function ReportDetailView({ reportRun, project }) {
                 });
 
             // Find all matching exceptions and get the latest one by created_date (calculateEmployeeTotals)
-             const matchingExceptionsCalc = employeeExceptions.filter(ex => {
-                 const exFrom = new Date(ex.date_from);
-                 const exTo = new Date(ex.date_to);
-                 return currentDate >= exFrom && currentDate <= exTo &&
-                        (String(ex.attendance_id) === 'ALL' || Number(ex.attendance_id) === attendanceIdNum) &&
-                        ex.use_in_analysis !== false &&
-                        ex.approval_status === 'approved';
-             });
+            const matchingExceptionsCalc = employeeExceptions.filter(ex => {
+                const exFrom = new Date(ex.date_from);
+                const exTo = new Date(ex.date_to);
+                return currentDate >= exFrom && currentDate <= exTo &&
+                       (String(ex.attendance_id) === 'ALL' || Number(ex.attendance_id) === attendanceIdNum);
+            });
 
             const dateException = matchingExceptionsCalc.length > 0
                 ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
@@ -1160,9 +1158,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
                 return currentDate >= exFrom && currentDate <= exTo &&
-                       (String(ex.attendance_id) === 'ALL' || Number(ex.attendance_id) === attendanceIdNum) &&
-                       ex.use_in_analysis !== false &&
-                       ex.approval_status === 'approved';
+                       (String(ex.attendance_id) === 'ALL' || Number(ex.attendance_id) === attendanceIdNum);
             });
 
             const dateException = matchingExceptionsDaily.length > 0
