@@ -281,6 +281,19 @@ export default function DeptHeadApproval() {
 
     const windowStatus = getApprovalWindowStatus();
 
+    // Get the department head's managed employees list
+    const deptHeadManagedIds = React.useMemo(() => {
+        // Try to get from daily breakdown data first (most reliable)
+        const breakdownData = dailyBreakdownData;
+        if (Object.keys(breakdownData).length > 0) {
+            return Object.keys(breakdownData).map(att_id => {
+                const emp = employees.find(e => String(e.attendance_id) === String(att_id));
+                return emp?.id;
+            }).filter(Boolean);
+        }
+        return [];
+    }, [dailyBreakdownData, employees]);
+
     // Filter and prepare results for this department, excluding department head's own record
     const departmentResults = allResults
         .map(result => {
@@ -289,6 +302,9 @@ export default function DeptHeadApproval() {
             
             // Exclude department head's own record - they should not approve their own minutes
             if (String(employee.id) === String(linkInfo?.department_head_id)) return null;
+            
+            // Only include employees that the department head manages (from daily breakdown)
+            if (deptHeadManagedIds.length > 0 && !deptHeadManagedIds.includes(employee.id)) return null;
 
             const salary = salaries.find(s => Number(s.attendance_id) === Number(result.attendance_id));
             // Find quarterly record: first try project-based, then calendar-based
