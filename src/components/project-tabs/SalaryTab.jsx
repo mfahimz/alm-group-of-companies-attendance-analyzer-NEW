@@ -54,9 +54,6 @@ export default function SalaryTab({ project, finalReport }) {
             );
             const result = analysisResults.find(r => Number(r.attendance_id) === Number(emp.attendance_id));
 
-            // Calculate half day not worked hours (half_absence_count * working_hours / 2)
-             const halfDayNotWorkedHours = (result?.half_absence_count || 0) * ((salary?.working_hours || 9) / 2);
-
              // Annual leave (paid leave) - separate from LOP
              const leaveDays = result?.annual_leave_count || 0;
              const leavePay = 0; // To be calculated with formula
@@ -102,10 +99,8 @@ export default function SalaryTab({ project, finalReport }) {
                 working_days: result?.working_days || 0,
                 present_days: result?.present_days || 0,
                 full_absence_count: result?.full_absence_count || 0, // LOP days only
-                half_absence_count: result?.half_absence_count || 0,
                 annual_leave_count: result?.annual_leave_count || 0, // Separate from LOP
                 sick_leave_count: result?.sick_leave_count || 0, // Separate from LOP
-                halfDayNotWorkedHours,
                 late_minutes: result?.late_minutes || 0,
                 early_checkout_minutes: result?.early_checkout_minutes || 0,
                 other_minutes: result?.other_minutes || 0,
@@ -321,8 +316,6 @@ export default function SalaryTab({ project, finalReport }) {
                                     <TableHead className="whitespace-nowrap">LOP Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Annual Leave Days</TableHead>
                                     <TableHead className="whitespace-nowrap">Sick Leave Days</TableHead>
-                                    <TableHead className="whitespace-nowrap">Half Days</TableHead>
-                                    <TableHead className="whitespace-nowrap">Half Day Not Worked Hours</TableHead>
                                     <TableHead className="whitespace-nowrap bg-amber-50">Leave Days</TableHead>
                                     <TableHead className="whitespace-nowrap bg-amber-50">Leave Pay</TableHead>
                                     <TableHead className="whitespace-nowrap bg-green-50">Salary Leave Days</TableHead>
@@ -356,8 +349,6 @@ export default function SalaryTab({ project, finalReport }) {
                                             <TableCell className="text-red-600 font-semibold">{row.full_absence_count}</TableCell>
                                             <TableCell className="text-green-600 font-medium">{row.annual_leave_count}</TableCell>
                                             <TableCell className="text-blue-600 font-medium">{row.sick_leave_count}</TableCell>
-                                            <TableCell>{row.half_absence_count}</TableCell>
-                                            <TableCell className="text-amber-600 font-medium">{row.halfDayNotWorkedHours.toFixed(2)}</TableCell>
                                             <TableCell className="bg-amber-50">{row.leaveDays}</TableCell>
                                             <TableCell className="bg-amber-50 p-1">
                                                 <Input
