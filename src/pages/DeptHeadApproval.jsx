@@ -731,15 +731,16 @@ export default function DeptHeadApproval() {
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="p-1 h-auto"
-                                                            onClick={() => {
-                                                                setSelectedEmployeeForBreakdown(result);
-                                                                setShowBreakdownDialog(true);
-                                                            }}
+                                                           size="sm"
+                                                           variant="ghost"
+                                                           className="p-1 h-auto"
+                                                           onClick={() => {
+                                                               setSelectedEmployeeForBreakdown(result);
+                                                               setShowBreakdownDialog(true);
+                                                           }}
+                                                           title="View daily breakdown"
                                                         >
-                                                            <Eye className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                                                           <Eye className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                                                         </Button>
                                                     </TableCell>
                                                     </TableRow>
