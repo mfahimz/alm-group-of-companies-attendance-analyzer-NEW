@@ -722,7 +722,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                             if (!employeeSearch) return true;
                                                             const search = employeeSearch.toLowerCase();
                                                             return emp.name.toLowerCase().includes(search) || 
-                                                                   emp.attendance_id.toLowerCase().includes(search);
+                                                                   String(emp.attendance_id).toLowerCase().includes(search);
                                                         })
                                                         .map(emp => (
                                                             <SelectItem key={emp.id} value={emp.attendance_id}>
@@ -757,7 +757,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                             if (!employeeSearch) return true;
                                                             const search = employeeSearch.toLowerCase();
                                                             return emp.name.toLowerCase().includes(search) || 
-                                                                   emp.attendance_id.toLowerCase().includes(search);
+                                                                   String(emp.attendance_id).toLowerCase().includes(search);
                                                         })
                                                         .map(emp => (
                                                             <SelectItem key={emp.id} value={emp.attendance_id}>
