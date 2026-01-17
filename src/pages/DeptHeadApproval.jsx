@@ -297,25 +297,18 @@ export default function DeptHeadApproval() {
                 (q.project_id === linkInfo.project_id || (q.allocation_type === 'calendar_quarter' && Number(q.year) === 2025 && Number(q.quarter) === 4))
             );
 
-            const totalDeductibleMinutes = (result.late_minutes || 0) + 
-                                          (result.early_checkout_minutes || 0) + 
-                                          (result.other_minutes || 0);
-            const finalDeductibleMinutes = Math.max(0, totalDeductibleMinutes - (result.grace_minutes || 0) - (result.approved_minutes || 0));
-
             return {
                 ...result,
                 employee,
                 salary,
-                quarterlyRecord,
-                totalDeductibleMinutes,
-                finalDeductibleMinutes
+                quarterlyRecord
             };
         })
         .filter(Boolean)
         .sort((a, b) => {
             // Sort by most problematic first
-            const scoreA = (a.full_absence_count * 1000) + a.finalDeductibleMinutes;
-            const scoreB = (b.full_absence_count * 1000) + b.finalDeductibleMinutes;
+            const scoreA = (a.full_absence_count * 1000) + ((a.late_minutes || 0) + (a.early_checkout_minutes || 0) + (a.other_minutes || 0));
+            const scoreB = (b.full_absence_count * 1000) + ((b.late_minutes || 0) + (b.early_checkout_minutes || 0) + (b.other_minutes || 0));
             return scoreB - scoreA;
         });
 
@@ -607,27 +600,27 @@ export default function DeptHeadApproval() {
                 )}
                 
                 <Card className="border-0 shadow-md">
-                     <CardHeader>
-                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                             <div>
-                                 <CardTitle className="text-xl sm:text-2xl">Department Head Approval</CardTitle>
-                                 <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                                     Department: <span className="font-medium">{linkInfo.department}</span>
-                                 </p>
-                                 {reportRun && (
-                                     <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                                         Report: {reportRun.report_name} ({new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()})
-                                     </p>
-                                 )}
-                             </div>
-                             {linkInfo.used && (
-                                 <div className="flex items-center gap-2 text-green-600 flex-shrink-0">
-                                     <Lock className="w-4 sm:w-5 h-4 sm:h-5" />
-                                     <span className="text-xs sm:text-sm font-medium">Approved</span>
-                                 </div>
-                             )}
-                         </div>
-                     </CardHeader>
+                    <CardHeader>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <CardTitle className="text-xl sm:text-2xl">Department Head Approval</CardTitle>
+                                <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                                    Department: <span className="font-medium">{linkInfo.department}</span>
+                                </p>
+                                {reportRun && (
+                                    <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                                        Report: {reportRun.report_name} ({new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()})
+                                    </p>
+                                )}
+                            </div>
+                            {linkInfo.used && (
+                                <div className="flex items-center gap-2 text-green-600 flex-shrink-0">
+                                    <Lock className="w-4 sm:w-5 h-4 sm:h-5" />
+                                    <span className="text-xs sm:text-sm font-medium">Approved</span>
+                                </div>
+                            )}
+                        </div>
+                    </CardHeader>
                     <CardContent className="p-3 sm:p-6 overflow-x-auto">
                          <div className="overflow-x-auto -mx-3 -mb-3 sm:mx-0 sm:mb-0">
                              <div className="min-w-max sm:min-w-full">
@@ -637,17 +630,17 @@ export default function DeptHeadApproval() {
                                          <TableHead className="text-xs sm:text-sm">Att ID</TableHead>
                                          <TableHead className="text-xs sm:text-sm">Name</TableHead>
                                          <TableHead className="text-xs sm:text-sm text-center">Working Days</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center hidden sm:table-cell">Present</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center">LOP</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center hidden md:table-cell">Half Day</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center">Late</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center">Early</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center hidden lg:table-cell">Other</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center hidden lg:table-cell">Total Ded</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden sm:table-cell">Present Days</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Annual Leave</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Sick Leave</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">LOP Days</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden md:table-cell">Half Days</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Late (min)</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Early (min)</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden lg:table-cell">Other (min)</TableHead>
                                          <TableHead className="text-xs sm:text-sm text-center hidden md:table-cell">Grace</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center">Q. Rem</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center">Approve</TableHead>
-                                         <TableHead className="text-xs sm:text-sm text-center hidden sm:table-cell">Final</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center">Approved Minutes</TableHead>
+                                         <TableHead className="text-xs sm:text-sm text-center hidden sm:table-cell">Deductible</TableHead>
                                          <TableHead className="text-xs sm:text-sm text-center">View</TableHead>
                                      </TableRow>
                                  </TableHeader>
@@ -662,7 +655,9 @@ export default function DeptHeadApproval() {
                                         departmentResults.map((result) => {
                                             const currentApproved = approvedMinutes[result.attendance_id] || result.approved_minutes || 0;
                                             const remainingQuarterly = result.quarterlyRecord?.remaining_minutes || 0;
-                                            const finalDeductible = Math.max(0, result.totalDeductibleMinutes - (result.grace_minutes || 0) - currentApproved);
+                                            const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0) + (result.other_minutes || 0);
+                                            const grace = result.grace_minutes ?? 15;
+                                            const deductible = Math.max(0, total - grace - currentApproved);
 
                                             return (
                                                 <TableRow key={result.attendance_id}>
@@ -671,23 +666,37 @@ export default function DeptHeadApproval() {
                                                     <TableCell className="text-center text-xs sm:text-sm">{result.working_days}</TableCell>
                                                     <TableCell className="text-center text-xs sm:text-sm hidden sm:table-cell">{result.present_days}</TableCell>
                                                     <TableCell className="text-center text-xs sm:text-sm">
+                                                        <span className={result.annual_leave_count > 0 ? 'text-blue-600 font-medium' : ''}>
+                                                            {result.annual_leave_count || 0}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">
+                                                        <span className={result.sick_leave_count > 0 ? 'text-purple-600 font-medium' : ''}>
+                                                            {result.sick_leave_count || 0}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">
                                                         <span className={result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}>
                                                             {result.full_absence_count}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell className="text-center text-xs sm:text-sm hidden md:table-cell">{result.half_absence_count}</TableCell>
-                                                    <TableCell className="text-center text-xs sm:text-sm">{result.late_minutes || 0}</TableCell>
-                                                    <TableCell className="text-center text-xs sm:text-sm">{result.early_checkout_minutes || 0}</TableCell>
-                                                    <TableCell className="text-center text-xs sm:text-sm hidden lg:table-cell">{result.other_minutes || 0}</TableCell>
-                                                    <TableCell className="text-center text-xs sm:text-sm hidden lg:table-cell">
-                                                        <span className={result.totalDeductibleMinutes > 0 ? 'font-medium text-amber-600' : ''}>
-                                                            {result.totalDeductibleMinutes}
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden md:table-cell">
+                                                        <span className={result.half_absence_count > 0 ? 'text-amber-600 font-medium' : ''}>
+                                                            {result.half_absence_count || 0}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell className="text-center text-xs sm:text-sm hidden md:table-cell">{result.grace_minutes || 0}</TableCell>
                                                     <TableCell className="text-center text-xs sm:text-sm">
-                                                        <span className="text-blue-600 font-medium">{remainingQuarterly}</span>
+                                                        <span className={result.late_minutes > 0 ? 'text-orange-600 font-medium' : ''}>
+                                                            {result.late_minutes || 0}
+                                                        </span>
                                                     </TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm">
+                                                        <span className={result.early_checkout_minutes > 0 ? 'text-blue-600 font-medium' : ''}>
+                                                            {result.early_checkout_minutes || 0}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden lg:table-cell">{result.other_minutes || 0}</TableCell>
+                                                    <TableCell className="text-center text-xs sm:text-sm hidden md:table-cell">{grace}</TableCell>
                                                     <TableCell className="text-center text-xs sm:text-sm">
                                                         <Input
                                                             type="number"
@@ -700,8 +709,8 @@ export default function DeptHeadApproval() {
                                                         />
                                                     </TableCell>
                                                     <TableCell className="text-center text-xs sm:text-sm hidden sm:table-cell">
-                                                        <span className={finalDeductible > 0 ? 'font-bold text-red-600' : 'text-green-600'}>
-                                                            {finalDeductible}
+                                                        <span className={deductible > 0 ? 'font-bold text-red-600' : 'text-green-600'}>
+                                                            {deductible} min
                                                         </span>
                                                     </TableCell>
                                                     <TableCell className="text-center">
