@@ -79,6 +79,10 @@ export default function Layout({ children, currentPageName }) {
         refetchOnMount: false // Don't refetch on component mount
     });
 
+    // Calculate user role early (needed by useQuery conditions below)
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isDepartmentHeadNeedsRedirect = userRole === 'department_head' && currentPageName !== 'DepartmentHeadDashboard' && currentUser && !isPublicPage;
+
     // Redirect to login if not authenticated on protected pages
     React.useEffect(() => {
         if (!isPublicPage && !isLoading && error) {
@@ -93,10 +97,6 @@ export default function Layout({ children, currentPageName }) {
             window.location.replace('/DepartmentHeadDashboard');
         }
     }, [isDepartmentHeadNeedsRedirect]);
-
-    // Check if department head needs immediate redirect
-    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isDepartmentHeadNeedsRedirect = userRole === 'department_head' && currentPageName !== 'DepartmentHeadDashboard' && currentUser && !isPublicPage;
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
