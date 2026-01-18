@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DollarSign, FileSpreadsheet, Save, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import PINLock from '../ui/PINLock';
 
 export default function SalaryTab({ project, finalReport }) {
     const { data: currentUser } = useQuery({
@@ -59,6 +60,7 @@ export default function SalaryTab({ project, finalReport }) {
     const [isSaving, setIsSaving] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [sortBy, setSortBy] = useState('department');
+    const [salaryUnlocked, setSalaryUnlocked] = useState(false);
 
     // Combine all data for each employee
     const salaryData = useMemo(() => {
@@ -250,6 +252,15 @@ export default function SalaryTab({ project, finalReport }) {
 
     return (
         <div className="space-y-6">
+            <PINLock onUnlock={(unlocked) => setSalaryUnlocked(unlocked)} storageKey="salary_tab_pin" />
+            {!salaryUnlocked && (
+                <Card className="border-0 shadow-lg">
+                    <CardContent className="p-12 text-center">
+                        <p className="text-slate-600">Please unlock the salary section to view the salary table.</p>
+                    </CardContent>
+                </Card>
+            )}
+            {salaryUnlocked && (
             <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-50 to-purple-50">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -475,6 +486,7 @@ export default function SalaryTab({ project, finalReport }) {
                     )}
                 </CardContent>
             </Card>
+            )}
         </div>
     );
 }

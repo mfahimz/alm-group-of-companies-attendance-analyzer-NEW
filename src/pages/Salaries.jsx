@@ -13,7 +13,7 @@ import { Search, Plus, Edit, Trash2, DollarSign, Upload, Download } from 'lucide
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import SortableTableHead from '../components/ui/SortableTableHead';
-import NumericLock from '../components/ui/NumericLock';
+import PINLock from '../components/ui/PINLock';
 
 export default function Salaries() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -25,7 +25,7 @@ export default function Salaries() {
     const fileInputRef = React.useRef(null);
     const [previewData, setPreviewData] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
-    const [isLocked, setIsLocked] = useState(true);
+    const [salaryUnlocked, setSalaryUnlocked] = useState(false);
     
     const [formData, setFormData] = useState({
         employee_id: '',
@@ -420,8 +420,15 @@ export default function Salaries() {
 
     return (
         <div className="space-y-6">
-            <NumericLock isLocked={isLocked} onUnlock={() => setIsLocked(false)} />
-            <Breadcrumb items={[{ label: 'Salaries' }]} />
+            <PINLock onUnlock={(unlocked) => setSalaryUnlocked(unlocked)} storageKey="salary_page_pin" />
+            {!salaryUnlocked && (
+                <div className="flex items-center justify-center py-12 text-slate-500">
+                    <p>Please unlock the salary section to continue.</p>
+                </div>
+            )}
+            {salaryUnlocked && (
+                <>
+                <Breadcrumb items={[{ label: 'Salaries' }]} />
 
             <div className="flex justify-between items-center">
                 <div>
@@ -819,6 +826,8 @@ export default function Salaries() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+                </>
+            )}
         </div>
     );
 }
