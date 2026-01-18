@@ -7,7 +7,6 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
 import ReportDetailView from '../components/project-tabs/ReportDetailView';
-import ApprovalLinksHistory from '../components/reports/ApprovalLinksHistory';
 import { formatInUAE } from '@/components/ui/timezone';
 
 export default function ReportDetailPage() {
@@ -91,8 +90,6 @@ export default function ReportDetailPage() {
 
             {/* Report Detail View */}
             <ReportDetailView reportRun={reportRun} project={project} />
-            
-            {isAdmin && <ApprovalLinksHistory reportRunId={reportRun.id} projectId={project.id} />}
         </div>
     );
 }
