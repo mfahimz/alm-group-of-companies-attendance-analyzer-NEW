@@ -49,45 +49,58 @@ export default function DepartmentHeadDashboard() {
         queryFn: async () => {
             if (!deptHeadAssignment) return null;
             
-            // Get current date in UAE timezone (date only, no time)
-            const today = nowInUAE();
-            const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            
-            console.log('🔍 Project Search:', {
-                company: deptHeadAssignment.company,
-                department: deptHeadAssignment.department,
-                todayDateOnly
-            });
-            
-            // Get all projects for this company
+            // ========== TEST MODE: HARDCODE PROJECT ==========
+            // Remove date filter and only show "November - Al Maraghi Abu Dhabi" project
             const projects = await base44.entities.Project.filter({
-                company: deptHeadAssignment.company
+                company: 'Al Maraghi Auto Repairs'
             });
             
-            console.log('📊 Projects found:', projects.length, projects.map(p => ({
-                name: p.name,
-                company: p.company,
-                department: p.department,
-                date_from: p.date_from,
-                date_to: p.date_to
-            })));
+            const testProject = projects.find(p => p.name === 'November - Al Maraghi Abu Dhabi');
+            console.log('🧪 TEST MODE - Hardcoded project:', testProject?.name || 'NOT FOUND');
+            return testProject || null;
+            // ========== END TEST MODE ==========
             
-            // Find project whose date range contains today (projects apply to all departments in a company)
-            const activeProject = projects.find(p => {
-                const projectStart = utcToUAE(p.date_from);
-                const projectEnd = utcToUAE(p.date_to);
-                
-                // Compare date parts only
-                const startDateOnly = new Date(projectStart.getFullYear(), projectStart.getMonth(), projectStart.getDate());
-                const endDateOnly = new Date(projectEnd.getFullYear(), projectEnd.getMonth(), projectEnd.getDate());
-                
-                const isInDateRange = startDateOnly <= todayDateOnly && endDateOnly >= todayDateOnly;
-                
-                return isInDateRange;
-            });
-            
-            console.log('✅ Active project:', activeProject?.name || 'NONE');
-            return activeProject || null;
+            // ========== ORIGINAL LOGIC (TO RESTORE AFTER TEST) ==========
+            // // Get current date in UAE timezone (date only, no time)
+            // const today = nowInUAE();
+            // const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            // 
+            // console.log('🔍 Project Search:', {
+            //     company: deptHeadAssignment.company,
+            //     department: deptHeadAssignment.department,
+            //     todayDateOnly
+            // });
+            // 
+            // // Get all projects for this company
+            // const projects = await base44.entities.Project.filter({
+            //     company: deptHeadAssignment.company
+            // });
+            // 
+            // console.log('📊 Projects found:', projects.length, projects.map(p => ({
+            //     name: p.name,
+            //     company: p.company,
+            //     department: p.department,
+            //     date_from: p.date_from,
+            //     date_to: p.date_to
+            // })));
+            // 
+            // // Find project whose date range contains today (projects apply to all departments in a company)
+            // const activeProject = projects.find(p => {
+            //     const projectStart = utcToUAE(p.date_from);
+            //     const projectEnd = utcToUAE(p.date_to);
+            //     
+            //     // Compare date parts only
+            //     const startDateOnly = new Date(projectStart.getFullYear(), projectStart.getMonth(), projectStart.getDate());
+            //     const endDateOnly = new Date(projectEnd.getFullYear(), projectEnd.getMonth(), projectEnd.getDate());
+            //     
+            //     const isInDateRange = startDateOnly <= todayDateOnly && endDateOnly >= todayDateOnly;
+            //     
+            //     return isInDateRange;
+            // });
+            // 
+            // console.log('✅ Active project:', activeProject?.name || 'NONE');
+            // return activeProject || null;
+            // ========== END ORIGINAL LOGIC ==========
         },
         enabled: !!deptHeadAssignment
     });
