@@ -79,8 +79,8 @@ export default function UserDialog({ open, onClose, user }) {
             }
         }
 
-        // Validate company assignment for user role only
-        if (formData.extended_role === 'user' && !formData.company) {
+        // Validate company assignment for user and department_head roles
+        if ((formData.extended_role === 'user' || formData.extended_role === 'department_head') && !formData.company) {
             toast.error('Please assign a company to this user');
             return;
         }
@@ -93,7 +93,7 @@ export default function UserDialog({ open, onClose, user }) {
         };
         
         // Only include company field based on role
-        if (formData.extended_role === 'user') {
+        if (formData.extended_role === 'user' || formData.extended_role === 'department_head') {
             dataToSubmit.company = formData.company;
         } else if (formData.extended_role === 'admin' || formData.extended_role === 'supervisor') {
             dataToSubmit.company = null;
@@ -160,6 +160,7 @@ export default function UserDialog({ open, onClose, user }) {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="user">User</SelectItem>
+                                    <SelectItem value="department_head">Department Head</SelectItem>
                                     <SelectItem value="supervisor">Supervisor</SelectItem>
                                     <SelectItem value="admin">Admin</SelectItem>
                                 </SelectContent>
@@ -167,11 +168,12 @@ export default function UserDialog({ open, onClose, user }) {
                             <p className="text-xs text-slate-500 mt-1">
                                 {formData.extended_role === 'admin' && 'Full system access'}
                                 {formData.extended_role === 'supervisor' && 'All projects & employees, no system settings'}
+                                {formData.extended_role === 'department_head' && 'Department approval access only'}
                                 {formData.extended_role === 'user' && 'Company-specific access only'}
                             </p>
                         </div>
 
-                        {formData.extended_role === 'user' && (
+                        {(formData.extended_role === 'user' || formData.extended_role === 'department_head') && (
                             <div>
                                 <Label htmlFor="company">Assigned Company *</Label>
                                 <Select
@@ -189,7 +191,7 @@ export default function UserDialog({ open, onClose, user }) {
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    User will only see data from this company
+                                    {formData.extended_role === 'department_head' ? 'Department head will only see data from this company' : 'User will only see data from this company'}
                                 </p>
                             </div>
                         )}
