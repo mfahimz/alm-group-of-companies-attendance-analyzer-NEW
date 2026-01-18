@@ -12,6 +12,7 @@ import { nowInUAE, utcToUAE } from '@/components/ui/timezone';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog.jsx';
+import AllowedMinutesHistory from '@/components/departmenthead/AllowedMinutesHistory.jsx';
 
 export default function DepartmentHeadDashboard() {
     const [showPreApprovalDialog, setShowPreApprovalDialog] = useState(false);
@@ -396,6 +397,14 @@ export default function DepartmentHeadDashboard() {
                     queryClient.invalidateQueries(['preApprovals', currentProject?.id]);
                 }}
             />
+
+            {/* Pre-Approved Minutes History */}
+            {currentProject && (
+                <AllowedMinutesHistory 
+                    projectId={currentProject.id}
+                    deptHeadVerification={deptHeadVerification}
+                />
+            )}
 
             {/* Employees List with Remaining Minutes */}
             {currentProject && (

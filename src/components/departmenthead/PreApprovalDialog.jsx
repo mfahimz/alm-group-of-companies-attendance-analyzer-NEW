@@ -90,6 +90,11 @@ export default function PreApprovalDialog({
             return;
         }
 
+        if (minutes > 120) {
+            toast.error('Allowed minutes cannot exceed 120 minutes per employee');
+            return;
+        }
+
         // SINGLE-DAY VALIDATION: date_to must be same as date_from for allowed minutes
         if (formData.date_to && formData.date_to !== formData.date_from) {
             toast.error('Pre-approved minutes can only be for a single day. From and To dates must be the same.');
