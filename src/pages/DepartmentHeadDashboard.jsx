@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -374,13 +373,11 @@ export default function DepartmentHeadDashboard() {
                 }}
             />
 
-            {/* Employees List with Approvals or Attendance Report */}
+            {/* Employees List with Remaining Minutes */}
             {currentProject && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>
-                            {salaryIsClosed ? 'Subordinates Attendance Report' : 'Employees & Pre-Approved Minutes'}
-                        </CardTitle>
+                        <CardTitle>Remaining Minutes Available</CardTitle>
                     </CardHeader>
                     <CardContent>
                         {employees.length === 0 ? (
@@ -391,26 +388,18 @@ export default function DepartmentHeadDashboard() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Employee Name</TableHead>
                                         <TableHead>Attendance ID</TableHead>
-                                        <TableHead className="text-center">Pre-Approvals Count</TableHead>
-                                        <TableHead className="text-center">Total Minutes Approved</TableHead>
+                                        <TableHead>Employee Name</TableHead>
+                                        <TableHead className="text-right">Remaining Minutes</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {employees.map(emp => (
                                         <TableRow key={emp.id}>
-                                            <TableCell className="font-medium">{emp.name}</TableCell>
-                                            <TableCell>{emp.attendance_id}</TableCell>
-                                            <TableCell className="text-center">
-                                                <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full font-semibold">
-                                                    {getEmployeeApprovalsCount(emp.attendance_id)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <span className="text-green-700 font-semibold">
-                                                    {getEmployeeTotalMinutes(emp.attendance_id)} min
-                                                </span>
+                                            <TableCell className="font-medium text-slate-700">{emp.attendance_id}</TableCell>
+                                            <TableCell>{emp.name}</TableCell>
+                                            <TableCell className="text-right font-semibold text-green-700">
+                                                {getEmployeeRemainingMinutes(emp.hrms_id)} min
                                             </TableCell>
                                         </TableRow>
                                     ))}
