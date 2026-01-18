@@ -906,9 +906,9 @@ export default function RunAnalysisTab({ project }) {
                 current: uniqueEmployeeIds.length, 
                 total: uniqueEmployeeIds.length, 
                 status: 'Saving results to database...',
-                subStatus: `Saving batch ${Math.floor(0 / 15) + 1}...`
+                subStatus: `Saving batch ${Math.floor(0 / 10) + 1}...`
             });
-            const createBatchSize = 15;
+            const createBatchSize = 10; // Reduced from 15 to 10 to avoid rate limits
             for (let i = 0; i < allResults.length; i += createBatchSize) {
                 const batch = allResults.slice(i, i + createBatchSize);
                 await base44.entities.AnalysisResult.bulkCreate(batch);
@@ -918,7 +918,7 @@ export default function RunAnalysisTab({ project }) {
                     status: 'Saving results to database...',
                     subStatus: `Saved ${Math.min(i + createBatchSize, allResults.length)}/${allResults.length} records`
                 });
-                await delay(800);
+                await delay(1500); // Increased from 800ms to 1500ms to prevent rate limiting
             }
 
             // Update project with last saved report
