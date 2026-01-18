@@ -23,6 +23,14 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
+        // Check if user has hrms_id set
+        if (!user.hrms_id) {
+            return Response.json({ 
+                error: 'User record missing HRMS ID. Admin must link this user to an employee.',
+                verified: false 
+            }, { status: 403 });
+        }
+
         // Find department head assignment
         const assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
             employee_id: user.hrms_id,
@@ -31,7 +39,7 @@ Deno.serve(async (req) => {
 
         if (assignments.length === 0) {
             return Response.json({ 
-                error: 'No active department head assignment found',
+                error: 'No active department head assignment found for this employee',
                 verified: false 
             }, { status: 403 });
         }
@@ -41,7 +49,7 @@ Deno.serve(async (req) => {
         // Verify user's company and department match assignment
         if (user.company !== assignment.company || user.department !== assignment.department) {
             return Response.json({ 
-                error: 'User assignment mismatch',
+                error: 'User assignment mismatch with department head record',
                 verified: false 
             }, { status: 403 });
         }

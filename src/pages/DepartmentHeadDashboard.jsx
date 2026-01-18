@@ -252,14 +252,18 @@ export default function DepartmentHeadDashboard() {
     }
 
     if (!deptHeadAssignment) {
+        const errorMessage = deptHeadVerification?.error || 'You are not assigned as a department head.';
         return (
             <div className="flex items-center justify-center min-h-screen bg-slate-50">
                 <Card className="max-w-md">
                     <CardContent className="p-6 text-center">
                         <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-                        <h2 className="text-xl font-semibold mb-2">No Department Assignment</h2>
-                        <p className="text-slate-600">
-                            You are not assigned as a department head. Please contact your administrator.
+                        <h2 className="text-xl font-semibold mb-2">Department Head Access Required</h2>
+                        <p className="text-slate-600 mb-4">
+                            {errorMessage}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                            Please contact your administrator to resolve this issue.
                         </p>
                     </CardContent>
                 </Card>
