@@ -139,11 +139,17 @@ export default function PreApprovalDialog({
                                     <SelectValue placeholder="Select employee" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {employees.map(emp => (
-                                        <SelectItem key={emp.id} value={String(emp.attendance_id)}>
-                                            {emp.name} (ID: {emp.attendance_id})
-                                        </SelectItem>
-                                    ))}
+                                    {employees.length === 0 ? (
+                                        <div className="p-2 text-sm text-slate-500">
+                                            No subordinate employees available
+                                        </div>
+                                    ) : (
+                                        employees.map(emp => (
+                                            <SelectItem key={emp.id} value={String(emp.attendance_id)}>
+                                                {emp.name} (ID: {emp.attendance_id})
+                                            </SelectItem>
+                                        ))
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>

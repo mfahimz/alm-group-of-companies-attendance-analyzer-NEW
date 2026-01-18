@@ -146,7 +146,11 @@ export default function DepartmentHeadDashboard() {
             });
             
             // Filter to only managed subordinates (compare as strings)
-            return allEmployees.filter(emp => managedIds.includes(String(emp.hrms_id)));
+            // CRITICAL: Exclude department head from the list (cannot self-approve)
+            return allEmployees.filter(emp => 
+                managedIds.includes(String(emp.hrms_id)) && 
+                String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
+            );
         },
         enabled: !!deptHeadVerification?.verified
     });
