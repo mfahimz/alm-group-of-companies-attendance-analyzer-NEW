@@ -379,8 +379,27 @@ export default function DepartmentHeadDashboard() {
                 </Card>
             )}
 
-            {/* Pre-Approval Form */}
-            {currentProject && !approvalPeriodEnded && (
+            {/* Show message when salary is closed - access to attendance report */}
+            {currentProject && salaryIsClosed && (
+                <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                    <CardContent className="p-6">
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-green-600 rounded-lg">
+                                <CheckCircle2 className="w-6 h-6 text-white" />
+                            </div>
+                            <div className="flex-1">
+                                <h2 className="text-lg font-semibold text-slate-900">Salary Closed</h2>
+                                <p className="text-slate-600 mt-1">
+                                    The salary for this period has been finalized. You can now view the complete attendance report for your subordinates below.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Pre-Approval Form - only shown before salary is closed */}
+            {currentProject && !salaryIsClosed && !approvalPeriodEnded && (
                 <Card>
                     <CardHeader>
                         <CardTitle>Pre-Approve Minutes for Employee</CardTitle>
