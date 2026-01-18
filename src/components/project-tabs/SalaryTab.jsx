@@ -18,13 +18,23 @@ export default function SalaryTab({ project, finalReport }) {
     const { data: employees = [], isLoading: loadingEmployees } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company, active: true }),
-        enabled: !!project.company
+        enabled: !!project.company,
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: salaries = [], isLoading: loadingSalaries } = useQuery({
         queryKey: ['salaries', project.company],
         queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
-        enabled: !!project.company
+        enabled: !!project.company,
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: analysisResults = [], isLoading: loadingResults } = useQuery({
@@ -33,7 +43,12 @@ export default function SalaryTab({ project, finalReport }) {
             project_id: project.id,
             report_run_id: finalReport.id
         }),
-        enabled: !!project.id && !!finalReport?.id
+        enabled: !!project.id && !!finalReport?.id,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';

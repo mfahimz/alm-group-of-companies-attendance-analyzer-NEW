@@ -21,12 +21,22 @@ export default function RunAnalysisTab({ project }) {
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
-        queryFn: () => base44.entities.Punch.filter({ project_id: project.id })
+        queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
-        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id })
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: currentUser } = useQuery({
@@ -39,7 +49,12 @@ export default function RunAnalysisTab({ project }) {
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Check for pending exceptions
@@ -47,7 +62,12 @@ export default function RunAnalysisTab({ project }) {
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
-        queryFn: () => base44.entities.Employee.filter({ company: project.company })
+        queryFn: () => base44.entities.Employee.filter({ company: project.company }),
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: rules } = useQuery({
@@ -58,7 +78,12 @@ export default function RunAnalysisTab({ project }) {
                 return JSON.parse(rulesList[0].rules_json);
             }
             return null;
-        }
+        },
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Get unique employee IDs from punches - ALWAYS include all employees with punch data
