@@ -133,6 +133,28 @@ export default function TechnicalDocumentation() {
                         </p>
                     </div>
 
+                    <h3 className="text-xl font-semibold mt-6">Maintenance Mode</h3>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-amber-900 mb-2">System Maintenance Access Control</h4>
+                        <p className="text-sm text-amber-800 mb-2">
+                            System administrators can enable maintenance mode to restrict access during system updates or critical maintenance.
+                        </p>
+                        <p className="text-sm text-amber-800 mb-2"><strong>Behavior:</strong></p>
+                        <ul className="text-sm text-amber-700">
+                            <li><strong>Admin:</strong> Full access - can navigate all pages and perform all operations</li>
+                            <li><strong>All Other Roles (CEO, Supervisor, Department Head, User):</strong> Redirected to Maintenance page with blocking message</li>
+                        </ul>
+                        <p className="text-sm text-amber-800 mt-3"><strong>Storage:</strong></p>
+                        <ul className="text-sm text-amber-700">
+                            <li>Setting stored in SystemSettings entity with setting_key = 'MAINTENANCE_MODE'</li>
+                            <li>setting_value = 'true' activates maintenance mode</li>
+                            <li>Cached for 5 minutes to reduce database load</li>
+                        </ul>
+                        <p className="text-sm text-amber-800 mt-3">
+                            <strong>Implementation:</strong> Check runs in Layout.js after authentication. Only users with role='admin' bypass the restriction.
+                        </p>
+                    </div>
+
                     <h3 className="text-xl font-semibold mt-6">Timezone Standard</h3>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <h4 className="font-semibold text-blue-900 mb-2">UAE Time (Asia/Dubai, UTC+4)</h4>
@@ -820,8 +842,9 @@ const menu = baseMenu.filter(item => hasPageAccess(item.url));`}
                             <p className="text-xs text-orange-800"><strong>Can modify:</strong> Pre-approve minutes for employees in their department</p>
                             <p className="text-xs text-orange-800"><strong>Forbidden:</strong> All other pages, all other data</p>
                             <p className="text-xs text-orange-800 mt-2">
-                                <strong>Implementation:</strong> Layout.js redirects department heads to DepartmentHeadDashboard if they try 
-                                to access any other page. No menu items shown.
+                                <strong>Implementation:</strong> Layout.js uses window.location.replace() to redirect department heads to 
+                                DepartmentHeadDashboard if they attempt to access any other page. This prevents navigation loops and ensures 
+                                single-page restriction enforcement. No menu items are shown in navbar.
                             </p>
                         </div>
 
