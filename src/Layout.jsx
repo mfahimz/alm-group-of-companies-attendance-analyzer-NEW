@@ -87,6 +87,16 @@ export default function Layout({ children, currentPageName }) {
         }
     }, [isPublicPage, isLoading, error]);
 
+    // Immediate redirect for department heads (before any page renders)
+    React.useEffect(() => {
+        if (currentUser && !isPublicPage) {
+            const userRole = currentUser.extended_role || currentUser.role || 'user';
+            if (userRole === 'department_head' && currentPageName !== 'DepartmentHeadDashboard') {
+                window.location.replace('/DepartmentHeadDashboard');
+            }
+        }
+    }, [currentUser, currentPageName, isPublicPage]);
+
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
         queryFn: async () => {
