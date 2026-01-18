@@ -16,7 +16,8 @@ export default function UserDialog({ open, onClose, user }) {
         display_name: '',
         extended_role: 'user',
         company: '',
-        department: ''
+        department: '',
+        hrms_id: ''
     });
     const queryClient = useQueryClient();
 
@@ -29,6 +30,12 @@ export default function UserDialog({ open, onClose, user }) {
     const { data: companySettings = [] } = useQuery({
         queryKey: ['companySettings'],
         queryFn: () => base44.entities.CompanySettings.list(),
+        enabled: formData.extended_role === 'department_head' && !!formData.company
+    });
+
+    const { data: employees = [] } = useQuery({
+        queryKey: ['employees', formData.company],
+        queryFn: () => base44.entities.Employee.filter({ company: formData.company }),
         enabled: formData.extended_role === 'department_head' && !!formData.company
     });
 
@@ -47,7 +54,8 @@ export default function UserDialog({ open, onClose, user }) {
                 display_name: user.display_name || '',
                 extended_role: user.extended_role || user.role || 'user',
                 company: user.company || '',
-                department: user.department || ''
+                department: user.department || '',
+                hrms_id: user.hrms_id || ''
             });
         } else {
             setFormData({
@@ -56,7 +64,8 @@ export default function UserDialog({ open, onClose, user }) {
                 display_name: '',
                 extended_role: 'user',
                 company: '',
-                department: ''
+                department: '',
+                hrms_id: ''
             });
         }
     }, [user]);
@@ -107,6 +116,12 @@ export default function UserDialog({ open, onClose, user }) {
             return;
         }
 
+        // Validate employee link for department_head role
+        if (formData.extended_role === 'department_head' && !formData.hrms_id) {
+            toast.error('Please link this department head to an employee');
+            return;
+        }
+
         // Only submit fields that should be updated
         const dataToSubmit = {
             full_name: formData.full_name,
@@ -117,15 +132,18 @@ export default function UserDialog({ open, onClose, user }) {
         // Only include company field based on role
         if (formData.extended_role === 'user' || formData.extended_role === 'department_head') {
             dataToSubmit.company = formData.company;
-            // Include department only for department_head role
+            // Include department and hrms_id only for department_head role
             if (formData.extended_role === 'department_head') {
                 dataToSubmit.department = formData.department;
+                dataToSubmit.hrms_id = formData.hrms_id;
             } else {
                 dataToSubmit.department = null;
+                dataToSubmit.hrms_id = null;
             }
         } else if (formData.extended_role === 'admin' || formData.extended_role === 'supervisor') {
             dataToSubmit.company = null;
             dataToSubmit.department = null;
+            dataToSubmit.hrms_id = null;
         }
 
         if (user) {
@@ -226,27 +244,51 @@ export default function UserDialog({ open, onClose, user }) {
                         )}
 
                         {formData.extended_role === 'department_head' && formData.company && (
-                            <div>
-                                <Label htmlFor="department">Assigned Department *</Label>
-                                <Select
-                                    value={formData.department}
-                                    onValueChange={(value) => setFormData({ ...formData, department: value })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select department" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableDepartments.map((dept) => (
-                                            <SelectItem key={dept} value={dept}>
-                                                {dept}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Only employees in this department will be visible to this department head
-                                </p>
-                            </div>
+                            <>
+                                <div>
+                                    <Label htmlFor="department">Assigned Department *</Label>
+                                    <Select
+                                        value={formData.department}
+                                        onValueChange={(value) => setFormData({ ...formData, department: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select department" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableDepartments.map((dept) => (
+                                                <SelectItem key={dept} value={dept}>
+                                                    {dept}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Only employees in this department will be visible to this department head
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="employee">Link to Employee *</Label>
+                                    <Select
+                                        value={formData.hrms_id}
+                                        onValueChange={(value) => setFormData({ ...formData, hrms_id: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select employee" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {employees.map((emp) => (
+                                                <SelectItem key={emp.hrms_id} value={emp.hrms_id.toString()}>
+                                                    {emp.name} (ID: {emp.hrms_id})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Link this user to their employee record in the employee master
+                                    </p>
+                                </div>
+                            </>
                         )}
 
                         <div className="flex justify-end gap-3 pt-4">
