@@ -1505,6 +1505,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
                 punchTimesShort: dayPunches.map(p => extractTime(p.timestamp_raw)).join(', '),
                 allPunchTimes: rawDayPunches.map(p => p.timestamp_raw).join(', '),
+                punchObjects: dayPunches,
                 shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
                 exception: dateException ? dateException.type : '-',
                 status,
@@ -1957,7 +1958,14 @@ export default function ReportDetailView({ reportRun, project }) {
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}
                 analysisResult={selectedEmployee}
-                dailyBreakdownData={{ [selectedEmployee?.attendance_id]: { daily_details: getDailyBreakdown.reduce((acc, day) => ({ ...acc, [day.dateStr]: { punches: day.punchTimes.split(', ').filter(Boolean) } }), {}) } }}
+                dailyBreakdownData={{ 
+                    [selectedEmployee?.attendance_id]: { 
+                        daily_details: getDailyBreakdown.reduce((acc, day) => ({ 
+                            ...acc, 
+                            [day.dateStr]: { punches: day.punchObjects || [] } 
+                        }), {}) 
+                    } 
+                }}
             />
 
             <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && setEditingGraceMinutes(null)}>

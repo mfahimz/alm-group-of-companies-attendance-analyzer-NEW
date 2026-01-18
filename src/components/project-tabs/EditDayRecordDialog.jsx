@@ -174,12 +174,18 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 return breakdownDate === recordDate;
             });
             
-            if (dayKey && breakdownDetails[dayKey]?.punches) {
-                return breakdownDetails[dayKey].punches.map((punchStr, idx) => ({
-                    id: `${dayKey}-${idx}`,
-                    timestamp_raw: punchStr,
-                    punch_date: dayKey
-                }));
+            if (dayKey && breakdownDetails[dayKey]?.punches && Array.isArray(breakdownDetails[dayKey].punches)) {
+                const punchData = breakdownDetails[dayKey].punches;
+                // Check if punches are already objects or strings
+                if (punchData.length > 0 && typeof punchData[0] === 'object') {
+                    return punchData;
+                } else if (punchData.length > 0 && typeof punchData[0] === 'string') {
+                    return punchData.map((punchStr, idx) => ({
+                        id: `${dayKey}-${idx}`,
+                        timestamp_raw: punchStr,
+                        punch_date: dayKey
+                    }));
+                }
             }
         }
         
