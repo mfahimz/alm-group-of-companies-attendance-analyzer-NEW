@@ -48,8 +48,9 @@ export default function DepartmentHeadDashboard() {
         queryFn: async () => {
             if (!deptHeadAssignment) return null;
             
-            // Get current date in UAE timezone
+            // Get current date in UAE timezone (date only, no time)
             const today = nowInUAE();
+            const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             
             // Get all projects for this company
             const projects = await base44.entities.Project.filter({
@@ -60,7 +61,12 @@ export default function DepartmentHeadDashboard() {
             const activeProject = projects.find(p => {
                 const projectStart = utcToUAE(p.date_from);
                 const projectEnd = utcToUAE(p.date_to);
-                const isInDateRange = projectStart <= today && projectEnd >= today;
+                
+                // Compare date parts only
+                const startDateOnly = new Date(projectStart.getFullYear(), projectStart.getMonth(), projectStart.getDate());
+                const endDateOnly = new Date(projectEnd.getFullYear(), projectEnd.getMonth(), projectEnd.getDate());
+                
+                const isInDateRange = startDateOnly <= todayDateOnly && endDateOnly >= todayDateOnly;
                 const isDepartmentMatch = p.department === 'All' || p.department === deptHeadAssignment.department;
                 return isInDateRange && isDepartmentMatch;
             });
