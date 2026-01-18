@@ -24,6 +24,7 @@ import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import TechnicalDocumentation from './pages/TechnicalDocumentation';
+import BusinessDocumentation from './pages/BusinessDocumentation';
 import __Layout from './Layout.jsx';
 
 
@@ -54,6 +55,7 @@ export const PAGES = {
     "Users": Users,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "TechnicalDocumentation": TechnicalDocumentation,
+    "BusinessDocumentation": BusinessDocumentation,
 }
 
 export const pagesConfig = {
