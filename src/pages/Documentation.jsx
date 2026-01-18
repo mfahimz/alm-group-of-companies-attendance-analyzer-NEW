@@ -470,6 +470,8 @@ export default function Documentation() {
                                 <li>Set up page permissions based on your organization's access needs</li>
                                 <li>Configure grace periods that match your company policy</li>
                                 <li>Define public holidays at the start of the year</li>
+                                <li>Assign department heads through Users page (role: Department Head)</li>
+                                <li>Link department heads to their departments via Department Heads settings page</li>
                                 <li>Document any custom rules or processes for your team</li>
                             </ul>
                         </div>
