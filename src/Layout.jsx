@@ -141,7 +141,6 @@ export default function Layout({ children, currentPageName }) {
         retry: 1
     });
 
-    // Calculate user role BEFORE any conditional returns
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
