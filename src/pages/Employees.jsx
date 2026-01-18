@@ -68,33 +68,41 @@ export default function Employees() {
     const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
-    // Server-side filtered employees based on user access
-    const { data: employees = [], isLoading } = useQuery({
-        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole],
+    // Server-side filtered employees with pagination
+    const { data: employeesData = { items: [], total: 0 }, isLoading } = useQuery({
+        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole, page, pageSize],
         queryFn: async () => {
-            if (!currentUser) return [];
+            if (!currentUser) return { items: [], total: 0 };
+            
+            const skip = (page - 1) * pageSize;
             
             // Admin, Supervisor, CEO can see all employees
             if (isAdmin || isSupervisor || isCEO) {
-                return await base44.entities.Employee.list('-created_date');
+                const items = await base44.entities.Employee.list('-created_date', pageSize, skip);
+                return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
             }
             
             // Department heads see only their department
             if (isDepartmentHead && currentUser.department) {
-                return await base44.entities.Employee.filter({
+                const items = await base44.entities.Employee.filter({
                     company: currentUser.company,
                     department: currentUser.department,
                     active: true
-                });
+                }, '-created_date', pageSize);
+                return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
             }
             
             // Regular users see only their company
-            return await base44.entities.Employee.filter({
+            const items = await base44.entities.Employee.filter({
                 company: currentUser.company
-            });
+            }, '-created_date', pageSize);
+            return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
         },
-        enabled: !!currentUser
+        enabled: !!currentUser,
+        keepPreviousData: true
     });
+
+    const employees = employeesData.items;
 
     const deleteMutation = useMutation({
         mutationFn: async (id) => {

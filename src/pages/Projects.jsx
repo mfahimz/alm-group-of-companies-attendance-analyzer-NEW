@@ -56,24 +56,35 @@ export default function Projects() {
         }
     }, [currentUser, permissions, navigate, userRole]);
 
-    // Server-side filtered projects based on user access
-    const { data: projects = [], isLoading } = useQuery({
-        queryKey: ['projects', currentUser?.company, userRole],
+    // Pagination state
+    const [page, setPage] = React.useState(1);
+    const [pageSize] = React.useState(50);
+
+    // Server-side filtered projects with pagination
+    const { data: projectsData = { items: [], total: 0 }, isLoading } = useQuery({
+        queryKey: ['projects', currentUser?.company, userRole, page, pageSize],
         queryFn: async () => {
-            if (!currentUser) return [];
+            if (!currentUser) return { items: [], total: 0 };
+            
+            const skip = (page - 1) * pageSize;
             
             // Admin, Supervisor, CEO can see all projects
             if (isAdminOrSupervisor || userRole === 'ceo') {
-                return await base44.entities.Project.list('-created_date');
+                const items = await base44.entities.Project.list('-created_date', pageSize, skip);
+                return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
             }
             
             // Regular users and department heads see only their company's projects
-            return await base44.entities.Project.filter({
+            const items = await base44.entities.Project.filter({
                 company: currentUser.company
-            });
+            }, '-created_date', pageSize);
+            return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
         },
-        enabled: !!currentUser
+        enabled: !!currentUser,
+        keepPreviousData: true
     });
+
+    const projects = projectsData.items;
 
     const checkOverlap = (start, end, excludeId = null) => {
         const startDate = new Date(start);

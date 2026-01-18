@@ -72,9 +72,9 @@ export default function Users() {
         }
     }, [currentUser, permissions, navigate]);
 
-    // SECURITY: Only admins can query User entity
-    const { data: users = [], isLoading } = useQuery({
-        queryKey: ['users'],
+    // SECURITY: Only admins can query User entity with pagination
+    const { data: usersData = { items: [], total: 0 }, isLoading } = useQuery({
+        queryKey: ['users', page, pageSize],
         queryFn: async () => {
             const user = await base44.auth.me();
             const userRole = user?.extended_role || user?.role || 'user';
@@ -83,10 +83,15 @@ export default function Users() {
                 throw new Error('Access denied: Admin role required');
             }
             
-            return await base44.entities.User.list('-created_date');
+            const skip = (page - 1) * pageSize;
+            const items = await base44.entities.User.list('-created_date', pageSize, skip);
+            return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
         },
-        enabled: !!currentUser
+        enabled: !!currentUser,
+        keepPreviousData: true
     });
+
+    const users = usersData.items;
 
     const { data: pagePermissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
