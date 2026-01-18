@@ -65,3 +65,58 @@ export function formatRelativeInUAE(date) {
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
     return formatInUAE(date, 'MMM d, yyyy');
 }
+
+/**
+ * Get start of day in UAE timezone
+ * @param {Date|string} date - Date to process
+ * @returns {Date} Start of day (00:00:00) in UAE timezone
+ */
+export function startOfDayUAE(date) {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    const uaeDate = toZonedTime(dateObj, UAE_TIMEZONE);
+    uaeDate.setHours(0, 0, 0, 0);
+    return uaeDate;
+}
+
+/**
+ * Get end of day in UAE timezone
+ * @param {Date|string} date - Date to process
+ * @returns {Date} End of day (23:59:59) in UAE timezone
+ */
+export function endOfDayUAE(date) {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    const uaeDate = toZonedTime(dateObj, UAE_TIMEZONE);
+    uaeDate.setHours(23, 59, 59, 999);
+    return uaeDate;
+}
+
+/**
+ * Parse date string in UAE timezone context
+ * @param {string} dateStr - Date string (e.g., "2025-01-18")
+ * @returns {Date} Date object representing that date in UAE timezone
+ */
+export function parseDateInUAE(dateStr) {
+    if (!dateStr) return null;
+    // Parse as UAE local date
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const uaeDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+    return toZonedTime(uaeDate, UAE_TIMEZONE);
+}
+
+/**
+ * Format date for input fields (YYYY-MM-DD in UAE timezone)
+ * @param {Date|string} date - Date to format
+ * @returns {string} Date string in YYYY-MM-DD format
+ */
+export function formatDateForInput(date) {
+    if (!date) return '';
+    return formatInUAE(date, 'yyyy-MM-dd');
+}
+
+/**
+ * Get current timestamp in UAE timezone (for storing)
+ * @returns {string} ISO string representing current UAE time
+ */
+export function nowUAETimestamp() {
+    return formatInUAE(new Date(), "yyyy-MM-dd'T'HH:mm:ss");
+}
