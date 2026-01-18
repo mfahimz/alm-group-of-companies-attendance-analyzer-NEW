@@ -321,103 +321,32 @@ export default function DepartmentHeadDashboard() {
                 </Card>
             )}
 
-            {/* Pre-Approval Form - only shown before salary is closed */}
+            {/* Pre-Approval Dialog Trigger - only shown before salary is closed */}
             {currentProject && !salaryIsClosed && !approvalPeriodEnded && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Pre-Approve Minutes for Employee</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Select Employee
-                                </label>
-                                <select
-                                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                                    value={selectedEmployee?.id || ''}
-                                    onChange={(e) => {
-                                        const emp = employees.find(e => e.id === e.target.value);
-                                        setSelectedEmployee(emp);
-                                    }}
-                                >
-                                    <option value="">-- Choose Employee --</option>
-                                    {employees.map(emp => (
-                                        <option key={emp.id} value={emp.id}>
-                                            {emp.name} (ID: {emp.attendance_id})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Select Date
-                                </label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            className="w-full justify-start text-left"
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {selectedDate ? format(selectedDate, 'dd MMM yyyy') : 'Pick a date'}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                            mode="single"
-                                            selected={selectedDate}
-                                            onSelect={setSelectedDate}
-                                            disabled={(date) => {
-                                                const projectStart = parseISO(currentProject.date_from);
-                                                const projectEnd = parseISO(currentProject.date_to);
-                                                return isBefore(date, projectStart) || 
-                                                       isAfter(date, projectEnd) ||
-                                                       isAfter(date, new Date()); // Cannot approve future dates
-                                            }}
-                                        />
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Approved Minutes
-                            </label>
-                            <Input
-                                type="number"
-                                placeholder="Enter minutes (e.g., 60)"
-                                value={approvedMinutes}
-                                onChange={(e) => setApprovedMinutes(e.target.value)}
-                                min="1"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Reason
-                            </label>
-                            <Textarea
-                                placeholder="Enter reason for approval (e.g., Hospital appointment, Personal emergency)"
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                rows={3}
-                            />
-                        </div>
-
-                        <Button 
-                            onClick={handleSaveApproval}
-                            disabled={createPreApprovalMutation.isPending}
-                            className="bg-green-600 hover:bg-green-700"
-                        >
-                            <CheckCircle2 className="w-4 h-4 mr-2" />
-                            {createPreApprovalMutation.isPending ? 'Saving...' : 'Save Pre-Approval'}
-                        </Button>
-                    </CardContent>
-                </Card>
+                <div className="flex justify-end">
+                    <Button 
+                        onClick={() => setShowPreApprovalDialog(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 gap-2"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Pre-Approved Minutes
+                    </Button>
+                </div>
             )}
+
+            {/* Pre-Approval Dialog */}
+            <PreApprovalDialog 
+                open={showPreApprovalDialog}
+                onClose={() => setShowPreApprovalDialog(false)}
+                projectId={currentProject?.id}
+                employees={employees}
+                deptHeadAssignment={deptHeadAssignment}
+                deptHeadVerification={deptHeadVerification}
+                currentProject={currentProject}
+                onSuccess={() => {
+                    queryClient.invalidateQueries(['preApprovals', currentProject?.id]);
+                }}
+            />
 
             {/* Employees List with Approvals or Attendance Report */}
             {currentProject && (
