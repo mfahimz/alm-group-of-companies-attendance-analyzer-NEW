@@ -65,23 +65,29 @@ Deno.serve(async (req) => {
                     // Note: This is a simplified version. In production, you'd call
                     // the actual analysis logic from RunAnalysisTab here
                     // For now, we'll create a placeholder result
+
+                    // FOUNDATION: Per-day allowed minutes matching (currently Al Maraghi Auto Repairs only)
+                    // This placeholder will be replaced with full analysis logic
+                    const exceptionOffsets = {};
+
                     const result = await base44.asServiceRole.entities.AnalysisResult.create({
-                        project_id,
-                        report_run_id: reportRun.id,
-                        attendance_id: attendanceId,
-                        working_days: 0,
-                        present_days: 0,
-                        full_absence_count: 0,
-                        half_absence_count: 0,
-                        sick_leave_count: 0,
-                        annual_leave_count: 0,
-                        late_minutes: 0,
-                        early_checkout_minutes: 0,
-                        other_minutes: 0,
-                        grace_minutes: 15,
-                        abnormal_dates: '',
-                        notes: 'Backend analysis in progress',
-                        auto_resolutions: ''
+                       project_id,
+                       report_run_id: reportRun.id,
+                       attendance_id: attendanceId,
+                       working_days: 0,
+                       present_days: 0,
+                       full_absence_count: 0,
+                       half_absence_count: 0,
+                       sick_leave_count: 0,
+                       annual_leave_count: 0,
+                       late_minutes: 0,
+                       early_checkout_minutes: 0,
+                       other_minutes: 0,
+                       grace_minutes: 15,
+                       abnormal_dates: '',
+                       notes: 'Backend analysis in progress',
+                       auto_resolutions: '',
+                       exception_offsets: JSON.stringify(exceptionOffsets)
                     });
 
                     return result.id;
