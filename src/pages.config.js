@@ -23,6 +23,7 @@ import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
+import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import __Layout from './Layout.jsx';
 
 
@@ -52,6 +53,7 @@ export const PAGES = {
     "UserProfile": UserProfile,
     "Users": Users,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
+    "TechnicalDocumentation": TechnicalDocumentation,
 }
 
 export const pagesConfig = {
