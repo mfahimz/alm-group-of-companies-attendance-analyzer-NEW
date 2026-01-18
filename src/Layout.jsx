@@ -150,10 +150,11 @@ export default function Layout({ children, currentPageName }) {
     const navbarMenu = React.useMemo(() => {
         if (!currentUser) return [];
 
-        // Department Head gets only their dashboard
+        // Department Head gets dashboard + projects (report view only)
         if (isDepartmentHead) {
             return [
-                { title: 'Dashboard', url: 'DepartmentHeadDashboard' }
+                { title: 'Dashboard', url: 'DepartmentHeadDashboard' },
+                { title: 'Projects', url: 'Projects' }
             ];
         }
 
