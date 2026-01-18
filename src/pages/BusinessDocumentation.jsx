@@ -145,6 +145,30 @@ export default function BusinessDocumentation() {
                             for consistency and compliance with UAE labor law.
                         </p>
                     </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Maintenance Mode</h3>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-amber-900 mb-2">System Maintenance Access</h4>
+                        <p className="text-sm text-amber-800 mb-2">
+                            During critical system updates or maintenance, administrators can enable maintenance mode 
+                            to restrict access to the system.
+                        </p>
+                        <p className="text-sm text-amber-800 mb-2"><strong>Who Can Access During Maintenance:</strong></p>
+                        <ul className="text-sm text-amber-700">
+                            <li><strong>Admin:</strong> Full system access to perform maintenance tasks</li>
+                            <li><strong>All Other Users (CEO, Supervisor, Department Head, Regular User):</strong> Blocked with maintenance message</li>
+                        </ul>
+                        <p className="text-sm text-amber-800 mt-3">
+                            <strong>When Maintenance Mode is Active:</strong> All non-admin users will see a maintenance screen 
+                            explaining that the system is temporarily unavailable. They cannot access any pages or data until 
+                            an administrator disables maintenance mode.
+                        </p>
+                        <p className="text-sm text-amber-800 mt-2">
+                            <strong>Purpose:</strong> This ensures data integrity during system updates, prevents users from 
+                            accessing incomplete features, and allows administrators to perform critical maintenance without 
+                            user interference.
+                        </p>
+                    </div>
                 </Section>
 
                 {/* Key Business Capabilities */}
