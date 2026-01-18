@@ -225,6 +225,13 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
+    // Redirect department heads to their dashboard (only once on mount, not on every render)
+    React.useEffect(() => {
+        if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard' && !isLoading && currentUser) {
+            window.location.href = '/DepartmentHeadDashboard';
+        }
+    }, [isDepartmentHead, currentPageName, isLoading, currentUser]);
+
     // CRITICAL: Block non-desktop devices BEFORE any rendering
     // This check happens even before authentication
     if (isChecking) {
@@ -273,13 +280,6 @@ export default function Layout({ children, currentPageName }) {
         window.location.href = '/Maintenance';
         return null;
     }
-
-    // Redirect department heads to their dashboard (only once on mount, not on every render)
-    React.useEffect(() => {
-        if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
-            window.location.href = '/DepartmentHeadDashboard';
-        }
-    }, [isDepartmentHead, currentPageName]);
 
     // Check if user has a company assigned (not required for admin/supervisor/ceo)
     if (!currentUser.company && (userRole === 'user' || userRole === 'department_head')) {
