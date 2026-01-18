@@ -72,9 +72,20 @@ export default function Users() {
         }
     }, [currentUser, permissions, navigate]);
 
+    // SECURITY: Only admins can query User entity
     const { data: users = [], isLoading } = useQuery({
         queryKey: ['users'],
-        queryFn: () => base44.entities.User.list('-created_date')
+        queryFn: async () => {
+            const user = await base44.auth.me();
+            const userRole = user?.extended_role || user?.role || 'user';
+            
+            if (userRole !== 'admin') {
+                throw new Error('Access denied: Admin role required');
+            }
+            
+            return await base44.entities.User.list('-created_date');
+        },
+        enabled: !!currentUser
     });
 
     const { data: pagePermissions = [] } = useQuery({

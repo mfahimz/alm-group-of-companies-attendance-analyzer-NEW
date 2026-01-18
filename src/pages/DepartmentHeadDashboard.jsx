@@ -29,18 +29,22 @@ export default function DepartmentHeadDashboard() {
         queryFn: () => base44.auth.me()
     });
 
-    // Get department head assignment
-    const { data: deptHeadAssignment } = useQuery({
-        queryKey: ['deptHeadAssignment', currentUser?.email],
+    // SECURITY: Verify department head assignment via backend
+    const { data: deptHeadVerification } = useQuery({
+        queryKey: ['deptHeadVerification', currentUser?.email],
         queryFn: async () => {
-            const assignments = await base44.entities.DepartmentHead.filter({ 
-                employee_id: currentUser.hrms_id || currentUser.id,
-                active: true 
-            });
-            return assignments[0] || null;
+            const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
+            return data;
         },
-        enabled: !!currentUser
+        enabled: !!currentUser,
+        retry: false
     });
+
+    const deptHeadAssignment = deptHeadVerification?.verified ? {
+        company: deptHeadVerification.assignment.company,
+        department: deptHeadVerification.assignment.department,
+        employee_id: deptHeadVerification.assignment.employee_id
+    } : null;
 
     // Get current month project (Al Maraghi Auto Repairs only)
     const { data: currentProject } = useQuery({
@@ -106,19 +110,20 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Auto Repairs'
     });
 
-    // Get employees under this department head
+    // SECURITY: Server-side filtered employees for this department head
     const { data: employees = [] } = useQuery({
         queryKey: ['deptEmployees', deptHeadAssignment?.company, deptHeadAssignment?.department],
         queryFn: async () => {
-            if (!deptHeadAssignment) return [];
+            if (!deptHeadVerification?.verified) return [];
             
+            // Use verified assignment data from backend
             return await base44.entities.Employee.filter({
-                company: deptHeadAssignment.company,
-                department: deptHeadAssignment.department,
+                company: deptHeadVerification.assignment.company,
+                department: deptHeadVerification.assignment.department,
                 active: true
             });
         },
-        enabled: !!deptHeadAssignment
+        enabled: !!deptHeadVerification?.verified
     });
 
     // Get existing pre-approvals for current project

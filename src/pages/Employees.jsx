@@ -61,25 +61,40 @@ export default function Employees() {
         }
     }, [currentUser, permissions, navigate]);
 
-    const { data: allEmployees = [], isLoading } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list('-created_date')
-    });
-
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
+    const isCEO = userRole === 'ceo';
+    const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
-    // Filter employees based on user access
-    const employees = React.useMemo(() => {
-        if (!currentUser) return [];
-        // Admin and supervisor can access all employees
-        const userRole = currentUser.extended_role || currentUser.role;
-        const canAccessAll = userRole === 'admin' || userRole === 'supervisor';
-        if (canAccessAll) return allEmployees;
-        return allEmployees.filter(e => e.company === currentUser.company);
-    }, [allEmployees, currentUser]);
+    // Server-side filtered employees based on user access
+    const { data: employees = [], isLoading } = useQuery({
+        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole],
+        queryFn: async () => {
+            if (!currentUser) return [];
+            
+            // Admin, Supervisor, CEO can see all employees
+            if (isAdmin || isSupervisor || isCEO) {
+                return await base44.entities.Employee.list('-created_date');
+            }
+            
+            // Department heads see only their department
+            if (isDepartmentHead && currentUser.department) {
+                return await base44.entities.Employee.filter({
+                    company: currentUser.company,
+                    department: currentUser.department,
+                    active: true
+                });
+            }
+            
+            // Regular users see only their company
+            return await base44.entities.Employee.filter({
+                company: currentUser.company
+            });
+        },
+        enabled: !!currentUser
+    });
 
     const deleteMutation = useMutation({
         mutationFn: async (id) => {

@@ -9,6 +9,14 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Token is required' }, { status: 400 });
         }
 
+        // SECURITY: Verify authenticated user (for non-public approval links)
+        let authenticatedUser = null;
+        try {
+            authenticatedUser = await base44.auth.me();
+        } catch (e) {
+            // Public link - no authentication required if admin_override_public is true
+        }
+
         // Verify link is still valid
         const links = await base44.asServiceRole.entities.ApprovalLink.filter({ link_token: token });
         
@@ -27,6 +35,15 @@ Deno.serve(async (req) => {
         // Check if already used
         if (link.used && !approve_all) {
             return Response.json({ error: 'Link already used' }, { status: 400 });
+        }
+
+        // SECURITY: For non-public links, verify user is the assigned department head
+        if (!link.admin_override_public && authenticatedUser) {
+            if (!authenticatedUser.hrms_id || authenticatedUser.hrms_id !== link.department_head_id) {
+                return Response.json({ 
+                    error: 'Access denied: You are not the assigned department head for this approval' 
+                }, { status: 403 });
+            }
         }
 
         // Approve exceptions

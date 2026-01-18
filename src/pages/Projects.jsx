@@ -56,18 +56,24 @@ export default function Projects() {
         }
     }, [currentUser, permissions, navigate, userRole]);
 
-    const { data: allProjects = [], isLoading } = useQuery({
-        queryKey: ['projects'],
-        queryFn: () => base44.entities.Project.list('-created_date')
+    // Server-side filtered projects based on user access
+    const { data: projects = [], isLoading } = useQuery({
+        queryKey: ['projects', currentUser?.company, userRole],
+        queryFn: async () => {
+            if (!currentUser) return [];
+            
+            // Admin, Supervisor, CEO can see all projects
+            if (isAdminOrSupervisor || userRole === 'ceo') {
+                return await base44.entities.Project.list('-created_date');
+            }
+            
+            // Regular users and department heads see only their company's projects
+            return await base44.entities.Project.filter({
+                company: currentUser.company
+            });
+        },
+        enabled: !!currentUser
     });
-
-    // Filter projects based on user access
-    const projects = React.useMemo(() => {
-        if (!currentUser) return [];
-        const canAccessAll = isAdminOrSupervisor;
-        if (canAccessAll) return allProjects;
-        return allProjects.filter(p => p.company === currentUser.company);
-    }, [allProjects, currentUser, isAdminOrSupervisor]);
 
     const checkOverlap = (start, end, excludeId = null) => {
         const startDate = new Date(start);
