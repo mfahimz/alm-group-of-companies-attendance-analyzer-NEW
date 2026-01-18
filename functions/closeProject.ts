@@ -39,31 +39,83 @@ Deno.serve(async (req) => {
             company: project.company
         });
 
-        // Deduct approved minutes from quarterly allowances
+        // FOUNDATION: Currently only applies to Al Maraghi Auto Repairs
+        // Design allows for per-company toggle via system settings in future
+        const enableAllowedMinutesDeduction = project.company === 'Al Maraghi Auto Repairs';
+
+        // Deduct allowed minutes exceptions from quarterly allowances (single-day per-day matching)
+        // Only applies to Al Maraghi Auto Repairs for now
         const updates = [];
-        for (const result of results) {
-            if (!result.approved_minutes || result.approved_minutes === 0) continue;
-
-            const employee = employees.find(e => e.attendance_id === result.attendance_id);
-            if (!employee) continue;
-
-            // Get or create quarterly minutes record
-            const quarterlyRecords = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
-                employee_id: employee.id,
-                project_id: project_id
+        
+        if (enableAllowedMinutesDeduction) {
+            // Get all ALLOWED_MINUTES exceptions for this project
+            const allowedMinutesExceptions = await base44.asServiceRole.entities.Exception.filter({
+                project_id: project_id,
+                type: 'ALLOWED_MINUTES'
             });
 
-            if (quarterlyRecords.length > 0) {
-                const record = quarterlyRecords[0];
-                const newUsedMinutes = (record.used_minutes || 0) + result.approved_minutes;
-                const newRemainingMinutes = Math.max(0, (record.total_minutes || 0) - newUsedMinutes);
+            // Group exceptions by attendance_id
+            const exceptionsByEmployee = {};
+            for (const exc of allowedMinutesExceptions) {
+                if (!exceptionsByEmployee[exc.attendance_id]) {
+                    exceptionsByEmployee[exc.attendance_id] = [];
+                }
+                exceptionsByEmployee[exc.attendance_id].push(exc);
+            }
 
-                updates.push(
-                    base44.asServiceRole.entities.EmployeeQuarterlyMinutes.update(record.id, {
-                        used_minutes: newUsedMinutes,
-                        remaining_minutes: newRemainingMinutes
-                    })
-                );
+            // Process each employee's exceptions
+            for (const attendanceId in exceptionsByEmployee) {
+                const employee = employees.find(e => e.attendance_id === parseInt(attendanceId));
+                if (!employee) continue;
+
+                const employeeExceptions = exceptionsByEmployee[attendanceId];
+                let totalMinutesToDeduct = 0;
+
+                // For each exception, calculate actual minutes used on that day
+                for (const exc of employeeExceptions) {
+                    // Find analysis result for this employee
+                    const empResult = results.find(r => r.attendance_id === parseInt(attendanceId));
+                    if (!empResult) continue;
+
+                    // Parse exception_offsets to find what was actually used on this date
+                    let exceptionOffsets = {};
+                    if (empResult.exception_offsets) {
+                        try {
+                            exceptionOffsets = JSON.parse(empResult.exception_offsets);
+                        } catch (e) {
+                            exceptionOffsets = {};
+                        }
+                    }
+
+                    const dateKey = exc.date_from; // ALLOWED_MINUTES are single-day (date_from === date_to)
+                    const dayOffset = exceptionOffsets[dateKey] || {};
+
+                    // Deduct only the actual minutes used (not the full approval)
+                    // dayOffset will have offset_late + offset_early that were actually matched
+                    const actualUsed = (dayOffset.offset_late || 0) + (dayOffset.offset_early || 0);
+                    totalMinutesToDeduct += actualUsed;
+                }
+
+                if (totalMinutesToDeduct > 0) {
+                    // Get quarterly minutes record
+                    const quarterlyRecords = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
+                        employee_id: employee.id,
+                        project_id: project_id
+                    });
+
+                    if (quarterlyRecords.length > 0) {
+                        const record = quarterlyRecords[0];
+                        const newUsedMinutes = (record.used_minutes || 0) + totalMinutesToDeduct;
+                        const newRemainingMinutes = Math.max(0, (record.total_minutes || 0) - newUsedMinutes);
+
+                        updates.push(
+                            base44.asServiceRole.entities.EmployeeQuarterlyMinutes.update(record.id, {
+                                used_minutes: newUsedMinutes,
+                                remaining_minutes: newRemainingMinutes
+                            })
+                        );
+                    }
+                }
             }
         }
 
