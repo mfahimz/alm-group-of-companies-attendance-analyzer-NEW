@@ -135,7 +135,7 @@ export default function Layout({ children, currentPageName }) {
                 return false;
             }
         },
-        enabled: !!currentUser && !isPublicPage,
+        enabled: !!currentUser && !isPublicPage && !isDepartmentHeadNeedsRedirect,
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
