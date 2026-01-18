@@ -62,11 +62,12 @@ export default function DepartmentHeadDashboard() {
                 department: deptHeadAssignment.department
             });
             
-            // Find project that matches current month date range
+            // Find project that overlaps with current month
             const currentMonthProject = projects.find(p => {
                 const projectStart = parseISO(p.date_from);
                 const projectEnd = parseISO(p.date_to);
-                return projectStart <= firstDay && projectEnd >= lastDay;
+                // Project overlaps current month if it starts before month ends and ends after month starts
+                return projectStart <= lastDay && projectEnd >= firstDay;
             });
             
             return currentMonthProject || null;
