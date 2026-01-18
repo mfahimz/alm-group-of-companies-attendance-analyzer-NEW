@@ -31,15 +31,18 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
+        // Convert hrms_id to string for comparison (may be number or string)
+        const hrmsIdString = String(user.hrms_id);
+
         // Find department head assignment
         const assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
-            employee_id: user.hrms_id,
+            employee_id: hrmsIdString,
             active: true
         });
 
         if (assignments.length === 0) {
             return Response.json({ 
-                error: 'No active department head assignment found for this employee',
+                error: 'No active department head assignment found for this employee. Admin must create a department head assignment.',
                 verified: false 
             }, { status: 403 });
         }
@@ -47,9 +50,17 @@ Deno.serve(async (req) => {
         const assignment = assignments[0];
 
         // Verify user's company and department match assignment
-        if (user.company !== assignment.company || user.department !== assignment.department) {
+        if (!user.company || !user.department || user.company !== assignment.company || user.department !== assignment.department) {
             return Response.json({ 
-                error: 'User assignment mismatch with department head record',
+                error: 'User assignment mismatch with department head record. Admin must assign company and department.',
+                verified: false 
+            }, { status: 403 });
+        }
+
+        // Verify that managed_employee_ids is set
+        if (!assignment.managed_employee_ids) {
+            return Response.json({ 
+                error: 'Department head assignment missing managed employees. Admin must assign subordinates.',
                 verified: false 
             }, { status: 403 });
         }
