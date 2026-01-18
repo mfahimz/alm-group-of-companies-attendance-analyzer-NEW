@@ -83,7 +83,9 @@ export default function DepartmentHeadDashboard() {
                 const isInDateRange = startDateOnly <= todayDateOnly && endDateOnly >= todayDateOnly;
                 const isDepartmentMatch = p.department === 'All' || p.department === deptHeadAssignment.department;
                 
-                console.log(`Project "${p.name}": inRange=${isInDateRange} (${startDateOnly} to ${endDateOnly}), deptMatch=${isDepartmentMatch}`);
+                console.log(`Project "${p.name}":
+                  - Date range: ${startDateOnly.toLocaleDateString()} to ${endDateOnly.toLocaleDateString()} → inRange=${isInDateRange}
+                  - Project dept: "${p.department}" vs Head dept: "${deptHeadAssignment.department}" → deptMatch=${isDepartmentMatch}`);
                 
                 return isInDateRange && isDepartmentMatch;
             });
