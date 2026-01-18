@@ -99,10 +99,33 @@ export default function Documentation() {
                         </ul>
                     </div>
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="text-lg font-semibold text-blue-900 mb-2">User Role</h4>
-                        <p className="text-blue-800">Limited access based on page permissions:</p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <h4 className="text-lg font-semibold text-blue-900 mb-2">Supervisor Role</h4>
+                        <p className="text-blue-800">Project and employee management access:</p>
                         <ul className="text-blue-800">
+                            <li>View and manage all projects</li>
+                            <li>Run analysis and generate reports</li>
+                            <li>Access employee and attendance data</li>
+                            <li>Cannot modify system settings or manage users</li>
+                        </ul>
+                    </div>
+
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <h4 className="text-lg font-semibold text-green-900 mb-2">Department Head Role <span className="text-xs font-normal">(Al Maraghi Auto Repairs only)</span></h4>
+                        <p className="text-green-800">Pre-approval and reporting access:</p>
+                        <ul className="text-green-800">
+                            <li>Pre-approve minutes for employees before report generation</li>
+                            <li>View current month project for their department</li>
+                            <li>View previous month's finalized reports</li>
+                            <li>Cannot create projects or run analysis</li>
+                            <li>Limited to single dashboard page (no main menu)</li>
+                        </ul>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                        <h4 className="text-lg font-semibold text-slate-900 mb-2">User Role</h4>
+                        <p className="text-slate-800">Limited access based on page permissions:</p>
+                        <ul className="text-slate-800">
                             <li>View projects and reports (if permitted)</li>
                             <li>Access assigned pages only</li>
                             <li>Cannot modify system settings or manage users</li>
