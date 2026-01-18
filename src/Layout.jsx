@@ -301,15 +301,37 @@ export default function Layout({ children, currentPageName }) {
         );
     }
 
-    // Check if department head has a department assigned
-    if (isDepartmentHead && !currentUser.department) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-600 text-center">
-                    No department is assigned. Wait for the administrator to assign a department.
+    // Check if department head has complete setup (role, company, department, hrms_id)
+    if (isDepartmentHead) {
+        if (!currentUser.company) {
+            return (
+                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                    <div className="text-slate-600 text-center">
+                        No company is assigned. Wait for the administrator to assign a company.
+                    </div>
                 </div>
-            </div>
-        );
+            );
+        }
+        
+        if (!currentUser.department) {
+            return (
+                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                    <div className="text-slate-600 text-center">
+                        No department is assigned. Wait for the administrator to assign a department.
+                    </div>
+                </div>
+            );
+        }
+
+        if (!currentUser.hrms_id) {
+            return (
+                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                    <div className="text-slate-600 text-center">
+                        Not linked to employee record. Wait for the administrator to link you to an employee.
+                    </div>
+                </div>
+            );
+        }
     }
 
     return (

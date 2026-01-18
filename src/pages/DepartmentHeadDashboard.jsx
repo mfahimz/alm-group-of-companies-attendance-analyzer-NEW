@@ -111,7 +111,7 @@ export default function DepartmentHeadDashboard() {
             if (!deptHeadVerification?.verified) return [];
             
             const managedIds = deptHeadVerification.assignment.managed_employee_ids 
-                ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => parseInt(id.trim()))
+                ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
                 : [];
             
             if (managedIds.length === 0) return [];
@@ -122,8 +122,8 @@ export default function DepartmentHeadDashboard() {
                 active: true
             });
             
-            // Filter to only managed subordinates
-            return allEmployees.filter(emp => managedIds.includes(emp.hrms_id));
+            // Filter to only managed subordinates (compare as strings)
+            return allEmployees.filter(emp => managedIds.includes(String(emp.hrms_id)));
         },
         enabled: !!deptHeadVerification?.verified
     });
