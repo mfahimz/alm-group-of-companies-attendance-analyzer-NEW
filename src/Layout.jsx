@@ -97,6 +97,10 @@ export default function Layout({ children, currentPageName }) {
         }
     }, [currentUser, currentPageName, isPublicPage]);
 
+    // Check if department head needs immediate redirect
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isDepartmentHeadNeedsRedirect = userRole === 'department_head' && currentPageName !== 'DepartmentHeadDashboard' && currentUser && !isPublicPage;
+
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
         queryFn: async () => {
@@ -107,7 +111,7 @@ export default function Layout({ children, currentPageName }) {
                 return []; // Return empty array on error instead of failing
             }
         },
-        enabled: !!currentUser && !isPublicPage,
+        enabled: !!currentUser && !isPublicPage && !isDepartmentHeadNeedsRedirect,
         staleTime: 30 * 60 * 1000, // Cache for 30 minutes (permissions rarely change)
         gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
         refetchOnWindowFocus: false,
