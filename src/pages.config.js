@@ -10,7 +10,6 @@ import Home from './pages/Home';
 import JobPositions from './pages/JobPositions';
 import Maintenance from './pages/Maintenance';
 import MaintenanceSettings from './pages/MaintenanceSettings';
-import PrivateFiles from './pages/PrivateFiles';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
 import QuarterlyMinutesManagement from './pages/QuarterlyMinutesManagement';
@@ -41,7 +40,6 @@ export const PAGES = {
     "JobPositions": JobPositions,
     "Maintenance": Maintenance,
     "MaintenanceSettings": MaintenanceSettings,
-    "PrivateFiles": PrivateFiles,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
     "QuarterlyMinutesManagement": QuarterlyMinutesManagement,

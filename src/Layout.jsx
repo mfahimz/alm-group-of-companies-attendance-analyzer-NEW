@@ -20,7 +20,6 @@ import {
             Book,
             Calendar,
             FileSpreadsheet,
-            Lock,
             Briefcase,
             Clock
         } from 'lucide-react';
@@ -194,15 +193,7 @@ export default function Layout({ children, currentPageName }) {
             });
             }
 
-            if (isAdmin) {
-            menu.push({
-                title: 'Data',
-                url: '#',
-                items: [
-                    { title: 'Private Files', url: 'PrivateFiles', icon: <Lock className="w-5 h-5" /> }
-                ]
-            });
-            }
+
 
         if (isAdmin || isCEO) {
             menu.push({
