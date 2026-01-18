@@ -225,6 +225,13 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
+    // Redirect department heads to their dashboard (only once on mount)
+    useEffect(() => {
+        if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
+            window.location.replace('/DepartmentHeadDashboard');
+        }
+    }, [isDepartmentHead, currentPageName]);
+
     // CRITICAL: Block non-desktop devices BEFORE any rendering
     // This check happens even before authentication
     if (isChecking) {
@@ -274,9 +281,8 @@ export default function Layout({ children, currentPageName }) {
         return null;
     }
 
-    // Redirect department heads to their dashboard
+    // Show loading state while redirect happens
     if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
-        window.location.replace('/DepartmentHeadDashboard');
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-slate-500">Redirecting to dashboard...</div>
