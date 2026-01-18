@@ -135,8 +135,10 @@ export default function SalaryTab({ project, finalReport }) {
         return depts.sort();
     }, [salaryData]);
 
-    // Filter and sort salary data
+    // Filter and sort salary data - only when final report exists
     const filteredSalaryData = useMemo(() => {
+        if (!finalReport) return [];
+        
         let filtered = salaryData;
         
         // Apply department filter
@@ -156,7 +158,7 @@ export default function SalaryTab({ project, finalReport }) {
             }
             return 0;
         });
-    }, [salaryData, departmentFilter, sortBy]);
+    }, [salaryData, departmentFilter, sortBy, finalReport]);
 
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
