@@ -17,14 +17,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function Projects() {
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [duplicateProject, setDuplicateProject] = useState(null);
     const [selectedProjects, setSelectedProjects] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortBy, setSortBy] = useState('status-closed-last');
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(50);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+
+    // Debounce search input
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setPage(1); // Reset to first page on search
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
 
     // Check page access
     const { data: currentUser } = useQuery({
@@ -55,10 +67,6 @@ export default function Projects() {
             }
         }
     }, [currentUser, permissions, navigate, userRole]);
-
-    // Pagination state
-    const [page, setPage] = React.useState(1);
-    const [pageSize] = React.useState(50);
 
     // Server-side filtered projects with pagination
     const { data: projectsData = { items: [], total: 0 }, isLoading } = useQuery({
@@ -135,8 +143,8 @@ export default function Projects() {
 
     const filteredProjects = React.useMemo(() => {
         let filtered = projects.filter(project =>
-            project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            project.department?.toLowerCase().includes(searchTerm.toLowerCase())
+            project.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+            project.department?.toLowerCase().includes(debouncedSearch.toLowerCase())
         );
 
         // Apply status filter
@@ -164,7 +172,7 @@ export default function Projects() {
         });
 
         return filtered;
-    }, [projects, searchTerm, statusFilter, sortBy]);
+    }, [projects, debouncedSearch, statusFilter, sortBy]);
 
     // Group projects by company
     const projectsByCompany = React.useMemo(() => {
