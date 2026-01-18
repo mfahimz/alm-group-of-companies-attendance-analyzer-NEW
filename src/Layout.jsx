@@ -177,11 +177,11 @@ export default function Layout({ children, currentPageName }) {
                     { title: 'Salaries', url: 'Salaries', icon: <LayoutDashboard className="w-5 h-5" /> },
                     { title: 'Quarterly Minutes', url: 'QuarterlyMinutesManagement', icon: <Clock className="w-5 h-5" /> },
                     ...(isAdmin || isSupervisor || isCEO ? [{ title: 'Reports & Analytics', url: 'Reports', icon: <BarChart3 className="w-5 h-5" /> }] : [])
-                    ]
-                    }
-            ];
+                ]
+            }
+        ];
 
-            if (isAdmin) {
+        if (isAdmin) {
             menu.push({
                 title: 'Recruitment',
                 url: 'Recruitment',
@@ -191,9 +191,7 @@ export default function Layout({ children, currentPageName }) {
                     { title: 'Candidate Screening', url: 'CandidateScreening', icon: <FileSpreadsheet className="w-5 h-5" /> }
                 ]
             });
-            }
-
-
+        }
 
         if (isAdmin || isCEO) {
             menu.push({
