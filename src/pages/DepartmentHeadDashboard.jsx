@@ -155,20 +155,30 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadVerification?.verified
     });
 
-    // Get quarterly minutes for all managed employees
-    const { data: quarterlyMinutes = [] } = useQuery({
-        queryKey: ['quarterlyMinutes', currentProject?.id, employees.map(e => e.id).join(',')],
-        queryFn: async () => {
-            if (!currentProject || employees.length === 0) return [];
-
-            // Auto-initialize on first load
+    // Auto-initialize quarterly minutes when project loads
+    useEffect(() => {
+        if (!currentProject) return;
+        
+        const initializeMinutes = async () => {
             try {
                 await base44.functions.invoke('initializeProjectQuarterlyMinutes', {
                     project_id: currentProject.id
                 });
+                // Trigger refetch after initialization
+                queryClient.invalidateQueries(['quarterlyMinutes']);
             } catch (e) {
-                // Already initialized or error - continue
+                console.log('Quarterly minutes already initialized or not needed');
             }
+        };
+        
+        initializeMinutes();
+    }, [currentProject?.id, queryClient]);
+
+    // Get quarterly minutes for all managed employees
+    const { data: quarterlyMinutes = [] } = useQuery({
+        queryKey: ['quarterlyMinutes', currentProject?.id],
+        queryFn: async () => {
+            if (!currentProject) return [];
 
             // Query by project_id; matches both calendar and project-period allocations
             const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
@@ -177,7 +187,7 @@ export default function DepartmentHeadDashboard() {
 
             return allMinutes;
         },
-        enabled: !!currentProject && employees.length > 0
+        enabled: !!currentProject
     });
 
     // Get remaining minutes for an employee (handle both string and number IDs)
