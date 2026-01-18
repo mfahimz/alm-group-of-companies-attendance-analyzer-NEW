@@ -16,7 +16,6 @@ export default function PINLock({ onUnlock, storageKey = 'salary_pin_unlocked' }
     useEffect(() => {
         const loadPin = async () => {
             try {
-                const { base44 } = await import('@/api/base44Client');
                 const settings = await base44.entities.SystemSettings.filter({
                     setting_key: 'SALARY_PAGE_PIN'
                 });
