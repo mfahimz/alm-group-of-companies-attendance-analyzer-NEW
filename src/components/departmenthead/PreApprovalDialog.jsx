@@ -1,0 +1,231 @@
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
+import { format, parseISO, addDays, isAfter } from 'date-fns';
+
+export default function PreApprovalDialog({ 
+    open, 
+    onClose, 
+    projectId, 
+    employees, 
+    deptHeadVerification, 
+    currentProject,
+    onSuccess 
+}) {
+    const [formData, setFormData] = useState({
+        attendance_id: '',
+        date_from: '',
+        date_to: '',
+        allowed_minutes: '',
+        allowed_minutes_type: 'both',
+        details: ''
+    });
+
+    const queryClient = useQueryClient();
+
+    const createMutation = useMutation({
+        mutationFn: async (data) => {
+            // Check if approval already exists for this date
+            const existing = await base44.entities.Exception.filter({
+                project_id: projectId,
+                attendance_id: data.attendance_id,
+                date_from: data.date_from,
+                date_to: data.date_to,
+                type: 'ALLOWED_MINUTES'
+            });
+
+            if (existing.length > 0) {
+                // Update existing
+                return await base44.entities.Exception.update(existing[0].id, {
+                    allowed_minutes: parseInt(data.allowed_minutes),
+                    allowed_minutes_type: data.allowed_minutes_type,
+                    details: data.details || null
+                });
+            } else {
+                // Create new
+                return await base44.entities.Exception.create({
+                    project_id: projectId,
+                    attendance_id: data.attendance_id,
+                    date_from: data.date_from,
+                    date_to: data.date_to,
+                    type: 'ALLOWED_MINUTES',
+                    allowed_minutes: parseInt(data.allowed_minutes),
+                    allowed_minutes_type: data.allowed_minutes_type || 'both',
+                    approval_status: 'approved_dept_head',
+                    approved_by_dept_head: deptHeadVerification.assignment.employee_id,
+                    dept_head_approval_date: new Date().toISOString(),
+                    details: data.details || null,
+                    use_in_analysis: true
+                });
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['preApprovals', projectId]);
+            toast.success('Pre-approved minutes saved successfully');
+            handleClose();
+            onSuccess?.();
+        },
+        onError: (error) => {
+            toast.error('Failed to save pre-approval: ' + error.message);
+        }
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        if (!formData.attendance_id || !formData.date_from || !formData.allowed_minutes) {
+            toast.error('Please fill in all required fields');
+            return;
+        }
+
+        const minutes = parseInt(formData.allowed_minutes);
+        if (isNaN(minutes) || minutes <= 0) {
+            toast.error('Please enter valid minutes');
+            return;
+        }
+
+        // Check cutoff date (project end date - 1 day)
+        const cutoffDate = addDays(parseISO(currentProject.date_to), -1);
+        if (isAfter(new Date(), cutoffDate)) {
+            toast.error('Approval period has ended. Cannot add new approvals.');
+            return;
+        }
+
+        createMutation.mutate({
+            ...formData,
+            date_to: formData.date_to || formData.date_from
+        });
+    };
+
+    const handleClose = () => {
+        setFormData({
+            attendance_id: '',
+            date_from: '',
+            date_to: '',
+            allowed_minutes: '',
+            allowed_minutes_type: 'both',
+            details: ''
+        });
+        onClose();
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={handleClose}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Add Pre-Approved Minutes</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Employee *</Label>
+                            <Select
+                                value={formData.attendance_id}
+                                onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select employee" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {employees.map(emp => (
+                                        <SelectItem key={emp.id} value={String(emp.attendance_id)}>
+                                            {emp.name} (ID: {emp.attendance_id})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label>Exception Type *</Label>
+                            <Input 
+                                value="Allowed Minutes (Pre-Approved)"
+                                disabled
+                                className="bg-slate-50"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>From Date *</Label>
+                            <Input
+                                type="date"
+                                value={formData.date_from}
+                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label>To Date</Label>
+                            <Input
+                                type="date"
+                                value={formData.date_to}
+                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                                placeholder="Same as From Date if not specified"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label>Allowed Minutes *</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="e.g., 60"
+                                    value={formData.allowed_minutes}
+                                    onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
+                                    min="1"
+                                />
+                            </div>
+                            <div>
+                                <Label>Apply To *</Label>
+                                <Select
+                                    value={formData.allowed_minutes_type}
+                                    onValueChange={(value) => setFormData({ ...formData, allowed_minutes_type: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="late">Late Arrivals Only</SelectItem>
+                                        <SelectItem value="early">Early Checkouts Only</SelectItem>
+                                        <SelectItem value="both">Both Late & Early</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-500">Minutes to waive due to approved reasons</p>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <Label>Details / Reason</Label>
+                        <Input
+                            value={formData.details}
+                            onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                            placeholder="e.g., Hospital appointment, Personal emergency"
+                        />
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                        <Button 
+                            type="submit" 
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                            disabled={createMutation.isPending}
+                        >
+                            {createMutation.isPending ? 'Saving...' : 'Save Pre-Approval'}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={handleClose}>
+                            Cancel
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
