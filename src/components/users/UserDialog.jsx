@@ -71,10 +71,51 @@ export default function UserDialog({ open, onClose, user }) {
     }, [user]);
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
+        mutationFn: async ({ id, data }) => {
+            // Update user record
+            await base44.entities.User.update(id, data);
+            
+            // If setting as department_head, create/update DepartmentHead record
+            if (data.extended_role === 'department_head' && data.hrms_id && data.company && data.department) {
+                // Check if DepartmentHead record exists
+                const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                    employee_id: data.hrms_id,
+                    company: data.company,
+                    department: data.department
+                });
+                
+                if (existingDeptHeads.length === 0) {
+                    // Create new DepartmentHead record
+                    await base44.entities.DepartmentHead.create({
+                        company: data.company,
+                        department: data.department,
+                        employee_id: data.hrms_id,
+                        active: true
+                    });
+                } else {
+                    // Update existing to active
+                    await base44.entities.DepartmentHead.update(existingDeptHeads[0].id, {
+                        active: true
+                    });
+                }
+            }
+            
+            // If removing department_head role, deactivate DepartmentHead record
+            if (data.extended_role !== 'department_head' && user.hrms_id) {
+                const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                    employee_id: user.hrms_id,
+                    active: true
+                });
+                
+                for (const dh of existingDeptHeads) {
+                    await base44.entities.DepartmentHead.update(dh.id, { active: false });
+                }
+            }
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['users']);
             queryClient.invalidateQueries(['currentUser']);
+            queryClient.invalidateQueries(['deptHeadVerification']);
             toast.success('User updated successfully');
             onClose();
         },
