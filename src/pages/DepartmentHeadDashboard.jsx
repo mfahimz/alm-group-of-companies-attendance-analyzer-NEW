@@ -155,17 +155,6 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadVerification?.verified
     });
 
-    // Initialize quarterly minutes if not already done
-    const { data: initStatus } = useMutation({
-        mutationFn: async () => {
-            if (!currentProject) return null;
-            const { data } = await base44.functions.invoke('initializeProjectQuarterlyMinutes', {
-                project_id: currentProject.id
-            });
-            return data;
-        }
-    });
-
     // Get quarterly minutes for all managed employees
     const { data: quarterlyMinutes = [] } = useQuery({
         queryKey: ['quarterlyMinutes', currentProject?.id, employees.map(e => e.id).join(',')],
