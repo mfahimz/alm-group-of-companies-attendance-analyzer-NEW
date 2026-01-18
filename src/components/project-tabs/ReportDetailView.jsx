@@ -27,8 +27,8 @@ export default function ReportDetailView({ reportRun, project }) {
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
-    const [approvalLinks, setApprovalLinks] = useState([]);
-    const [showLinksDialog, setShowLinksDialog] = useState(false);
+
+
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
@@ -1059,39 +1059,7 @@ export default function ReportDetailView({ reportRun, project }) {
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
             
-            // Always generate approval links for admins (regardless of edit count)
-            if (isAdmin) {
-                try {
-                    setSaveProgress({ current: 100, total: 100, status: 'Generating approval links...' });
-                    
-                    const response = await base44.functions.invoke('generateApprovalLinks', {
-                        report_run_id: reportRun.id,
-                        project_id: project.id,
-                        company: project.company
-                    });
-                    
-                    if (response.data.success && response.data.links && response.data.links.length > 0) {
-                        setApprovalLinks(response.data.links);
-                        setShowLinksDialog(true);
-                        queryClient.invalidateQueries(['approvalLinks']);
-                        toast.success(`Approval links generated for ${response.data.links.length} department${response.data.links.length !== 1 ? 's' : ''}`);
-                    } else if (response.data.warnings && response.data.warnings.length > 0) {
-                        // Show all warnings to help debug
-                        response.data.warnings.forEach(warning => toast.warning(warning));
-                    } else if (response.data.skipped_exceptions && response.data.skipped_exceptions.length > 0) {
-                        // Show why exceptions were skipped
-                        const reasons = response.data.skipped_exceptions.map(s => 
-                            `${s.attendance_id || s.employee_name}: ${s.reason}`
-                        ).join('\n');
-                        toast.warning(`Exceptions skipped:\n${reasons}`);
-                    } else if (response.data.message) {
-                        toast.info(response.data.message);
-                    }
-                } catch (linkError) {
-                    console.error('Failed to generate approval links:', linkError);
-                    toast.error('Failed to generate approval links: ' + linkError.message);
-                }
-            }
+            // Note: Approval links functionality removed - department heads now use pre-approval system
             
             setIsSaving(false);
             setSaveProgress(null);
@@ -2087,79 +2055,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 </DialogContent>
             </Dialog>
 
-            {/* Approval Links Dialog */}
-            <Dialog open={showLinksDialog} onOpenChange={setShowLinksDialog}>
-                <DialogContent className="max-w-4xl max-h-[85vh]">
-                    <DialogHeader>
-                        <DialogTitle>Department Head Approval Links</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4 overflow-y-auto max-h-[calc(85vh-120px)]">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <p className="text-sm text-blue-800">
-                                Share these links with department heads to review and approve exception requests. 
-                                Each link is unique and expires in {approvalLinks[0] ? '3 days' : 'the configured time'}.
-                            </p>
-                        </div>
-                        
-                        {approvalLinks.map((link, idx) => {
-                            // Use the full_link from backend which includes CUSTOM_DOMAIN
-                            const linkUrl = link.full_link || `${window.location.origin}/DeptHeadApproval?token=${link.link_token}`;
-                            const messageText = `Dear Department Head,
 
-Please find the verification link below to review and approve the attendance exceptions for ${link.department}:
-
-${linkUrl}
-
-Verification Code: ${link.verification_code}
-
-This link will expire on ${new Date(link.expires_at).toLocaleDateString()}.
-
-Thank you.`;
-                            return (
-                            <Card key={idx} className="border-indigo-200 bg-indigo-50">
-                                <CardContent className="p-4 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{link.department}</p>
-                                            <p className="text-sm text-slate-600">Department Head: {link.department_head_name}</p>
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                {link.exception_count} exception{link.exception_count !== 1 ? 's' : ''} to review
-                                            </p>
-                                        </div>
-                                        <span className="text-xs text-slate-500">
-                                            Expires: {new Date(link.expires_at).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        <div>
-                                            <Label className="text-xs text-slate-600 mb-2 block">Complete Message</Label>
-                                            <div className="bg-white rounded-lg p-3 border border-slate-200 mb-2">
-                                                <pre className="text-xs whitespace-pre-wrap font-sans text-slate-700">{messageText}</pre>
-                                            </div>
-                                            <Button
-                                                size="sm"
-                                                className="w-full"
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(messageText);
-                                                    toast.success('Message copied to clipboard');
-                                                }}
-                                            >
-                                                <Copy className="w-4 h-4 mr-2" />
-                                                Copy Complete Message
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                        })}
-                    </div>
-                    <div className="flex justify-end">
-                        <Button onClick={() => setShowLinksDialog(false)}>Close</Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }
