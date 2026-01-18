@@ -46,15 +46,13 @@ export default function DepartmentHeadDashboard() {
         employee_id: deptHeadVerification.assignment.employee_id
     } : null;
 
-    // Get current month project (Al Maraghi Auto Repairs only)
+    // Get active project containing today's date
     const { data: currentProject } = useQuery({
-        queryKey: ['currentMonthProject', deptHeadAssignment?.company, deptHeadAssignment?.department],
+        queryKey: ['activeProject', deptHeadAssignment?.company, deptHeadAssignment?.department],
         queryFn: async () => {
             if (!deptHeadAssignment) return null;
             
-            const now = new Date();
-            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const today = new Date();
             
             // Get all projects for this company and department
             const projects = await base44.entities.Project.filter({
@@ -62,15 +60,14 @@ export default function DepartmentHeadDashboard() {
                 department: deptHeadAssignment.department
             });
             
-            // Find project that overlaps with current month
-            const currentMonthProject = projects.find(p => {
+            // Find project whose date range contains today
+            const activeProject = projects.find(p => {
                 const projectStart = parseISO(p.date_from);
                 const projectEnd = parseISO(p.date_to);
-                // Project overlaps current month if it starts before month ends and ends after month starts
-                return projectStart <= lastDay && projectEnd >= firstDay;
+                return projectStart <= today && projectEnd >= today;
             });
             
-            return currentMonthProject || null;
+            return activeProject || null;
         },
         enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Auto Repairs'
     });
