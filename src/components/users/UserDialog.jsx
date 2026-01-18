@@ -77,38 +77,49 @@ export default function UserDialog({ open, onClose, user }) {
             
             // If setting as department_head, create/update DepartmentHead record
             if (data.extended_role === 'department_head' && data.hrms_id && data.company && data.department) {
-                // Check if DepartmentHead record exists
-                const existingDeptHeads = await base44.entities.DepartmentHead.filter({
-                    employee_id: data.hrms_id,
-                    company: data.company,
-                    department: data.department
-                });
-                
-                if (existingDeptHeads.length === 0) {
-                    // Create new DepartmentHead record
-                    await base44.entities.DepartmentHead.create({
-                        company: data.company,
-                        department: data.department,
-                        employee_id: data.hrms_id,
-                        active: true
+                try {
+                    // Check if DepartmentHead record exists for this employee
+                    const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                        employee_id: data.hrms_id
                     });
-                } else {
-                    // Update existing to active
-                    await base44.entities.DepartmentHead.update(existingDeptHeads[0].id, {
-                        active: true
-                    });
+                    
+                    const existingRecord = existingDeptHeads.find(dh => 
+                        dh.company === data.company && dh.department === data.department
+                    );
+                    
+                    if (existingRecord) {
+                        // Update existing to active
+                        await base44.entities.DepartmentHead.update(existingRecord.id, {
+                            active: true
+                        });
+                    } else {
+                        // Create new DepartmentHead record
+                        await base44.entities.DepartmentHead.create({
+                            company: data.company,
+                            department: data.department,
+                            employee_id: data.hrms_id,
+                            active: true
+                        });
+                    }
+                } catch (err) {
+                    console.error('Failed to create/update DepartmentHead record:', err);
+                    throw new Error('Failed to setup department head assignment: ' + err.message);
                 }
             }
             
             // If removing department_head role, deactivate DepartmentHead record
             if (data.extended_role !== 'department_head' && previousUser?.hrms_id) {
-                const existingDeptHeads = await base44.entities.DepartmentHead.filter({
-                    employee_id: previousUser.hrms_id,
-                    active: true
-                });
-                
-                for (const dh of existingDeptHeads) {
-                    await base44.entities.DepartmentHead.update(dh.id, { active: false });
+                try {
+                    const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                        employee_id: previousUser.hrms_id,
+                        active: true
+                    });
+                    
+                    for (const dh of existingDeptHeads) {
+                        await base44.entities.DepartmentHead.update(dh.id, { active: false });
+                    }
+                } catch (err) {
+                    console.error('Failed to deactivate DepartmentHead record:', err);
                 }
             }
         },
@@ -116,7 +127,7 @@ export default function UserDialog({ open, onClose, user }) {
             queryClient.invalidateQueries(['users']);
             queryClient.invalidateQueries(['currentUser']);
             queryClient.invalidateQueries(['deptHeadVerification']);
-            toast.success('User updated successfully');
+            toast.success('User updated successfully. Department head access is now active.');
             onClose();
         },
         onError: (error) => {
