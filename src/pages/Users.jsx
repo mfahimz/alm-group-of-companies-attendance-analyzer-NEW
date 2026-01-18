@@ -28,9 +28,10 @@ const DEFAULT_PAGES = [
     { page_name: 'Training', description: 'Training guides and videos', allowed_roles: 'admin,supervisor,user' },
     { page_name: 'UserProfile', description: 'User profile settings', allowed_roles: 'admin,supervisor,user' },
     { page_name: 'EmployeeProfile', description: 'Employee profile details', allowed_roles: 'admin,supervisor' },
-    { page_name: 'ReportDetail', description: 'Detailed attendance report view', allowed_roles: 'admin,supervisor' },
+    { page_name: 'ReportDetail', description: 'Detailed attendance report view', allowed_roles: 'admin,supervisor,department_head' },
     { page_name: 'Reports', description: 'Reports and analytics', allowed_roles: 'admin,supervisor' },
-    { page_name: 'DepartmentHeadSettings', description: 'Department head configuration', allowed_roles: 'admin' }
+    { page_name: 'DepartmentHeadSettings', description: 'Department head configuration', allowed_roles: 'admin' },
+    { page_name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', allowed_roles: 'department_head' }
 ];
 
 export default function Users() {
@@ -115,6 +116,8 @@ export default function Users() {
         if (currentRole === 'admin') {
             newRole = 'supervisor';
         } else if (currentRole === 'supervisor') {
+            newRole = 'department_head';
+        } else if (currentRole === 'department_head') {
             newRole = 'user';
         } else {
             newRole = 'admin';
@@ -328,10 +331,16 @@ export default function Users() {
                                                         px-2 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1
                                                         ${displayRole === 'admin' ? 'bg-purple-100 text-purple-700' : 
                                                           displayRole === 'supervisor' ? 'bg-blue-100 text-blue-700' : 
+                                                          displayRole === 'department_head' ? 'bg-green-100 text-green-700' :
                                                           'bg-slate-100 text-slate-700'}
                                                     `}>
-                                                        {displayRole === 'admin' ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                                                        {displayRole === 'admin' ? 'Admin' : displayRole === 'supervisor' ? 'Supervisor' : 'User'}
+                                                        {displayRole === 'admin' ? <Shield className="w-3 h-3" /> : 
+                                                         displayRole === 'department_head' ? <Shield className="w-3 h-3" /> :
+                                                         <UserIcon className="w-3 h-3" />}
+                                                        {displayRole === 'admin' ? 'Admin' : 
+                                                         displayRole === 'supervisor' ? 'Supervisor' : 
+                                                         displayRole === 'department_head' ? 'Dept Head' :
+                                                         'User'}
                                                     </span>
                                                 );
                                             })()}
@@ -352,7 +361,7 @@ export default function Users() {
                                                     variant="outline"
                                                     onClick={() => handleToggleRole(user)}
                                                     disabled={updateUserMutation.isPending}
-                                                    title="Toggle role (Admin → Supervisor → User → Admin)"
+                                                    title="Toggle role (Admin → Supervisor → Dept Head → User → Admin)"
                                                 >
                                                     <Shield className="w-4 h-4" />
                                                 </Button>
@@ -432,6 +441,7 @@ export default function Users() {
                                             <TableHead>Description</TableHead>
                                             <TableHead className="text-center">Admin</TableHead>
                                             <TableHead className="text-center">Supervisor</TableHead>
+                                            <TableHead className="text-center">Dept Head</TableHead>
                                             <TableHead className="text-center">User</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -485,10 +495,31 @@ export default function Users() {
                                                 <TableCell className="text-center">
                                                     <Button
                                                         size="sm"
+                                                        variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'}
+                                                        onClick={() => togglePageRole(permission, 'department_head')}
+                                                        disabled={updatePermissionMutation.isPending}
+                                                        className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}
+                                                    >
+                                                        {hasPageRole(permission, 'department_head') ? (
+                                                            <>
+                                                                <Shield className="w-4 h-4 mr-2" />
+                                                                Allowed
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Lock className="w-4 h-4 mr-2" />
+                                                                Denied
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Button
+                                                        size="sm"
                                                         variant={hasPageRole(permission, 'user') ? 'default' : 'outline'}
                                                         onClick={() => togglePageRole(permission, 'user')}
                                                         disabled={updatePermissionMutation.isPending}
-                                                        className={hasPageRole(permission, 'user') ? 'bg-green-600 hover:bg-green-700' : ''}
+                                                        className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}
                                                     >
                                                         {hasPageRole(permission, 'user') ? (
                                                             <>
