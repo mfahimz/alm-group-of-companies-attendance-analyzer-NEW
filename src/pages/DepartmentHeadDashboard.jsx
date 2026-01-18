@@ -4,15 +4,13 @@ import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar as CalendarIcon, Eye, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Eye, CheckCircle2, Clock, AlertCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog';
 
 export default function DepartmentHeadDashboard() {
     const [selectedEmployee, setSelectedEmployee] = useState(null);
