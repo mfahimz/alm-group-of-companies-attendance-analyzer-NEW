@@ -134,79 +134,7 @@ export default function DepartmentHeadDashboard() {
         enabled: !!currentProject
     });
 
-    // Create pre-approval mutation
-    const createPreApprovalMutation = useMutation({
-        mutationFn: async ({ employeeId, date, minutes, reason }) => {
-            // Check if approval already exists
-            const existing = preApprovals.find(pa => 
-                pa.attendance_id === employeeId && 
-                pa.date_from === date && 
-                pa.date_to === date
-            );
-            
-            if (existing) {
-                // Update existing
-                return await base44.entities.Exception.update(existing.id, {
-                    allowed_minutes: parseInt(minutes),
-                    details: reason
-                });
-            } else {
-                // Create new
-                return await base44.entities.Exception.create({
-                    project_id: currentProject.id,
-                    attendance_id: employeeId,
-                    date_from: date,
-                    date_to: date,
-                    type: 'ALLOWED_MINUTES',
-                    allowed_minutes: parseInt(minutes),
-                    allowed_minutes_type: 'both',
-                    approval_status: 'approved_dept_head',
-                    approved_by_dept_head: deptHeadVerification.assignment.employee_id,
-                    dept_head_approval_date: new Date().toISOString(),
-                    details: reason,
-                    use_in_analysis: true
-                });
-            }
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['preApprovals', currentProject?.id]);
-            toast.success('Minutes pre-approved successfully');
-            setSelectedEmployee(null);
-            setSelectedDate(null);
-            setApprovedMinutes('');
-            setReason('');
-        },
-        onError: (error) => {
-            toast.error('Failed to save pre-approval: ' + error.message);
-        }
-    });
 
-    const handleSaveApproval = () => {
-        if (!selectedEmployee || !selectedDate || !approvedMinutes) {
-            toast.error('Please select employee, date, and enter minutes');
-            return;
-        }
-
-        const minutes = parseInt(approvedMinutes);
-        if (isNaN(minutes) || minutes <= 0) {
-            toast.error('Please enter valid minutes');
-            return;
-        }
-
-        // Check cutoff date (project end date - 1 day)
-        const cutoffDate = addDays(parseISO(currentProject.date_to), -1);
-        if (isAfter(new Date(), cutoffDate)) {
-            toast.error('Approval period has ended. Cannot add new approvals.');
-            return;
-        }
-
-        createPreApprovalMutation.mutate({
-            employeeId: selectedEmployee.attendance_id,
-            date: format(selectedDate, 'yyyy-MM-dd'),
-            minutes,
-            reason
-        });
-    };
 
     // Get approvals count for each employee
     const getEmployeeApprovalsCount = (employeeId) => {
