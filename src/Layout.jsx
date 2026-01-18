@@ -276,10 +276,10 @@ export default function Layout({ children, currentPageName }) {
 
     // Redirect department heads to their dashboard
     if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
+        window.location.replace('/DepartmentHeadDashboard');
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-slate-500">Redirecting to dashboard...</div>
-                {setTimeout(() => { window.location.href = '/DepartmentHeadDashboard'; }, 0)}
             </div>
         );
     }
