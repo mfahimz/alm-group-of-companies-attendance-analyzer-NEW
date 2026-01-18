@@ -89,13 +89,10 @@ export default function Layout({ children, currentPageName }) {
 
     // Immediate redirect for department heads (before any page renders)
     React.useEffect(() => {
-        if (currentUser && !isPublicPage) {
-            const userRole = currentUser.extended_role || currentUser.role || 'user';
-            if (userRole === 'department_head' && currentPageName !== 'DepartmentHeadDashboard') {
-                window.location.replace('/DepartmentHeadDashboard');
-            }
+        if (isDepartmentHeadNeedsRedirect) {
+            window.location.replace('/DepartmentHeadDashboard');
         }
-    }, [currentUser, currentPageName, isPublicPage]);
+    }, [isDepartmentHeadNeedsRedirect]);
 
     // Check if department head needs immediate redirect
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
