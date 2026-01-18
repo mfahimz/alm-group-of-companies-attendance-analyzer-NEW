@@ -243,13 +243,21 @@ export default function SalaryTab({ project, finalReport }) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {showEmptySalaryTab && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-                            <strong>⚠️ No Final Report:</strong> The table below shows the structure only. All salary values will be zero until a report is marked as final.
+                    {filteredSalaryData.length === 0 ? (
+                        <div className="text-center py-12">
+                            <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                            <p className="text-slate-600 text-lg font-medium">No Employees Found</p>
+                            <p className="text-slate-500 text-sm mt-2">Add employees to this company first to see salary calculations.</p>
                         </div>
-                    )}
-                    
-                    <div className="space-y-4 mb-4">
+                    ) : (
+                        <>
+                            {showEmptySalaryTab && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
+                                    <strong>⚠️ No Final Report:</strong> The table below shows the structure only. All salary values will be zero until a report is marked as final.
+                                </div>
+                            )}
+                            
+                            <div className="space-y-4 mb-4">
                         <div className="bg-white rounded-lg p-4">
                             <p className="text-sm text-slate-600 mb-4">
                                 <strong>Note:</strong> Salary calculations based on latest saved report. Data from salary master is read-only.
@@ -448,6 +456,8 @@ export default function SalaryTab({ project, finalReport }) {
                             </TableBody>
                         </Table>
                     </div>
+                        </>
+                    )}
                 </CardContent>
             </Card>
         </div>
