@@ -235,10 +235,34 @@ export default function Documentation() {
                                 <ul className="text-sm">
                                     <li>View complete attendance results for all employees</li>
                                     <li>Search and filter results</li>
-                                    <li>Export to CSV for external use</li>
+                                    <li>Export to Excel for external use</li>
                                     <li>Click on any employee to see day-by-day breakdown</li>
                                     <li>View punch times and calculated status for each day</li>
                                 </ul>
+                            </div>
+                        </div>
+                        
+                        <div className="flex gap-4">
+                            <div className="flex-shrink-0 w-10 h-10 bg-green-600 text-white rounded-full flex items-center justify-center font-bold">8</div>
+                            <div>
+                                <h4 className="text-lg font-semibold">Department Head Pre-Approval Workflow <span className="text-xs font-normal bg-green-100 text-green-700 px-2 py-0.5 rounded">(Al Maraghi Auto Repairs only)</span></h4>
+                                <p className="mb-2">Department heads can pre-approve minutes BEFORE report generation:</p>
+                                <ul className="text-sm">
+                                    <li><strong>Access:</strong> Department heads login and see only their dashboard (no other pages)</li>
+                                    <li><strong>Current Month Project:</strong> System automatically shows project matching current month for their department</li>
+                                    <li><strong>Pre-Approve Minutes:</strong> Select employee, pick date, enter minutes with reason (e.g., "Hospital appointment")</li>
+                                    <li><strong>Cutoff Date:</strong> Approvals can only be added until one day before project end date</li>
+                                    <li><strong>Storage:</strong> Pre-approvals saved as ALLOWED_MINUTES exceptions with approval_status: "approved_dept_head"</li>
+                                    <li><strong>Impact on Analysis:</strong> When report is generated, pre-approved minutes are automatically deducted from calculated late/early minutes</li>
+                                    <li><strong>Previous Reports:</strong> After salary is saved, department heads can view previous month's finalized report</li>
+                                </ul>
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
+                                    <p className="text-sm text-green-900">
+                                        <strong>Example:</strong> Employee needs to leave 1 hour early for appointment on Jan 15. 
+                                        Department head logs in, selects employee, picks Jan 15, enters 60 minutes with reason "Doctor appointment". 
+                                        When report is later generated, those 60 minutes won't be counted as late/early checkout.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
