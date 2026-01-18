@@ -90,6 +90,12 @@ export default function PreApprovalDialog({
             return;
         }
 
+        // SINGLE-DAY VALIDATION: date_to must be same as date_from for allowed minutes
+        if (formData.date_to && formData.date_to !== formData.date_from) {
+            toast.error('Pre-approved minutes can only be for a single day. From and To dates must be the same.');
+            return;
+        }
+
         // Check cutoff date (project end date - 1 day)
         const cutoffDate = addDays(parseISO(currentProject.date_to), -1);
         if (isAfter(new Date(), cutoffDate)) {
@@ -99,7 +105,7 @@ export default function PreApprovalDialog({
 
         createMutation.mutate({
             ...formData,
-            date_to: formData.date_to || formData.date_from
+            date_to: formData.date_from
         });
     };
 
@@ -151,24 +157,14 @@ export default function PreApprovalDialog({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label>From Date *</Label>
-                            <Input
-                                type="date"
-                                value={formData.date_from}
-                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <Label>To Date</Label>
-                            <Input
-                                type="date"
-                                value={formData.date_to}
-                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
-                                placeholder="Same as From Date if not specified"
-                            />
-                        </div>
+                    <div>
+                        <Label>Date *</Label>
+                        <Input
+                            type="date"
+                            value={formData.date_from}
+                            onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Pre-approved minutes apply to a single day only</p>
                     </div>
 
                     <div className="border-t pt-4 space-y-4">
