@@ -15,7 +15,8 @@ export default function UserDialog({ open, onClose, user }) {
         email: '',
         display_name: '',
         extended_role: 'user',
-        company: ''
+        company: '',
+        department: ''
     });
     const queryClient = useQueryClient();
 
@@ -25,6 +26,19 @@ export default function UserDialog({ open, onClose, user }) {
         enabled: open
     });
 
+    const { data: companySettings = [] } = useQuery({
+        queryKey: ['companySettings'],
+        queryFn: () => base44.entities.CompanySettings.list(),
+        enabled: formData.extended_role === 'department_head' && !!formData.company
+    });
+
+    const availableDepartments = React.useMemo(() => {
+        if (!formData.company || formData.extended_role !== 'department_head') return [];
+        const setting = companySettings.find(s => s.company === formData.company);
+        if (!setting) return [];
+        return setting.departments.split(',').map(d => d.trim()).filter(Boolean);
+    }, [formData.company, formData.extended_role, companySettings]);
+
     useEffect(() => {
         if (user) {
             setFormData({
@@ -32,7 +46,8 @@ export default function UserDialog({ open, onClose, user }) {
                 email: user.email || '',
                 display_name: user.display_name || '',
                 extended_role: user.extended_role || user.role || 'user',
-                company: user.company || ''
+                company: user.company || '',
+                department: user.department || ''
             });
         } else {
             setFormData({
@@ -40,7 +55,8 @@ export default function UserDialog({ open, onClose, user }) {
                 email: '',
                 display_name: '',
                 extended_role: 'user',
-                company: ''
+                company: '',
+                department: ''
             });
         }
     }, [user]);
@@ -85,6 +101,12 @@ export default function UserDialog({ open, onClose, user }) {
             return;
         }
 
+        // Validate department assignment for department_head role
+        if (formData.extended_role === 'department_head' && !formData.department) {
+            toast.error('Please assign a department for the department head');
+            return;
+        }
+
         // Only submit fields that should be updated
         const dataToSubmit = {
             full_name: formData.full_name,
@@ -95,8 +117,15 @@ export default function UserDialog({ open, onClose, user }) {
         // Only include company field based on role
         if (formData.extended_role === 'user' || formData.extended_role === 'department_head') {
             dataToSubmit.company = formData.company;
+            // Include department only for department_head role
+            if (formData.extended_role === 'department_head') {
+                dataToSubmit.department = formData.department;
+            } else {
+                dataToSubmit.department = null;
+            }
         } else if (formData.extended_role === 'admin' || formData.extended_role === 'supervisor') {
             dataToSubmit.company = null;
+            dataToSubmit.department = null;
         }
 
         if (user) {
@@ -178,7 +207,7 @@ export default function UserDialog({ open, onClose, user }) {
                                 <Label htmlFor="company">Assigned Company *</Label>
                                 <Select
                                     value={formData.company}
-                                    onValueChange={(value) => setFormData({ ...formData, company: value })}
+                                    onValueChange={(value) => setFormData({ ...formData, company: value, department: '' })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select company" />
@@ -192,6 +221,30 @@ export default function UserDialog({ open, onClose, user }) {
                                 </Select>
                                 <p className="text-xs text-slate-500 mt-1">
                                     {formData.extended_role === 'department_head' ? 'Department head will only see data from this company' : 'User will only see data from this company'}
+                                </p>
+                            </div>
+                        )}
+
+                        {formData.extended_role === 'department_head' && formData.company && (
+                            <div>
+                                <Label htmlFor="department">Assigned Department *</Label>
+                                <Select
+                                    value={formData.department}
+                                    onValueChange={(value) => setFormData({ ...formData, department: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select department" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableDepartments.map((dept) => (
+                                            <SelectItem key={dept} value={dept}>
+                                                {dept}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Only employees in this department will be visible to this department head
                                 </p>
                             </div>
                         )}
