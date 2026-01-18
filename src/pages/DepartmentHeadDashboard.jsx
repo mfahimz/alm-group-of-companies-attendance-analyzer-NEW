@@ -224,6 +224,9 @@ export default function DepartmentHeadDashboard() {
             .reduce((sum, pa) => sum + (pa.allowed_minutes || 0), 0);
     };
 
+    // Check if salary is closed for current project
+    const salaryIsClosed = currentProject?.status === 'closed';
+
     // Check if not Al Maraghi Auto Repairs
     if (deptHeadAssignment && deptHeadAssignment.company !== 'Al Maraghi Auto Repairs') {
         return (
