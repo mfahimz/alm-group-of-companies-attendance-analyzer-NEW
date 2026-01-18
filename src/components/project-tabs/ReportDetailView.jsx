@@ -1836,7 +1836,7 @@ export default function ReportDetailView({ reportRun, project }) {
                                      <TableHead>Early Min</TableHead>
                                      <TableHead>Other Min</TableHead>
                                      <TableHead>Abnormal</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1918,7 +1918,14 @@ export default function ReportDetailView({ reportRun, project }) {
                                                 <span className="text-slate-400">-</span>
                                             )}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.otherMinutes > 0 ? (
+                                                <span className="text-purple-600 font-medium">{day.otherMinutes} min</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
                                             {day.abnormal && (
                                                 <span className="text-amber-600 font-medium">Yes</span>
                                             )}
@@ -1950,6 +1957,7 @@ export default function ReportDetailView({ reportRun, project }) {
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}
                 analysisResult={selectedEmployee}
+                dailyBreakdownData={{ [selectedEmployee?.attendance_id]: { daily_details: getDailyBreakdown.reduce((acc, day) => ({ ...acc, [day.dateStr]: { punches: day.punchTimes.split(', ').filter(Boolean) } }), {}) } }}
             />
 
             <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && setEditingGraceMinutes(null)}>
