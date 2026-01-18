@@ -174,6 +174,12 @@ export default function UserDialog({ open, onClose, user }) {
             return;
         }
 
+        // Validate that admin/supervisor don't have company/department/hrms_id set
+        if ((formData.extended_role === 'admin' || formData.extended_role === 'supervisor' || formData.extended_role === 'ceo') && formData.hrms_id) {
+            toast.error(`${formData.extended_role} users should not have an employee link`);
+            return;
+        }
+
         // Only submit fields that should be updated
         const dataToSubmit = {
             full_name: formData.full_name,
