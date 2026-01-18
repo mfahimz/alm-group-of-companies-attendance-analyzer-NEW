@@ -274,11 +274,12 @@ export default function Layout({ children, currentPageName }) {
         return null;
     }
 
-    // Redirect department heads to their dashboard
-    if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
-        window.location.href = '/DepartmentHeadDashboard';
-        return null;
-    }
+    // Redirect department heads to their dashboard (only once on mount, not on every render)
+    React.useEffect(() => {
+        if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
+            window.location.href = '/DepartmentHeadDashboard';
+        }
+    }, [isDepartmentHead, currentPageName]);
 
     // Check if user has a company assigned (not required for admin/supervisor/ceo)
     if (!currentUser.company && (userRole === 'user' || userRole === 'department_head')) {
