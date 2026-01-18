@@ -53,9 +53,9 @@ Deno.serve(async (req) => {
         
         // Calculate total minutes based on project duration
         const quartersSpanned = calculateQuartersInProject(project.date_from, project.date_to);
-        const totalMinutesForProject = quartersSpanned * 120; // 120 minutes per quarter
+        const totalMinutesForProject = 120; // Always 120 min per employee per project period
         
-        console.log(`Project spans ${quartersSpanned} quarter(s), allocating ${totalMinutesForProject} minutes per employee`);
+        console.log(`Project spans ${quartersSpanned} quarter(s), allocating 120 minutes per employee`);
         
         // Get all employees for this project
         let employees = [];
@@ -99,16 +99,17 @@ Deno.serve(async (req) => {
             });
             
             if (existing.length === 0) {
+                // Store as number for consistency
+                const employeeIdNum = Number(employee.hrms_id);
+                
                 await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.create({
-                    employee_id: employee.hrms_id,
+                    employee_id: employeeIdNum,
                     project_id: project_id,
                     company: project.company,
                     allocation_type: 'project_period',
-                    total_minutes: totalMinutesForProject,
+                    total_minutes: 120,
                     used_minutes: 0,
-                    remaining_minutes: totalMinutesForProject,
-                    year: null,
-                    quarter: null
+                    remaining_minutes: 120
                 });
                 initialized++;
             } else {
