@@ -151,32 +151,25 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadVerification?.verified
     });
 
-    // Get existing pre-approvals for current project
-    const { data: preApprovals = [] } = useQuery({
-        queryKey: ['preApprovals', currentProject?.id],
+    // Get quarterly minutes for all managed employees
+    const { data: quarterlyMinutes = [] } = useQuery({
+        queryKey: ['quarterlyMinutes', currentProject?.id, employees.map(e => e.id).join(',')],
         queryFn: async () => {
-            if (!currentProject) return [];
+            if (!currentProject || employees.length === 0) return [];
             
-            return await base44.entities.Exception.filter({
-                project_id: currentProject.id,
-                type: 'ALLOWED_MINUTES',
-                approval_status: 'approved_dept_head'
+            const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
+                project_id: currentProject.id
             });
+            
+            return allMinutes;
         },
-        enabled: !!currentProject
+        enabled: !!currentProject && employees.length > 0
     });
 
-
-
-    // Get approvals count for each employee
-    const getEmployeeApprovalsCount = (employeeId) => {
-        return preApprovals.filter(pa => pa.attendance_id === employeeId).length;
-    };
-
-    const getEmployeeTotalMinutes = (employeeId) => {
-        return preApprovals
-            .filter(pa => pa.attendance_id === employeeId)
-            .reduce((sum, pa) => sum + (pa.allowed_minutes || 0), 0);
+    // Get remaining minutes for an employee
+    const getEmployeeRemainingMinutes = (employeeId) => {
+        const record = quarterlyMinutes.find(qm => qm.employee_id === employeeId);
+        return record?.remaining_minutes || 0;
     };
 
     // Check if salary is closed for current project
