@@ -130,6 +130,7 @@ export default function Layout({ children, currentPageName }) {
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
+    const isDepartmentHead = userRole === 'department_head';
     const canAccessAllCompanies = isAdmin || isSupervisor || isCEO;
 
     const hasPageAccess = React.useCallback((pageName) => {
@@ -143,6 +144,13 @@ export default function Layout({ children, currentPageName }) {
     // Build navbar menu - MUST be before conditional returns
     const navbarMenu = React.useMemo(() => {
         if (!currentUser) return [];
+
+        // Department Head gets only their dashboard
+        if (isDepartmentHead) {
+            return [
+                { title: 'Dashboard', url: 'DepartmentHeadDashboard' }
+            ];
+        }
 
         const menu = [
             { title: 'Dashboard', url: 'Dashboard' },
@@ -203,7 +211,7 @@ export default function Layout({ children, currentPageName }) {
             }
             return hasPageAccess(item.url);
         });
-    }, [currentUser, permissions, isAdmin, isSupervisor, isCEO, userRole, hasPageAccess]);
+    }, [currentUser, permissions, isAdmin, isSupervisor, isCEO, isDepartmentHead, userRole, hasPageAccess]);
 
     // Set UAE timezone for the entire app
     useEffect(() => {
