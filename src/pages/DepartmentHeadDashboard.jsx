@@ -104,18 +104,26 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Auto Repairs'
     });
 
-    // SECURITY: Server-side filtered employees for this department head
+    // SECURITY: Server-side filtered employees for this department head (only managed subordinates)
     const { data: employees = [] } = useQuery({
-        queryKey: ['deptEmployees', deptHeadAssignment?.company, deptHeadAssignment?.department],
+        queryKey: ['deptEmployees', deptHeadAssignment?.company, deptHeadAssignment?.department, deptHeadVerification?.assignment?.managed_employee_ids],
         queryFn: async () => {
             if (!deptHeadVerification?.verified) return [];
             
-            // Use verified assignment data from backend
-            return await base44.entities.Employee.filter({
+            const managedIds = deptHeadVerification.assignment.managed_employee_ids 
+                ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => parseInt(id.trim()))
+                : [];
+            
+            if (managedIds.length === 0) return [];
+            
+            // Fetch all managed employees
+            const allEmployees = await base44.entities.Employee.filter({
                 company: deptHeadVerification.assignment.company,
-                department: deptHeadVerification.assignment.department,
                 active: true
             });
+            
+            // Filter to only managed subordinates
+            return allEmployees.filter(emp => managedIds.includes(emp.hrms_id));
         },
         enabled: !!deptHeadVerification?.verified
     });
