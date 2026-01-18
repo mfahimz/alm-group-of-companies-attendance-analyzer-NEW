@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog';
+import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog.jsx';
 
 export default function DepartmentHeadDashboard() {
     const [showPreApprovalDialog, setShowPreApprovalDialog] = useState(false);
