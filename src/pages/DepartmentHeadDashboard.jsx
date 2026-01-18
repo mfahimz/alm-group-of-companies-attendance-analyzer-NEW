@@ -49,17 +49,18 @@ export default function DepartmentHeadDashboard() {
             
             const today = new Date();
             
-            // Get all projects for this company and department
+            // Get all projects for this company
             const projects = await base44.entities.Project.filter({
-                company: deptHeadAssignment.company,
-                department: deptHeadAssignment.department
+                company: deptHeadAssignment.company
             });
             
-            // Find project whose date range contains today
+            // Find project whose date range contains today and matches department or has "All"
             const activeProject = projects.find(p => {
                 const projectStart = parseISO(p.date_from);
                 const projectEnd = parseISO(p.date_to);
-                return projectStart <= today && projectEnd >= today;
+                const isInDateRange = projectStart <= today && projectEnd >= today;
+                const isDepartmentMatch = p.department === 'All' || p.department === deptHeadAssignment.department;
+                return isInDateRange && isDepartmentMatch;
             });
             
             return activeProject || null;
