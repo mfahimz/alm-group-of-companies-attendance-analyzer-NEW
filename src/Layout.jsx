@@ -255,8 +255,14 @@ export default function Layout({ children, currentPageName }) {
         return null;
     }
 
+    // Redirect department heads to their dashboard
+    if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
+        window.location.href = '/DepartmentHeadDashboard';
+        return null;
+    }
+
     // Check if user has a company assigned (not required for admin/supervisor/ceo)
-    if (!currentUser.company && userRole === 'user') {
+    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head')) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-slate-600 text-center">
