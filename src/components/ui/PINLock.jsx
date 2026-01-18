@@ -12,25 +12,33 @@ export default function PINLock({ onUnlock, storageKey = 'salary_pin_unlocked' }
     const [systemPin, setSystemPin] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Load system PIN from settings
+    // Load system PIN from settings - only on mount, non-blocking
     useEffect(() => {
+        let isMounted = true;
+        
         const loadPin = async () => {
             try {
                 const settings = await base44.entities.SystemSettings.filter({
                     setting_key: 'SALARY_PAGE_PIN'
                 });
                 
-                if (settings.length > 0) {
-                    setSystemPin(settings[0].setting_value);
+                if (isMounted) {
+                    if (settings.length > 0) {
+                        setSystemPin(settings[0].setting_value);
+                    }
+                    setLoading(false);
                 }
             } catch (error) {
                 console.error('Failed to load PIN settings:', error);
-            } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         loadPin();
+        
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     // Check if already unlocked in session
