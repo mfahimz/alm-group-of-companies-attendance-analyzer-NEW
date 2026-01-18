@@ -10,7 +10,7 @@ import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
-export default function ReportTab({ project }) {
+export default function ReportTab({ project, isDepartmentHead = false }) {
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
@@ -22,6 +22,18 @@ export default function ReportTab({ project }) {
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
+
+    // Get department head verification if department head
+    const { data: deptHeadVerification } = useQuery({
+        queryKey: ['deptHeadVerification', isDepartmentHead],
+        queryFn: async () => {
+            if (!isDepartmentHead) return null;
+            const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
+            return data;
+        },
+        enabled: isDepartmentHead,
+        retry: false
+    });
 
     const { data: allReportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
@@ -36,6 +48,27 @@ export default function ReportTab({ project }) {
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', project.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ project_id: project.id })
+    });
+
+    // Get employees for department head filtering
+    const { data: departmentEmployees = [] } = useQuery({
+        queryKey: ['departmentEmployees', project.id, isDepartmentHead, deptHeadVerification?.assignment?.department],
+        queryFn: async () => {
+            if (!isDepartmentHead || !deptHeadVerification?.verified) return [];
+            
+            // Get all employees in this department, excluding the department head
+            const allEmpls = await base44.entities.Employee.filter({
+                company: deptHeadVerification.assignment.company,
+                department: deptHeadVerification.assignment.department,
+                active: true
+            });
+
+            // Exclude the department head themselves
+            return allEmpls.filter(emp => 
+                String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
+            );
+        },
+        enabled: isDepartmentHead && !!deptHeadVerification?.verified
     });
 
     const deleteReportMutation = useMutation({
@@ -90,6 +123,14 @@ export default function ReportTab({ project }) {
         }
     };
 
+    // For department heads: filter results to show only their subordinates
+    const filteredResults = isDepartmentHead && deptHeadVerification?.verified
+        ? allResults.filter(result => {
+            const empIdStr = String(result.attendance_id);
+            return departmentEmployees.some(emp => String(emp.attendance_id) === empIdStr);
+        })
+        : allResults;
+
     return (
         <div className="space-y-6">
             <Card className="border-0 shadow-sm">
@@ -109,7 +150,7 @@ export default function ReportTab({ project }) {
                                         <TableHead>Report Name</TableHead>
                                         <TableHead>Generated On</TableHead>
                                         <TableHead>Period</TableHead>
-                                        <TableHead>Employees</TableHead>
+                                        <TableHead>{isDepartmentHead ? 'Your Team' : 'Employees'}</TableHead>
                                         <TableHead>Verified</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
@@ -117,8 +158,10 @@ export default function ReportTab({ project }) {
                                 </TableHeader>
                                 <TableBody>
                                     {reportRuns.map((run) => {
-                                        const runResults = allResults.filter(r => r.report_run_id === run.id);
-                                        const verifiedCount = run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0;
+                                        const runResults = filteredResults.filter(r => r.report_run_id === run.id);
+                                        const verifiedCount = isDepartmentHead
+                                            ? runResults.length // For dept heads, show results count as verification
+                                            : (run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0);
                                         
                                         return (
                                             <TableRow key={run.id}>
@@ -139,13 +182,18 @@ export default function ReportTab({ project }) {
                                                 <TableCell>
                                                     {new Date(run.date_from).toLocaleDateString()} - {new Date(run.date_to).toLocaleDateString()}
                                                 </TableCell>
-                                                <TableCell>{run.employee_count}</TableCell>
+                                                <TableCell>
+                                                    {isDepartmentHead ? departmentEmployees.length : run.employee_count}
+                                                </TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
-                                                        <span className={verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600'}>
-                                                            {verifiedCount} / {run.employee_count}
+                                                        <span className={isDepartmentHead 
+                                                            ? 'text-slate-600' 
+                                                            : (verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600')
+                                                        }>
+                                                            {isDepartmentHead ? runResults.length : verifiedCount} / {isDepartmentHead ? departmentEmployees.length : run.employee_count}
                                                         </span>
-                                                        {verifiedCount === run.employee_count && (
+                                                        {!isDepartmentHead && verifiedCount === run.employee_count && (
                                                             <CheckCircle className="w-4 h-4 text-green-600" />
                                                         )}
                                                     </div>
@@ -165,7 +213,7 @@ export default function ReportTab({ project }) {
                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
                                                         </Link>
-                                                        {isAdminOrSupervisor && !run.is_final && (
+                                                        {!isDepartmentHead && isAdminOrSupervisor && !run.is_final && (
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="ghost"
@@ -176,7 +224,7 @@ export default function ReportTab({ project }) {
                                                                 <Star className="w-4 h-4 text-amber-600" />
                                                             </Button>
                                                         )}
-                                                        {isAdmin && (
+                                                        {!isDepartmentHead && isAdmin && (
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="ghost"
