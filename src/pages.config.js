@@ -1,7 +1,6 @@
 import CandidateScreening from './pages/CandidateScreening';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
-import DeptHeadApproval from './pages/DeptHeadApproval';
 import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
@@ -31,7 +30,6 @@ export const PAGES = {
     "CandidateScreening": CandidateScreening,
     "Dashboard": Dashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
-    "DeptHeadApproval": DeptHeadApproval,
     "Documentation": Documentation,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
