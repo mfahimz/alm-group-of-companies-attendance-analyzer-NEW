@@ -230,16 +230,8 @@ export default function SalaryTab({ project, finalReport }) {
         );
     }
 
-    if (!finalReport) {
-        return (
-            <Card className="border-0 shadow-lg">
-                <CardContent className="p-12 text-center">
-                    <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600">The Salary tab is only available after a report has been marked as final.</p>
-                </CardContent>
-            </Card>
-        );
-    }
+    // Show empty state for admin when no final report exists
+    const showEmptySalaryTab = !finalReport;
 
     return (
         <div className="space-y-6">
@@ -251,6 +243,14 @@ export default function SalaryTab({ project, finalReport }) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
+                    {showEmptySalaryTab ? (
+                        <div className="text-center py-12">
+                            <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                            <p className="text-slate-600 text-lg font-medium">No Final Report Available</p>
+                            <p className="text-slate-500 text-sm mt-2">Salary calculations will appear here once a report is marked as final.</p>
+                        </div>
+                    ) : (
+                        <>
                     <div className="space-y-4 mb-4">
                         <div className="bg-white rounded-lg p-4">
                             <p className="text-sm text-slate-600 mb-4">
@@ -450,6 +450,8 @@ export default function SalaryTab({ project, finalReport }) {
                             </TableBody>
                         </Table>
                     </div>
+                        </>
+                    )}
                 </CardContent>
             </Card>
         </div>
