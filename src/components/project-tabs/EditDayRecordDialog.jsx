@@ -165,14 +165,16 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const getDayPunches = () => {
         if (!dayRecord) return [];
         
+        // Convert dayRecord.date (DD/MM/YYYY) to YYYY-MM-DD for matching
+        const [day, month, year] = dayRecord.date.split('/');
+        const dateStrYMD = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
         // First priority: use pre-cached daily breakdown data (most reliable)
         if (dailyBreakdownData && dailyBreakdownData[attendanceId]?.daily_details) {
             const breakdownDetails = dailyBreakdownData[attendanceId].daily_details;
-            const dayKey = Object.keys(breakdownDetails).find(date => {
-                const breakdownDate = new Date(date).toLocaleDateString();
-                const recordDate = new Date(dayRecord.date).toLocaleDateString();
-                return breakdownDate === recordDate;
-            });
+            
+            // Use dateStr directly from dayRecord if available, otherwise match by date
+            const dayKey = dayRecord.dateStr || Object.keys(breakdownDetails).find(date => date === dateStrYMD);
             
             if (dayKey && breakdownDetails[dayKey]?.punches && Array.isArray(breakdownDetails[dayKey].punches)) {
                 const punchData = breakdownDetails[dayKey].punches;
@@ -190,8 +192,6 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         }
         
         // Fallback: try to match from punches array
-        const [day, month, year] = dayRecord.date.split('/');
-        const dateStrYMD = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dateStrDMY = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
         
         const dayPunches = punches.filter(p => {
