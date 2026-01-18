@@ -168,7 +168,7 @@ export default function DepartmentHeadDashboard() {
                     allowed_minutes: parseInt(minutes),
                     allowed_minutes_type: 'both',
                     approval_status: 'approved_dept_head',
-                    approved_by_dept_head: currentUser.hrms_id || currentUser.id,
+                    approved_by_dept_head: deptHeadVerification.assignment.employee_id,
                     dept_head_approval_date: new Date().toISOString(),
                     details: reason,
                     use_in_analysis: true

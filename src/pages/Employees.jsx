@@ -98,6 +98,12 @@ export default function Employees() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id) => {
+            // SECURITY: Verify user has access to this employee
+            const employeeToDelete = employees.find(e => e.id === id);
+            if (!employeeToDelete) {
+                throw new Error('Employee not found or access denied');
+            }
+            
             await base44.entities.Employee.delete(id);
         },
         onSuccess: () => {
@@ -120,6 +126,13 @@ export default function Employees() {
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
                 try {
+                    // SECURITY: Verify user has access to this employee
+                    const employeeToDelete = employees.find(e => e.id === id);
+                    if (!employeeToDelete) {
+                        console.error('Access denied for employee:', id);
+                        continue;
+                    }
+                    
                     await base44.entities.Employee.delete(id);
                     results.push(id);
                 } catch (error) {
@@ -146,6 +159,13 @@ export default function Employees() {
             const results = [];
             for (const id of ids) {
                 try {
+                    // SECURITY: Verify user has access to this employee
+                    const employeeToUpdate = employees.find(e => e.id === id);
+                    if (!employeeToUpdate) {
+                        console.error('Access denied for employee:', id);
+                        continue;
+                    }
+                    
                     await base44.entities.Employee.update(id, updates);
                     results.push(id);
                 } catch (error) {

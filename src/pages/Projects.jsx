@@ -97,6 +97,12 @@ export default function Projects() {
 
     const deleteMutation = useMutation({
         mutationFn: async (projectId) => {
+            // SECURITY: Verify user has access to this project
+            const projectToDelete = projects.find(p => p.id === projectId);
+            if (!projectToDelete) {
+                throw new Error('Project not found or access denied');
+            }
+
             // Use bulk delete by query filter instead of fetching and deleting one-by-one
             await base44.entities.ReportRun.deleteMany({ project_id: projectId });
             await base44.entities.AnalysisResult.deleteMany({ project_id: projectId });

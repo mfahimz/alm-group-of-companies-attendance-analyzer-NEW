@@ -9,6 +9,12 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // SECURITY: Only admin or supervisor can mark final reports
+        const userRole = user?.extended_role || user?.role || 'user';
+        if (userRole !== 'admin' && userRole !== 'supervisor') {
+            return Response.json({ error: 'Access denied: Admin or Supervisor role required' }, { status: 403 });
+        }
+
         const { report_run_id, project_id } = await req.json();
 
         if (!report_run_id || !project_id) {

@@ -5,8 +5,10 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
-        if (!user || user.role !== 'admin') {
-            return Response.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+        // SECURITY: Only admin can finalize reports
+        const userRole = user?.extended_role || user?.role || 'user';
+        if (userRole !== 'admin') {
+            return Response.json({ error: 'Access denied: Admin role required' }, { status: 403 });
         }
 
         const { report_run_id, project_id } = await req.json();
