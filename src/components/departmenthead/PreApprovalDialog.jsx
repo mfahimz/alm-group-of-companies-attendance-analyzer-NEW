@@ -29,6 +29,21 @@ export default function PreApprovalDialog({
 
     const queryClient = useQueryClient();
 
+    // Fetch quarterly minutes for selected employee
+    const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);
+    const { data: quarterlyMinutes } = useQuery({
+        queryKey: ['employeeQuarterlyMinutes', selectedEmployee?.hrms_id, projectId],
+        queryFn: async () => {
+            if (!selectedEmployee || !projectId) return null;
+            const records = await base44.entities.EmployeeQuarterlyMinutes.filter({
+                employee_id: String(selectedEmployee.hrms_id),
+                project_id: projectId
+            });
+            return records[0] || null;
+        },
+        enabled: !!selectedEmployee && !!projectId
+    });
+
     const createMutation = useMutation({
         mutationFn: async (data) => {
             // Check if approval already exists for this date
@@ -90,8 +105,9 @@ export default function PreApprovalDialog({
             return;
         }
 
-        if (minutes > 120) {
-            toast.error('Allowed minutes cannot exceed 120 minutes per employee');
+        const availableMinutes = quarterlyMinutes?.remaining_minutes || 0;
+        if (minutes > availableMinutes) {
+            toast.error(`Allowed minutes cannot exceed available balance of ${availableMinutes} minutes`);
             return;
         }
 
@@ -188,7 +204,11 @@ export default function PreApprovalDialog({
                                     value={formData.allowed_minutes}
                                     onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
                                     min="1"
+                                    max={quarterlyMinutes?.remaining_minutes || 0}
                                 />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Available: {quarterlyMinutes?.remaining_minutes || 0} minutes
+                                </p>
                             </div>
                             <div>
                                 <Label>Apply To *</Label>
