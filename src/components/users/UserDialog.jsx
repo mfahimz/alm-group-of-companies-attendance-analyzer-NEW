@@ -71,7 +71,7 @@ export default function UserDialog({ open, onClose, user }) {
     }, [user]);
 
     const updateMutation = useMutation({
-        mutationFn: async ({ id, data }) => {
+        mutationFn: async ({ id, data, previousUser }) => {
             // Update user record
             await base44.entities.User.update(id, data);
             
@@ -101,9 +101,9 @@ export default function UserDialog({ open, onClose, user }) {
             }
             
             // If removing department_head role, deactivate DepartmentHead record
-            if (data.extended_role !== 'department_head' && user.hrms_id) {
+            if (data.extended_role !== 'department_head' && previousUser?.hrms_id) {
                 const existingDeptHeads = await base44.entities.DepartmentHead.filter({
-                    employee_id: user.hrms_id,
+                    employee_id: previousUser.hrms_id,
                     active: true
                 });
                 
@@ -189,7 +189,7 @@ export default function UserDialog({ open, onClose, user }) {
 
         if (user) {
             console.log('Updating user with data:', dataToSubmit);
-            updateMutation.mutate({ id: user.id, data: dataToSubmit });
+            updateMutation.mutate({ id: user.id, data: dataToSubmit, previousUser: user });
         } else {
             toast.info('To add new users, please use the invite feature in your admin dashboard');
             onClose();
