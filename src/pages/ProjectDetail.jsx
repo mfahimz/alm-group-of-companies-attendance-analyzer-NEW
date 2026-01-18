@@ -15,6 +15,7 @@ import RunAnalysisTab from '../components/project-tabs/RunAnalysisTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import Breadcrumb from '../components/ui/Breadcrumb';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 export default function ProjectDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -43,8 +44,10 @@ export default function ProjectDetail() {
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
   const isCEO = userRole === 'ceo';
+  const isDepartmentHead = userRole === 'department_head';
   const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO;
   const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
+  const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
 
   const { data: reportRuns = [] } = useQuery({
     queryKey: ['reportRuns', projectId],
@@ -186,7 +189,19 @@ export default function ProjectDetail() {
                 </div>
             </div>
 
-            {/* Tabs */}
+            {/* Tabs - Department heads see only Report tab */}
+            {isDeptHeadViewOnly ? (
+                <div className="space-y-6">
+                    <Card className="border-0 shadow-sm">
+                        <CardHeader>
+                            <CardTitle>Report</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ReportTab project={project} isDepartmentHead={true} />
+                        </CardContent>
+                    </Card>
+                </div>
+            ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl -mx-6 px-6 py-3 border-b border-slate-200">
                     <TabsList className="bg-white shadow-lg rounded-2xl p-1.5 flex flex-wrap h-auto gap-1 w-full sm:w-auto border-0">
@@ -269,6 +284,7 @@ export default function ProjectDetail() {
                     <SalaryTab project={project} finalReport={finalReport} />
                 </TabsContent>
             </Tabs>
+            )}
         </div>);
 
 }
