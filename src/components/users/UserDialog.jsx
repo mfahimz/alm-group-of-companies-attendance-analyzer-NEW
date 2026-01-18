@@ -124,10 +124,10 @@ export default function UserDialog({ open, onClose, user }) {
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['users']);
-            queryClient.invalidateQueries(['currentUser']);
-            queryClient.invalidateQueries(['deptHeadVerification']);
-            toast.success('User updated successfully. Department head access is now active.');
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+            queryClient.invalidateQueries({ queryKey: ['deptHeadVerification'] });
+            toast.success('User updated successfully.');
             onClose();
         },
         onError: (error) => {
