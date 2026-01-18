@@ -120,6 +120,31 @@ export default function BusinessDocumentation() {
                             or tablet devices will see a message explaining the desktop-only policy and will not be able to proceed.
                         </p>
                     </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Timezone Standard</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-900 mb-2">All Times are UAE Time</h4>
+                        <p className="text-sm text-blue-800 mb-2">
+                            <strong>Important:</strong> This system uses UAE time (Asia/Dubai, UTC+4) for all dates and times. 
+                            Your device's local timezone is ignored.
+                        </p>
+                        <p className="text-sm text-blue-800 mb-2"><strong>What This Means:</strong></p>
+                        <ul className="text-sm text-blue-700">
+                            <li>All punch times are recorded and displayed in UAE time</li>
+                            <li>Shift schedules use UAE time (e.g., 8:00 AM means 8:00 AM UAE)</li>
+                            <li>Reports show attendance data in UAE time</li>
+                            <li>Approval timestamps are in UAE time</li>
+                            <li>Salary calculations use UAE date boundaries</li>
+                        </ul>
+                        <p className="text-sm text-blue-800 mt-3">
+                            <strong>Example:</strong> If you access the system from outside UAE, all times shown are still UAE time. 
+                            A punch at "8:30 AM" means 8:30 AM in Dubai, regardless of where you are.
+                        </p>
+                        <p className="text-sm text-blue-800 mt-2">
+                            <strong>For Payroll:</strong> All exported attendance data and salary reports use UAE dates and times 
+                            for consistency and compliance with UAE labor law.
+                        </p>
+                    </div>
                 </Section>
 
                 {/* Key Business Capabilities */}

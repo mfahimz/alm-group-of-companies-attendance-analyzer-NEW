@@ -132,6 +132,41 @@ export default function TechnicalDocumentation() {
                             Resize events dynamically block access if window is resized below threshold.
                         </p>
                     </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Timezone Standard</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-900 mb-2">UAE Time (Asia/Dubai, UTC+4)</h4>
+                        <p className="text-sm text-blue-800 mb-2">
+                            All dates, times, and timestamps use UAE timezone exclusively. System behavior never depends on user's local device time.
+                        </p>
+                        <p className="text-sm text-blue-800 mb-2"><strong>What Uses UAE Time:</strong></p>
+                        <ul className="text-sm text-blue-700">
+                            <li>Punch timestamps and attendance calculations</li>
+                            <li>Shift start/end time comparisons</li>
+                            <li>Day boundaries (00:00–23:59 UAE time)</li>
+                            <li>Approval timestamps and audit logs</li>
+                            <li>Reports and Excel exports</li>
+                        </ul>
+                        <p className="text-sm text-blue-800 mt-3"><strong>Storage Strategy:</strong></p>
+                        <ul className="text-sm text-blue-700">
+                            <li>Database stores timestamps in UTC format</li>
+                            <li>Frontend converts all timestamps to UAE time before display</li>
+                            <li>All calculations performed in UAE timezone context</li>
+                        </ul>
+                        <p className="text-sm text-blue-800 mt-3"><strong>Utility Functions:</strong></p>
+                        <ul className="text-sm text-blue-700 font-mono text-xs">
+                            <li>formatInUAE() - Format dates in UAE timezone</li>
+                            <li>nowInUAE() - Get current UAE time</li>
+                            <li>uaeToUTC() - Convert UAE to UTC for storage</li>
+                            <li>utcToUAE() - Convert UTC to UAE for display</li>
+                            <li>startOfDayUAE() - Get 00:00 UAE time for date</li>
+                            <li>endOfDayUAE() - Get 23:59 UAE time for date</li>
+                        </ul>
+                        <p className="text-sm text-blue-800 mt-3">
+                            <strong>Critical Rule:</strong> Never use raw `new Date()` or browser local time for attendance logic. 
+                            Always use centralized timezone utilities from `components/ui/timezone.jsx`.
+                        </p>
+                    </div>
                 </Section>
 
                 {/* Architecture Overview */}

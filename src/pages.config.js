@@ -1,5 +1,7 @@
+import BusinessDocumentation from './pages/BusinessDocumentation';
 import CandidateScreening from './pages/CandidateScreening';
 import Dashboard from './pages/Dashboard';
+import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
 import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
@@ -18,19 +20,19 @@ import ReportDetail from './pages/ReportDetail';
 import Reports from './pages/Reports';
 import RulesSettings from './pages/RulesSettings';
 import Salaries from './pages/Salaries';
+import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
-import TechnicalDocumentation from './pages/TechnicalDocumentation';
-import BusinessDocumentation from './pages/BusinessDocumentation';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "BusinessDocumentation": BusinessDocumentation,
     "CandidateScreening": CandidateScreening,
     "Dashboard": Dashboard,
+    "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
     "Documentation": Documentation,
     "EmployeeProfile": EmployeeProfile,
@@ -49,13 +51,11 @@ export const PAGES = {
     "Reports": Reports,
     "RulesSettings": RulesSettings,
     "Salaries": Salaries,
+    "TechnicalDocumentation": TechnicalDocumentation,
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "DepartmentHeadDashboard": DepartmentHeadDashboard,
-    "TechnicalDocumentation": TechnicalDocumentation,
-    "BusinessDocumentation": BusinessDocumentation,
 }
 
 export const pagesConfig = {
