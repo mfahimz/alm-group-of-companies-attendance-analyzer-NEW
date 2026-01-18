@@ -8,6 +8,8 @@ import { base44 } from '@/api/base44Client';
 import { Navbar1 } from '@/components/ui/Navbar1';
 import { formatInUAE } from '@/components/ui/timezone';
 import { CompanyBadge } from '@/components/ui/CompanyBadge';
+import { useDeviceDetection } from './components/ui/useDeviceDetection';
+import DesktopOnlyScreen from './components/ui/DesktopOnlyScreen';
 import {
             BarChart3,
             FolderKanban,
@@ -25,6 +27,9 @@ import {
 
 
 export default function Layout({ children, currentPageName }) {
+    // CRITICAL: Device detection must run FIRST, before any other logic
+    const { isDesktop, isChecking } = useDeviceDetection();
+
     // Public pages that don't require authentication
     const publicPages = ['DeptHeadApproval'];
     const isPublicPage = publicPages.includes(currentPageName);
@@ -219,6 +224,20 @@ export default function Layout({ children, currentPageName }) {
         console.log('App Timezone: UAE (Asia/Dubai)');
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
+
+    // CRITICAL: Block non-desktop devices BEFORE any rendering
+    // This check happens even before authentication
+    if (isChecking) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-500">Loading...</div>
+            </div>
+        );
+    }
+
+    if (!isDesktop) {
+        return <DesktopOnlyScreen />;
+    }
 
     // AFTER all hooks, handle conditional rendering
     // For public pages, render without layout

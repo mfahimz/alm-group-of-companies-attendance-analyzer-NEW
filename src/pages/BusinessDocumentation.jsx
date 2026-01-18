@@ -97,6 +97,29 @@ export default function BusinessDocumentation() {
                         <li><strong>Audit Compliance:</strong> Creates permanent records that can be audited years later</li>
                         <li><strong>Multi-Company Management:</strong> Handles different policies for different companies in one system</li>
                     </ul>
+
+                    <h3 className="text-xl font-semibold mt-6">Supported Devices</h3>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-amber-900 mb-2">Desktop Computers Only</h4>
+                        <p className="text-sm text-amber-800 mb-2">
+                            This system can ONLY be accessed from desktop or laptop computers. Mobile phones and tablets are not supported.
+                        </p>
+                        <p className="text-sm text-amber-800 mb-2"><strong>Why Desktop Only?</strong></p>
+                        <ul className="text-sm text-amber-700">
+                            <li>Attendance reports contain complex tables that require large screens</li>
+                            <li>Excel file uploads and exports work best on desktop browsers</li>
+                            <li>Multi-step workflows (upload → configure → analyze → export) need desktop tools</li>
+                            <li>Data entry and review tasks require keyboard and mouse precision</li>
+                        </ul>
+                        <p className="text-sm text-amber-800 mt-3">
+                            <strong>Minimum Requirements:</strong> Screen width of 1024 pixels or larger, desktop web browser 
+                            (Chrome, Firefox, Safari, or Edge recommended).
+                        </p>
+                        <p className="text-sm text-amber-800 mt-2">
+                            <strong>What Happens on Mobile/Tablet:</strong> Users attempting to access the system from mobile 
+                            or tablet devices will see a message explaining the desktop-only policy and will not be able to proceed.
+                        </p>
+                    </div>
                 </Section>
 
                 {/* Key Business Capabilities */}

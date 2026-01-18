@@ -107,6 +107,31 @@ export default function TechnicalDocumentation() {
                         <li><strong>Punches:</strong> Up to 10 million punch records per project (30-day period × 5,000 employees × 8 punches/day)</li>
                         <li><strong>Analysis Performance:</strong> Client-side analysis for up to 500 employees/project; batch processing for larger datasets</li>
                     </ul>
+
+                    <h3 className="text-xl font-semibold mt-6">Platform Restrictions</h3>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-red-900 mb-2">Desktop-Only Policy</h4>
+                        <p className="text-sm text-red-800 mb-2">
+                            This application is intentionally restricted to desktop devices only. Mobile phones and tablets are blocked.
+                        </p>
+                        <p className="text-sm text-red-800 mb-2"><strong>Reason:</strong></p>
+                        <ul className="text-sm text-red-700">
+                            <li>Complex data tables require large screens for usability</li>
+                            <li>Excel export workflows are optimized for desktop browsers</li>
+                            <li>Multi-step attendance analysis requires desktop tools</li>
+                            <li>File upload and CSV parsing need desktop file system access</li>
+                        </ul>
+                        <p className="text-sm text-red-800 mt-3"><strong>Device Detection Logic:</strong></p>
+                        <ul className="text-sm text-red-700">
+                            <li>Screen width must be ≥ 1024px</li>
+                            <li>User agent must NOT indicate mobile/tablet</li>
+                            <li>Primary pointer type must be "fine" (mouse/trackpad, not touch)</li>
+                        </ul>
+                        <p className="text-sm text-red-800 mt-3">
+                            <strong>Implementation:</strong> Device check runs globally before authentication and route loading. 
+                            Resize events dynamically block access if window is resized below threshold.
+                        </p>
+                    </div>
                 </Section>
 
                 {/* Architecture Overview */}
