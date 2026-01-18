@@ -225,13 +225,6 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
-    // Redirect department heads to their dashboard (only once on mount, not on every render)
-    React.useEffect(() => {
-        if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard' && !isLoading && currentUser) {
-            window.location.href = '/DepartmentHeadDashboard';
-        }
-    }, [isDepartmentHead, currentPageName, isLoading, currentUser]);
-
     // CRITICAL: Block non-desktop devices BEFORE any rendering
     // This check happens even before authentication
     if (isChecking) {
@@ -279,6 +272,16 @@ export default function Layout({ children, currentPageName }) {
     if (maintenanceMode && userRole !== 'admin' && currentPageName !== 'Maintenance') {
         window.location.href = '/Maintenance';
         return null;
+    }
+
+    // Redirect department heads to their dashboard
+    if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-500">Redirecting to dashboard...</div>
+                {setTimeout(() => { window.location.href = '/DepartmentHeadDashboard'; }, 0)}
+            </div>
+        );
     }
 
     // Check if user has a company assigned (not required for admin/supervisor/ceo)
