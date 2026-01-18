@@ -496,11 +496,13 @@ export default function DepartmentHeadDashboard() {
                 </Card>
             )}
 
-            {/* Employees List with Approvals */}
+            {/* Employees List with Approvals or Attendance Report */}
             {currentProject && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Employees & Pre-Approved Minutes</CardTitle>
+                        <CardTitle>
+                            {salaryIsClosed ? 'Subordinates Attendance Report' : 'Employees & Pre-Approved Minutes'}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {employees.length === 0 ? (
