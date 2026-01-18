@@ -155,24 +155,45 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadVerification?.verified
     });
 
+    // Initialize quarterly minutes if not already done
+    const { data: initStatus } = useMutation({
+        mutationFn: async () => {
+            if (!currentProject) return null;
+            const { data } = await base44.functions.invoke('initializeProjectQuarterlyMinutes', {
+                project_id: currentProject.id
+            });
+            return data;
+        }
+    });
+
     // Get quarterly minutes for all managed employees
     const { data: quarterlyMinutes = [] } = useQuery({
         queryKey: ['quarterlyMinutes', currentProject?.id, employees.map(e => e.id).join(',')],
         queryFn: async () => {
             if (!currentProject || employees.length === 0) return [];
-            
+
+            // Auto-initialize on first load
+            try {
+                await base44.functions.invoke('initializeProjectQuarterlyMinutes', {
+                    project_id: currentProject.id
+                });
+            } catch (e) {
+                // Already initialized or error - continue
+            }
+
+            // Query by project_id; matches both calendar and project-period allocations
             const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
                 project_id: currentProject.id
             });
-            
+
             return allMinutes;
         },
         enabled: !!currentProject && employees.length > 0
     });
 
-    // Get remaining minutes for an employee
+    // Get remaining minutes for an employee (handle both string and number IDs)
     const getEmployeeRemainingMinutes = (employeeId) => {
-        const record = quarterlyMinutes.find(qm => qm.employee_id === employeeId);
+        const record = quarterlyMinutes.find(qm => String(qm.employee_id) === String(employeeId));
         return record?.remaining_minutes || 0;
     };
 
