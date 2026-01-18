@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Wrench, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Wrench, AlertTriangle, CheckCircle, Key } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function MaintenanceSettingsPage() {
     const queryClient = useQueryClient();
+    const [salaryPin, setSalaryPin] = useState('');
+    const [showPinEdit, setShowPinEdit] = useState(false);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -26,6 +29,16 @@ export default function MaintenanceSettingsPage() {
                 return settings[0].setting_value === 'true';
             }
             return false;
+        }
+    });
+
+    const { data: currentSalaryPin } = useQuery({
+        queryKey: ['salaryPin'],
+        queryFn: async () => {
+            const settings = await base44.entities.SystemSettings.filter({ 
+                setting_key: 'SALARY_PAGE_PIN' 
+            });
+            return settings.length > 0 ? settings[0].setting_value : '';
         }
     });
 
@@ -53,6 +66,39 @@ export default function MaintenanceSettingsPage() {
         },
         onError: (error) => {
             toast.error('Failed to update: ' + error.message);
+        }
+    });
+
+    const setSalaryPinMutation = useMutation({
+        mutationFn: async (pin) => {
+            if (!pin || pin.trim() === '') {
+                throw new Error('PIN cannot be empty');
+            }
+            
+            const settings = await base44.entities.SystemSettings.filter({ 
+                setting_key: 'SALARY_PAGE_PIN' 
+            });
+            
+            if (settings.length > 0) {
+                await base44.entities.SystemSettings.update(settings[0].id, {
+                    setting_value: pin
+                });
+            } else {
+                await base44.entities.SystemSettings.create({
+                    setting_key: 'SALARY_PAGE_PIN',
+                    setting_value: pin,
+                    description: 'PIN required to access Salary page and Salary tab'
+                });
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['salaryPin']);
+            setSalaryPin('');
+            setShowPinEdit(false);
+            toast.success('Salary PIN updated successfully');
+        },
+        onError: (error) => {
+            toast.error('Failed to update PIN: ' + error.message);
         }
     });
 
@@ -163,6 +209,81 @@ export default function MaintenanceSettingsPage() {
                         >
                             Disable Maintenance
                         </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Salary Page PIN Settings */}
+            <Card className="border-0 shadow-lg mt-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Key className="w-5 h-5 text-indigo-600" />
+                        Salary Page PIN Lock
+                    </CardTitle>
+                    <CardDescription>
+                        Set a PIN required to access the Salary page and Salary tab in projects
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Current PIN Status */}
+                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                        <div>
+                            <Label className="text-base font-semibold">
+                                {currentSalaryPin ? 'PIN Set' : 'No PIN Set'}
+                            </Label>
+                            <p className="text-sm text-slate-600 mt-1">
+                                {currentSalaryPin 
+                                    ? 'Users must enter the PIN to view salary information' 
+                                    : 'No PIN protection is currently enabled'}
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowPinEdit(!showPinEdit)}
+                        >
+                            {showPinEdit ? 'Cancel' : 'Edit PIN'}
+                        </Button>
+                    </div>
+
+                    {/* PIN Edit Form */}
+                    {showPinEdit && (
+                        <div className="space-y-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                            <div>
+                                <Label htmlFor="salary-pin" className="text-sm font-semibold">
+                                    Enter New PIN
+                                </Label>
+                                <Input
+                                    id="salary-pin"
+                                    type="password"
+                                    value={salaryPin}
+                                    onChange={(e) => setSalaryPin(e.target.value)}
+                                    placeholder="Enter 4-6 digit PIN"
+                                    maxLength="6"
+                                    className="mt-2"
+                                />
+                                <p className="text-xs text-slate-600 mt-1">
+                                    Use a 4-6 digit numeric PIN for security
+                                </p>
+                            </div>
+                            <Button
+                                onClick={() => setSalaryPinMutation.mutate(salaryPin)}
+                                disabled={!salaryPin || salaryPin.length < 4 || setSalaryPinMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                {setSalaryPinMutation.isPending ? 'Setting PIN...' : 'Set PIN'}
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Info */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h3 className="font-semibold text-blue-900 mb-2">How it works</h3>
+                        <ul className="text-sm text-blue-700 space-y-1">
+                            <li>• When set, users must enter the PIN to unlock the Salary page</li>
+                            <li>• The PIN is also required when viewing the Salary tab in projects</li>
+                            <li>• The PIN persists during the user session</li>
+                            <li>• All attempts are tracked and limited to 3 incorrect tries</li>
+                        </ul>
                     </div>
                 </CardContent>
             </Card>
