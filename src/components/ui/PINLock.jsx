@@ -3,6 +3,7 @@ import { Lock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { base44 } from '@/api/base44Client';
 
 export default function PINLock({ onUnlock, storageKey = 'salary_pin_unlocked' }) {
     const [pin, setPin] = useState('');
