@@ -74,7 +74,7 @@ export default function Users() {
 
     // SECURITY: Only admins can query User entity with pagination
     const { data: usersData = { items: [], total: 0 }, isLoading } = useQuery({
-        queryKey: ['users', page, pageSize],
+        queryKey: ['users', currentPage, rowsPerPage],
         queryFn: async () => {
             const user = await base44.auth.me();
             const userRole = user?.extended_role || user?.role || 'user';
@@ -83,9 +83,9 @@ export default function Users() {
                 throw new Error('Access denied: Admin role required');
             }
             
-            const skip = (page - 1) * pageSize;
-            const items = await base44.entities.User.list('-created_date', pageSize, skip);
-            return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+            const skip = (currentPage - 1) * rowsPerPage;
+            const items = await base44.entities.User.list('-created_date', rowsPerPage, skip);
+            return { items, total: items.length === rowsPerPage ? (currentPage + 1) * rowsPerPage : skip + items.length };
         },
         enabled: !!currentUser,
         keepPreviousData: true
