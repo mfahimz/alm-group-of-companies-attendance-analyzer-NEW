@@ -13,10 +13,7 @@ import { createPageUrl } from '../utils';
 import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog';
 
 export default function DepartmentHeadDashboard() {
-    const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const [selectedDate, setSelectedDate] = useState(null);
-    const [approvedMinutes, setApprovedMinutes] = useState('');
-    const [reason, setReason] = useState('');
+    const [showPreApprovalDialog, setShowPreApprovalDialog] = useState(false);
     const [viewingPreviousReport, setViewingPreviousReport] = useState(false);
 
     const queryClient = useQueryClient();
