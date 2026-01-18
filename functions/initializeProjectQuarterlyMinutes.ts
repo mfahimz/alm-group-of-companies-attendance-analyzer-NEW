@@ -117,19 +117,7 @@ Deno.serve(async (req) => {
             }
         }
         
-        // Log the initialization
-        await base44.asServiceRole.functions.invoke('logAudit', {
-            action: 'INITIALIZE_PROJECT_MINUTES',
-            entity_type: 'EmployeeQuarterlyMinutes',
-            entity_id: project_id,
-            entity_name: project.name,
-            details: `Initialized project-based quarterly minutes for ${initialized} employees. Total allocation: ${totalMinutesForProject} minutes (${quartersSpanned} quarters)`,
-            user_email: 'system@automation',
-            user_name: 'System Automation',
-            user_role: 'system',
-            company: project.company,
-            success: true
-        });
+        console.log(`Initialization complete: ${initialized} new, ${alreadyExists} existing`);
         
         return Response.json({
             success: true,
