@@ -689,7 +689,7 @@ const finalSalary = Math.round((basicSalary - totalDeduction) * 100) / 100;`}
                     <ul className="text-sm">
                         <li>If current date falls within ramadan_start_date and ramadan_end_date</li>
                         <li>Determine which week of Ramadan (week1 or week2)</li>
-                        <li>Fetch shift from week1_shifts or week2_shifts JSON (stored as {attendance_id: {shift1_start, shift1_end, ...}})</li>
+                        <li>Fetch shift from week1_shifts or week2_shifts JSON (stored as attendance_id mapping to shift object)</li>
                         <li>Apply Ramadan shift instead of regular shift timing</li>
                     </ul>
 
