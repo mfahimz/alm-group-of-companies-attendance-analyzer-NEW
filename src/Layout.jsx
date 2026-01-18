@@ -301,6 +301,17 @@ export default function Layout({ children, currentPageName }) {
         );
     }
 
+    // Check if department head has a department assigned
+    if (isDepartmentHead && !currentUser.department) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-600 text-center">
+                    No department is assigned. Wait for the administrator to assign a department.
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
             {/* Top Navbar */}
