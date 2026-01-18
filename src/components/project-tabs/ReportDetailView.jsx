@@ -43,18 +43,21 @@ export default function ReportDetailView({ reportRun, project }) {
     const { data: results = [] } = useQuery({
         queryKey: ['results', reportRun.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
-        staleTime: 30 * 1000, // Cache for 30 seconds only - results change frequently
-        retry: false,
-        gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
-        refetchInterval: 5 * 60 * 1000 // Auto-refetch every 5 minutes
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company }),
-        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
-        retry: false,
-        gcTime: 60 * 60 * 1000
+        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Only fetch punches and shifts if project is NOT closed (data is deleted on close)
@@ -62,26 +65,32 @@ export default function ReportDetailView({ reportRun, project }) {
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
         enabled: project.status !== 'closed',
-        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
-        retry: false,
-        gcTime: 60 * 60 * 1000
+        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
         enabled: project.status !== 'closed',
-        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
-        retry: false,
-        gcTime: 60 * 60 * 1000
+        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        staleTime: 60 * 60 * 1000, // Cache for 60 minutes
-        retry: false,
-        gcTime: 60 * 60 * 1000
+        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Load verified employees from report
@@ -758,11 +767,16 @@ export default function ReportDetailView({ reportRun, project }) {
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
             verified_employees: verifiedList.join(',')
         }),
+        onSuccess: () => {
+            // Don't invalidate - local state is already updated
+        },
         onError: () => {
             // Only invalidate on error to refetch correct state
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.error('Failed to update verification');
-        }
+        },
+        retry: 3,
+        retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000)
     });
 
     // Debounce verification updates to prevent rate limiting
@@ -989,19 +1003,52 @@ export default function ReportDetailView({ reportRun, project }) {
             }
 
             if (exceptionsToCreate.length > 0) {
-                const batchSize = 20;
+                const batchSize = 10;
                 const totalBatches = Math.ceil(exceptionsToCreate.length / batchSize);
+                const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+                
+                // Retry helper with backoff
+                const retryWithBackoff = async (fn, maxRetries = 3) => {
+                    for (let i = 0; i < maxRetries; i++) {
+                        try {
+                            return await fn();
+                        } catch (error) {
+                            const isRateLimit = error.message?.includes('rate limit') || error.status === 429;
+                            if (isRateLimit && i < maxRetries - 1) {
+                                const backoffTime = Math.min(2000 * Math.pow(2, i), 10000);
+                                await delay(backoffTime);
+                                continue;
+                            }
+                            throw error;
+                        }
+                    }
+                };
                 
                 for (let i = 0; i < exceptionsToCreate.length; i += batchSize) {
                     const batch = exceptionsToCreate.slice(i, i + batchSize);
-                    await base44.entities.Exception.bulkCreate(batch);
-                    
                     const batchNumber = Math.floor(i / batchSize) + 1;
+                    
                     setSaveProgress({ 
                         current: batchNumber, 
                         total: totalBatches, 
                         status: `Saving exceptions ${batchNumber}/${totalBatches}...` 
                     });
+                    
+                    try {
+                        await retryWithBackoff(() => base44.entities.Exception.bulkCreate(batch));
+                        await delay(1500); // Delay between batches
+                    } catch (error) {
+                        console.error(`Batch ${batchNumber} failed, trying individual saves:`, error);
+                        // Fallback to individual saves
+                        for (const ex of batch) {
+                            try {
+                                await retryWithBackoff(() => base44.entities.Exception.create(ex));
+                                await delay(500);
+                            } catch (exError) {
+                                console.error('Failed to save exception:', ex, exError);
+                            }
+                        }
+                    }
                 }
             }
 
