@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Calendar as CalendarIcon, Eye, CheckCircle2, Clock, AlertCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
+import { nowInUAE, utcToUAE } from '@/components/ui/timezone';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog.jsx';
@@ -41,13 +42,14 @@ export default function DepartmentHeadDashboard() {
         employee_id: deptHeadVerification.assignment.employee_id
     } : null;
 
-    // Get active project containing today's date
+    // Get active project containing today's date (UAE timezone)
     const { data: currentProject } = useQuery({
         queryKey: ['activeProject', deptHeadAssignment?.company, deptHeadAssignment?.department],
         queryFn: async () => {
             if (!deptHeadAssignment) return null;
             
-            const today = new Date();
+            // Get current date in UAE timezone
+            const today = nowInUAE();
             
             // Get all projects for this company
             const projects = await base44.entities.Project.filter({
@@ -56,8 +58,8 @@ export default function DepartmentHeadDashboard() {
             
             // Find project whose date range contains today and matches department or has "All"
             const activeProject = projects.find(p => {
-                const projectStart = parseISO(p.date_from);
-                const projectEnd = parseISO(p.date_to);
+                const projectStart = utcToUAE(p.date_from);
+                const projectEnd = utcToUAE(p.date_to);
                 const isInDateRange = projectStart <= today && projectEnd >= today;
                 const isDepartmentMatch = p.department === 'All' || p.department === deptHeadAssignment.department;
                 return isInDateRange && isDepartmentMatch;
@@ -68,13 +70,13 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Auto Repairs'
     });
 
-    // Get previous month's finalized report
+    // Get previous month's finalized report (UAE timezone)
     const { data: previousReport } = useQuery({
         queryKey: ['previousReport', deptHeadAssignment?.company, deptHeadAssignment?.department],
         queryFn: async () => {
             if (!deptHeadAssignment) return null;
             
-            const now = new Date();
+            const now = nowInUAE();
             const prevMonthFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             const prevMonthLast = new Date(now.getFullYear(), now.getMonth(), 0);
             
@@ -247,8 +249,8 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    const projectEndCutoff = currentProject ? addDays(parseISO(currentProject.date_to), -1) : null;
-    const approvalPeriodEnded = projectEndCutoff && isAfter(new Date(), projectEndCutoff);
+    const projectEndCutoff = currentProject ? addDays(utcToUAE(currentProject.date_to), -1) : null;
+    const approvalPeriodEnded = projectEndCutoff && isAfter(nowInUAE(), projectEndCutoff);
 
     return (
         <div className="max-w-7xl mx-auto p-6 space-y-6">
