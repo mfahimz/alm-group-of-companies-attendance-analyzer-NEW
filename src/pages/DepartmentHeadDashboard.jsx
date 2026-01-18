@@ -52,10 +52,24 @@ export default function DepartmentHeadDashboard() {
             const today = nowInUAE();
             const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             
+            console.log('🔍 Project Search:', {
+                company: deptHeadAssignment.company,
+                department: deptHeadAssignment.department,
+                todayDateOnly
+            });
+            
             // Get all projects for this company
             const projects = await base44.entities.Project.filter({
                 company: deptHeadAssignment.company
             });
+            
+            console.log('📊 Projects found:', projects.length, projects.map(p => ({
+                name: p.name,
+                company: p.company,
+                department: p.department,
+                date_from: p.date_from,
+                date_to: p.date_to
+            })));
             
             // Find project whose date range contains today and matches department or has "All"
             const activeProject = projects.find(p => {
@@ -68,12 +82,16 @@ export default function DepartmentHeadDashboard() {
                 
                 const isInDateRange = startDateOnly <= todayDateOnly && endDateOnly >= todayDateOnly;
                 const isDepartmentMatch = p.department === 'All' || p.department === deptHeadAssignment.department;
+                
+                console.log(`Project "${p.name}": inRange=${isInDateRange} (${startDateOnly} to ${endDateOnly}), deptMatch=${isDepartmentMatch}`);
+                
                 return isInDateRange && isDepartmentMatch;
             });
             
+            console.log('✅ Active project:', activeProject?.name || 'NONE');
             return activeProject || null;
         },
-        enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Auto Repairs'
+        enabled: !!deptHeadAssignment
     });
 
     // Get previous month's finalized report (UAE timezone)
