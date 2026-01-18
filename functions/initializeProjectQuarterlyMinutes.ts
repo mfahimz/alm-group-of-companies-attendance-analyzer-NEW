@@ -90,20 +90,17 @@ Deno.serve(async (req) => {
         let alreadyExists = 0;
         
         for (const employee of employees) {
-            // Check if already initialized
+            // Check if already initialized (employee_id is string per schema)
             const existing = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
-                employee_id: employee.hrms_id,
+                employee_id: String(employee.hrms_id),
                 project_id: project_id,
                 company: project.company,
                 allocation_type: 'project_period'
             });
             
             if (existing.length === 0) {
-                // Store as number for consistency
-                const employeeIdNum = Number(employee.hrms_id);
-                
                 await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.create({
-                    employee_id: employeeIdNum,
+                    employee_id: String(employee.hrms_id),
                     project_id: project_id,
                     company: project.company,
                     allocation_type: 'project_period',
