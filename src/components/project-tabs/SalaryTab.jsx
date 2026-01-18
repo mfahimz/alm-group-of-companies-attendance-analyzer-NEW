@@ -135,10 +135,8 @@ export default function SalaryTab({ project, finalReport }) {
         return depts.sort();
     }, [salaryData]);
 
-    // Filter and sort salary data - only when final report exists
+    // Filter and sort salary data
     const filteredSalaryData = useMemo(() => {
-        if (!finalReport) return [];
-        
         let filtered = salaryData;
         
         // Apply department filter
@@ -158,7 +156,7 @@ export default function SalaryTab({ project, finalReport }) {
             }
             return 0;
         });
-    }, [salaryData, departmentFilter, sortBy, finalReport]);
+    }, [salaryData, departmentFilter, sortBy]);
 
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
@@ -245,14 +243,12 @@ export default function SalaryTab({ project, finalReport }) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {showEmptySalaryTab ? (
-                        <div className="text-center py-12">
-                            <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                            <p className="text-slate-600 text-lg font-medium">No Final Report Available</p>
-                            <p className="text-slate-500 text-sm mt-2">Salary calculations will appear here once a report is marked as final.</p>
+                    {showEmptySalaryTab && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
+                            <strong>⚠️ No Final Report:</strong> The table below shows the structure only. All salary values will be zero until a report is marked as final.
                         </div>
-                    ) : (
-                        <>
+                    )}
+                    
                     <div className="space-y-4 mb-4">
                         <div className="bg-white rounded-lg p-4">
                             <p className="text-sm text-slate-600 mb-4">
@@ -452,8 +448,6 @@ export default function SalaryTab({ project, finalReport }) {
                             </TableBody>
                         </Table>
                     </div>
-                        </>
-                    )}
                 </CardContent>
             </Card>
         </div>
