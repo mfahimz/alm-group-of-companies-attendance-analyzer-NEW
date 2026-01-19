@@ -70,16 +70,16 @@ export default function Employees() {
 
     // Server-side filtered employees with pagination
     const { data: employeesData = { items: [], total: 0 }, isLoading } = useQuery({
-        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole, page, pageSize],
+        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole, currentPage, rowsPerPage],
         queryFn: async () => {
             if (!currentUser) return { items: [], total: 0 };
             
-            const skip = (page - 1) * pageSize;
+            const skip = (currentPage - 1) * rowsPerPage;
             
             // Admin, Supervisor, CEO can see all employees
             if (isAdmin || isSupervisor || isCEO) {
-                const items = await base44.entities.Employee.list('-created_date', pageSize, skip);
-                return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+                const items = await base44.entities.Employee.list('-created_date', rowsPerPage, skip);
+                return { items, total: items.length === rowsPerPage ? (currentPage + 1) * rowsPerPage : skip + items.length };
             }
             
             // Department heads see only their department
@@ -88,15 +88,15 @@ export default function Employees() {
                     company: currentUser.company,
                     department: currentUser.department,
                     active: true
-                }, '-created_date', pageSize);
-                return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
+                }, '-created_date', rowsPerPage);
+                return { items, total: items.length === rowsPerPage ? (currentPage + 1) * rowsPerPage : items.length };
             }
             
             // Regular users see only their company
             const items = await base44.entities.Employee.filter({
                 company: currentUser.company
-            }, '-created_date', pageSize);
-            return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
+            }, '-created_date', rowsPerPage);
+            return { items, total: items.length === rowsPerPage ? (currentPage + 1) * rowsPerPage : items.length };
         },
         enabled: !!currentUser,
         keepPreviousData: true
