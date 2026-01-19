@@ -2,7 +2,8 @@ import React from 'react';
 import { TableHead } from '@/components/ui/table';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
-export default function SortableTableHead({ children, sortKey, currentSort, onSort, className = '' }) {
+export default function SortableTableHead({ children, label, sortKey, currentSort, onSort, className = '' }) {
+    const displayLabel = label || children;
     const handleClick = () => {
         if (!sortKey || !onSort) return;
         
@@ -19,7 +20,7 @@ export default function SortableTableHead({ children, sortKey, currentSort, onSo
     const direction = currentSort?.direction;
 
     if (!sortKey || !onSort) {
-        return <TableHead className={className}>{children}</TableHead>;
+        return <TableHead className={className}>{displayLabel}</TableHead>;
     }
 
     return (
@@ -28,7 +29,7 @@ export default function SortableTableHead({ children, sortKey, currentSort, onSo
                 onClick={handleClick}
                 className="flex items-center gap-2 hover:text-slate-900 transition-colors font-medium w-full"
             >
-                {children}
+                {displayLabel}
                 {isActive ? (
                     direction === 'asc' ? (
                         <ArrowUp className="w-4 h-4" />
