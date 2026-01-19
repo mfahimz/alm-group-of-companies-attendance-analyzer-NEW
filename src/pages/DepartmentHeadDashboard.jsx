@@ -173,17 +173,17 @@ export default function DepartmentHeadDashboard() {
             
             if (managedIds.length === 0) return [];
             
-            // Fetch all managed employees
+            // Fetch all managed employees by their IDs
             const allEmployees = await base44.entities.Employee.filter({
                 company: deptHeadVerification.assignment.company,
                 active: true
             });
             
-            // Filter to only managed subordinates (compare as strings)
+            // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
             // CRITICAL: Exclude department head from the list (cannot self-approve)
             return allEmployees.filter(emp => 
-                managedIds.includes(String(emp.hrms_id)) && 
-                String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
+                managedIds.includes(String(emp.id)) && 
+                String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
             );
         },
         enabled: !!deptHeadVerification?.verified,
