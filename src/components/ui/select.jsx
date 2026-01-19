@@ -59,26 +59,35 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
     return React.Children.toArray(children).filter((child) => {
       if (!React.isValidElement(child)) return true;
       
-      const childText = child.props?.children;
-      if (typeof childText === 'string') {
-        return childText.toLowerCase().includes(search.toLowerCase());
-      }
-      
-      // For complex children, try to get text content
+      // Helper to safely extract and convert all text content to string
       const getTextContent = (node) => {
+        if (node === null || node === undefined) return '';
         if (typeof node === 'string') return node;
         if (typeof node === 'number') return String(node);
+        if (typeof node === 'boolean') return '';
+        
         if (React.isValidElement(node)) {
           return getTextContent(node.props?.children);
         }
+        
         if (Array.isArray(node)) {
-          return node.map(getTextContent).join(' ');
+          return node.map(getTextContent).filter(Boolean).join(' ');
         }
-        return '';
+        
+        // For any other type, try to convert to string safely
+        try {
+          return String(node);
+        } catch {
+          return '';
+        }
       };
       
-      const textContent = String(getTextContent(childText));
-      return textContent.toLowerCase().includes(search.toLowerCase());
+      const childText = child.props?.children;
+      const textContent = getTextContent(childText);
+      
+      // Ensure we have a string before calling toLowerCase
+      const searchableText = String(textContent || '');
+      return searchableText.toLowerCase().includes(search.toLowerCase());
     });
   }, [children, search, filter]);
 
