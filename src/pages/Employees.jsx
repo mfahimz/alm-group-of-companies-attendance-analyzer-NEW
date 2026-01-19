@@ -68,41 +68,34 @@ export default function Employees() {
     const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
-    // Server-side filtered employees with pagination
-    const { data: employeesData = { items: [], total: 0 }, isLoading } = useQuery({
-        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole, currentPage, rowsPerPage],
+    // Fetch all employees (server-side filtering by role, client-side pagination)
+    const { data: employees = [], isLoading } = useQuery({
+        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole],
         queryFn: async () => {
-            if (!currentUser) return { items: [], total: 0 };
-            
-            const skip = (currentPage - 1) * rowsPerPage;
+            if (!currentUser) return [];
             
             // Admin, Supervisor, CEO can see all employees
             if (isAdmin || isSupervisor || isCEO) {
-                const items = await base44.entities.Employee.list('-created_date', rowsPerPage, skip);
-                return { items, total: items.length === rowsPerPage ? (currentPage + 1) * rowsPerPage : skip + items.length };
+                return await base44.entities.Employee.list('name', 1000);
             }
             
             // Department heads see only their department
             if (isDepartmentHead && currentUser.department) {
-                const items = await base44.entities.Employee.filter({
+                return await base44.entities.Employee.filter({
                     company: currentUser.company,
                     department: currentUser.department,
                     active: true
-                }, '-created_date', rowsPerPage);
-                return { items, total: items.length === rowsPerPage ? (currentPage + 1) * rowsPerPage : items.length };
+                });
             }
             
             // Regular users see only their company
-            const items = await base44.entities.Employee.filter({
+            return await base44.entities.Employee.filter({
                 company: currentUser.company
-            }, '-created_date', rowsPerPage);
-            return { items, total: items.length === rowsPerPage ? (currentPage + 1) * rowsPerPage : items.length };
+            });
         },
         enabled: !!currentUser,
-        keepPreviousData: true
+        staleTime: 2 * 60 * 1000
     });
-
-    const employees = employeesData.items;
 
     const deleteMutation = useMutation({
         mutationFn: async (id) => {
