@@ -460,7 +460,6 @@ export default function DepartmentHeadDashboard() {
                                     <TableRow>
                                         <TableHead>Attendance ID</TableHead>
                                         <TableHead>Employee Name</TableHead>
-                                        <TableHead className="text-right">Remaining Minutes</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -468,9 +467,6 @@ export default function DepartmentHeadDashboard() {
                                         <TableRow key={emp.id}>
                                             <TableCell className="font-medium text-slate-700">{emp.attendance_id}</TableCell>
                                             <TableCell>{emp.name}</TableCell>
-                                            <TableCell className="text-right font-semibold text-green-700">
-                                                {getEmployeeRemainingMinutes(emp.hrms_id)} min
-                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
