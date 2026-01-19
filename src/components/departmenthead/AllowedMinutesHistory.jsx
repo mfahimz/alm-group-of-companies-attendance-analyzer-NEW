@@ -64,7 +64,6 @@ export default function AllowedMinutesHistory({ projectId, deptHeadVerification 
                             <TableRow>
                                 <TableHead>Attendance ID</TableHead>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Minutes</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead>Reason</TableHead>
                                 <TableHead>Created</TableHead>
@@ -75,9 +74,6 @@ export default function AllowedMinutesHistory({ projectId, deptHeadVerification 
                                 <TableRow key={exc.id}>
                                     <TableCell className="font-medium">{exc.attendance_id}</TableCell>
                                     <TableCell>{format(parseISO(exc.date_from), 'dd MMM yyyy')}</TableCell>
-                                    <TableCell className="font-semibold text-green-700">
-                                        {exc.allowed_minutes} min
-                                    </TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className="text-xs">
                                             {exc.allowed_minutes_type === 'both' 
