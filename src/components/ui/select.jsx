@@ -77,7 +77,7 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
         return '';
       };
       
-      const textContent = getTextContent(childText);
+      const textContent = String(getTextContent(childText));
       return textContent.toLowerCase().includes(search.toLowerCase());
     });
   }, [children, search, filter]);
