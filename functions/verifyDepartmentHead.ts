@@ -40,11 +40,13 @@ Deno.serve(async (req) => {
         if (employees.length === 0) {
             return Response.json({ 
                 error: 'No active employee record found with this HRMS ID.',
-                verified: false 
+                verified: false,
+                debug: { hrms_id: user.hrms_id }
             }, { status: 403 });
         }
 
         const employee = employees[0];
+        console.log('Found employee:', employee.id, employee.name, 'for user hrms_id:', user.hrms_id);
 
         // Find department head assignment using the Employee's ID
         const assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
@@ -52,10 +54,30 @@ Deno.serve(async (req) => {
             active: true
         });
 
+        console.log('DepartmentHead query result:', assignments.length, 'assignments found for employee_id:', employee.id);
+
         if (assignments.length === 0) {
+            // Get all department heads to debug
+            const allDeptHeads = await base44.asServiceRole.entities.DepartmentHead.list();
+            console.log('All department heads:', allDeptHeads.map(dh => ({ 
+                id: dh.id, 
+                employee_id: dh.employee_id, 
+                active: dh.active,
+                company: dh.company,
+                department: dh.department
+            })));
+            
             return Response.json({ 
                 error: 'No active department head assignment found for this employee. Admin must create a department head assignment.',
-                verified: false 
+                verified: false,
+                debug: { 
+                    employee_id: employee.id,
+                    employee_name: employee.name,
+                    all_dept_heads: allDeptHeads.map(dh => ({ 
+                        employee_id: dh.employee_id, 
+                        active: dh.active 
+                    }))
+                }
             }, { status: 403 });
         }
 
