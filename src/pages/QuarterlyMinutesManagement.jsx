@@ -97,8 +97,8 @@ export default function QuarterlyMinutesManagement() {
         let filtered = combinedData.filter(item => {
             const matchesSearch = 
                 item.employee_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                String(item.employee_attendance_id).includes(searchQuery) ||
-                String(item.employee_id).includes(searchQuery);
+                String(item.employee_attendance_id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                String(item.employee_id).toLowerCase().includes(searchQuery.toLowerCase());
 
             const matchesCompany = companyFilter === 'all' || item.employee_company === companyFilter;
             const matchesDepartment = departmentFilter === 'all' || item.employee_department === departmentFilter;
