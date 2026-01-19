@@ -38,7 +38,9 @@ export default function QuarterlyMinutesManagement() {
 
     const { data: quarterlyMinutes = [], isLoading: minutesLoading } = useQuery({
         queryKey: ['quarterlyMinutes'],
-        queryFn: () => base44.entities.EmployeeQuarterlyMinutes.list()
+        queryFn: () => base44.entities.EmployeeQuarterlyMinutes.filter({
+            company: 'Al Maraghi Auto Repairs'
+        })
     });
 
     const { data: companies = [] } = useQuery({
