@@ -31,9 +31,10 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
-        // Find the employee record using hrms_id
+        // Find the employee record using hrms_id (convert to number to ensure match)
+        const hrmsIdNumber = Number(user.hrms_id);
         const employees = await base44.asServiceRole.entities.Employee.filter({
-            hrms_id: user.hrms_id,
+            hrms_id: hrmsIdNumber,
             active: true
         });
 
@@ -41,7 +42,11 @@ Deno.serve(async (req) => {
             return Response.json({ 
                 error: 'No active employee record found with this HRMS ID.',
                 verified: false,
-                debug: { hrms_id: user.hrms_id }
+                debug: { 
+                    hrms_id: user.hrms_id,
+                    hrms_id_type: typeof user.hrms_id,
+                    hrms_id_number: hrmsIdNumber
+                }
             }, { status: 403 });
         }
 
