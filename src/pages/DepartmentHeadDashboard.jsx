@@ -23,7 +23,12 @@ export default function DepartmentHeadDashboard() {
     // Get current user
     const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
+        queryFn: () => base44.auth.me(),
+        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        gcTime: 20 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // SECURITY: Verify department head assignment via backend
@@ -34,7 +39,12 @@ export default function DepartmentHeadDashboard() {
             return data;
         },
         enabled: !!currentUser,
-        retry: false
+        retry: false,
+        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     const deptHeadAssignment = deptHeadVerification?.verified ? {
@@ -102,7 +112,12 @@ export default function DepartmentHeadDashboard() {
             // return activeProject || null;
             // ========== END ORIGINAL LOGIC ==========
         },
-        enabled: !!deptHeadAssignment
+        enabled: !!deptHeadAssignment,
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Get previous month's finalized report (UAE timezone)
@@ -138,7 +153,12 @@ export default function DepartmentHeadDashboard() {
             
             return reports[0] || null;
         },
-        enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Auto Repairs'
+        enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Auto Repairs',
+        staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // SECURITY: Server-side filtered employees for this department head (only managed subordinates)
@@ -166,7 +186,12 @@ export default function DepartmentHeadDashboard() {
                 String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
             );
         },
-        enabled: !!deptHeadVerification?.verified
+        enabled: !!deptHeadVerification?.verified,
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // No auto-initialization needed - using calendar quarters directly
@@ -188,7 +213,12 @@ export default function DepartmentHeadDashboard() {
 
             return allMinutes;
         },
-        enabled: !!currentProject && currentProject.company === 'Al Maraghi Auto Repairs'
+        enabled: !!currentProject && currentProject.company === 'Al Maraghi Auto Repairs',
+        staleTime: 2 * 60 * 1000, // Cache for 2 minutes (data changes frequently)
+        gcTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Get remaining minutes for an employee (handle both string and number IDs)
