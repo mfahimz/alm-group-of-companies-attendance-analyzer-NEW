@@ -31,12 +31,24 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
-        // Convert hrms_id to string for comparison (may be number or string)
-        const hrmsIdString = String(user.hrms_id);
+        // Find the employee record using hrms_id
+        const employees = await base44.asServiceRole.entities.Employee.filter({
+            hrms_id: user.hrms_id,
+            active: true
+        });
 
-        // Find department head assignment
+        if (employees.length === 0) {
+            return Response.json({ 
+                error: 'No active employee record found with this HRMS ID.',
+                verified: false 
+            }, { status: 403 });
+        }
+
+        const employee = employees[0];
+
+        // Find department head assignment using the Employee's ID
         const assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
-            employee_id: hrmsIdString,
+            employee_id: employee.id,
             active: true
         });
 
