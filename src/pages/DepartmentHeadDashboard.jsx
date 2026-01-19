@@ -169,39 +169,26 @@ export default function DepartmentHeadDashboard() {
         enabled: !!deptHeadVerification?.verified
     });
 
-    // Auto-initialize quarterly minutes when project loads
-    useEffect(() => {
-        if (!currentProject) return;
-        
-        const initializeMinutes = async () => {
-            try {
-                await base44.functions.invoke('initializeProjectQuarterlyMinutes', {
-                    project_id: currentProject.id
-                });
-                // Trigger refetch after initialization
-                queryClient.invalidateQueries(['quarterlyMinutes']);
-            } catch (e) {
-                console.log('Quarterly minutes already initialized or not needed');
-            }
-        };
-        
-        initializeMinutes();
-    }, [currentProject?.id, queryClient]);
+    // No auto-initialization needed - using calendar quarters directly
 
-    // Get quarterly minutes for all managed employees
+    // Get quarterly minutes for all managed employees (calendar-based Q4 2025)
     const { data: quarterlyMinutes = [] } = useQuery({
-        queryKey: ['quarterlyMinutes', currentProject?.id],
+        queryKey: ['quarterlyMinutes', currentProject?.company],
         queryFn: async () => {
             if (!currentProject) return [];
 
-            // Query by project_id; matches both calendar and project-period allocations
+            // For Al Maraghi Auto Repairs, use calendar quarter system
+            // November 2025 falls in Q4 2025
             const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
-                project_id: currentProject.id
+                company: currentProject.company,
+                year: 2025,
+                quarter: 4,
+                allocation_type: 'calendar_quarter'
             });
 
             return allMinutes;
         },
-        enabled: !!currentProject
+        enabled: !!currentProject && currentProject.company === 'Al Maraghi Auto Repairs'
     });
 
     // Get remaining minutes for an employee (handle both string and number IDs)
