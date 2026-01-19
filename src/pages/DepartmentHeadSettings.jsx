@@ -411,7 +411,7 @@ export default function DepartmentHeadSettings() {
                                                         if (!managedEmployeesSearch) return true;
                                                         const search = managedEmployeesSearch.toLowerCase();
                                                         return emp.name.toLowerCase().includes(search) || 
-                                                               emp.attendance_id.toLowerCase().includes(search);
+                                                               String(emp.attendance_id).toLowerCase().includes(search);
                                                     })
                                                     .map(emp => (
                                                         <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -669,7 +669,7 @@ export default function DepartmentHeadSettings() {
                                                         if (!editManagedEmployeesSearch) return true;
                                                         const search = editManagedEmployeesSearch.toLowerCase();
                                                         return emp.name.toLowerCase().includes(search) || 
-                                                               emp.attendance_id.toLowerCase().includes(search);
+                                                               String(emp.attendance_id).toLowerCase().includes(search);
                                                     })
                                                     .map(emp => (
                                                         <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
