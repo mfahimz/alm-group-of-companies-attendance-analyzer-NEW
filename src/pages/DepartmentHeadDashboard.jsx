@@ -322,8 +322,11 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
+    // ========== TEST MODE: Disable approval period check ==========
+    // TODO: REVERT THIS AFTER TESTING - Re-enable the approval cutoff
     const projectEndCutoff = currentProject ? addDays(utcToUAE(currentProject.date_to), -1) : null;
-    const approvalPeriodEnded = projectEndCutoff && isAfter(nowInUAE(), projectEndCutoff);
+    const approvalPeriodEnded = false; // HARDCODED FOR TESTING - normally: projectEndCutoff && isAfter(nowInUAE(), projectEndCutoff)
+    // ========== END TEST MODE ==========
 
     return (
         <div className="max-w-7xl mx-auto p-6 space-y-6">
