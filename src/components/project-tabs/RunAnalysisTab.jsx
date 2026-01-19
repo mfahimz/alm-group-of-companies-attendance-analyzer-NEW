@@ -566,15 +566,19 @@ export default function RunAnalysisTab({ project }) {
                 full_absence_count++;
             }
 
-            // Track allowed minutes from ALLOWED_MINUTES exception (with error handling)
-            let allowedMinutesForDay = 0;
+            // Track approved minutes from ALLOWED_MINUTES exception (with error handling)
+            // ONLY for Al Maraghi Auto Repairs - approved minutes reduce deductible amount
+            let approvedMinutesForDay = 0;
             try {
-                if (dateException && dateException.type === 'ALLOWED_MINUTES') {
-                    allowedMinutesForDay = dateException.allowed_minutes || 0;
+                if (project.company === 'Al Maraghi Auto Repairs' && 
+                    dateException && 
+                    dateException.type === 'ALLOWED_MINUTES' && 
+                    dateException.approval_status === 'approved_dept_head') {
+                    approvedMinutesForDay = dateException.allowed_minutes || 0;
                 }
             } catch (error) {
-                console.error(`Error reading allowed minutes for date ${dateStr}:`, error);
-                allowedMinutesForDay = 0;
+                console.error(`Error reading approved minutes for date ${dateStr}:`, error);
+                approvedMinutesForDay = 0;
             }
 
             // Skip time calculation if there's an exception that handles attendance status OR has manual time values
@@ -627,16 +631,26 @@ export default function RunAnalysisTab({ project }) {
                     }
                 }
                 
-                // Apply allowed minutes - subtract from late/early
-                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
-                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                    // Proportionally reduce late and early
-                    if (totalDayMinutes > 0) {
+                // NEW LOGIC for Al Maraghi Auto Repairs:
+                // 1. Calculate total actual late+early minutes
+                // 2. Subtract approved minutes FIRST (don't deduct these at all)
+                // 3. Grace minutes apply to remaining excess only
+                // Example: 53 actual, 50 approved = 3 excess. Grace 15 min -> 0 deduction
+                if (project.company === 'Al Maraghi Auto Repairs' && approvedMinutesForDay > 0) {
+                    const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                    // Subtract approved minutes from total
+                    const excessMinutes = Math.max(0, totalDayMinutes - approvedMinutesForDay);
+                    
+                    // Proportionally distribute excess back to late and early
+                    if (totalDayMinutes > 0 && excessMinutes > 0) {
                         const lateRatio = dayLateMinutes / totalDayMinutes;
                         const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                        dayLateMinutes = Math.round(remaining * lateRatio);
-                        dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                        dayLateMinutes = Math.round(excessMinutes * lateRatio);
+                        dayEarlyMinutes = Math.round(excessMinutes * earlyRatio);
+                    } else {
+                        // All minutes covered by approval
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
                     }
                 }
                 
