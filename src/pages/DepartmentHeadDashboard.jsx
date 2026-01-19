@@ -21,13 +21,13 @@ export default function DepartmentHeadDashboard() {
     const queryClient = useQueryClient();
 
     // Get current user
-    const { data: currentUser } = useQuery({
+    const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
 
     // SECURITY: Verify department head assignment via backend
-    const { data: deptHeadVerification } = useQuery({
+    const { data: deptHeadVerification, isLoading: verificationLoading } = useQuery({
         queryKey: ['deptHeadVerification', currentUser?.email],
         queryFn: async () => {
             const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
@@ -44,7 +44,7 @@ export default function DepartmentHeadDashboard() {
     } : null;
 
     // Get active project containing today's date (UAE timezone)
-    const { data: currentProject } = useQuery({
+    const { data: currentProject, isLoading: projectLoading } = useQuery({
         queryKey: ['activeProject', deptHeadAssignment?.company, deptHeadAssignment?.department],
         queryFn: async () => {
             if (!deptHeadAssignment) return null;
@@ -200,24 +200,10 @@ export default function DepartmentHeadDashboard() {
     // Check if salary is closed for current project
     const salaryIsClosed = currentProject?.status === 'closed';
 
-    // Check if not Al Maraghi Auto Repairs
-    if (deptHeadAssignment && deptHeadAssignment.company !== 'Al Maraghi Auto Repairs') {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <Card className="max-w-md">
-                    <CardContent className="p-6 text-center">
-                        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-                        <h2 className="text-xl font-semibold mb-2">Feature Not Available</h2>
-                        <p className="text-slate-600">
-                            This feature is currently only available for Al Maraghi Auto Repairs.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
+    // CRITICAL: Single loading state - wait for ALL essential data before rendering anything
+    const isInitialLoading = userLoading || verificationLoading || (!!deptHeadAssignment && projectLoading);
 
-    if (!currentUser) {
+    if (isInitialLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-slate-50">
                 <div className="text-slate-500">Loading...</div>
@@ -225,7 +211,8 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    if (!deptHeadAssignment) {
+    // After loading completes, check for errors/issues
+    if (!currentUser || !deptHeadVerification?.verified) {
         const errorMessage = deptHeadVerification?.error || 'You are not assigned as a department head.';
         return (
             <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -238,6 +225,23 @@ export default function DepartmentHeadDashboard() {
                         </p>
                         <p className="text-sm text-slate-500">
                             Please contact your administrator to resolve this issue.
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // Check if not Al Maraghi Auto Repairs (after all data is loaded)
+    if (deptHeadAssignment && deptHeadAssignment.company !== 'Al Maraghi Auto Repairs') {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                <Card className="max-w-md">
+                    <CardContent className="p-6 text-center">
+                        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                        <h2 className="text-xl font-semibold mb-2">Feature Not Available</h2>
+                        <p className="text-slate-600">
+                            This feature is currently only available for Al Maraghi Auto Repairs.
                         </p>
                     </CardContent>
                 </Card>
