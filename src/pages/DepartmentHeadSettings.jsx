@@ -410,8 +410,9 @@ export default function DepartmentHeadSettings() {
                                                     .filter(emp => {
                                                         if (!managedEmployeesSearch) return true;
                                                         const search = managedEmployeesSearch.toLowerCase();
+                                                        const attendanceIdStr = emp.attendance_id != null ? String(emp.attendance_id) : '';
                                                         return emp.name.toLowerCase().includes(search) || 
-                                                               String(emp.attendance_id).toLowerCase().includes(search);
+                                                               attendanceIdStr.toLowerCase().includes(search);
                                                     })
                                                     .map(emp => (
                                                         <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -668,8 +669,9 @@ export default function DepartmentHeadSettings() {
                                                     .filter(emp => {
                                                         if (!editManagedEmployeesSearch) return true;
                                                         const search = editManagedEmployeesSearch.toLowerCase();
+                                                        const attendanceIdStr = emp.attendance_id != null ? String(emp.attendance_id) : '';
                                                         return emp.name.toLowerCase().includes(search) || 
-                                                               String(emp.attendance_id).toLowerCase().includes(search);
+                                                               attendanceIdStr.toLowerCase().includes(search);
                                                     })
                                                     .map(emp => (
                                                         <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
