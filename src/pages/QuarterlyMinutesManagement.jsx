@@ -50,11 +50,23 @@ export default function QuarterlyMinutesManagement() {
 
     const updateMinutesMutation = useMutation({
         mutationFn: async ({ recordId, updates }) => {
-            return await base44.entities.EmployeeQuarterlyMinutes.update(recordId, updates);
+            // Update EmployeeQuarterlyMinutes
+            const result = await base44.entities.EmployeeQuarterlyMinutes.update(recordId, updates);
+            
+            // Sync total_minutes back to Employee profile (bidirectional)
+            if (updates.total_minutes !== undefined) {
+                await base44.functions.invoke('syncQuarterlyMinutesToEmployee', {
+                    quarterly_minutes_id: recordId,
+                    total_minutes: updates.total_minutes
+                });
+            }
+            
+            return result;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
-            toast.success('Quarterly minutes updated successfully');
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            toast.success('Quarterly minutes updated and synced to employee profile');
         },
         onError: (error) => {
             toast.error('Failed to update: ' + error.message);
