@@ -33,43 +33,15 @@ Deno.serve(async (req) => {
 
         // Find the employee record using hrms_id (convert to number to ensure match)
         const hrmsIdNumber = Number(user.hrms_id);
-        
-        console.log('[verifyDepartmentHead] Searching for employee with hrms_id:', {
-            original: user.hrms_id,
-            type: typeof user.hrms_id,
-            asNumber: hrmsIdNumber
-        });
-        
         const employees = await base44.asServiceRole.entities.Employee.filter({
             hrms_id: hrmsIdNumber,
             active: true
         });
 
-        console.log('[verifyDepartmentHead] Filter result:', employees.length, 'employees found');
-
         if (employees.length === 0) {
-            // Try to find ANY employee with matching hrms_id (without active filter)
-            const allMatches = await base44.asServiceRole.entities.Employee.filter({
-                hrms_id: hrmsIdNumber
-            });
-            
-            console.log('[verifyDepartmentHead] All matches (including inactive):', allMatches.length);
-            
             return Response.json({ 
                 error: 'No active employee record found with this HRMS ID.',
-                verified: false,
-                debug: { 
-                    hrms_id: user.hrms_id,
-                    hrms_id_type: typeof user.hrms_id,
-                    hrms_id_number: hrmsIdNumber,
-                    total_matches: allMatches.length,
-                    matches_including_inactive: allMatches.map(e => ({
-                        id: e.id,
-                        name: e.name,
-                        hrms_id: e.hrms_id,
-                        active: e.active
-                    }))
-                }
+                verified: false
             }, { status: 403 });
         }
 
