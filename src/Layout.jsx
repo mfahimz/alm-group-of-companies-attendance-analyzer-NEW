@@ -150,7 +150,7 @@ export default function Layout({ children, currentPageName }) {
         if (!currentUser) return [];
 
         const menu = [
-            { title: 'Dashboard', url: 'Dashboard' },
+            { title: 'Dashboard', url: isDepartmentHead ? 'DepartmentHeadDashboard' : 'Dashboard' },
             {
                 title: 'Projects',
                 url: 'Projects',
