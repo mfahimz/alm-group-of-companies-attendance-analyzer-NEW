@@ -82,9 +82,15 @@ export default function DepartmentHeadDashboard() {
         });
     }, [deptHeadVerification?.verified, verificationLoading, deptHeadAssignment?.company, deptHeadAssignment?.department]);
 
+    // Memoize project query key to prevent re-renders
+    const projectQueryKey = React.useMemo(() => 
+        ['activeProject', deptHeadAssignment?.company, deptHeadAssignment?.department],
+        [deptHeadAssignment?.company, deptHeadAssignment?.department]
+    );
+
     // Get active project containing today's date (UAE timezone)
     const { data: currentProject, isLoading: projectLoading } = useQuery({
-        queryKey: ['activeProject', deptHeadAssignment?.company, deptHeadAssignment?.department],
+        queryKey: projectQueryKey,
         queryFn: async () => {
             if (!deptHeadAssignment) return null;
             
