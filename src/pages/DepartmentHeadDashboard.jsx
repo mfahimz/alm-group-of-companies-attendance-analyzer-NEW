@@ -279,42 +279,157 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    if (viewingPreviousReport && previousReport) {
+    // DEPARTMENT HEAD - Get previous report's project
+    const { data: previousProject } = useQuery({
+        queryKey: ['previousProject', previousReport?.project_id],
+        queryFn: async () => {
+            if (!previousReport) return null;
+            const projects = await base44.entities.Project.filter({ id: previousReport.project_id });
+            return projects[0] || null;
+        },
+        enabled: !!previousReport && viewingPreviousReport
+    });
+
+    // DEPARTMENT HEAD - Get previous report results filtered by department
+    const { data: previousReportResults = [] } = useQuery({
+        queryKey: ['previousReportResults', previousReport?.id, deptHeadAssignment?.department],
+        queryFn: async () => {
+            if (!previousReport || !deptHeadAssignment) return [];
+            
+            const allResults = await base44.entities.AnalysisResult.filter({ 
+                report_run_id: previousReport.id 
+            });
+            
+            // Get all employees for the project's company
+            const allEmployees = await base44.entities.Employee.filter({
+                company: deptHeadAssignment.company
+            });
+            
+            // Filter results to only show employees from dept head's department
+            return allResults.filter(result => {
+                const employee = allEmployees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
+                return employee && employee.department === deptHeadAssignment.department;
+            });
+        },
+        enabled: !!previousReport && !!deptHeadAssignment && viewingPreviousReport
+    });
+
+    if (viewingPreviousReport && previousReport && previousProject) {
         return (
             <div className="max-w-7xl mx-auto p-6 space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900">Previous Month Report</h1>
                         <p className="text-slate-600 mt-1">
-                            Report for {format(parseISO(previousReport.date_from), 'MMMM yyyy')}
+                            {deptHeadAssignment.department} Department - {format(parseISO(previousReport.date_from), 'MMMM yyyy')}
                         </p>
                     </div>
                     <Button onClick={() => setViewingPreviousReport(false)} variant="outline">
-                        Back to Approvals
+                        Back to Dashboard
                     </Button>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Report Details</CardTitle>
+                        <CardTitle>Report Summary</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-2">
-                            <p><strong>Report Name:</strong> {previousReport.report_name || 'Unnamed Report'}</p>
-                            <p><strong>Period:</strong> {format(parseISO(previousReport.date_from), 'dd MMM yyyy')} - {format(parseISO(previousReport.date_to), 'dd MMM yyyy')}</p>
-                            <p><strong>Employees:</strong> {previousReport.employee_count}</p>
-                            <p><strong>Generated On:</strong> {format(parseISO(previousReport.created_date), 'dd MMM yyyy HH:mm')}</p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-sm text-slate-600">Report Name</p>
+                                <p className="font-medium">{previousReport.report_name || 'Unnamed Report'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-slate-600">Period</p>
+                                <p className="font-medium">{format(parseISO(previousReport.date_from), 'dd MMM yyyy')} - {format(parseISO(previousReport.date_to), 'dd MMM yyyy')}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-slate-600">Your Department Employees</p>
+                                <p className="font-medium">{previousReportResults.length}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-slate-600">Generated On</p>
+                                <p className="font-medium">{format(parseISO(previousReport.created_date), 'dd MMM yyyy HH:mm')}</p>
+                            </div>
                         </div>
-                        <div className="mt-6">
-                            <Link 
-                                to={createPageUrl('ReportDetail') + `?id=${previousReport.id}&project_id=${previousReport.project_id}`}
-                                target="_blank"
-                            >
-                                <Button className="bg-indigo-600 hover:bg-indigo-700">
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    View Full Report
-                                </Button>
-                            </Link>
+                    </CardContent>
+                </Card>
+
+                {/* Department-Filtered Report Table */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Attendance Report - {deptHeadAssignment.department} Department</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Working Days</TableHead>
+                                        <TableHead>Present Days</TableHead>
+                                        <TableHead>LOP Days</TableHead>
+                                        <TableHead>Late Minutes</TableHead>
+                                        <TableHead>Early Checkout</TableHead>
+                                        <TableHead>Approved Minutes</TableHead>
+                                        <TableHead>Grace</TableHead>
+                                        <TableHead>Deductible</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {previousReportResults.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={10} className="text-center py-8 text-slate-500">
+                                                No employees found in your department for this report
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        previousReportResults.map((result) => {
+                                            const employee = employees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
+                                            const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0) + (result.other_minutes || 0);
+                                            const grace = result.grace_minutes ?? 15;
+                                            const approved = result.approved_minutes || 0;
+                                            const deductible = Math.max(0, total - grace - approved);
+                                            
+                                            return (
+                                                <TableRow key={result.id}>
+                                                    <TableCell className="font-medium">{result.attendance_id}</TableCell>
+                                                    <TableCell>{employee?.name || 'Unknown'}</TableCell>
+                                                    <TableCell>{result.working_days}</TableCell>
+                                                    <TableCell>{result.present_days}</TableCell>
+                                                    <TableCell>
+                                                        <span className={`${result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}`}>
+                                                            {result.full_absence_count}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`${result.late_minutes > 0 ? 'text-orange-600 font-medium' : ''}`}>
+                                                            {result.late_minutes || 0}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`${result.early_checkout_minutes > 0 ? 'text-blue-600 font-medium' : ''}`}>
+                                                            {result.early_checkout_minutes || 0}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`${approved > 0 ? 'text-green-600 font-medium' : 'text-slate-400'}`}>
+                                                            {approved}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>{grace}</TableCell>
+                                                    <TableCell>
+                                                        <span className={`font-bold ${deductible > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                            {deductible} min
+                                                        </span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </TableBody>
+                            </Table>
                         </div>
                     </CardContent>
                 </Card>
