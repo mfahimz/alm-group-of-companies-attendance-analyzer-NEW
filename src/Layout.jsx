@@ -80,16 +80,6 @@ export default function Layout({ children, currentPageName }) {
 
     // Calculate user role early (needed by useQuery conditions below)
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isDepartmentHeadNeedsRedirect = userRole === 'department_head' && currentPageName !== 'DepartmentHeadDashboard' && currentUser && !isPublicPage;
-
-
-
-    // Immediate redirect for department heads (before any page renders)
-    React.useEffect(() => {
-        if (isDepartmentHeadNeedsRedirect) {
-            window.location.replace('/DepartmentHeadDashboard');
-        }
-    }, [isDepartmentHeadNeedsRedirect]);
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
@@ -151,15 +141,6 @@ export default function Layout({ children, currentPageName }) {
     // Build navbar menu - MUST be before conditional returns
     const navbarMenu = React.useMemo(() => {
         if (!currentUser) return [];
-
-        // Department Head gets dashboard + projects (filtered by company only)
-        if (isDepartmentHead) {
-            const projectsUrl = `Projects?company=${encodeURIComponent(currentUser.company)}`;
-            return [
-                { title: 'Dashboard', url: 'DepartmentHeadDashboard' },
-                { title: 'Projects', url: projectsUrl }
-            ];
-        }
 
         const menu = [
             { title: 'Dashboard', url: 'Dashboard' },
@@ -257,15 +238,6 @@ export default function Layout({ children, currentPageName }) {
     if (maintenanceMode && userRole !== 'admin' && currentPageName !== 'Maintenance') {
         window.location.href = '/Maintenance';
         return null;
-    }
-
-    // Show loading state while redirect happens
-    if (isDepartmentHead && currentPageName !== 'DepartmentHeadDashboard') {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-500">Redirecting to dashboard...</div>
-            </div>
-        );
     }
 
     // Check if user has a company assigned (not required for admin/supervisor/ceo)
