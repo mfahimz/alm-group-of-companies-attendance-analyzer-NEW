@@ -558,38 +558,7 @@ export default function DepartmentHeadDashboard() {
                 />
             )}
 
-            {/* Employees List with Remaining Minutes */}
-            {currentProject && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Remaining Minutes Available</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {employees.length === 0 ? (
-                            <div className="text-center py-8 text-slate-500">
-                                No employees found in this department.
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Attendance ID</TableHead>
-                                        <TableHead>Employee Name</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {employees.map(emp => (
-                                        <TableRow key={emp.id}>
-                                            <TableCell className="font-medium text-slate-700">{emp.attendance_id}</TableCell>
-                                            <TableCell>{emp.name}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
+
         </div>
     );
 }
