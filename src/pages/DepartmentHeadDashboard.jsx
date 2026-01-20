@@ -32,13 +32,21 @@ export default function DepartmentHeadDashboard() {
     });
 
     // SECURITY: Verify department head assignment via backend
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isDepartmentHead = userRole === 'department_head';
+
     const { data: deptHeadVerification, isLoading: verificationLoading } = useQuery({
-        queryKey: ['deptHeadVerification', currentUser?.email],
+        queryKey: ['deptHeadVerification', isDepartmentHead, currentUser?.email],
         queryFn: async () => {
+            // Only call if user role is department_head
+            if (!isDepartmentHead) {
+                console.log('[DeptHeadDashboard] Skipping verification - not a department head role');
+                return null;
+            }
             const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
             return data;
         },
-        enabled: !!currentUser,
+        enabled: !!currentUser && isDepartmentHead,
         retry: false,
         staleTime: 10 * 60 * 1000, // Cache for 10 minutes
         gcTime: 15 * 60 * 1000,
