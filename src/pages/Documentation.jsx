@@ -245,22 +245,23 @@ export default function Documentation() {
                         <div className="flex gap-4">
                             <div className="flex-shrink-0 w-10 h-10 bg-green-600 text-white rounded-full flex items-center justify-center font-bold">8</div>
                             <div>
-                                <h4 className="text-lg font-semibold">Department Head Pre-Approval Workflow <span className="text-xs font-normal bg-green-100 text-green-700 px-2 py-0.5 rounded">(Al Maraghi Auto Repairs only)</span></h4>
-                                <p className="mb-2">Department heads can pre-approve minutes BEFORE report generation:</p>
+                                <h4 className="text-lg font-semibold">Department Head Pre-Approval Dashboard <span className="text-xs font-normal bg-green-100 text-green-700 px-2 py-0.5 rounded">(Al Maraghi Auto Repairs only)</span></h4>
+                                <p className="mb-2">Department heads can pre-approve minutes BEFORE report generation using their dedicated dashboard:</p>
                                 <ul className="text-sm">
                                     <li><strong>Access:</strong> Department heads login and see only their dashboard (no other pages)</li>
-                                    <li><strong>Current Month Project:</strong> System automatically shows project matching current month for their department</li>
-                                    <li><strong>Pre-Approve Minutes:</strong> Select employee, pick date, enter minutes with reason (e.g., "Hospital appointment")</li>
-                                    <li><strong>Cutoff Date:</strong> Approvals can only be added until one day before project end date</li>
-                                    <li><strong>Storage:</strong> Pre-approvals saved as ALLOWED_MINUTES exceptions with approval_status: "approved_dept_head"</li>
-                                    <li><strong>Impact on Analysis:</strong> When report is generated, pre-approved minutes are automatically deducted from calculated late/early minutes</li>
-                                    <li><strong>Previous Reports:</strong> After salary is saved, department heads can view previous month's finalized report</li>
+                                    <li><strong>Current Month Project:</strong> System automatically shows the project matching the current month for their department</li>
+                                    <li><strong>Pre-Approve Minutes:</strong> Click "Add Pre-Approved Minutes", select employee from their team, pick a single date, enter minutes with reason (e.g., "Hospital appointment")</li>
+                                    <li><strong>Cutoff Date:</strong> Pre-approvals can only be added until one day before the project end date</li>
+                                    <li><strong>Quarterly Allowance:</strong> Each employee has a quarterly allowance (default 120 minutes). Dashboard shows remaining balance for each team member.</li>
+                                    <li><strong>Storage:</strong> Pre-approvals are saved as ALLOWED_MINUTES exceptions and automatically applied during analysis</li>
+                                    <li><strong>Impact on Analysis:</strong> Pre-approved minutes are deducted from calculated late/early minutes and reduce the quarterly allowance</li>
+                                    <li><strong>Previous Reports:</strong> Department heads can view the previous month's finalized report for reference</li>
                                 </ul>
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
                                     <p className="text-sm text-green-900">
-                                        <strong>Example:</strong> Employee needs to leave 1 hour early for appointment on Jan 15. 
-                                        Department head logs in, selects employee, picks Jan 15, enters 60 minutes with reason "Doctor appointment". 
-                                        When report is later generated, those 60 minutes won't be counted as late/early checkout.
+                                        <strong>Example:</strong> Employee needs to leave 1 hour early for a doctor's appointment on Jan 15. 
+                                        Department head logs in to their dashboard, selects the employee, picks Jan 15, enters 60 minutes with reason "Doctor appointment". 
+                                        When HR later generates the report, those 60 minutes won't be counted as deductible early checkout minutes.
                                     </p>
                                 </div>
                             </div>

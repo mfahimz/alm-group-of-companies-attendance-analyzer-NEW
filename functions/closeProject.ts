@@ -98,9 +98,12 @@ Deno.serve(async (req) => {
 
                 if (totalMinutesToDeduct > 0) {
                     // Get quarterly minutes record
+                    // FIXED: Use hrms_id (string) and project_id for project-based, or year/quarter for calendar-based
+                    // Al Maraghi Auto Repairs uses calendar quarters
                     const quarterlyRecords = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
-                        employee_id: employee.id,
-                        project_id: project_id
+                        employee_id: String(employee.hrms_id),
+                        project_id: project_id,
+                        allocation_type: 'project_period'
                     });
 
                     if (quarterlyRecords.length > 0) {

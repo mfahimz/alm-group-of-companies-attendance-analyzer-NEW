@@ -25,7 +25,14 @@ Deno.serve(async (req) => {
             { name: 'EmployeeProfile', description: 'Employee profile details' },
             { name: 'ReportDetail', description: 'Detailed attendance report view' },
             { name: 'Reports', description: 'Reports and analytics' },
-            { name: 'DepartmentHeadSettings', description: 'Department head configuration' }
+            { name: 'DepartmentHeadSettings', description: 'Department head configuration' },
+            { name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports' },
+            { name: 'QuarterlyMinutesManagement', description: 'Quarterly minutes management' },
+            { name: 'Recruitment', description: 'Recruitment hub' },
+            { name: 'JobPositions', description: 'Job position management' },
+            { name: 'CandidateScreening', description: 'Candidate screening and resume analysis' },
+            { name: 'MaintenanceSettings', description: 'System maintenance mode settings' },
+            { name: 'Maintenance', description: 'Maintenance page' }
         ];
 
         // Fetch existing permissions

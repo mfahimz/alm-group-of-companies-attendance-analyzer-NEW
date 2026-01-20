@@ -57,8 +57,8 @@ export default function RunAnalysisTab({ project }) {
         refetchOnMount: false
     });
 
-    // Check for pending exceptions
-    const hasPendingExceptions = exceptions.some(e => e.approval_status === 'pending_dept_head');
+    // Pending exception check removed - all exceptions are auto-approved now
+    const hasPendingExceptions = false;
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', project.company],
@@ -1163,20 +1163,7 @@ export default function RunAnalysisTab({ project }) {
                         )}
                     </div>
 
-                    {hasPendingExceptions && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-                                <div>
-                                    <p className="font-medium text-amber-900">Pending Exception Approvals</p>
-                                    <p className="text-sm text-amber-700 mt-1">
-                                        There are {exceptions.filter(e => e.approval_status === 'pending_dept_head').length} exception(s) awaiting department head approval. 
-                                        Analysis cannot run until all exceptions are approved or rejected.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+
 
                     <div className="flex gap-2">
                         <Button 
@@ -1193,7 +1180,7 @@ export default function RunAnalysisTab({ project }) {
                         </Button>
                         <Button
                             onClick={handleAnalyze}
-                            disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo || hasPendingExceptions}
+                            disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo}
                             className="bg-indigo-600 hover:bg-indigo-700"
                             size="lg"
                         >
@@ -1201,10 +1188,7 @@ export default function RunAnalysisTab({ project }) {
                             {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
                         </Button>
                         <p className="text-sm text-slate-500 mt-2">
-                            {hasPendingExceptions 
-                                ? 'Analysis is blocked until all exceptions are approved.'
-                                : 'Select a date range and run analysis to generate attendance report for that period.'
-                            }
+                            Select a date range and run analysis to generate attendance report for that period.
                         </p>
                     </div>
                 </CardContent>
