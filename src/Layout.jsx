@@ -241,15 +241,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     // AFTER all hooks, handle conditional rendering
-    // For public pages, render without layout
-    if (isPublicPage) {
-      return (
-          <>
-              {children}
-              <Toaster position="top-right" richColors />
-          </>
-      );
-    }
+
 
     // For protected pages, show loading while checking auth
     if (isLoading) {
