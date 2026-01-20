@@ -15,6 +15,30 @@ import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
 
+const PAGE_DISPLAY_NAMES = {
+    'Dashboard': 'Main Dashboard',
+    'DepartmentHeadDashboard': 'Department Head Dashboard',
+    'Projects': 'Projects List',
+    'ProjectDetail': 'Project Details',
+    'Employees': 'Employees Management',
+    'Salaries': 'Salary Management',
+    'Users': 'Users & Permissions',
+    'RulesSettings': 'Attendance Rules Settings',
+    'RamadanSchedules': 'Ramadan Schedules',
+    'Documentation': 'System Documentation',
+    'Training': 'Training Guides',
+    'UserProfile': 'User Profile',
+    'EmployeeProfile': 'Employee Profile',
+    'ReportDetail': 'Report Details View',
+    'Reports': 'Reports & Analytics',
+    'DepartmentHeadSettings': 'Department Heads Settings',
+    'QuarterlyMinutesManagement': 'Quarterly Minutes Management',
+    'Recruitment': 'Recruitment Hub',
+    'JobPositions': 'Job Positions',
+    'CandidateScreening': 'Candidate Screening',
+    'MaintenanceSettings': 'Maintenance Mode Settings'
+};
+
 const DEFAULT_PAGES = [
     { page_name: 'Dashboard', description: 'Main dashboard with project overview', allowed_roles: 'admin,supervisor,user' },
     { page_name: 'Projects', description: 'Project management and listing', allowed_roles: 'admin,supervisor' },
@@ -464,7 +488,9 @@ export default function Users() {
                                     <TableBody>
                                         {pagePermissions.map((permission) => (
                                             <TableRow key={permission.id}>
-                                                <TableCell className="font-medium">{permission.page_name}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
+                                                </TableCell>
                                                 <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
                                                 <TableCell className="text-center">
                                                     <Button
