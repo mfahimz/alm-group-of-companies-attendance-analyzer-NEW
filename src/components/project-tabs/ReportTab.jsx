@@ -29,23 +29,28 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     // Get department head verification if department head
     const { data: deptHeadVerification, error: deptHeadError } = useQuery({
-        queryKey: ['deptHeadVerification', isDepartmentHead],
+        queryKey: ['deptHeadVerification', isDepartmentHead, currentUser?.email],
         queryFn: async () => {
-            if (!isDepartmentHead) return null;
+            // Double-check to prevent any execution for non-department heads
+            if (!isDepartmentHead) {
+                console.log('[ReportTab] Skipping dept head verification - not a department head');
+                return null;
+            }
             console.log('[ReportTab] Verifying department head');
             const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
             console.log('[ReportTab] Department head verification result:', data);
             return data;
         },
-        enabled: isDepartmentHead,
-        retry: false
+        enabled: isDepartmentHead && !!currentUser,
+        retry: false,
+        staleTime: Infinity // Don't refetch automatically
     });
 
     React.useEffect(() => {
-        if (deptHeadError) {
+        if (deptHeadError && isDepartmentHead) {
             console.error('[ReportTab] Department head verification error:', deptHeadError);
         }
-    }, [deptHeadError]);
+    }, [deptHeadError, isDepartmentHead]);
 
     const { data: allReportRuns = [], error: reportRunsError } = useQuery({
         queryKey: ['reportRuns', project.id],
