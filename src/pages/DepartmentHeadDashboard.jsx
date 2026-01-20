@@ -20,13 +20,6 @@ export default function DepartmentHeadDashboard() {
 
     const queryClient = useQueryClient();
 
-    // DEBUG: Track component renders
-    console.log('🔄 DepartmentHeadDashboard RENDER', {
-        showPreApprovalDialog,
-        viewingPreviousReport,
-        timestamp: new Date().toISOString()
-    });
-
     // Get current user - shared from Layout cache
     const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
@@ -37,15 +30,6 @@ export default function DepartmentHeadDashboard() {
         refetchOnReconnect: false,
         refetchOnMount: false
     });
-
-    // DEBUG: Track user query state
-    React.useEffect(() => {
-        console.log('👤 currentUser query state:', { 
-            hasUser: !!currentUser, 
-            userLoading,
-            email: currentUser?.email 
-        });
-    }, [currentUser, userLoading]);
 
     // SECURITY: Verify department head assignment via backend
     const { data: deptHeadVerification, isLoading: verificationLoading } = useQuery({
@@ -71,16 +55,6 @@ export default function DepartmentHeadDashboard() {
             employee_id: deptHeadVerification.assignment.employee_id
         } : null;
     }, [deptHeadVerification?.verified, deptHeadVerification?.assignment?.company, deptHeadVerification?.assignment?.department, deptHeadVerification?.assignment?.employee_id]);
-
-    // DEBUG: Track dept head verification
-    React.useEffect(() => {
-        console.log('🔐 deptHeadVerification state:', { 
-            verified: deptHeadVerification?.verified,
-            verificationLoading,
-            company: deptHeadAssignment?.company,
-            department: deptHeadAssignment?.department
-        });
-    }, [deptHeadVerification?.verified, verificationLoading, deptHeadAssignment?.company, deptHeadAssignment?.department]);
 
     // Memoize project query key to prevent re-renders
     const projectQueryKey = React.useMemo(() => 
@@ -300,29 +274,8 @@ export default function DepartmentHeadDashboard() {
     // Check if salary is closed for current project
     const salaryIsClosed = currentProject?.status === 'closed';
 
-    // DEBUG: Track project state
-    React.useEffect(() => {
-        console.log('📊 currentProject state:', { 
-            hasProject: !!currentProject,
-            projectName: currentProject?.name,
-            status: currentProject?.status,
-            salaryIsClosed
-        });
-    }, [currentProject?.name, currentProject?.status, salaryIsClosed]);
-
     // CRITICAL: Single loading state - wait for ALL essential data before rendering anything
     const isInitialLoading = userLoading || verificationLoading || (!!deptHeadAssignment && projectLoading);
-
-    // DEBUG: Track loading states
-    React.useEffect(() => {
-        console.log('⏳ Loading states:', { 
-            userLoading,
-            verificationLoading,
-            projectLoading,
-            isInitialLoading,
-            hasProject: !!currentProject
-        });
-    }, [userLoading, verificationLoading, projectLoading, isInitialLoading]);
 
     if (isInitialLoading) {
         return (
