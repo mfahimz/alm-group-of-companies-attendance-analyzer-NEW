@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster } from 'sonner';
 import NotificationCenter from './components/ui/NotificationCenter';
-import GlobalSearch from './components/ui/GlobalSearch';
-import { useKeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Navbar1 } from '@/components/ui/Navbar1';
@@ -34,10 +32,6 @@ export default function Layout({ children, currentPageName }) {
     const isPublicPage = publicPages.includes(currentPageName);
 
     // ALL hooks must be called unconditionally at the top
-    const [searchOpen, setSearchOpen] = useState(false);
-
-    useKeyboardShortcuts({ onOpenSearch: () => setSearchOpen(true) });
-
     const { data: currentUser, isLoading, error } = useQuery({
         queryKey: ['currentUser'],
         queryFn: async () => {
@@ -328,15 +322,7 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Toast Notifications */}
             <Toaster position="top-right" richColors />
-
-            {/* Global Search */}
-            <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
-
-            {/* Keyboard Shortcut Hint */}
-            <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-3 py-2 rounded-lg shadow-lg text-xs opacity-0 hover:opacity-100 transition-opacity">
-                Press <kbd className="px-1 py-0.5 bg-slate-700 rounded">⌘K</kbd> to search
             </div>
-        </div>
-    );
+            );
 
 }
