@@ -161,6 +161,41 @@ export default function DepartmentHeadDashboard() {
         refetchOnMount: false
     });
 
+    // DEPARTMENT HEAD - Get previous report's project
+    const { data: previousProject } = useQuery({
+        queryKey: ['previousProject', previousReport?.project_id],
+        queryFn: async () => {
+            if (!previousReport) return null;
+            const projects = await base44.entities.Project.filter({ id: previousReport.project_id });
+            return projects[0] || null;
+        },
+        enabled: !!previousReport && viewingPreviousReport
+    });
+
+    // DEPARTMENT HEAD - Get previous report results filtered by department
+    const { data: previousReportResults = [] } = useQuery({
+        queryKey: ['previousReportResults', previousReport?.id, deptHeadAssignment?.department],
+        queryFn: async () => {
+            if (!previousReport || !deptHeadAssignment) return [];
+            
+            const allResults = await base44.entities.AnalysisResult.filter({ 
+                report_run_id: previousReport.id 
+            });
+            
+            // Get all employees for the project's company
+            const allEmployees = await base44.entities.Employee.filter({
+                company: deptHeadAssignment.company
+            });
+            
+            // Filter results to only show employees from dept head's department
+            return allResults.filter(result => {
+                const employee = allEmployees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
+                return employee && employee.department === deptHeadAssignment.department;
+            });
+        },
+        enabled: !!previousReport && !!deptHeadAssignment && viewingPreviousReport
+    });
+
     // SECURITY: Server-side filtered employees for this department head (only managed subordinates)
     const { data: employees = [] } = useQuery({
         queryKey: ['deptEmployees', deptHeadAssignment?.company, deptHeadAssignment?.department, deptHeadVerification?.assignment?.managed_employee_ids],
@@ -278,41 +313,6 @@ export default function DepartmentHeadDashboard() {
             </div>
         );
     }
-
-    // DEPARTMENT HEAD - Get previous report's project
-    const { data: previousProject } = useQuery({
-        queryKey: ['previousProject', previousReport?.project_id],
-        queryFn: async () => {
-            if (!previousReport) return null;
-            const projects = await base44.entities.Project.filter({ id: previousReport.project_id });
-            return projects[0] || null;
-        },
-        enabled: !!previousReport && viewingPreviousReport
-    });
-
-    // DEPARTMENT HEAD - Get previous report results filtered by department
-    const { data: previousReportResults = [] } = useQuery({
-        queryKey: ['previousReportResults', previousReport?.id, deptHeadAssignment?.department],
-        queryFn: async () => {
-            if (!previousReport || !deptHeadAssignment) return [];
-            
-            const allResults = await base44.entities.AnalysisResult.filter({ 
-                report_run_id: previousReport.id 
-            });
-            
-            // Get all employees for the project's company
-            const allEmployees = await base44.entities.Employee.filter({
-                company: deptHeadAssignment.company
-            });
-            
-            // Filter results to only show employees from dept head's department
-            return allResults.filter(result => {
-                const employee = allEmployees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
-                return employee && employee.department === deptHeadAssignment.department;
-            });
-        },
-        enabled: !!previousReport && !!deptHeadAssignment && viewingPreviousReport
-    });
 
     if (viewingPreviousReport && previousReport && previousProject) {
         return (
