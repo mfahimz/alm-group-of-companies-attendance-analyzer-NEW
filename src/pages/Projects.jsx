@@ -57,11 +57,26 @@ export default function Projects() {
     });
 
     useEffect(() => {
+        console.log('🔍 PROJECTS PAGE ACCESS CHECK:', {
+            userRole,
+            hasCurrentUser: !!currentUser,
+            permissionsCount: permissions.length,
+            permissions: permissions.map(p => ({ page: p.page_name, roles: p.allowed_roles }))
+        });
+
         if (currentUser && permissions.length > 0) {
             const permission = permissions.find(p => p.page_name === 'Projects');
+            console.log('🔐 Projects Permission Check:', {
+                permissionFound: !!permission,
+                allowedRoles: permission?.allowed_roles,
+                userRole,
+                willRedirect: permission ? !permission.allowed_roles.split(',').map(r => r.trim()).includes(userRole) : false
+            });
+
             if (permission) {
                 const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
                 if (!allowedRoles.includes(userRole)) {
+                    console.log('❌ ACCESS DENIED - Redirecting to Dashboard');
                     toast.error('Access denied.');
                     navigate(createPageUrl('Dashboard'));
                 }
