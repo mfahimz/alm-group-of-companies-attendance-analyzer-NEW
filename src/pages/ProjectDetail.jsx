@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, LockOpen, RefreshCw } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ export default function ProjectDetail() {
   const urlParams = new URLSearchParams(window.location.search);
   const projectId = urlParams.get('id');
   const [activeTab, setActiveTab] = useState('overview');
+  const navigate = useNavigate();
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -48,6 +49,14 @@ export default function ProjectDetail() {
   const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO;
   const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
   const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
+
+  // CRITICAL: Department heads can only access CLOSED projects
+  React.useEffect(() => {
+    if (project && isDepartmentHead && project.status !== 'closed') {
+      toast.error('Access denied. Department heads can only view closed projects.');
+      navigate(createPageUrl('Projects'));
+    }
+  }, [project, isDepartmentHead, navigate]);
 
   const { data: reportRuns = [] } = useQuery({
     queryKey: ['reportRuns', projectId],
