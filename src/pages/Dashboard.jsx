@@ -20,6 +20,16 @@ export default function Dashboard() {
         queryFn: () => base44.auth.me()
     });
 
+    // Redirect department heads immediately (before any rendering)
+    React.useEffect(() => {
+        if (currentUser) {
+            const userRole = currentUser.extended_role || currentUser.role || 'user';
+            if (userRole === 'department_head') {
+                window.location.replace('/DepartmentHeadDashboard');
+            }
+        }
+    }, [currentUser]);
+
     const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list('-created_date', 100),
