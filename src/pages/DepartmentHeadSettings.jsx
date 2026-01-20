@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, Users, Search, Filter, CheckCircle, Clock, XCircle, Mail } from 'lucide-react';
+import { Plus, Trash2, Edit, Users, Search, Filter, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
@@ -45,11 +45,6 @@ export default function DepartmentHeadSettings() {
     const { data: users = [] } = useQuery({
         queryKey: ['users'],
         queryFn: () => base44.entities.User.list()
-    });
-
-    const { data: approvalLinks = [] } = useQuery({
-        queryKey: ['approvalLinks'],
-        queryFn: () => base44.entities.ApprovalLink.list('-created_date')
     });
 
     const { data: exceptions = [] } = useQuery({
@@ -183,36 +178,7 @@ export default function DepartmentHeadSettings() {
         );
     };
 
-    // Calculate approval statistics for each department head
-    const getDeptHeadStats = (deptHead) => {
-        const deptHeadLinks = approvalLinks.filter(link => 
-            link.department_head_id === deptHead.employee_id && 
-            link.department === deptHead.department &&
-            link.company === deptHead.company
-        );
 
-        const totalLinks = deptHeadLinks.length;
-        const usedLinks = deptHeadLinks.filter(link => link.used).length;
-        const approvedLinks = deptHeadLinks.filter(link => link.approved).length;
-        const pendingLinks = deptHeadLinks.filter(link => !link.used && new Date(link.expires_at) > new Date()).length;
-
-        // Get pending exceptions for this dept head
-        const managedEmployeeIds = deptHead.managed_employee_ids ? deptHead.managed_employee_ids.split(',').filter(Boolean) : [];
-        const pendingExceptions = exceptions.filter(exc => {
-            const employee = employees.find(e => e.attendance_id === exc.attendance_id);
-            return employee && 
-                   managedEmployeeIds.includes(employee.id) && 
-                   exc.approval_status === 'pending_dept_head';
-        }).length;
-
-        return {
-            totalLinks,
-            usedLinks,
-            approvedLinks,
-            pendingLinks,
-            pendingExceptions
-        };
-    };
 
     // Filter department heads
     const filteredDeptHeads = deptHeads.filter(dh => {
@@ -230,25 +196,7 @@ export default function DepartmentHeadSettings() {
 
     const allDepartments = [...new Set(deptHeads.filter(dh => dh.active).map(dh => dh.department))];
 
-    const sendNotification = async (deptHead) => {
-        try {
-            const deptHeadEmployee = employees.find(e => e.id === deptHead.employee_id);
-            if (!deptHeadEmployee?.email) {
-                toast.error('Department head has no email set');
-                return;
-            }
 
-            await base44.integrations.Core.SendEmail({
-                to: deptHeadEmployee.email,
-                subject: 'Pending Attendance Exception Approvals',
-                body: `Dear ${deptHeadEmployee.name},\n\nYou have pending attendance exception approvals waiting for your review.\n\nPlease log in to the system to review and approve these requests.\n\nBest regards,\nHR Team`
-            });
-
-            toast.success('Notification sent successfully');
-        } catch (error) {
-            toast.error('Failed to send notification: ' + error.message);
-        }
-    };
 
     return (
         <div className="space-y-6">
@@ -260,7 +208,7 @@ export default function DepartmentHeadSettings() {
             </div>
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="border-0 shadow-sm">
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -276,25 +224,14 @@ export default function DepartmentHeadSettings() {
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-slate-600">Pending Exceptions</p>
-                                <p className="text-2xl font-bold text-amber-600">
-                                    {exceptions.filter(e => e.approval_status === 'pending_dept_head').length}
-                                </p>
-                            </div>
-                            <Clock className="w-8 h-8 text-amber-600 opacity-20" />
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-slate-600">Active Links</p>
+                                <p className="text-sm text-slate-600">Total Managed Employees</p>
                                 <p className="text-2xl font-bold text-blue-600">
-                                    {approvalLinks.filter(link => !link.used && new Date(link.expires_at) > new Date()).length}
+                                    {deptHeads.filter(dh => dh.active).reduce((sum, dh) => {
+                                        return sum + (dh.managed_employee_ids ? dh.managed_employee_ids.split(',').filter(Boolean).length : 0);
+                                    }, 0)}
                                 </p>
                             </div>
-                            <CheckCircle className="w-8 h-8 text-blue-600 opacity-20" />
+                            <Users className="w-8 h-8 text-blue-600 opacity-20" />
                         </div>
                     </CardContent>
                 </Card>
@@ -302,12 +239,12 @@ export default function DepartmentHeadSettings() {
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-slate-600">Total Approved</p>
-                                <p className="text-2xl font-bold text-green-600">
-                                    {approvalLinks.filter(link => link.approved).length}
+                                <p className="text-sm text-slate-600">Companies Covered</p>
+                                <p className="text-2xl font-bold text-purple-600">
+                                    {[...new Set(deptHeads.filter(dh => dh.active).map(dh => dh.company))].length}
                                 </p>
                             </div>
-                            <CheckCircle className="w-8 h-8 text-green-600 opacity-20" />
+                            <CheckCircle className="w-8 h-8 text-purple-600 opacity-20" />
                         </div>
                     </CardContent>
                 </Card>
@@ -528,7 +465,6 @@ export default function DepartmentHeadSettings() {
                                     <TableHead>Department</TableHead>
                                     <TableHead>Department Head</TableHead>
                                     <TableHead>Managed Employees</TableHead>
-                                    <TableHead>Pending/Links</TableHead>
                                     <TableHead>Reports To</TableHead>
                                     <TableHead>Actions</TableHead>
                                 </TableRow>
@@ -538,8 +474,6 @@ export default function DepartmentHeadSettings() {
                                     const managedCount = dh.managed_employee_ids 
                                         ? dh.managed_employee_ids.split(',').filter(Boolean).length 
                                         : 0;
-                                    
-                                    const stats = getDeptHeadStats(dh);
                                     
                                     return (
                                         <TableRow key={dh.id}>
@@ -554,46 +488,11 @@ export default function DepartmentHeadSettings() {
                                                     <span className="text-sm font-medium">{managedCount}</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    {stats.pendingExceptions > 0 && (
-                                                        <div className="flex items-center gap-1 text-amber-600">
-                                                            <Clock className="w-3 h-3" />
-                                                            <span className="text-xs font-medium">{stats.pendingExceptions} pending</span>
-                                                        </div>
-                                                    )}
-                                                    {stats.pendingLinks > 0 && (
-                                                        <div className="flex items-center gap-1 text-blue-600">
-                                                            <Mail className="w-3 h-3" />
-                                                            <span className="text-xs font-medium">{stats.pendingLinks} active links</span>
-                                                        </div>
-                                                    )}
-                                                    {stats.approvedLinks > 0 && (
-                                                        <div className="flex items-center gap-1 text-green-600">
-                                                            <CheckCircle className="w-3 h-3" />
-                                                            <span className="text-xs font-medium">{stats.approvedLinks} approved</span>
-                                                        </div>
-                                                    )}
-                                                    {stats.pendingExceptions === 0 && stats.pendingLinks === 0 && stats.approvedLinks === 0 && (
-                                                        <span className="text-xs text-slate-400">—</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
                                             <TableCell className="text-sm text-slate-600">
                                                 {dh.reports_to ? getReportsToName(dh.reports_to) : '—'}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex gap-1">
-                                                    {stats.pendingExceptions > 0 && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => sendNotification(dh)}
-                                                            title="Send notification"
-                                                        >
-                                                            <Mail className="w-4 h-4 text-blue-600" />
-                                                        </Button>
-                                                    )}
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
