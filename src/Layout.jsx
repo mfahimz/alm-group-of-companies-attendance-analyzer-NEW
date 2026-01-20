@@ -80,6 +80,14 @@ export default function Layout({ children, currentPageName }) {
 
     // Calculate user role early (needed by useQuery conditions below)
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isDepartmentHead = userRole === 'department_head';
+
+    // Redirect department heads from Dashboard to DepartmentHeadDashboard
+    React.useEffect(() => {
+        if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
+            window.location.replace('/DepartmentHeadDashboard');
+        }
+    }, [currentUser, isDepartmentHead, currentPageName]);
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
@@ -127,7 +135,6 @@ export default function Layout({ children, currentPageName }) {
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
-    const isDepartmentHead = userRole === 'department_head';
     const canAccessAllCompanies = isAdmin || isSupervisor || isCEO;
 
     const hasPageAccess = React.useCallback((pageName) => {
