@@ -91,7 +91,7 @@ export default function Layout({ children, currentPageName }) {
                 return []; // Return empty array on error instead of failing
             }
         },
-        enabled: !!currentUser && !isPublicPage && !isDepartmentHeadNeedsRedirect,
+        enabled: !!currentUser && !isPublicPage,
         staleTime: 30 * 60 * 1000, // Cache for 30 minutes (permissions rarely change)
         gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
         refetchOnWindowFocus: false,
@@ -115,7 +115,7 @@ export default function Layout({ children, currentPageName }) {
                 return false;
             }
         },
-        enabled: !!currentUser && !isPublicPage && !isDepartmentHeadNeedsRedirect,
+        enabled: !!currentUser && !isPublicPage,
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
