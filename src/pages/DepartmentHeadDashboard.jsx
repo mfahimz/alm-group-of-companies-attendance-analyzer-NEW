@@ -20,12 +20,12 @@ export default function DepartmentHeadDashboard() {
 
     const queryClient = useQueryClient();
 
-    // Get current user
+    // Get current user - shared from Layout cache
     const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me(),
-        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
-        gcTime: 20 * 60 * 1000,
+        staleTime: Infinity, // Use cached data from Layout
+        gcTime: Infinity,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -276,12 +276,12 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    // After loading completes, check for errors/issues
+    // After loading completes, check for errors/issues (base44 handles auth redirect)
     if (!currentUser || !deptHeadVerification?.verified) {
         const errorMessage = deptHeadVerification?.error || 'You are not assigned as a department head.';
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <Card className="max-w-md">
+            <div className="max-w-4xl mx-auto p-6">
+                <Card className="border-amber-200 bg-amber-50">
                     <CardContent className="p-6 text-center">
                         <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                         <h2 className="text-xl font-semibold mb-2">Department Head Access Required</h2>
@@ -300,8 +300,8 @@ export default function DepartmentHeadDashboard() {
     // Check if not Al Maraghi Auto Repairs (after all data is loaded)
     if (deptHeadAssignment && deptHeadAssignment.company !== 'Al Maraghi Auto Repairs') {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <Card className="max-w-md">
+            <div className="max-w-4xl mx-auto p-6">
+                <Card className="border-amber-200 bg-amber-50">
                     <CardContent className="p-6 text-center">
                         <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                         <h2 className="text-xl font-semibold mb-2">Feature Not Available</h2>

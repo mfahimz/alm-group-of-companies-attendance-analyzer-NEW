@@ -82,13 +82,7 @@ export default function Layout({ children, currentPageName }) {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isDepartmentHeadNeedsRedirect = userRole === 'department_head' && currentPageName !== 'DepartmentHeadDashboard' && currentUser && !isPublicPage;
 
-    // Redirect to login if not authenticated on protected pages
-    React.useEffect(() => {
-        if (!isPublicPage && !isLoading && error) {
-            console.log('Redirecting to login due to error:', error);
-            base44.auth.redirectToLogin(window.location.pathname);
-        }
-    }, [isPublicPage, isLoading, error]);
+
 
     // Immediate redirect for department heads (before any page renders)
     React.useEffect(() => {
@@ -244,22 +238,13 @@ export default function Layout({ children, currentPageName }) {
     // AFTER all hooks, handle conditional rendering
 
 
-    // For protected pages, show loading while checking auth
-    if (isLoading) {
-      return (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-              <div className="text-slate-500">Loading...</div>
-          </div>
-      );
-    }
-
-    // If not loading but no user (error state), show loading while redirect happens
-    if (!currentUser) {
-      return (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-              <div className="text-slate-500">Redirecting to login...</div>
-          </div>
-      );
+    // For protected pages, show loading while checking auth (base44 handles redirect)
+    if (isLoading || !currentUser) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-500">Loading...</div>
+            </div>
+        );
     }
 
     // Check maintenance mode (skip for admin users)
