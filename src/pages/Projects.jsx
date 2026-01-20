@@ -98,7 +98,16 @@ export default function Projects() {
                 return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
             }
             
-            // Regular users and department heads see only their company's projects
+            // Department heads see only CLOSED projects from their company
+            if (isDepartmentHead) {
+                const items = await base44.entities.Project.filter({
+                    company: currentUser.company,
+                    status: 'closed'
+                }, '-created_date', pageSize);
+                return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
+            }
+            
+            // Regular users see all projects from their company
             const items = await base44.entities.Project.filter({
                 company: currentUser.company
             }, '-created_date', pageSize);
