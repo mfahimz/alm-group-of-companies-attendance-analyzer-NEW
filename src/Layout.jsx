@@ -3,7 +3,8 @@ import { Toaster } from 'sonner';
 import NotificationCenter from './components/ui/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Navbar1 } from '@/components/ui/Navbar1';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from './utils';
 import { formatInUAE } from '@/components/ui/timezone';
 import { CompanyBadge } from '@/components/ui/CompanyBadge';
 import { useDeviceDetection } from './components/ui/useDeviceDetection';
@@ -19,25 +20,24 @@ import {
             Calendar,
             FileSpreadsheet,
             Briefcase,
-            Clock
+            Clock,
+            ChevronDown,
+            LogOut
         } from 'lucide-react';
 
 
 export default function Layout({ children, currentPageName }) {
-    // CRITICAL: Device detection must run FIRST, before any other logic
     const { isDesktop, isChecking } = useDeviceDetection();
+    const [expandedMenus, setExpandedMenus] = useState({});
 
-    // Public pages that don't require authentication
     const publicPages = [];
     const isPublicPage = publicPages.includes(currentPageName);
 
-    // ALL hooks must be called unconditionally at the top
     const { data: currentUser, isLoading, error } = useQuery({
         queryKey: ['currentUser'],
         queryFn: async () => {
             try {
                 const user = await base44.auth.me();
-                // Log user activity
                 try {
                     let ipAddress = 'Unknown';
                     try {
@@ -54,9 +54,7 @@ export default function Layout({ children, currentPageName }) {
                         user_agent: navigator.userAgent,
                         location: 'UAE'
                     });
-                } catch (e) {
-                    // Silent fail for activity log
-                }
+                } catch (e) {}
                 return user;
             } catch (err) {
                 console.error('Auth error:', err);
@@ -65,18 +63,16 @@ export default function Layout({ children, currentPageName }) {
         },
         enabled: !isPublicPage,
         retry: false,
-        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
-        gcTime: 20 * 60 * 1000, // Keep in cache for 20 minutes
-        refetchOnWindowFocus: false, // Don't refetch on window focus
-        refetchOnReconnect: false, // Don't refetch on reconnect
-        refetchOnMount: false // Don't refetch on component mount
+        staleTime: 15 * 60 * 1000,
+        gcTime: 20 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
-    // Calculate user role early (needed by useQuery conditions below)
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isDepartmentHead = userRole === 'department_head';
 
-    // Redirect department heads from Dashboard to DepartmentHeadDashboard
     React.useEffect(() => {
         if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
             window.location.replace('/DepartmentHeadDashboard');
@@ -90,16 +86,16 @@ export default function Layout({ children, currentPageName }) {
                 return await base44.entities.PagePermission.list();
             } catch (err) {
                 console.error('Permissions fetch error:', err);
-                return []; // Return empty array on error instead of failing
+                return [];
             }
         },
         enabled: !!currentUser && !isPublicPage,
-        staleTime: 30 * 60 * 1000, // Cache for 30 minutes (permissions rarely change)
-        gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false,
-        retry: 1 // Only retry once on failure
+        retry: 1
     });
 
     const { data: maintenanceMode } = useQuery({
@@ -118,7 +114,7 @@ export default function Layout({ children, currentPageName }) {
             }
         },
         enabled: !!currentUser && !isPublicPage,
-        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -129,7 +125,6 @@ export default function Layout({ children, currentPageName }) {
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
-    const canAccessAllCompanies = isAdmin || isSupervisor || isCEO;
 
     const hasPageAccess = React.useCallback((pageName) => {
       if (!currentUser) return false;
@@ -139,15 +134,14 @@ export default function Layout({ children, currentPageName }) {
       return allowedRoles.includes(userRole);
     }, [currentUser, permissions, userRole]);
 
-    // Build navbar menu - MUST be before conditional returns
-    const navbarMenu = React.useMemo(() => {
+    const sidebarMenu = React.useMemo(() => {
         if (!currentUser) return [];
 
         const menu = [
-            { title: 'Dashboard', url: isDepartmentHead ? 'DepartmentHeadDashboard' : 'Dashboard' },
+            { title: 'Dashboard', url: isDepartmentHead ? 'DepartmentHeadDashboard' : 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
             {
                 title: 'Projects',
-                url: 'Projects',
+                icon: <FolderKanban className="w-5 h-5" />,
                 items: [
                     { title: 'Projects', url: 'Projects', icon: <FolderKanban className="w-5 h-5" /> },
                     { title: 'Employees', url: 'Employees', icon: <Users className="w-5 h-5" /> },
@@ -161,7 +155,7 @@ export default function Layout({ children, currentPageName }) {
         if (isAdmin) {
             menu.push({
                 title: 'Recruitment',
-                url: 'Recruitment',
+                icon: <Briefcase className="w-5 h-5" />,
                 items: [
                     { title: 'Recruitment Hub', url: 'Recruitment', icon: <Users className="w-5 h-5" /> },
                     { title: 'Job Positions', url: 'JobPositions', icon: <Briefcase className="w-5 h-5" /> },
@@ -173,7 +167,7 @@ export default function Layout({ children, currentPageName }) {
         if (isAdmin || isCEO) {
             menu.push({
                 title: 'Settings',
-                url: '#',
+                icon: <Settings className="w-5 h-5" />,
                 items: [
                     { title: 'Users & Permissions', url: 'Users', icon: <Shield className="w-5 h-5" /> },
                     { title: 'Department Heads', url: 'DepartmentHeadSettings', icon: <Users className="w-5 h-5" /> },
@@ -189,28 +183,19 @@ export default function Layout({ children, currentPageName }) {
         return menu
             .map(item => {
                 if (item.items) {
-                    // Filter out sub-items user doesn't have access to
                     const filteredSubItems = item.items.filter(subItem => hasPageAccess(subItem.url));
-                    // Return item with filtered sub-items, or null if no sub-items remain
                     return filteredSubItems.length > 0 ? { ...item, items: filteredSubItems } : null;
                 }
-                // For items without sub-items, check if user has access
                 return hasPageAccess(item.url) ? item : null;
             })
-            .filter(item => item !== null); // Remove null entries
+            .filter(item => item !== null);
     }, [currentUser, permissions, isAdmin, isSupervisor, isCEO, isDepartmentHead, userRole, hasPageAccess]);
 
-    // Set UAE timezone for the entire app
     useEffect(() => {
-        // Log timezone info for debugging
         console.log('App Timezone: UAE (Asia/Dubai)');
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
-
-
-    // CRITICAL: Block non-desktop devices BEFORE any rendering
-    // This check happens even before authentication
     if (isChecking) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -223,10 +208,6 @@ export default function Layout({ children, currentPageName }) {
         return <DesktopOnlyScreen />;
     }
 
-    // AFTER all hooks, handle conditional rendering
-
-
-    // For protected pages, show loading while checking auth (base44 handles redirect)
     if (isLoading || !currentUser) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -235,13 +216,11 @@ export default function Layout({ children, currentPageName }) {
         );
     }
 
-    // Check maintenance mode (skip for admin users)
     if (maintenanceMode && userRole !== 'admin' && currentPageName !== 'Maintenance') {
         window.location.href = '/Maintenance';
         return null;
     }
 
-    // Check if user has a company assigned (not required for admin/supervisor/ceo)
     if (!currentUser.company && (userRole === 'user' || userRole === 'department_head')) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -252,7 +231,6 @@ export default function Layout({ children, currentPageName }) {
         );
     }
 
-    // Check if department head has complete setup (role, company, department, hrms_id)
     if (isDepartmentHead) {
         if (!currentUser.company) {
             return (
@@ -285,44 +263,118 @@ export default function Layout({ children, currentPageName }) {
         }
     }
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
-            {/* Top Navbar */}
-            <Navbar1
-                logo={{
-                    url: 'Dashboard',
-                    icon: BarChart3,
-                    title: 'ALM Attendance'
-                }}
-                menu={navbarMenu}
-                    auth={{
-                        user: currentUser ? {
-                            name: currentUser.display_name || currentUser.full_name,
-                            email: currentUser.email
-                        } : null,
-                        logout: {
-                            text: 'Logout',
-                            onClick: () => base44.auth.logout()
-                        }
-                    }}
-            />
+    const toggleMenu = (title) => {
+        setExpandedMenus(prev => ({
+            ...prev,
+            [title]: !prev[title]
+        }));
+    };
 
-            {/* Main Content */}
-            <main className="container mx-auto px-4 py-6">
-                <div className="flex justify-between items-center mb-4">
+    return (
+        <div className="flex min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
+            {/* Left Sidebar */}
+            <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
+                {/* Logo */}
+                <div className="p-6 border-b border-slate-200">
+                    <Link to={createPageUrl('Dashboard')} className="flex items-center gap-3">
+                        <BarChart3 className="w-8 h-8 text-indigo-600" />
+                        <span className="font-bold text-lg text-slate-900">ALM Attendance</span>
+                    </Link>
+                </div>
+
+                {/* Navigation */}
+                <nav className="flex-1 p-4 overflow-y-auto">
+                    {sidebarMenu.map((item, index) => (
+                        <div key={index} className="mb-1">
+                            {item.items ? (
+                                <div>
+                                    <button
+                                        onClick={() => toggleMenu(item.title)}
+                                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {item.icon}
+                                            <span>{item.title}</span>
+                                        </div>
+                                        <ChevronDown className={`w-4 h-4 transition-transform ${expandedMenus[item.title] ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {expandedMenus[item.title] && (
+                                        <div className="ml-4 mt-1 space-y-1">
+                                            {item.items.map((subItem, subIndex) => (
+                                                <Link
+                                                    key={subIndex}
+                                                    to={createPageUrl(subItem.url)}
+                                                    className={`flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-colors ${
+                                                        currentPageName === subItem.url
+                                                            ? 'bg-indigo-50 text-indigo-600 font-medium'
+                                                            : 'text-slate-600 hover:bg-slate-100'
+                                                    }`}
+                                                >
+                                                    {subItem.icon}
+                                                    <span>{subItem.title}</span>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <Link
+                                    to={createPageUrl(item.url)}
+                                    className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                                        currentPageName === item.url
+                                            ? 'bg-indigo-50 text-indigo-600'
+                                            : 'text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    {item.icon}
+                                    <span>{item.title}</span>
+                                </Link>
+                            )}
+                        </div>
+                    ))}
+                </nav>
+
+                {/* User Section */}
+                <div className="p-4 border-t border-slate-200">
                     {currentUser?.company && (
-                        <CompanyBadge company={currentUser.company} className="text-sm" />
+                        <div className="mb-3">
+                            <CompanyBadge company={currentUser.company} className="text-xs" />
+                        </div>
                     )}
-                    <div className="ml-auto">
-                        <NotificationCenter />
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-900 truncate">
+                                {currentUser.display_name || currentUser.full_name}
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
+                        </div>
+                        <button
+                            onClick={() => base44.auth.logout()}
+                            className="ml-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Logout"
+                        >
+                            <LogOut className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
-                {children}
-            </main>
+            </aside>
 
-            {/* Toast Notifications */}
-            <Toaster position="top-right" richColors />
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Top Bar */}
+                <header className="bg-white border-b border-slate-200 px-6 py-4">
+                    <div className="flex justify-end">
+                        <NotificationCenter />
+                    </div>
+                </header>
+
+                {/* Page Content */}
+                <main className="flex-1 overflow-auto p-6">
+                    {children}
+                </main>
             </div>
-            );
 
+            <Toaster position="top-right" richColors />
+        </div>
+    );
 }
