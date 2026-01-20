@@ -67,18 +67,37 @@ NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName
 
 const NavigationMenuLink = NavigationMenuPrimitive.Link
 
-const NavigationMenuViewport = React.forwardRef(({ className, ...props }, ref) => (
-  <div className={cn("absolute left-0 top-full flex justify-center")}>
-    <NavigationMenuPrimitive.Viewport
-      className={cn(
-        "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90 md:w-[var(--radix-navigation-menu-viewport-width)]",
-        className
-      )}
-      ref={ref}
-      {...props}
-    />
-  </div>
-))
+const NavigationMenuViewport = React.forwardRef(({ className, ...props }, ref) => {
+  const [position, setPosition] = React.useState(0);
+  
+  React.useEffect(() => {
+    const handlePositionChange = () => {
+      const activeContent = document.querySelector('[data-state="open"] [data-radix-navigation-menu-viewport]');
+      if (activeContent) {
+        const rect = activeContent.getBoundingClientRect();
+        setPosition(rect.left);
+      }
+    };
+    
+    const observer = new MutationObserver(handlePositionChange);
+    observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-state'] });
+    
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className={cn("absolute top-full flex justify-center")} style={{ left: position }}>
+      <NavigationMenuPrimitive.Viewport
+        className={cn(
+          "origin-top relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90 md:w-[var(--radix-navigation-menu-viewport-width)]",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    </div>
+  );
+})
 NavigationMenuViewport.displayName = NavigationMenuPrimitive.Viewport.displayName
 
 const NavigationMenuIndicator = React.forwardRef(({ className, ...props }, ref) => (
