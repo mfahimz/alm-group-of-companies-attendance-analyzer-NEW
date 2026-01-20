@@ -47,6 +47,7 @@ export default function Projects() {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
+    const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
     const { data: permissions = [] } = useQuery({
@@ -283,15 +284,24 @@ export default function Projects() {
                             </div>
                             <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-400 rounded-full animate-bounce"></div>
                         </div>
-                        <h3 className="text-2xl font-bold text-slate-900 mb-2">No projects yet</h3>
-                        <p className="text-slate-600 mb-6">Create your first project to start tracking attendance</p>
-                        <Button 
-                            onClick={() => setShowCreateDialog(true)}
-                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Create First Project
-                        </Button>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                            {isDepartmentHead ? 'No Closed Projects' : 'No projects yet'}
+                        </h3>
+                        <p className="text-slate-600 mb-6">
+                            {isDepartmentHead 
+                                ? 'No projects have been closed yet. Check back later for completed project reports.'
+                                : 'Create your first project to start tracking attendance'
+                            }
+                        </p>
+                        {!isDepartmentHead && (
+                            <Button 
+                                onClick={() => setShowCreateDialog(true)}
+                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create First Project
+                            </Button>
+                        )}
                     </CardContent>
                 </Card>
             ) : (
