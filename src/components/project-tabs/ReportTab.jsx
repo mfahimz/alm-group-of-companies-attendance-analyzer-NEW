@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
 export default function ReportTab({ project, isDepartmentHead = false }) {
+    console.log('[ReportTab] Rendering with:', { projectId: project?.id, isDepartmentHead });
+    
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
@@ -23,39 +25,86 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const isSupervisor = userRole === 'supervisor';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
+    console.log('[ReportTab] User role:', { userRole, isDepartmentHead, isAdmin, isSupervisor });
+
     // Get department head verification if department head
-    const { data: deptHeadVerification } = useQuery({
+    const { data: deptHeadVerification, error: deptHeadError } = useQuery({
         queryKey: ['deptHeadVerification', isDepartmentHead],
         queryFn: async () => {
             if (!isDepartmentHead) return null;
+            console.log('[ReportTab] Verifying department head');
             const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
+            console.log('[ReportTab] Department head verification result:', data);
             return data;
         },
         enabled: isDepartmentHead,
         retry: false
     });
 
-    const { data: allReportRuns = [] } = useQuery({
+    React.useEffect(() => {
+        if (deptHeadError) {
+            console.error('[ReportTab] Department head verification error:', deptHeadError);
+        }
+    }, [deptHeadError]);
+
+    const { data: allReportRuns = [], error: reportRunsError } = useQuery({
         queryKey: ['reportRuns', project.id],
-        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date')
+        queryFn: async () => {
+            console.log('[ReportTab] Fetching report runs for project:', project.id);
+            const runs = await base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date');
+            console.log('[ReportTab] Fetched', runs.length, 'report runs');
+            return runs;
+        }
     });
+
+    React.useEffect(() => {
+        if (reportRunsError) {
+            console.error('[ReportTab] Report runs fetch error:', reportRunsError);
+        }
+    }, [reportRunsError]);
 
     // If project is closed, only show the last saved report
     const reportRuns = project.status === 'closed' && project.last_saved_report_id
         ? allReportRuns.filter(r => r.id === project.last_saved_report_id)
         : allReportRuns;
 
-    const { data: allResults = [] } = useQuery({
-        queryKey: ['results', project.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({ project_id: project.id })
+    console.log('[ReportTab] Report runs filtered:', {
+        total: allReportRuns.length,
+        filtered: reportRuns.length,
+        isClosed: project.status === 'closed',
+        lastSavedId: project.last_saved_report_id
     });
 
+    const { data: allResults = [], error: resultsError } = useQuery({
+        queryKey: ['results', project.id],
+        queryFn: async () => {
+            console.log('[ReportTab] Fetching analysis results for project:', project.id);
+            const results = await base44.entities.AnalysisResult.filter({ project_id: project.id });
+            console.log('[ReportTab] Fetched', results.length, 'analysis results');
+            return results;
+        }
+    });
+
+    React.useEffect(() => {
+        if (resultsError) {
+            console.error('[ReportTab] Analysis results fetch error:', resultsError);
+        }
+    }, [resultsError]);
+
     // Get employees for department head filtering
-    const { data: departmentEmployees = [] } = useQuery({
+    const { data: departmentEmployees = [], error: employeesError } = useQuery({
         queryKey: ['departmentEmployees', project.id, isDepartmentHead, deptHeadVerification?.assignment?.department],
         queryFn: async () => {
-            if (!isDepartmentHead || !deptHeadVerification?.verified) return [];
+            if (!isDepartmentHead || !deptHeadVerification?.verified) {
+                console.log('[ReportTab] Skipping employee fetch - not dept head or not verified');
+                return [];
+            }
             
+            console.log('[ReportTab] Fetching department employees for:', {
+                company: deptHeadVerification.assignment.company,
+                department: deptHeadVerification.assignment.department
+            });
+
             // Get all employees in this department, excluding the department head
             const allEmpls = await base44.entities.Employee.filter({
                 company: deptHeadVerification.assignment.company,
@@ -63,13 +112,24 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 active: true
             });
 
+            console.log('[ReportTab] Fetched', allEmpls.length, 'employees in department');
+
             // Exclude the department head themselves
-            return allEmpls.filter(emp => 
+            const filtered = allEmpls.filter(emp => 
                 String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
             );
+
+            console.log('[ReportTab] After excluding dept head:', filtered.length, 'employees');
+            return filtered;
         },
         enabled: isDepartmentHead && !!deptHeadVerification?.verified
     });
+
+    React.useEffect(() => {
+        if (employeesError) {
+            console.error('[ReportTab] Department employees fetch error:', employeesError);
+        }
+    }, [employeesError]);
 
     const deleteReportMutation = useMutation({
         mutationFn: async (reportRunId) => {
@@ -130,6 +190,14 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             return departmentEmployees.some(emp => String(emp.attendance_id) === empIdStr);
         })
         : allResults;
+
+    console.log('[ReportTab] Results filtering:', {
+        isDepartmentHead,
+        verified: deptHeadVerification?.verified,
+        totalResults: allResults.length,
+        filteredResults: filteredResults.length,
+        departmentEmployees: departmentEmployees.length
+    });
 
     return (
         <div className="space-y-6">

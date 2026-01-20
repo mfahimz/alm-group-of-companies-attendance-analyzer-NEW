@@ -85,37 +85,66 @@ export default function Projects() {
     }, [currentUser, permissions, navigate, userRole]);
 
     // Server-side filtered projects with pagination
-    const { data: projectsData = { items: [], total: 0 }, isLoading } = useQuery({
+    const { data: projectsData = { items: [], total: 0 }, isLoading, error: projectsError } = useQuery({
         queryKey: ['projects', currentUser?.company, userRole, page, pageSize],
         queryFn: async () => {
-            if (!currentUser) return { items: [], total: 0 };
+            console.log('[Projects] Fetching projects for user:', {
+                company: currentUser?.company,
+                role: userRole,
+                isDepartmentHead,
+                page,
+                pageSize
+            });
+
+            if (!currentUser) {
+                console.log('[Projects] No current user, returning empty');
+                return { items: [], total: 0 };
+            }
             
             const skip = (page - 1) * pageSize;
             
-            // Admin, Supervisor, CEO can see all projects
-            if (isAdminOrSupervisor || userRole === 'ceo') {
-                const items = await base44.entities.Project.list('-created_date', pageSize, skip);
-                return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
-            }
-            
-            // Department heads see only CLOSED projects from their company
-            if (isDepartmentHead) {
+            try {
+                // Admin, Supervisor, CEO can see all projects
+                if (isAdminOrSupervisor || userRole === 'ceo') {
+                    console.log('[Projects] Fetching all projects (admin/supervisor/ceo)');
+                    const items = await base44.entities.Project.list('-created_date', pageSize, skip);
+                    console.log('[Projects] Fetched', items.length, 'projects');
+                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+                }
+                
+                // Department heads see only CLOSED projects from their company
+                if (isDepartmentHead) {
+                    console.log('[Projects] Fetching CLOSED projects for department head, company:', currentUser.company);
+                    const items = await base44.entities.Project.filter({
+                        company: currentUser.company,
+                        status: 'closed'
+                    }, '-created_date', pageSize);
+                    console.log('[Projects] Fetched', items.length, 'closed projects for department head');
+                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
+                }
+                
+                // Regular users see all projects from their company
+                console.log('[Projects] Fetching projects for regular user, company:', currentUser.company);
                 const items = await base44.entities.Project.filter({
-                    company: currentUser.company,
-                    status: 'closed'
+                    company: currentUser.company
                 }, '-created_date', pageSize);
+                console.log('[Projects] Fetched', items.length, 'projects for user');
                 return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
+            } catch (error) {
+                console.error('[Projects] Error fetching projects:', error);
+                throw error;
             }
-            
-            // Regular users see all projects from their company
-            const items = await base44.entities.Project.filter({
-                company: currentUser.company
-            }, '-created_date', pageSize);
-            return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
         },
         enabled: !!currentUser,
         keepPreviousData: true
     });
+
+    // Log any query errors
+    React.useEffect(() => {
+        if (projectsError) {
+            console.error('[Projects] Query error:', projectsError);
+        }
+    }, [projectsError]);
 
     const projects = projectsData.items;
 
