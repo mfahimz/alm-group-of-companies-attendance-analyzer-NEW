@@ -30,7 +30,7 @@ export default function Layout({ children, currentPageName }) {
     const { isDesktop, isChecking } = useDeviceDetection();
 
     // Public pages that don't require authentication
-    const publicPages = ['DeptHeadApproval'];
+    const publicPages = [];
     const isPublicPage = publicPages.includes(currentPageName);
 
     // ALL hooks must be called unconditionally at the top
