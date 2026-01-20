@@ -190,17 +190,8 @@ export default function ProjectDetail() {
             </div>
 
             {/* Tabs - Department heads see only Report tab */}
-            {isDeptHeadViewOnly ? (
-                <div className="space-y-6">
-                    <Card className="border-0 shadow-sm">
-                        <CardHeader>
-                            <CardTitle>Report</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ReportTab project={project} isDepartmentHead={true} />
-                        </CardContent>
-                    </Card>
-                </div>
+            {isDepartmentHead ? (
+                <ReportTab project={project} isDepartmentHead={true} />
             ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl -mx-6 px-6 py-3 border-b border-slate-200">
