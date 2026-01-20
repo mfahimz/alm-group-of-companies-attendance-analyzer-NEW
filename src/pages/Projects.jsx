@@ -269,13 +269,15 @@ export default function Projects() {
                             Bulk Edit ({selectedProjects.length})
                         </Button>
                     )}
-                    <Button 
-                        onClick={() => setShowCreateDialog(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        New Project
-                    </Button>
+                    {!isDepartmentHead && (
+                        <Button 
+                            onClick={() => setShowCreateDialog(true)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            New Project
+                        </Button>
+                    )}
                 </div>
             </div>
 
