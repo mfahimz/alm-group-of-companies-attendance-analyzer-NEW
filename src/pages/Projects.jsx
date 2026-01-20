@@ -88,10 +88,14 @@ export default function Projects() {
     const { data: projectsData = { items: [], total: 0 }, isLoading, error: projectsError } = useQuery({
         queryKey: ['projects', currentUser?.company, userRole, page, pageSize],
         queryFn: async () => {
+            const role = currentUser?.extended_role || currentUser?.role || 'user';
+            const isAdminRole = role === 'admin' || role === 'supervisor' || role === 'ceo';
+            const isDeptHead = role === 'department_head';
+
             console.log('[Projects] Fetching projects for user:', {
                 company: currentUser?.company,
-                role: userRole,
-                isDepartmentHead,
+                role,
+                isDeptHead,
                 page,
                 pageSize
             });
@@ -105,7 +109,7 @@ export default function Projects() {
             
             try {
                 // Admin, Supervisor, CEO can see all projects
-                if (isAdminOrSupervisor || userRole === 'ceo') {
+                if (isAdminRole) {
                     console.log('[Projects] Fetching all projects (admin/supervisor/ceo)');
                     const items = await base44.entities.Project.list('-created_date', pageSize, skip);
                     console.log('[Projects] Fetched', items.length, 'projects');
@@ -113,7 +117,7 @@ export default function Projects() {
                 }
                 
                 // Department heads see only CLOSED projects from their company
-                if (isDepartmentHead) {
+                if (isDeptHead) {
                     console.log('[Projects] Fetching CLOSED projects for department head, company:', currentUser.company);
                     const items = await base44.entities.Project.filter({
                         company: currentUser.company,
