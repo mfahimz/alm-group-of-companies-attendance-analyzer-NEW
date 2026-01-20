@@ -118,7 +118,7 @@ export default function Dashboard() {
             <div className="space-y-6 animate-in fade-in duration-500">
                 <div className="animate-in slide-in-from-top-4 duration-700">
                     <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-                        Welcome back, {currentUser?.full_name || (isCEO ? 'CEO' : 'Admin')}
+                        Welcome back, {currentUser?.display_name || currentUser?.full_name || (isCEO ? 'CEO' : 'Admin')}
                     </h1>
                     <p className="text-slate-600 mt-2 text-lg">System administration and monitoring</p>
                 </div>
@@ -132,7 +132,7 @@ export default function Dashboard() {
             <div className="space-y-6 animate-in fade-in duration-500">
                 <div className="animate-in slide-in-from-top-4 duration-700">
                     <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-                        Welcome back, {currentUser?.full_name || 'Supervisor'}
+                        Welcome back, {currentUser?.display_name || currentUser?.full_name || 'Supervisor'}
                     </h1>
                     <p className="text-slate-600 mt-2 text-lg">Manage your team's attendance</p>
                 </div>
@@ -147,7 +147,7 @@ export default function Dashboard() {
             {/* Header */}
             <div className="animate-in slide-in-from-top-4 duration-700">
                 <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-                    Welcome back, {currentUser?.full_name || 'User'}
+                    Welcome back, {currentUser?.display_name || currentUser?.full_name || 'User'}
                 </h1>
                 <p className="text-slate-600 mt-2 text-lg">View your attendance and submit requests</p>
             </div>
