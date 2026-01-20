@@ -204,12 +204,18 @@ export default function Layout({ children, currentPageName }) {
             });
         }
 
-        return menu.filter(item => {
-            if (item.items) {
-                return item.items.some(subItem => hasPageAccess(subItem.url));
-            }
-            return hasPageAccess(item.url);
-        });
+        return menu
+            .map(item => {
+                if (item.items) {
+                    // Filter out sub-items user doesn't have access to
+                    const filteredSubItems = item.items.filter(subItem => hasPageAccess(subItem.url));
+                    // Return item with filtered sub-items, or null if no sub-items remain
+                    return filteredSubItems.length > 0 ? { ...item, items: filteredSubItems } : null;
+                }
+                // For items without sub-items, check if user has access
+                return hasPageAccess(item.url) ? item : null;
+            })
+            .filter(item => item !== null); // Remove null entries
     }, [currentUser, permissions, isAdmin, isSupervisor, isCEO, isDepartmentHead, userRole, hasPageAccess]);
 
     // Set UAE timezone for the entire app
