@@ -63,11 +63,14 @@ export default function DepartmentHeadDashboard() {
         refetchOnMount: false
     });
 
-    const deptHeadAssignment = deptHeadVerification?.verified ? {
-        company: deptHeadVerification.assignment.company,
-        department: deptHeadVerification.assignment.department,
-        employee_id: deptHeadVerification.assignment.employee_id
-    } : null;
+    // Memoize dept head assignment to prevent re-renders
+    const deptHeadAssignment = React.useMemo(() => {
+        return deptHeadVerification?.verified ? {
+            company: deptHeadVerification.assignment.company,
+            department: deptHeadVerification.assignment.department,
+            employee_id: deptHeadVerification.assignment.employee_id
+        } : null;
+    }, [deptHeadVerification?.verified, deptHeadVerification?.assignment?.company, deptHeadVerification?.assignment?.department, deptHeadVerification?.assignment?.employee_id]);
 
     // DEBUG: Track dept head verification
     React.useEffect(() => {
@@ -77,7 +80,7 @@ export default function DepartmentHeadDashboard() {
             company: deptHeadAssignment?.company,
             department: deptHeadAssignment?.department
         });
-    }, [deptHeadVerification, verificationLoading, deptHeadAssignment]);
+    }, [deptHeadVerification?.verified, verificationLoading, deptHeadAssignment?.company, deptHeadAssignment?.department]);
 
     // Get active project containing today's date (UAE timezone)
     const { data: currentProject, isLoading: projectLoading } = useQuery({
@@ -299,7 +302,7 @@ export default function DepartmentHeadDashboard() {
             status: currentProject?.status,
             salaryIsClosed
         });
-    }, [currentProject, salaryIsClosed]);
+    }, [currentProject?.name, currentProject?.status, salaryIsClosed]);
 
     // CRITICAL: Single loading state - wait for ALL essential data before rendering anything
     const isInitialLoading = userLoading || verificationLoading || (!!deptHeadAssignment && projectLoading);
@@ -313,7 +316,7 @@ export default function DepartmentHeadDashboard() {
             isInitialLoading,
             hasProject: !!currentProject
         });
-    }, [userLoading, verificationLoading, projectLoading, isInitialLoading, currentProject]);
+    }, [userLoading, verificationLoading, projectLoading, isInitialLoading]);
 
     if (isInitialLoading) {
         return (
