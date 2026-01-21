@@ -285,6 +285,7 @@ export default function DepartmentHeadSettings() {
 
             {/* Statistics Cards */}
             {activeTab === 'manage' && (
+                <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="border-0 shadow-sm">
                     <CardContent className="p-4">
@@ -625,6 +626,7 @@ export default function DepartmentHeadSettings() {
                     )}
                 </CardContent>
             </Card>
+                </>
             )}
 
             {/* Tree View Tab */}
