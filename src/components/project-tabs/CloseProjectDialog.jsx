@@ -18,7 +18,7 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
         mutationFn: async () => {
             // Step 1: Update employee grace minutes from last report (if enabled)
             if (captureGraceMinutes) {
-                setDeleteProgress({ phase: 'Updating employee grace minutes...', percent: 20 });
+                setDeleteProgress({ phase: 'Updating employee grace minutes...', percent: 50 });
                 const results = await base44.entities.AnalysisResult.filter({ report_run_id: lastSavedReport.id });
                 const employees = await base44.entities.Employee.filter({ company: project.company });
                 
@@ -35,32 +35,25 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                 }
             }
 
-            // Step 2: Delete all punches (backend handles this quickly with parallel processing)
-            setDeleteProgress({ phase: 'Deleting punch records in parallel batches...', percent: 60 });
-            const deleteResult = await base44.functions.invoke('deleteProjectPunches', {
+            // Step 2: Close project via backend (handles quarterly minutes deductions)
+            setDeleteProgress({ phase: 'Finalizing project...', percent: 90 });
+            const closeResult = await base44.functions.invoke('closeProject', {
                 project_id: project.id
             });
 
-            if (!deleteResult.data.success) {
-                throw new Error('Failed to delete punches');
+            if (!closeResult.data.success) {
+                throw new Error(closeResult.data.error || 'Failed to close project');
             }
 
-            // Step 3: Update project status to closed
-            setDeleteProgress({ phase: 'Finalizing project...', percent: 90 });
-            await base44.entities.Project.update(project.id, {
-                status: 'closed',
-                last_saved_report_id: lastSavedReport.id
-            });
-
-            return deleteResult.data;
+            return closeResult.data;
         },
         onSuccess: (result) => {
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['punches', project.id]);
             queryClient.invalidateQueries(['employees']);
             const message = captureGraceMinutes 
-                ? `Project closed. Grace minutes updated for all employees. ${result.deleted_count} punch records deleted.`
-                : `Project closed. ${result.deleted_count} punch records deleted.`;
+                ? `Project closed. Grace minutes updated for all employees. ${result.updated_records} quarterly minutes records updated.`
+                : `Project closed. ${result.updated_records} quarterly minutes records updated.`;
             toast.success(message);
             setDeleteProgress(null);
             onClose();
@@ -93,10 +86,10 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                                         Closing and finalizing this project will:
                                     </p>
                                     <ul className="text-sm text-red-800 space-y-1 ml-4">
-                                        <li>• Delete all punch records permanently</li>
                                         <li>• Make the project completely read-only</li>
                                         <li>• Prevent any future analysis or data uploads</li>
-                                        <li>• Keep only the last saved report</li>
+                                        <li>• Keep the last saved report and all punch data</li>
+                                        <li>• Deduct approved minutes from quarterly allowances (Al Maraghi Auto Repairs)</li>
                                     </ul>
                                 </div>
                             </div>
