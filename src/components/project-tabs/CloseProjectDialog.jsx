@@ -90,6 +90,7 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                                         <li>• Prevent any future analysis or data uploads</li>
                                         <li>• Keep the last saved report and all punch data</li>
                                         <li>• Deduct approved minutes from quarterly allowances (Al Maraghi Auto Repairs)</li>
+                                        <li>• Complete final step after salary calculation</li>
                                     </ul>
                                 </div>
                             </div>
