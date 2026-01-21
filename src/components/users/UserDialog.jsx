@@ -27,24 +27,35 @@ export default function UserDialog({ open, onClose, user }) {
         enabled: open
     });
 
-    const { data: companySettings = [] } = useQuery({
-        queryKey: ['companySettings'],
-        queryFn: () => base44.entities.CompanySettings.list(),
+    const { data: deptHeads = [] } = useQuery({
+        queryKey: ['deptHeads'],
+        queryFn: () => base44.entities.DepartmentHead.list(),
         enabled: formData.extended_role === 'department_head' && !!formData.company
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', formData.company],
-        queryFn: () => base44.entities.Employee.filter({ company: formData.company }),
+        queryFn: () => base44.entities.Employee.list(),
         enabled: formData.extended_role === 'department_head' && !!formData.company
     });
 
+    // Get departments that have active department heads in this company
     const availableDepartments = React.useMemo(() => {
         if (!formData.company || formData.extended_role !== 'department_head') return [];
-        const setting = companySettings.find(s => s.company === formData.company);
-        if (!setting) return [];
-        return setting.departments.split(',').map(d => d.trim()).filter(Boolean);
-    }, [formData.company, formData.extended_role, companySettings]);
+        
+        const activeDeptHeads = deptHeads.filter(dh => 
+            dh.company === formData.company && dh.active
+        );
+        
+        // Create mapping of department → department head name
+        const deptMap = {};
+        activeDeptHeads.forEach(dh => {
+            const empName = employees.find(e => e.id === dh.employee_id)?.name || 'Unknown';
+            deptMap[dh.department] = empName;
+        });
+        
+        return deptMap;
+    }, [formData.company, formData.extended_role, deptHeads, employees]);
 
     useEffect(() => {
         if (user) {
@@ -69,6 +80,16 @@ export default function UserDialog({ open, onClose, user }) {
             });
         }
     }, [user]);
+
+    // Auto-unassign department if no longer has active department head
+    useEffect(() => {
+        if (formData.extended_role === 'department_head' && formData.company && formData.department) {
+            const deptHasHead = Object.keys(availableDepartments).includes(formData.department);
+            if (!deptHasHead && formData.department) {
+                setFormData(prev => ({ ...prev, department: '' }));
+            }
+        }
+    }, [availableDepartments, formData.extended_role, formData.company]);
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data, previousUser }) => {
@@ -313,12 +334,12 @@ export default function UserDialog({ open, onClose, user }) {
                                             <SelectValue placeholder="Select department" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {availableDepartments.map((dept) => (
-                                                <SelectItem key={dept} value={dept}>
-                                                    {dept}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
+                                                             {Object.entries(availableDepartments).map(([dept, headName]) => (
+                                                                 <SelectItem key={dept} value={dept}>
+                                                                     {dept} → {headName}
+                                                                 </SelectItem>
+                                                             ))}
+                                                         </SelectContent>
                                     </Select>
                                     <p className="text-xs text-slate-500 mt-1">
                                         Only employees in this department will be visible to this department head
