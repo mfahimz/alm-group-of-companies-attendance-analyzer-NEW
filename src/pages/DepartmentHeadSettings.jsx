@@ -562,7 +562,14 @@ export default function DepartmentHeadSettings() {
                             </div>
 
                             <div>
-                                <Label>Managed Employees</Label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <Label>Managed Employees</Label>
+                                    {selectedManagedEmployees.length > 0 && (
+                                        <span className="text-xs text-indigo-600 font-medium">
+                                            {selectedManagedEmployees.length} selected
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="border rounded-lg bg-slate-50">
                                     <div className="p-2 border-b bg-white">
                                         <div className="relative">
