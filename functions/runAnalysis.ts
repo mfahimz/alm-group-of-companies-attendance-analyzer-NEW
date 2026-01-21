@@ -504,6 +504,7 @@ Deno.serve(async (req) => {
                         dateException.type === 'ALLOWED_MINUTES' && 
                         dateException.approval_status === 'approved_dept_head') {
                         approvedMinutesForDay = dateException.allowed_minutes || 0;
+                        total_approved_minutes += approvedMinutesForDay;
                     }
                 } catch {
                     approvedMinutesForDay = 0;
