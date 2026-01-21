@@ -172,9 +172,10 @@ export default function SalaryTab({ project, finalReport }) {
         return depts.sort();
     }, [salaryData]);
 
-    // Filter and sort salary data
+    // Filter and sort salary data (use calculated data if available, otherwise use original)
+    const dataToDisplay = calculatedData || salaryData;
     const filteredSalaryData = useMemo(() => {
-        let filtered = salaryData;
+        let filtered = dataToDisplay;
         
         // Apply department filter
         if (departmentFilter !== 'all') {
@@ -193,7 +194,7 @@ export default function SalaryTab({ project, finalReport }) {
             }
             return 0;
         });
-    }, [salaryData, departmentFilter, sortBy]);
+    }, [dataToDisplay, departmentFilter, sortBy]);
 
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
