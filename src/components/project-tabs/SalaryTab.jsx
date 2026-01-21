@@ -437,24 +437,8 @@ export default function SalaryTab({ project, finalReport }) {
                                                     className="h-8 text-xs"
                                                 />
                                             </TableCell>
-                                            <TableCell className="bg-purple-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getValue(row, 'leaveHours').toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'leaveHours', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
-                                            <TableCell className="bg-purple-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getValue(row, 'leaveHoursPay').toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'leaveHoursPay', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
+                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.leaveHours.toFixed(2)}</TableCell>
+                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.leaveHoursPay.toFixed(2)}</TableCell>
                                             <TableCell className="bg-red-50 p-1">
                                                 <Input
                                                     type="number"
