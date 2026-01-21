@@ -551,6 +551,24 @@ export default function DepartmentHeadSettings() {
                                 </div>
                             </div>
 
+                            {selectedManagedEmployees.length > 0 && (
+                                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                    <p className="text-xs font-medium text-indigo-900 mb-2">
+                                        Selected Employees ({selectedManagedEmployees.length})
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {selectedManagedEmployees.map(empId => {
+                                            const emp = employees.find(e => e.id === empId);
+                                            return emp ? (
+                                                <span key={empId} className="inline-flex items-center px-2 py-1 bg-white border border-indigo-200 rounded text-xs text-slate-700">
+                                                    {emp.name}
+                                                </span>
+                                            ) : null;
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <Label>Managed Employees</Label>
