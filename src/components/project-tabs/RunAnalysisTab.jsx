@@ -894,148 +894,39 @@ export default function RunAnalysisTab({ project }) {
         }
 
         setIsAnalyzing(true);
-        setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Processing...' });
+        setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Starting analysis on server...' });
 
         try {
-            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-            
-            // Retry logic with exponential backoff for rate limit errors
-            const retryWithBackoff = async (fn, maxRetries = 3) => {
-                for (let i = 0; i < maxRetries; i++) {
-                    try {
-                        return await fn();
-                    } catch (error) {
-                        const isRateLimit = error.message?.includes('rate limit') || 
-                                          error.message?.includes('429') ||
-                                          error.status === 429;
-                        if (isRateLimit && i < maxRetries - 1) {
-                            const backoffTime = Math.min(2000 * Math.pow(2, i), 10000); // Max 10s
-                            console.log(`Rate limit hit, retrying in ${backoffTime}ms...`);
-                            await delay(backoffTime);
-                            continue;
-                        }
-                        throw error;
-                    }
-                }
-            };
-
-            const allResults = [];
-            // Create report run FIRST to get the report_run_id
-            const reportRun = await retryWithBackoff(() => 
-                base44.entities.ReportRun.create({
-                    project_id: project.id,
-                    report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
-                    date_from: dateFrom,
-                    date_to: dateTo,
-                    employee_count: uniqueEmployeeIds.length
-                })
-            );
-
-            // Process employees in smaller chunks to reduce memory usage
-            const analysisChunkSize = 50;
-            for (let chunkStart = 0; chunkStart < uniqueEmployeeIds.length; chunkStart += analysisChunkSize) {
-                const chunkEnd = Math.min(chunkStart + analysisChunkSize, uniqueEmployeeIds.length);
-                const chunk = uniqueEmployeeIds.slice(chunkStart, chunkEnd);
-                
-                for (let i = 0; i < chunk.length; i++) {
-                    const globalIndex = chunkStart + i;
-                    const attendance_id = chunk[i];
-                    const employee = employees.find(e => Number(e.attendance_id) === Number(attendance_id));
-                    const employeeName = employee?.name || attendance_id;
-                    setProgress({ 
-                        current: globalIndex + 1, 
-                        total: uniqueEmployeeIds.length, 
-                        status: `Analyzing ${globalIndex + 1}/${uniqueEmployeeIds.length}: ${employeeName}`,
-                        subStatus: 'Calculating attendance data...'
-                    });
-
-                    const result = await analyzeEmployee(attendance_id);
-                    allResults.push({
-                        project_id: project.id,
-                        report_run_id: reportRun.id,
-                        attendance_id: result.attendance_id,
-                        working_days: result.working_days,
-                        present_days: result.present_days,
-                        full_absence_count: result.full_absence_count,
-                        half_absence_count: result.half_absence_count,
-                        sick_leave_count: result.sick_leave_count,
-                        annual_leave_count: result.annual_leave_count,
-                        late_minutes: result.late_minutes,
-                        early_checkout_minutes: result.early_checkout_minutes,
-                        other_minutes: result.other_minutes,
-                        grace_minutes: result.grace_minutes,
-                        abnormal_dates: result.abnormal_dates,
-                        notes: result.notes,
-                        auto_resolutions: result.auto_resolutions
-                    });
-                }
-            }
-
+            // Call backend function to run analysis
             setProgress({ 
-                current: uniqueEmployeeIds.length, 
+                current: 0, 
                 total: uniqueEmployeeIds.length, 
-                status: 'Saving results to database...',
-                subStatus: 'Preparing batches...'
+                status: 'Processing on server...',
+                subStatus: 'Analysis is running in the background. This may take a few minutes.'
             });
-            
-            // Adaptive batch size with rate limit protection
-            const createBatchSize = 8; // Conservative batch size
-            const minDelayMs = 1200; // Minimum delay between batches
-            let consecutiveErrors = 0;
-            
-            for (let i = 0; i < allResults.length; i += createBatchSize) {
-                const batch = allResults.slice(i, i + createBatchSize);
-                const batchNum = Math.floor(i / createBatchSize) + 1;
-                const totalBatches = Math.ceil(allResults.length / createBatchSize);
-                
+
+            const response = await base44.functions.invoke('runAnalysis', {
+                project_id: project.id,
+                date_from: dateFrom,
+                date_to: dateTo,
+                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`
+            });
+
+            if (response.data.success) {
+                queryClient.invalidateQueries(['results', project.id]);
+                queryClient.invalidateQueries(['reportRuns', project.id]);
+                queryClient.invalidateQueries(['project', project.id]);
+                queryClient.invalidateQueries(['projects']);
+                toast.success(response.data.message);
                 setProgress({ 
-                    current: uniqueEmployeeIds.length, 
-                    total: uniqueEmployeeIds.length, 
-                    status: 'Saving to database...',
-                    subStatus: `Batch ${batchNum}/${totalBatches} - ${Math.min(i + createBatchSize, allResults.length)}/${allResults.length} records`
+                    current: response.data.processed_count, 
+                    total: response.data.total_count, 
+                    status: 'Complete!',
+                    subStatus: 'Report generated successfully'
                 });
-                
-                try {
-                    await retryWithBackoff(() => base44.entities.AnalysisResult.bulkCreate(batch));
-                    consecutiveErrors = 0;
-                    
-                    // Adaptive delay - increase if we're hitting issues
-                    const adaptiveDelay = minDelayMs + (consecutiveErrors * 500);
-                    await delay(adaptiveDelay);
-                } catch (error) {
-                    consecutiveErrors++;
-                    console.error(`Batch ${batchNum} failed after retries:`, error);
-                    
-                    // If batch fails, try individual records
-                    console.log('Attempting individual record saves...');
-                    for (const record of batch) {
-                        try {
-                            await retryWithBackoff(() => base44.entities.AnalysisResult.create(record));
-                            await delay(500); // Slower for individual saves
-                        } catch (recordError) {
-                            console.error('Failed to save record:', record.attendance_id, recordError);
-                        }
-                    }
-                }
+            } else {
+                throw new Error(response.data.error || 'Analysis failed');
             }
-
-            // Update project with last saved report
-            await base44.entities.Project.update(project.id, {
-                last_saved_report_id: reportRun.id,
-                status: 'analyzed'
-            });
-
-            queryClient.invalidateQueries(['results', project.id]);
-            queryClient.invalidateQueries(['reportRuns', project.id]);
-            queryClient.invalidateQueries(['project', project.id]);
-            queryClient.invalidateQueries(['projects']);
-            toast.success(`Analysis completed for ${dateFrom} to ${dateTo}`);
-            setProgress({ 
-                current: uniqueEmployeeIds.length, 
-                total: uniqueEmployeeIds.length, 
-                status: 'Complete!',
-                subStatus: 'Report generated successfully'
-            });
         } catch (error) {
             toast.error('Analysis failed: ' + error.message);
             console.error(error);
