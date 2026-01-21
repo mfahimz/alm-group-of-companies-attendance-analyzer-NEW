@@ -666,28 +666,38 @@ export default function DepartmentHeadSettings() {
                                                                attendanceIdStr.toLowerCase().includes(search);
                                                     })
                                                     .map(emp => {
-                                                        const isDeptHeadForThis = emp.id === editingHead.employee_id;
+                                                         const isDeptHeadForThis = emp.id === editingHead.employee_id;
+                                                         const assignedDeptHead = deptHeads.find(dh => 
+                                                             dh.active && 
+                                                             dh.employee_id === emp.id && 
+                                                             dh.id !== editingHead.id
+                                                         );
 
-                                                        return (
-                                                            <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedManagedEmployees.includes(emp.id)}
-                                                                    onChange={() => toggleManagedEmployee(emp.id)}
-                                                                    disabled={isDeptHeadForThis}
-                                                                    className="rounded border-slate-300"
-                                                                />
-                                                                <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
-                                                                    {emp.name} ({emp.attendance_id})
-                                                                </span>
-                                                                {isDeptHeadForThis && (
-                                                                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                                                                        Department Head
-                                                                    </span>
-                                                                )}
-                                                            </label>
-                                                        );
-                                                    })}
+                                                         return (
+                                                             <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
+                                                                 <input
+                                                                     type="checkbox"
+                                                                     checked={selectedManagedEmployees.includes(emp.id)}
+                                                                     onChange={() => toggleManagedEmployee(emp.id)}
+                                                                     disabled={isDeptHeadForThis}
+                                                                     className="rounded border-slate-300"
+                                                                 />
+                                                                 <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
+                                                                     {emp.name} ({emp.attendance_id})
+                                                                 </span>
+                                                                 {isDeptHeadForThis && (
+                                                                     <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                                                         Department Head
+                                                                     </span>
+                                                                 )}
+                                                                 {assignedDeptHead && (
+                                                                     <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                                                                         Assigned: {assignedDeptHead.department}
+                                                                     </span>
+                                                                 )}
+                                                             </label>
+                                                         );
+                                                     })}
                                             </div>
                                         )}
                                     </div>
