@@ -66,6 +66,11 @@ export default function DepartmentHeadSettings() {
         .filter(dh => dh.active)
         .map(dh => dh.employee_id);
 
+    // Get all employee IDs that are managed by ANY department head (assigned to a dept head)
+    const managedEmployeeIds = deptHeads
+        .filter(dh => dh.active && dh.managed_employee_ids)
+        .flatMap(dh => dh.managed_employee_ids.split(',').filter(Boolean));
+
     // Available employees = company match, active, and NOT already a dept head (unless editing that specific head)
     const availableEmployees = employees.filter(e => {
         if (e.company !== selectedCompany || !e.active) return false;
@@ -413,6 +418,7 @@ export default function DepartmentHeadSettings() {
                                                     })
                                                     .map(emp => {
                                                          const isDeptHeadForThis = emp.id === selectedEmployee;
+                                                         const isAssignedToAnyDeptHead = managedEmployeeIds.includes(emp.id);
 
                                                          return (
                                                              <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -426,9 +432,11 @@ export default function DepartmentHeadSettings() {
                                                                  <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
                                                                      {emp.name} ({emp.attendance_id})
                                                                  </span>
-                                                                 <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                                                     Not Assigned
-                                                                 </span>
+                                                                 {!isAssignedToAnyDeptHead && !isDeptHeadForThis && (
+                                                                     <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                                                         Not Assigned
+                                                                     </span>
+                                                                 )}
                                                              </label>
                                                          );
                                                      })}
@@ -665,7 +673,7 @@ export default function DepartmentHeadSettings() {
                                                     })
                                                     .map(emp => {
                                                          const isDeptHeadForThis = emp.id === editingHead.employee_id;
-                                                         const isAssignedElsewhere = assignedDeptHeadIds.includes(emp.id) && emp.id !== editingHead.employee_id;
+                                                         const isAssignedToAnyDeptHead = managedEmployeeIds.includes(emp.id);
 
                                                          return (
                                                              <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -679,7 +687,7 @@ export default function DepartmentHeadSettings() {
                                                                  <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
                                                                      {emp.name} ({emp.attendance_id})
                                                                  </span>
-                                                                 {!isAssignedElsewhere && !isDeptHeadForThis && (
+                                                                 {!isAssignedToAnyDeptHead && !isDeptHeadForThis && (
                                                                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
                                                                          Not Assigned
                                                                      </span>
