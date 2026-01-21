@@ -232,6 +232,34 @@ export default function SalaryTab({ project, finalReport }) {
         return { total, wpsPay, balance };
     };
 
+    // Calculate salaries from finalized report
+    const handleCalculateSalaries = async () => {
+        if (!finalReport?.id) {
+            toast.error('No finalized report found');
+            return;
+        }
+
+        setIsCalculating(true);
+        try {
+            const response = await base44.functions.invoke('calculateSalaries', {
+                project_id: project.id,
+                report_run_id: finalReport.id
+            });
+
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'Failed to calculate salaries');
+            }
+
+            setCalculatedData(response.data.data);
+            setEditableData({});
+            toast.success('Salaries calculated successfully');
+        } catch (error) {
+            toast.error('Failed to calculate salaries: ' + error.message);
+        } finally {
+            setIsCalculating(false);
+        }
+    };
+
     // Save all changes
     const handleSave = async () => {
         setIsSaving(true);
