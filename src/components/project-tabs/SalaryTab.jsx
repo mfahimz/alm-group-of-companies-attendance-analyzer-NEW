@@ -336,7 +336,7 @@ export default function SalaryTab({ project, finalReport }) {
                             <p className="text-sm text-slate-600 mb-4">
                                 <strong>Note:</strong> Salary calculations based on latest saved report. Data from salary master is read-only.
                             </p>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="text-sm font-medium text-slate-700 mb-2 block">Department</label>
                                     <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
@@ -366,8 +366,18 @@ export default function SalaryTab({ project, finalReport }) {
                                 </div>
                                 <div className="flex items-end">
                                     <Button 
+                                        onClick={handleCalculateSalaries} 
+                                        disabled={isCalculating || !finalReport}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        <DollarSign className="w-4 h-4 mr-2" />
+                                        {isCalculating ? 'Calculating...' : 'Calculate Salary'}
+                                    </Button>
+                                </div>
+                                <div className="flex items-end">
+                                    <Button 
                                         onClick={handleSave} 
-                                        disabled={isSaving || Object.keys(editableData).length === 0}
+                                        disabled={isSaving || Object.keys(editableData).length === 0 || !calculatedData}
                                         className="w-full bg-green-600 hover:bg-green-700"
                                     >
                                         <Save className="w-4 h-4 mr-2" />
