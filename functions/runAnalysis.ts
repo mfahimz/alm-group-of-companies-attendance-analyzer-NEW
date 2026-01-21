@@ -682,11 +682,16 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Save results in batches
-        const batchSize = 10;
+        // Save results in batches with delay to avoid rate limits
+        const batchSize = 50;
         for (let i = 0; i < allResults.length; i += batchSize) {
             const batch = allResults.slice(i, i + batchSize);
             await base44.asServiceRole.entities.AnalysisResult.bulkCreate(batch);
+            
+            // Add delay between batches to avoid rate limits
+            if (i + batchSize < allResults.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
         }
 
         // Update project status
