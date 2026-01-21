@@ -57,7 +57,8 @@ const DEFAULT_COMPANY_RULES = {
     report_rules: {
         show_notes: true,
         notes_only_dates_no_reason: true
-    }
+    },
+    approved_minutes_enabled: false
 };
 
 export default function RulesSettings() {
@@ -647,6 +648,36 @@ export default function RulesSettings() {
                                     <Switch
                                         checked={rules.report_rules?.notes_only_dates_no_reason}
                                         onCheckedChange={(checked) => updateRule(company, 'report_rules', 'notes_only_dates_no_reason', checked)}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Advanced Features */}
+                        <Card className="border-0 bg-white shadow-sm">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-slate-900">
+                                    <Settings className="w-5 h-5 text-indigo-600" />
+                                    Advanced Features
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <Label className="text-slate-900">Approved Minutes Offset</Label>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Deduct approved minutes BEFORE applying grace minutes (currently only for Al Maraghi Auto Repairs)
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={rules.approved_minutes_enabled ?? false}
+                                        onCheckedChange={(checked) => setCompanyRules(prev => ({
+                                            ...prev,
+                                            [company]: {
+                                                ...prev[company],
+                                                approved_minutes_enabled: checked
+                                            }
+                                        }))}
                                     />
                                 </div>
                             </CardContent>
