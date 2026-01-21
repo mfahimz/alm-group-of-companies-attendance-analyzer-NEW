@@ -412,9 +412,7 @@ export default function DepartmentHeadSettings() {
                                                                attendanceIdStr.toLowerCase().includes(search);
                                                     })
                                                     .map(emp => {
-                                                        const isAlreadyDeptHead = assignedDeptHeadIds.includes(emp.id);
                                                         const isDeptHeadForThis = emp.id === selectedEmployee;
-                                                        const isNotAssignedAnywhere = !isAlreadyDeptHead && !isDeptHeadForThis;
 
                                                         return (
                                                             <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -427,11 +425,10 @@ export default function DepartmentHeadSettings() {
                                                                 />
                                                                 <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
                                                                     {emp.name} ({emp.attendance_id})
-                                                                    {isDeptHeadForThis && ' (Department Head)'}
                                                                 </span>
-                                                                {isNotAssignedAnywhere && (
-                                                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                                                        Not Assigned
+                                                                {isDeptHeadForThis && (
+                                                                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                                                        Department Head
                                                                     </span>
                                                                 )}
                                                             </label>
@@ -669,9 +666,7 @@ export default function DepartmentHeadSettings() {
                                                                attendanceIdStr.toLowerCase().includes(search);
                                                     })
                                                     .map(emp => {
-                                                        const isAlreadyDeptHead = assignedDeptHeadIds.includes(emp.id) && emp.id !== editingHead.employee_id;
                                                         const isDeptHeadForThis = emp.id === editingHead.employee_id;
-                                                        const isNotAssignedAnywhere = !assignedDeptHeadIds.includes(emp.id);
 
                                                         return (
                                                             <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -684,11 +679,10 @@ export default function DepartmentHeadSettings() {
                                                                 />
                                                                 <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
                                                                     {emp.name} ({emp.attendance_id})
-                                                                    {isDeptHeadForThis && ' (Department Head)'}
                                                                 </span>
-                                                                {isNotAssignedAnywhere && (
-                                                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                                                        Not Assigned
+                                                                {isDeptHeadForThis && (
+                                                                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                                                        Department Head
                                                                     </span>
                                                                 )}
                                                             </label>
