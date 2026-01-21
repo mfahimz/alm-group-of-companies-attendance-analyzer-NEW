@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Calendar as CalendarIcon, Settings, BarChart3, Eye, EyeOff } from 'lucide-react';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns';
-import { parseUAEDate, formatInUAE } from '@/components/ui/timezone';
+import { parseDateInUAE, formatInUAE } from '@/components/ui/timezone';
 import ProjectsWidget from '@/components/dashboard-widgets/ProjectsWidget';
 import AnalysisProgressWidget from '@/components/dashboard-widgets/AnalysisProgressWidget';
 import RecentActivityWidget from '@/components/dashboard-widgets/RecentActivityWidget';
@@ -75,8 +75,8 @@ export default function CompanyDashboard() {
                 const config = JSON.parse(savedLayout.layout_config);
                 setWidgets(config);
                 setDateRangePreset(savedLayout.date_range_preset || 'this_month');
-                if (savedLayout.custom_date_from) setCustomDateFrom(parseUAEDate(savedLayout.custom_date_from));
-                if (savedLayout.custom_date_to) setCustomDateTo(parseUAEDate(savedLayout.custom_date_to));
+                if (savedLayout.custom_date_from) setCustomDateFrom(parseDateInUAE(savedLayout.custom_date_from));
+                if (savedLayout.custom_date_to) setCustomDateTo(parseDateInUAE(savedLayout.custom_date_to));
             } catch (e) {
                 console.error('Failed to parse layout:', e);
             }

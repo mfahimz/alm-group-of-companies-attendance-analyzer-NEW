@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { FileText, Users, Calendar, Loader2 } from 'lucide-react';
-import { formatInUAE, parseUAEDate } from '@/components/ui/timezone';
+import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function RecentActivityWidget({ dateRange, company, userRole }) {
@@ -42,7 +42,7 @@ export default function RecentActivityWidget({ dateRange, company, userRole }) {
         if (!dateRange.from || !dateRange.to) return items;
         
         return items.filter(item => {
-            const itemDate = parseUAEDate(item[dateField]);
+            const itemDate = parseDateInUAE(item[dateField]);
             return itemDate >= dateRange.from && itemDate <= dateRange.to;
         });
     };
@@ -75,7 +75,7 @@ export default function RecentActivityWidget({ dateRange, company, userRole }) {
                                 <div className="flex items-center justify-between mt-1">
                                     <span className="text-xs text-slate-500">{project.company}</span>
                                     <span className="text-xs text-slate-400">
-                                        {formatDistanceToNow(parseUAEDate(project.updated_date), { addSuffix: true })}
+                                        {formatDistanceToNow(parseDateInUAE(project.updated_date), { addSuffix: true })}
                                     </span>
                                 </div>
                             </div>
@@ -98,7 +98,7 @@ export default function RecentActivityWidget({ dateRange, company, userRole }) {
                                     {report.report_name || 'Report Run'}
                                 </p>
                                 <p className="text-xs text-blue-700 mt-1">
-                                    {report.employee_count} employees • {formatInUAE(parseUAEDate(report.date_from), 'MMM dd')} - {formatInUAE(parseUAEDate(report.date_to), 'MMM dd')}
+                                    {report.employee_count} employees • {formatInUAE(parseDateInUAE(report.date_from), 'MMM dd')} - {formatInUAE(parseDateInUAE(report.date_to), 'MMM dd')}
                                 </p>
                             </div>
                         ))}
@@ -120,7 +120,7 @@ export default function RecentActivityWidget({ dateRange, company, userRole }) {
                                     {exception.type.replace(/_/g, ' ')}
                                 </p>
                                 <p className="text-xs text-amber-700 mt-1">
-                                    {formatInUAE(parseUAEDate(exception.date_from), 'MMM dd, yyyy')}
+                                    {formatInUAE(parseDateInUAE(exception.date_from), 'MMM dd, yyyy')}
                                 </p>
                             </div>
                         ))}

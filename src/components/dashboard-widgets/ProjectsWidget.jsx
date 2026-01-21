@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { FolderKanban, FolderOpen, FolderCheck, Loader2 } from 'lucide-react';
-import { parseUAEDate } from '@/components/ui/timezone';
+import { parseDateInUAE } from '@/components/ui/timezone';
 
 export default function ProjectsWidget({ dateRange, company, userRole }) {
     const { data: projects = [], isLoading } = useQuery({
@@ -17,8 +17,8 @@ export default function ProjectsWidget({ dateRange, company, userRole }) {
         if (!dateRange.from || !dateRange.to) return projects;
         
         return projects.filter(project => {
-            const projectStart = parseUAEDate(project.date_from);
-            const projectEnd = parseUAEDate(project.date_to);
+            const projectStart = parseDateInUAE(project.date_from);
+            const projectEnd = parseDateInUAE(project.date_to);
             return projectStart <= dateRange.to && projectEnd >= dateRange.from;
         });
     };
