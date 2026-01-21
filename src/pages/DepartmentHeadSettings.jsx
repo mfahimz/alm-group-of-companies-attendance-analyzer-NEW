@@ -727,16 +727,20 @@ export default function DepartmentHeadSettings() {
                                         ) : (
                                             <div className="space-y-2">
                                                 {employees
-                                                    .filter(e => e.company === editingHead.company && e.active)
-                                                    .filter(emp => {
-                                                        if (!editManagedEmployeesSearch) return true;
-                                                        const search = editManagedEmployeesSearch.toLowerCase();
-                                                        const attendanceIdStr = emp.attendance_id != null ? String(emp.attendance_id) : '';
-                                                        return emp.name.toLowerCase().includes(search) || 
-                                                               attendanceIdStr.toLowerCase().includes(search);
-                                                    })
-                                                    .map(emp => {
-                                                         const isDeptHeadForThis = emp.id === editingHead.employee_id;
+                                                     .filter(e => {
+                                                         if (e.company !== editingHead.company || !e.active) return false;
+                                                         if (e.id === editingHead.employee_id) return true;
+                                                         return !assignedDeptHeadIds.includes(e.id);
+                                                     })
+                                                     .filter(emp => {
+                                                         if (!editManagedEmployeesSearch) return true;
+                                                         const search = editManagedEmployeesSearch.toLowerCase();
+                                                         const attendanceIdStr = emp.attendance_id != null ? String(emp.attendance_id) : '';
+                                                         return emp.name.toLowerCase().includes(search) || 
+                                                                attendanceIdStr.toLowerCase().includes(search);
+                                                     })
+                                                     .map(emp => {
+                                                          const isDeptHeadForThis = emp.id === editingHead.employee_id;
                                                          const isAssignedToAnyDeptHead = managedEmployeeIds.includes(emp.id);
 
                                                          return (
