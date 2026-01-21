@@ -627,6 +627,39 @@ export default function DepartmentHeadSettings() {
             </Card>
             )}
 
+            {/* Tree View Tab */}
+            {activeTab === 'tree' && (
+                <Card className="border-0 shadow-md">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>Department Head Hierarchy</CardTitle>
+                                <p className="text-sm text-slate-600 mt-2">Visual representation of department heads and their managed employees</p>
+                            </div>
+                            <Select value={filterCompany} onValueChange={setFilterCompany}>
+                                <SelectTrigger className="w-48">
+                                    <Filter className="w-4 h-4 mr-2" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Companies</SelectItem>
+                                    {companies.map(c => (
+                                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <HierarchyTree 
+                            deptHeads={deptHeads} 
+                            employees={employees}
+                            filterCompany={filterCompany}
+                        />
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Edit Dialog */}
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
                 <DialogContent className="max-w-2xl">
