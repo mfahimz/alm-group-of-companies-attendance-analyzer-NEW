@@ -64,6 +64,9 @@ export default function SalaryTab({ project, finalReport }) {
 
     // Combine all data for each employee
     const salaryData = useMemo(() => {
+        // Only apply leave hours pay calculation for Al Maraghi Auto Repairs
+        const isAlMaraghi = project.company === 'Al Maraghi Auto Repairs';
+
         return employees.map(emp => {
             const salary = salaries.find(s => 
                 s.employee_id === emp.hrms_id || 
@@ -71,9 +74,10 @@ export default function SalaryTab({ project, finalReport }) {
             );
             const result = analysisResults.find(r => Number(r.attendance_id) === Number(emp.attendance_id));
 
-             // Leave Days in salary table = LOP days from the report
+             // Leave Pay = LOP Days × (Basic + Allowance) ÷ 30
              const leaveDays = result?.full_absence_count || 0;
-              const leavePay = (salary?.total_salary || 0) / 30 * leaveDays;
+             const totalSalaryAmount = salary?.total_salary || 0;
+             const leavePay = (totalSalaryAmount / 30) * leaveDays;
 
              // Sick leave (paid leave) - separate from LOP
              const salaryLeaveDays = result?.sick_leave_count || 0;
@@ -83,18 +87,32 @@ export default function SalaryTab({ project, finalReport }) {
              const lopDays = result?.full_absence_count || 0;
              const lopDeduction = 0; // To be calculated based on lopDays only
 
+             // Leave Hours Pay calculation (only for Al Maraghi)
+             let leaveHours = 0;
+             let leaveHoursPay = 0;
+             if (isAlMaraghi && result?.deductible_minutes !== undefined) {
+                 // Convert deductible minutes to hours (max 2 decimals)
+                 leaveHours = Math.round((result.deductible_minutes / 60) * 100) / 100;
+                 
+                 // Per-minute salary = (Basic + Allowance) ÷ (30 days × Working Hours × 60 minutes)
+                 const workingHours = salary?.working_hours || 9;
+                 const perMinuteSalary = totalSalaryAmount / (30 * workingHours * 60);
+                 
+                 // Leave Hours Pay = Leave Hours × Per-Minute Salary
+                 leaveHoursPay = leaveHours * perMinuteSalary;
+             }
+
              // Other calculations
              const otHours = 0; // To be calculated
              const otSalary = 0; // To be calculated
-             const leaveHours = 0; // To be calculated
-             const leaveHoursPay = 0; // To be calculated
              const otherDeduction = 0; // To be set manually
              const bonus = 0; // To be set manually
              const incentive = 0; // To be set manually
              const advanceSalaryDeduction = 0; // To be set manually
              const deductibleMinutesAmount = 0; // To be calculated based on deductible minutes
 
-             const totalSalary = (salary?.total_salary || 0) + leavePay + salaryLeaveAmount + otSalary + leaveHoursPay + bonus + incentive 
+             // Total = (Basic + Allowance) - (Leave Pay + Leave Hours Pay)
+             const totalSalaryAfterDeductions = totalSalaryAmount - leavePay - leaveHoursPay + leavePay + salaryLeaveAmount + otSalary + leaveHoursPay + bonus + incentive 
                                  - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
             const wpsPay = totalSalary; // WPS is typically the total
             const balance = 0; // Balance = Total - WPS Pay
