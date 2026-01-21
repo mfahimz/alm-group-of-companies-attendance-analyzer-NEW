@@ -205,6 +205,31 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isResizing) return;
+            const newWidth = e.clientX;
+            if (newWidth >= 200 && newWidth <= 400) {
+                setSidebarWidth(newWidth);
+                localStorage.setItem('sidebarWidth', newWidth.toString());
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+        };
+
+        if (isResizing) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
+
     if (isChecking) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -289,31 +314,6 @@ export default function Layout({ children, currentPageName }) {
         setIsResizing(true);
         e.preventDefault();
     };
-
-    useEffect(() => {
-        const handleMouseMove = (e) => {
-            if (!isResizing) return;
-            const newWidth = e.clientX;
-            if (newWidth >= 200 && newWidth <= 400) {
-                setSidebarWidth(newWidth);
-                localStorage.setItem('sidebarWidth', newWidth.toString());
-            }
-        };
-
-        const handleMouseUp = () => {
-            setIsResizing(false);
-        };
-
-        if (isResizing) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-        }
-
-        return () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isResizing]);
 
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
