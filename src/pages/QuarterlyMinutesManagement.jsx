@@ -217,7 +217,11 @@ export default function QuarterlyMinutesManagement() {
                 </div>
                 <Button
                     variant="outline"
-                    onClick={() => queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] })}
+                    onClick={() => {
+                        queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
+                        queryClient.invalidateQueries({ queryKey: ['employees'] });
+                        toast.success('Data refreshed');
+                    }}
                 >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Refresh
