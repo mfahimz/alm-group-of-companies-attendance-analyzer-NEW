@@ -173,7 +173,7 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                         className="bg-red-600 hover:bg-red-700"
                     >
                         <Trash2 className="w-4 h-4 mr-2" />
-                        {closeProjectMutation.isPending ? 'Closing...' : 'Yes, Close & Finalize'}
+                        {closeProjectMutation.isPending ? 'Closing...' : 'Yes, Close Project'}
                     </Button>
                 </div>
             </DialogContent>
