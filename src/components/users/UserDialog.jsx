@@ -356,7 +356,7 @@ export default function UserDialog({ open, onClose, user }) {
                                             <SelectValue placeholder="Select employee" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {employees.map((emp) => (
+                                            {employees.filter(emp => emp.company === formData.company).map((emp) => (
                                                 <SelectItem key={emp.hrms_id} value={emp.hrms_id.toString()}>
                                                     {emp.name} (ID: {emp.hrms_id})
                                                 </SelectItem>
