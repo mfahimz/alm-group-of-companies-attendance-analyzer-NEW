@@ -84,9 +84,9 @@ Deno.serve(async (req) => {
         console.log(`Found ${duplicates.length} duplicate groups`);
         console.log(`Will delete ${toDelete.length} duplicate records`);
 
-        // Delete duplicates in batches
+        // Delete duplicates in smaller batches with longer delays
         if (toDelete.length > 0) {
-            const batchSize = 10;
+            const batchSize = 5;
             let deleted = 0;
             
             for (let i = 0; i < toDelete.length; i += batchSize) {
@@ -97,9 +97,9 @@ Deno.serve(async (req) => {
                 await Promise.all(deletePromises);
                 deleted += batch.length;
                 
-                // Small delay between batches
+                // Longer delay between batches to avoid rate limits
                 if (i + batchSize < toDelete.length) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
             
