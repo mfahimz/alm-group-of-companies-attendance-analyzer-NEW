@@ -19,6 +19,8 @@ export default function QuarterlyMinutesManagement() {
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [yearFilter, setYearFilter] = useState('all');
     const [quarterFilter, setQuarterFilter] = useState('all');
+    const [allocationTypeFilter, setAllocationTypeFilter] = useState('all');
+    const [projectFilter, setProjectFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_name', direction: 'asc' });
     const [editingValues, setEditingValues] = useState({});
 
@@ -38,15 +40,28 @@ export default function QuarterlyMinutesManagement() {
 
     const { data: quarterlyMinutes = [], isLoading: minutesLoading } = useQuery({
         queryKey: ['quarterlyMinutes'],
-        queryFn: () => base44.entities.EmployeeQuarterlyMinutes.filter({
-            company: 'Al Maraghi Auto Repairs'
-        })
+        queryFn: () => base44.entities.EmployeeQuarterlyMinutes.list()
+    });
+
+    const { data: projects = [] } = useQuery({
+        queryKey: ['projects'],
+        queryFn: () => base44.entities.Project.list()
     });
 
     const { data: companies = [] } = useQuery({
         queryKey: ['companies'],
         queryFn: () => base44.entities.CompanySettings.list()
     });
+
+    // Combine quarterly minutes with project names
+    const enrichedMinutes = useMemo(() => {
+        return quarterlyMinutes.map(qm => ({
+            ...qm,
+            project_name: qm.project_id 
+                ? projects.find(p => p.id === qm.project_id)?.name || 'Unknown Project'
+                : null
+        }));
+    }, [quarterlyMinutes, projects]);
 
     const updateMinutesMutation = useMutation({
         mutationFn: async ({ recordId, updates }) => {
@@ -75,7 +90,7 @@ export default function QuarterlyMinutesManagement() {
 
     // Combine employee and quarterly minutes data
     const combinedData = useMemo(() => {
-        return quarterlyMinutes.map(qm => {
+        return enrichedMinutes.map(qm => {
             const employee = employees.find(e => 
                 String(e.hrms_id) === String(qm.employee_id) || 
                 String(e.id) === String(qm.employee_id)
@@ -87,10 +102,11 @@ export default function QuarterlyMinutesManagement() {
                 employee_name: employee?.name || 'Unknown',
                 employee_attendance_id: employee?.attendance_id || '-',
                 employee_company: employee?.company || qm.company,
-                employee_department: employee?.department || '-'
+                employee_department: employee?.department || '-',
+                project_name: qm.project_name
             };
         });
-    }, [quarterlyMinutes, employees]);
+    }, [enrichedMinutes, employees]);
 
     // Filter and sort data
     const filteredAndSortedData = useMemo(() => {
@@ -104,11 +120,13 @@ export default function QuarterlyMinutesManagement() {
             const matchesDepartment = departmentFilter === 'all' || item.employee_department === departmentFilter;
             const matchesYear = yearFilter === 'all' || String(item.year) === yearFilter;
             const matchesQuarter = quarterFilter === 'all' || String(item.quarter) === quarterFilter;
+            const matchesAllocationType = allocationTypeFilter === 'all' || item.allocation_type === allocationTypeFilter;
+            const matchesProject = projectFilter === 'all' || item.project_id === projectFilter;
 
             // User role filtering
             const matchesRole = isAdminOrCEO || item.employee_company === userCompany;
 
-            return matchesSearch && matchesCompany && matchesDepartment && matchesYear && matchesQuarter && matchesRole;
+            return matchesSearch && matchesCompany && matchesDepartment && matchesYear && matchesQuarter && matchesAllocationType && matchesProject && matchesRole;
         });
 
         // Sort
@@ -127,7 +145,7 @@ export default function QuarterlyMinutesManagement() {
         });
 
         return filtered;
-    }, [combinedData, searchQuery, companyFilter, departmentFilter, yearFilter, quarterFilter, sortConfig, isAdminOrCEO, userCompany]);
+    }, [combinedData, searchQuery, companyFilter, departmentFilter, yearFilter, quarterFilter, allocationTypeFilter, projectFilter, sortConfig, isAdminOrCEO, userCompany]);
 
     const handleSort = (key) => {
         setSortConfig(prev => ({
@@ -175,6 +193,10 @@ export default function QuarterlyMinutesManagement() {
     const availableDepartments = [...new Set(combinedData.map(d => d.employee_department))].filter(Boolean);
     const availableYears = [...new Set(combinedData.map(d => d.year))].filter(Boolean).sort((a, b) => b - a);
     const availableQuarters = [...new Set(combinedData.map(d => d.quarter))].filter(Boolean).sort();
+    const availableAllocationTypes = [...new Set(combinedData.map(d => d.allocation_type))].filter(Boolean);
+    const availableProjects = projects.filter(p => 
+        combinedData.some(d => d.project_id === p.id)
+    );
 
     if (employeesLoading || minutesLoading) {
         return (
@@ -205,7 +227,7 @@ export default function QuarterlyMinutesManagement() {
             {/* Filters */}
             <Card>
                 <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <Input
@@ -265,6 +287,31 @@ export default function QuarterlyMinutesManagement() {
                                 ))}
                             </SelectContent>
                         </Select>
+
+                        <Select value={allocationTypeFilter} onValueChange={setAllocationTypeFilter}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                <SelectItem value="calendar_quarter">Calendar Quarter</SelectItem>
+                                <SelectItem value="project_period">Project Period</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {allocationTypeFilter === 'project_period' && (
+                            <Select value={projectFilter} onValueChange={setProjectFilter}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All Projects" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Projects</SelectItem>
+                                    {availableProjects.map(project => (
+                                        <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -362,14 +409,20 @@ export default function QuarterlyMinutesManagement() {
                                         currentSort={sortConfig}
                                         onSort={handleSort}
                                     />
-                                    <TableHead>Type</TableHead>
+                                    <SortableTableHead
+                                        label="Type"
+                                        sortKey="allocation_type"
+                                        currentSort={sortConfig}
+                                        onSort={handleSort}
+                                    />
+                                    <TableHead>Project</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredAndSortedData.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={isAdminOrCEO ? 12 : 11} className="text-center py-8 text-slate-500">
+                                        <TableCell colSpan={isAdminOrCEO ? 13 : 12} className="text-center py-8 text-slate-500">
                                             No quarterly minutes records found
                                         </TableCell>
                                     </TableRow>
@@ -436,8 +489,17 @@ export default function QuarterlyMinutesManagement() {
                                                         {remainingMinutes}
                                                     </span>
                                                 </TableCell>
-                                                <TableCell className="text-xs text-slate-500">
-                                                    {record.allocation_type}
+                                                <TableCell>
+                                                    <span className={`text-xs px-2 py-1 rounded ${
+                                                        record.allocation_type === 'calendar_quarter' 
+                                                            ? 'bg-blue-100 text-blue-700' 
+                                                            : 'bg-purple-100 text-purple-700'
+                                                    }`}>
+                                                        {record.allocation_type === 'calendar_quarter' ? 'Calendar' : 'Project'}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-xs text-slate-600">
+                                                    {record.project_name || '-'}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {isEditing ? (

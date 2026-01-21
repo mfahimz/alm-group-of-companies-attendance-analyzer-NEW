@@ -1,5 +1,6 @@
 import BusinessDocumentation from './pages/BusinessDocumentation';
 import CandidateScreening from './pages/CandidateScreening';
+import CompanyDashboard from './pages/CompanyDashboard';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
@@ -24,13 +25,13 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import CompanyDashboard from './pages/CompanyDashboard';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "BusinessDocumentation": BusinessDocumentation,
     "CandidateScreening": CandidateScreening,
+    "CompanyDashboard": CompanyDashboard,
     "Dashboard": Dashboard,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
@@ -55,7 +56,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "CompanyDashboard": CompanyDashboard,
 }
 
 export const pagesConfig = {
