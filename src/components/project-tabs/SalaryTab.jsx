@@ -61,6 +61,8 @@ export default function SalaryTab({ project, finalReport }) {
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [sortBy, setSortBy] = useState('department');
     const [salaryUnlocked, setSalaryUnlocked] = useState(false);
+    const [isCalculating, setIsCalculating] = useState(false);
+    const [calculatedData, setCalculatedData] = useState(null);
 
     // Combine all data for each employee
     const salaryData = useMemo(() => {
