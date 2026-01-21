@@ -13,11 +13,9 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog.jsx';
 import AllowedMinutesHistory from '@/components/departmenthead/AllowedMinutesHistory.jsx';
-import AddExceptionDialog from '@/components/departmenthead/AddExceptionDialog.jsx';
 
 export default function DepartmentHeadDashboard() {
     const [showPreApprovalDialog, setShowPreApprovalDialog] = useState(false);
-    const [showAddExceptionDialog, setShowAddExceptionDialog] = useState(false);
     const [viewingPreviousReport, setViewingPreviousReport] = useState(false);
 
     const queryClient = useQueryClient();
@@ -542,16 +540,9 @@ export default function DepartmentHeadDashboard() {
                 </Card>
             )}
 
-            {/* Action Buttons - only shown before salary is closed */}
+            {/* Pre-Approval Dialog Trigger - only shown before salary is closed */}
             {currentProject && !salaryIsClosed && !approvalPeriodEnded && (
-                <div className="flex justify-end gap-2">
-                    <Button 
-                        onClick={() => setShowAddExceptionDialog(true)}
-                        className="bg-amber-600 hover:bg-amber-700 gap-2"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Exception (Test)
-                    </Button>
+                <div className="flex justify-end">
                     <Button 
                         onClick={() => setShowPreApprovalDialog(true)}
                         className="bg-indigo-600 hover:bg-indigo-700 gap-2"
@@ -561,18 +552,6 @@ export default function DepartmentHeadDashboard() {
                     </Button>
                 </div>
             )}
-
-            {/* Add Exception Dialog (Test) */}
-            <AddExceptionDialog 
-                open={showAddExceptionDialog}
-                onClose={() => setShowAddExceptionDialog(false)}
-                employees={employees}
-                projectId={currentProject?.id}
-                deptHeadAssignment={deptHeadAssignment}
-                onSuccess={() => {
-                    queryClient.invalidateQueries(['exceptions']);
-                }}
-            />
 
             {/* Pre-Approval Dialog */}
             <PreApprovalDialog 
