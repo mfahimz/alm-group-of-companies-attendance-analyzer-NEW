@@ -205,6 +205,16 @@ export default function DepartmentHeadSettings() {
     };
 
     const toggleManagedEmployee = (employeeId) => {
+        // Check if trying to select someone who is already a dept head
+        const isAlreadyDeptHead = assignedDeptHeadIds.includes(employeeId);
+        
+        if (isAlreadyDeptHead && !selectedManagedEmployees.includes(employeeId)) {
+            const emp = employees.find(e => e.id === employeeId);
+            const deptHeadAssignment = deptHeads.find(dh => dh.active && dh.employee_id === employeeId);
+            toast.error(`${emp?.name || 'Employee'} is already assigned as department head for ${deptHeadAssignment?.department || 'another department'} in ${deptHeadAssignment?.company || 'another company'}`);
+            return;
+        }
+
         setSelectedManagedEmployees(prev => 
             prev.includes(employeeId) 
                 ? prev.filter(id => id !== employeeId)
@@ -401,21 +411,32 @@ export default function DepartmentHeadSettings() {
                                                         return emp.name.toLowerCase().includes(search) || 
                                                                attendanceIdStr.toLowerCase().includes(search);
                                                     })
-                                                    .map(emp => (
-                                                        <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedManagedEmployees.includes(emp.id)}
-                                                                onChange={() => toggleManagedEmployee(emp.id)}
-                                                                disabled={emp.id === selectedEmployee}
-                                                                className="rounded border-slate-300"
-                                                            />
-                                                            <span className={`text-sm ${emp.id === selectedEmployee ? 'text-slate-400' : ''}`}>
-                                                                {emp.name} ({emp.attendance_id})
-                                                                {emp.id === selectedEmployee && ' (Department Head)'}
-                                                            </span>
-                                                        </label>
-                                                    ))}
+                                                    .map(emp => {
+                                                        const isAlreadyDeptHead = assignedDeptHeadIds.includes(emp.id);
+                                                        const isDeptHeadForThis = emp.id === selectedEmployee;
+                                                        const isNotAssignedAnywhere = !isAlreadyDeptHead && !isDeptHeadForThis;
+
+                                                        return (
+                                                            <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedManagedEmployees.includes(emp.id)}
+                                                                    onChange={() => toggleManagedEmployee(emp.id)}
+                                                                    disabled={isDeptHeadForThis}
+                                                                    className="rounded border-slate-300"
+                                                                />
+                                                                <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
+                                                                    {emp.name} ({emp.attendance_id})
+                                                                    {isDeptHeadForThis && ' (Department Head)'}
+                                                                </span>
+                                                                {isNotAssignedAnywhere && (
+                                                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                                                        Not Assigned
+                                                                    </span>
+                                                                )}
+                                                            </label>
+                                                        );
+                                                    })}
                                             </div>
                                         )}
                                     </div>
@@ -647,21 +668,32 @@ export default function DepartmentHeadSettings() {
                                                         return emp.name.toLowerCase().includes(search) || 
                                                                attendanceIdStr.toLowerCase().includes(search);
                                                     })
-                                                    .map(emp => (
-                                                        <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedManagedEmployees.includes(emp.id)}
-                                                                onChange={() => toggleManagedEmployee(emp.id)}
-                                                                disabled={emp.id === editingHead.employee_id}
-                                                                className="rounded border-slate-300"
-                                                            />
-                                                            <span className={`text-sm ${emp.id === editingHead.employee_id ? 'text-slate-400' : ''}`}>
-                                                                {emp.name} ({emp.attendance_id})
-                                                                {emp.id === editingHead.employee_id && ' (Department Head)'}
-                                                            </span>
-                                                        </label>
-                                                    ))}
+                                                    .map(emp => {
+                                                        const isAlreadyDeptHead = assignedDeptHeadIds.includes(emp.id) && emp.id !== editingHead.employee_id;
+                                                        const isDeptHeadForThis = emp.id === editingHead.employee_id;
+                                                        const isNotAssignedAnywhere = !assignedDeptHeadIds.includes(emp.id);
+
+                                                        return (
+                                                            <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedManagedEmployees.includes(emp.id)}
+                                                                    onChange={() => toggleManagedEmployee(emp.id)}
+                                                                    disabled={isDeptHeadForThis}
+                                                                    className="rounded border-slate-300"
+                                                                />
+                                                                <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
+                                                                    {emp.name} ({emp.attendance_id})
+                                                                    {isDeptHeadForThis && ' (Department Head)'}
+                                                                </span>
+                                                                {isNotAssignedAnywhere && (
+                                                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                                                        Not Assigned
+                                                                    </span>
+                                                                )}
+                                                            </label>
+                                                        );
+                                                    })}
                                             </div>
                                         )}
                                     </div>
