@@ -656,7 +656,7 @@ Deno.serve(async (req) => {
             const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
             
             // Calculate deductible_minutes for salary (for Al Maraghi Auto Repairs)
-            const deductible_minutes = late_minutes + early_checkout_minutes + other_minutes - (approvedMinutesForDay || 0);
+            const deductible_minutes = late_minutes + early_checkout_minutes + other_minutes - total_approved_minutes;
 
             return {
                 attendance_id,
@@ -669,7 +669,7 @@ Deno.serve(async (req) => {
                 late_minutes,
                 early_checkout_minutes,
                 other_minutes,
-                approved_minutes: approvedMinutesForDay || 0,
+                approved_minutes: total_approved_minutes,
                 deductible_minutes: Math.max(0, deductible_minutes),
                 grace_minutes: baseGrace + carriedGrace,
                 abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
