@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, Users, Search, Filter, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, Users, Search, Filter, CheckCircle, TreePine } from 'lucide-react';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
+import HierarchyTree from '../components/departmenthead/HierarchyTree';
 
 export default function DepartmentHeadSettings() {
     const [selectedCompany, setSelectedCompany] = useState('');
@@ -25,6 +26,7 @@ export default function DepartmentHeadSettings() {
     const [filterDepartment, setFilterDepartment] = useState('all');
     const [managedEmployeesSearch, setManagedEmployeesSearch] = useState('');
     const [editManagedEmployeesSearch, setEditManagedEmployeesSearch] = useState('');
+    const [activeTab, setActiveTab] = useState('manage');
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -256,7 +258,33 @@ export default function DepartmentHeadSettings() {
                 <p className="text-slate-600 mt-2">Manage department heads, their teams, and approval workflows</p>
             </div>
 
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-slate-200 -mx-4 px-4">
+                <button
+                    onClick={() => setActiveTab('manage')}
+                    className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                        activeTab === 'manage'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                    Manage
+                </button>
+                <button
+                    onClick={() => setActiveTab('tree')}
+                    className={`px-4 py-3 font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                        activeTab === 'tree'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                    <TreePine className="w-4 h-4" />
+                    Hierarchy Tree
+                </button>
+            </div>
+
             {/* Statistics Cards */}
+            {activeTab === 'manage' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="border-0 shadow-sm">
                     <CardContent className="p-4">
@@ -597,6 +625,7 @@ export default function DepartmentHeadSettings() {
                     )}
                 </CardContent>
             </Card>
+            )}
 
             {/* Edit Dialog */}
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
