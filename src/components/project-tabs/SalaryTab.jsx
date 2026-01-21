@@ -326,9 +326,19 @@ export default function SalaryTab({ project, finalReport }) {
                         </div>
                     ) : (
                         <>
-                            {showEmptySalaryTab && (
+                            {!finalReport && (
                                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-                                    <strong>⚠️ No Final Report:</strong> The table below shows the structure only. All salary values will be zero until a report is marked as final.
+                                    <strong>⚠️ No Final Report:</strong> Finalize the report first, then click "Calculate Salary" to populate salary calculations.
+                                </div>
+                            )}
+                            {finalReport && !calculatedData && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                                    <strong>ℹ️ Ready to Calculate:</strong> Click "Calculate Salary" button to fetch finalized report data and calculate salaries.
+                                </div>
+                            )}
+                            {calculatedData && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
+                                    <strong>✓ Calculated:</strong> Salary data has been calculated from the finalized report. Edit values as needed and click "Save Changes" to persist.
                                 </div>
                             )}
                             
