@@ -90,12 +90,20 @@ Deno.serve(async (req) => {
             });
         });
 
-        // DELETE mismatched records
+        // DELETE mismatched records in batches to avoid rate limits
         if (mismatches.length > 0) {
-            const deletePromises = mismatches.map(m => 
-                base44.asServiceRole.entities.EmployeeQuarterlyMinutes.delete(m.id)
-            );
-            await Promise.all(deletePromises);
+            const batchSize = 10;
+            for (let i = 0; i < mismatches.length; i += batchSize) {
+                const batch = mismatches.slice(i, i + batchSize);
+                const deletePromises = batch.map(m => 
+                    base44.asServiceRole.entities.EmployeeQuarterlyMinutes.delete(m.id)
+                );
+                await Promise.all(deletePromises);
+                // Small delay between batches
+                if (i + batchSize < mismatches.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
         }
 
         return Response.json({
