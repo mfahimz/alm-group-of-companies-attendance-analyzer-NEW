@@ -82,11 +82,11 @@ export default function Layout({ children, currentPageName }) {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isDepartmentHead = userRole === 'department_head';
 
-    React.useEffect(() => {
-        if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
-            window.location.replace('/DepartmentHeadDashboard');
-        }
-    }, [currentUser, isDepartmentHead, currentPageName]);
+    // Redirect department heads away from Dashboard before anything renders
+    if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
+        window.location.replace(createPageUrl('DepartmentHeadDashboard'));
+        return null;
+    }
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
@@ -327,7 +327,7 @@ export default function Layout({ children, currentPageName }) {
             >
                 {/* Logo */}
                 <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                    <Link to={createPageUrl('Dashboard')} className={`flex items-center gap-3 ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
+                    <Link to={createPageUrl(isDepartmentHead ? 'DepartmentHeadDashboard' : 'Dashboard')} className={`flex items-center gap-3 ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
                         <BarChart3 className="w-8 h-8 text-indigo-600 flex-shrink-0" />
                         {!sidebarCollapsed && <span className="font-bold text-lg text-slate-900">ALM Attendance</span>}
                     </Link>
