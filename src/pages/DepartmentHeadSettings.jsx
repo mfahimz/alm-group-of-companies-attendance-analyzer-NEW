@@ -413,7 +413,6 @@ export default function DepartmentHeadSettings() {
                                                     })
                                                     .map(emp => {
                                                          const isDeptHeadForThis = emp.id === selectedEmployee;
-                                                         const isAssignedAsHead = assignedDeptHeadIds.includes(emp.id);
 
                                                          return (
                                                              <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -427,11 +426,9 @@ export default function DepartmentHeadSettings() {
                                                                  <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
                                                                      {emp.name} ({emp.attendance_id})
                                                                  </span>
-                                                                 {!isAssignedAsHead && !isDeptHeadForThis && (
-                                                                     <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                                                         Not Assigned
-                                                                     </span>
-                                                                 )}
+                                                                 <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                                                     Not Assigned
+                                                                 </span>
                                                              </label>
                                                          );
                                                      })}
@@ -668,7 +665,7 @@ export default function DepartmentHeadSettings() {
                                                     })
                                                     .map(emp => {
                                                          const isDeptHeadForThis = emp.id === editingHead.employee_id;
-                                                         const isAssignedAsHead = assignedDeptHeadIds.includes(emp.id);
+                                                         const isAssignedElsewhere = assignedDeptHeadIds.includes(emp.id) && emp.id !== editingHead.employee_id;
 
                                                          return (
                                                              <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
@@ -682,7 +679,7 @@ export default function DepartmentHeadSettings() {
                                                                  <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
                                                                      {emp.name} ({emp.attendance_id})
                                                                  </span>
-                                                                 {!isAssignedAsHead && !isDeptHeadForThis && (
+                                                                 {!isAssignedElsewhere && !isDeptHeadForThis && (
                                                                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
                                                                          Not Assigned
                                                                      </span>
