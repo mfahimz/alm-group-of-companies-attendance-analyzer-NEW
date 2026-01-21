@@ -298,6 +298,7 @@ Deno.serve(async (req) => {
             let late_minutes = 0;
             let early_checkout_minutes = 0;
             let other_minutes = 0;
+            let total_approved_minutes = 0;
             const abnormal_dates_list = [];
             const critical_abnormal_dates = [];
             const auto_resolutions = [];
