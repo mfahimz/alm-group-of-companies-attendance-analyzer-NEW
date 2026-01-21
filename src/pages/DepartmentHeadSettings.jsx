@@ -88,6 +88,28 @@ export default function DepartmentHeadSettings() {
                 throw new Error('Please select company, department, and employee');
             }
 
+            // Check if this employee is already assigned as a department head anywhere
+            const existingAssignment = deptHeads.find(dh => 
+                dh.active && 
+                dh.employee_id === selectedEmployee
+            );
+            
+            if (existingAssignment) {
+                const empName = getDeptHeadName(selectedEmployee);
+                throw new Error(`${empName} is already assigned as department head for ${existingAssignment.department} in ${existingAssignment.company}`);
+            }
+
+            // Check if this company+department combination already has a department head
+            const duplicateDept = deptHeads.find(dh => 
+                dh.active && 
+                dh.company === selectedCompany && 
+                dh.department === selectedDepartment
+            );
+            
+            if (duplicateDept) {
+                throw new Error(`${selectedDepartment} in ${selectedCompany} already has a department head: ${getDeptHeadName(duplicateDept.employee_id)}`);
+            }
+
             await base44.entities.DepartmentHead.create({
                 company: selectedCompany,
                 department: selectedDepartment,
