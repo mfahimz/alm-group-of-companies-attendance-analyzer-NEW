@@ -61,7 +61,19 @@ export default function DepartmentHeadSettings() {
         return ['Admin', ...setting.departments.split(',').map(d => d.trim()).filter(Boolean)];
     }, [selectedCompany, companySettings]);
 
-    const availableEmployees = employees.filter(e => e.company === selectedCompany && e.active);
+    // Get all employee IDs that are already assigned as department heads
+    const assignedDeptHeadIds = deptHeads
+        .filter(dh => dh.active)
+        .map(dh => dh.employee_id);
+
+    // Available employees = company match, active, and NOT already a dept head (unless editing that specific head)
+    const availableEmployees = employees.filter(e => {
+        if (e.company !== selectedCompany || !e.active) return false;
+        // If editing, allow the current dept head employee to remain in list
+        if (editingHead && e.id === editingHead.employee_id) return true;
+        // Otherwise, exclude employees who are already dept heads
+        return !assignedDeptHeadIds.includes(e.id);
+    });
 
     // Get department heads that can be reported to (exclude self if editing)
     const availableReportsTo = deptHeads.filter(dh => 
@@ -314,11 +326,20 @@ export default function DepartmentHeadSettings() {
                                     <SelectValue placeholder="Select employee" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {availableEmployees.map(e => (
-                                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                                    ))}
+                                    {availableEmployees.length === 0 ? (
+                                        <div className="p-2 text-sm text-slate-500">
+                                            No available employees (all assigned as dept heads)
+                                        </div>
+                                    ) : (
+                                        availableEmployees.map(e => (
+                                            <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                                        ))
+                                    )}
                                 </SelectContent>
                             </Select>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Only employees not assigned as department heads are shown
+                            </p>
                         </div>
                     </div>
 
