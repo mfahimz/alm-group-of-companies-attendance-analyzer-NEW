@@ -117,12 +117,14 @@ export default function PreApprovalDialog({
             return;
         }
 
-        // Check cutoff date (project end date - 1 day)
-        const cutoffDate = addDays(parseISO(currentProject.date_to), -1);
-        if (isAfter(new Date(), cutoffDate)) {
-            toast.error('Approval period has ended. Cannot add new approvals.');
-            return;
-        }
+        // ========== TEST MODE: Disable date limit check ==========
+        // TODO: REVERT THIS AFTER TESTING - Re-enable cutoff date validation
+        // const cutoffDate = addDays(parseISO(currentProject.date_to), -1);
+        // if (isAfter(new Date(), cutoffDate)) {
+        //     toast.error('Approval period has ended. Cannot add new approvals.');
+        //     return;
+        // }
+        // ========== END TEST MODE ==========
 
         createMutation.mutate({
             ...formData,
