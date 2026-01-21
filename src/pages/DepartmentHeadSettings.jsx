@@ -490,19 +490,9 @@ export default function DepartmentHeadSettings() {
                                                 {getDeptHeadName(dh.employee_id)}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Users className="w-4 h-4 text-slate-400" />
-                                                        <span className="text-sm font-medium">{managedCount}</span>
-                                                    </div>
-                                                    {managedCount > 0 && (
-                                                        <div className="text-xs text-slate-500">
-                                                            {dh.managed_employee_ids.split(',').filter(Boolean).map(empId => {
-                                                                const emp = employees.find(e => e.id === empId);
-                                                                return emp?.name || 'Unknown';
-                                                            }).join(', ')}
-                                                        </div>
-                                                    )}
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="w-4 h-4 text-slate-400" />
+                                                    <span className="text-sm font-medium">{managedCount}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-sm text-slate-600">
