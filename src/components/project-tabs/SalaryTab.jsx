@@ -64,6 +64,17 @@ export default function SalaryTab({ project, finalReport }) {
     const [salaryUnlocked, setSalaryUnlocked] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
     const [calculatedData, setCalculatedData] = useState(null);
+    
+    // Advanced search and filter state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [advancedFilters, setAdvancedFilters] = useState({
+        salaryMin: '',
+        salaryMax: '',
+        leaveDaysMin: '',
+        leaveDaysMax: '',
+        deductionMin: '',
+        deductionMax: ''
+    });
 
     // Combine all data for each employee
     const salaryData = useMemo(() => {
