@@ -369,8 +369,9 @@ export default function SalaryTab({ project, finalReport }) {
                 throw new Error(response.data.error || 'Failed to calculate salaries');
             }
 
+            // Set calculated data but preserve any existing edits
             setCalculatedData(response.data.data);
-            setEditableData({});
+            // Keep editableData intact so user edits are preserved
             toast.success('Salaries calculated successfully');
         } catch (error) {
             toast.error('Failed to calculate salaries: ' + error.message);
