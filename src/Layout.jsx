@@ -83,9 +83,13 @@ export default function Layout({ children, currentPageName }) {
     const isDepartmentHead = userRole === 'department_head';
     const isHRManager = userRole === 'hr_manager';
 
-    // Redirect department heads away from Dashboard before anything renders
+    // Redirect department heads and HR managers away from Dashboard before anything renders
     if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
         window.location.replace(createPageUrl('DepartmentHeadDashboard'));
+        return null;
+    }
+    if (currentUser && isHRManager && currentPageName === 'Dashboard') {
+        window.location.replace(createPageUrl('HRManagerDashboard'));
         return null;
     }
 
