@@ -49,13 +49,40 @@ Deno.serve(async (req) => {
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || 9;
 
-            // Leave Pay = LOP Days × (Total Salary ÷ 30)
-            const leaveDays = result?.full_absence_count || 0;
+            // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
+            const annualLeaveDays = result?.annual_leave_count || 0;
+            const lopDays = result?.full_absence_count || 0;
+            const leaveDays = annualLeaveDays + lopDays;
+            
+            // Leave Pay = (Total Salary / 30) × Leave Days
             const leavePay = leaveDays > 0 ? (totalSalaryAmount / 30) * leaveDays : 0;
+
+            // Salary Leave Days = Annual Leave Days (from exceptions ANNUAL_LEAVE type)
+            const salaryLeaveDays = annualLeaveDays;
+            
+            // Salary Leave Amount calculation based on working hours
+            let salaryLeaveAmount = 0;
+            if (salaryLeaveDays > 0) {
+                if (workingHours === 8) {
+                    // 8-hour employees: (Total Salary / 30) × Salary Leave Days
+                    salaryLeaveAmount = (totalSalaryAmount / 30) * salaryLeaveDays;
+                } else if (workingHours === 9) {
+                    // 9-hour employees: ((Total Salary × 0.8767) / 30) × Salary Leave Days
+                    // 0.8767 = 1 - 0.1233
+                    const adjustedSalary = totalSalaryAmount * 0.8767;
+                    salaryLeaveAmount = (adjustedSalary / 30) * salaryLeaveDays;
+                }
+            }
+
+            // Net Deduction = Leave Pay - Salary Leave Amount
+            const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
             // Deductible Hours = deductible_minutes ÷ 60
             const deductibleMinutes = result?.deductible_minutes || 0;
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+
+            // Final Total = Total Salary - Net Deduction
+            const finalTotal = totalSalaryAmount - netDeduction;
 
             return {
                 attendance_id: emp.attendance_id,
@@ -83,8 +110,8 @@ Deno.serve(async (req) => {
                 // Calculated salary fields
                 leaveDays,
                 leavePay: Math.round(leavePay * 100) / 100,
-                salaryLeaveDays: 0,
-                salaryLeaveAmount: 0,
+                salaryLeaveDays,
+                salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
                 otHours: 0,
                 otSalary: 0,
                 deductibleHours,
@@ -94,11 +121,11 @@ Deno.serve(async (req) => {
                 incentive: 0,
                 advanceSalaryDeduction: 0,
                 lopDeduction: 0,
-                lopDays: leaveDays,
                 deductibleMinutesAmount: 0,
+                netDeduction: Math.round(netDeduction * 100) / 100,
                 // Total calculation
-                total: totalSalaryAmount - leavePay,
-                wpsPay: totalSalaryAmount - leavePay,
+                total: Math.round(finalTotal * 100) / 100,
+                wpsPay: Math.round(finalTotal * 100) / 100,
                 balance: 0
             };
         });
