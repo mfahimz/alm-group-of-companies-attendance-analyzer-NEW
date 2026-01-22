@@ -264,7 +264,7 @@ export default function Layout({ children, currentPageName }) {
         return null;
     }
 
-    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head')) {
+    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'hr_manager')) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-slate-600 text-center">
