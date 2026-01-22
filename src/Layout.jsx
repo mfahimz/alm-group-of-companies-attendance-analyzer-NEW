@@ -170,24 +170,25 @@ export default function Layout({ children, currentPageName }) {
         ];
 
         if (isAdmin) {
-            menu.push({
-                title: 'Recruitment',
-                icon: <Briefcase className="w-5 h-5" />,
-                items: [
-                    { title: 'Recruitment Hub', url: 'Recruitment', icon: <Users className="w-5 h-5" /> },
-                    { title: 'Job Positions', url: 'JobPositions', icon: <Briefcase className="w-5 h-5" /> },
-                    { title: 'Candidate Screening', url: 'CandidateScreening', icon: <FileSpreadsheet className="w-5 h-5" /> }
-                ]
-            });
-        }
+                menu.push({
+                    title: 'Recruitment',
+                    icon: <Briefcase className="w-5 h-5" />,
+                    items: [
+                        { title: 'Recruitment Hub', url: 'Recruitment', icon: <Users className="w-5 h-5" /> },
+                        { title: 'Job Positions', url: 'JobPositions', icon: <Briefcase className="w-5 h-5" /> },
+                        { title: 'Candidate Screening', url: 'CandidateScreening', icon: <FileSpreadsheet className="w-5 h-5" /> }
+                    ]
+                });
+            }
 
-        if (isAdmin || isCEO) {
-            menu.push({
-                title: 'Settings',
-                icon: <Settings className="w-5 h-5" />,
-                items: [
-                    { title: 'Users & Permissions', url: 'Users', icon: <Shield className="w-5 h-5" /> },
-                    { title: 'Department Heads', url: 'DepartmentHeadSettings', icon: <Users className="w-5 h-5" /> },
+            if (isAdmin || isCEO) {
+                menu.push({
+                    title: 'Settings',
+                    icon: <Settings className="w-5 h-5" />,
+                    items: [
+                        { title: 'Users & Permissions', url: 'Users', icon: <Shield className="w-5 h-5" /> },
+                        { title: 'Department Heads', url: 'DepartmentHeadSettings', icon: <Users className="w-5 h-5" /> },
+                        { title: 'HR Managers', url: 'HRManagerSettings', icon: <Users className="w-5 h-5" /> },
                     { title: 'Rules Settings', url: 'RulesSettings', icon: <Settings className="w-5 h-5" /> },
                     { title: 'Ramadan Schedules', url: 'RamadanSchedules', icon: <Calendar className="w-5 h-5" /> },
                     { title: 'Maintenance Mode', url: 'MaintenanceSettings', icon: <Settings className="w-5 h-5" /> },
