@@ -423,8 +423,8 @@ export default function SalaryTab({ project, finalReport }) {
                                     <TableHead className="whitespace-nowrap bg-green-50">Salary Leave Amount</TableHead>
                                     <TableHead className="whitespace-nowrap bg-blue-50">OT Hours</TableHead>
                                     <TableHead className="whitespace-nowrap bg-blue-50">OT Salary</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-purple-50">Leave Hours</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-purple-50">Leave Hours Pay</TableHead>
+                                    <TableHead className="whitespace-nowrap bg-purple-50">Deductible Hours</TableHead>
+                                    <TableHead className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</TableHead>
                                     <TableHead className="whitespace-nowrap bg-red-50">Other Deduction</TableHead>
                                     <TableHead className="whitespace-nowrap bg-green-50">Bonus</TableHead>
                                     <TableHead className="whitespace-nowrap bg-green-50">Incentive</TableHead>
