@@ -207,7 +207,6 @@ export default function SalaryTab({ project, finalReport }) {
         const leavePay = getValue(row, 'leavePay');
         const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount');
         const otSalary = getValue(row, 'otSalary');
-        const leaveHoursPay = getValue(row, 'leaveHoursPay');
         const bonus = getValue(row, 'bonus');
         const incentive = getValue(row, 'incentive');
         const otherDeduction = getValue(row, 'otherDeduction');
@@ -215,7 +214,7 @@ export default function SalaryTab({ project, finalReport }) {
         const lopDeduction = getValue(row, 'lopDeduction');
         const deductibleMinutesAmount = getValue(row, 'deductibleMinutesAmount');
 
-        const total = row.total_salary + leavePay + salaryLeaveAmount + otSalary + leaveHoursPay + bonus + incentive
+        const total = row.total_salary + leavePay + salaryLeaveAmount + otSalary + bonus + incentive
                       - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
         const wpsPay = total;
         const balance = 0;
