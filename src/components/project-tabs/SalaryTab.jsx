@@ -740,14 +740,8 @@ export default function SalaryTab({ project, finalReport }) {
                                                     className="h-8 text-xs"
                                                 />
                                              </TableCell>
-                                             <TableCell className="bg-amber-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getValue(row, 'leavePay').toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
+                                             <TableCell className="bg-amber-100 p-2 text-sm font-medium text-slate-700">
+                                                {getValue(row, 'leavePay').toFixed(2)}
                                              </TableCell>
                                              <TableCell className="bg-green-50 p-1">
                                                 <Input
