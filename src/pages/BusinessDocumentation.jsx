@@ -205,9 +205,16 @@ export default function BusinessDocumentation() {
                         Based on attendance results, the system calculates salary deductions:
                     </p>
                     <ul>
-                        <li><strong>Full Day Deductions:</strong> Each absent day deducts 1/30th of monthly salary</li>
-                        <li><strong>Half Day Deductions:</strong> Each half day deducts 1/60th of monthly salary</li>
-                        <li><strong>Minute Deductions:</strong> Late and early minutes are converted to hours and deducted from salary</li>
+                        <li><strong>Leave Days:</strong> Days without punches (Annual Leave + LOP days, NOT sick leave)</li>
+                        <li><strong>Leave Pay:</strong> (Total Salary ÷ 30) × Leave Days</li>
+                        <li><strong>Salary Leave Amount:</strong> Paid leave (Annual Leave) calculated based on working hours:
+                            <ul>
+                                <li>For 8-hour employees: (Total Salary ÷ 30) × Annual Leave Days</li>
+                                <li>For 9-hour employees: ((Total Salary × 0.8767) ÷ 30) × Annual Leave Days</li>
+                            </ul>
+                        </li>
+                        <li><strong>Net Leave Deduction:</strong> Leave Pay - Salary Leave Amount (minimum 0)</li>
+                        <li><strong>Final Salary:</strong> Total Salary - Net Leave Deduction + Other Adjustments</li>
                         <li><strong>Grace Minutes:</strong> First 15 minutes late are forgiven (configurable)</li>
                         <li><strong>Approved Minutes:</strong> Department head approvals reduce deductible minutes</li>
                     </ul>
