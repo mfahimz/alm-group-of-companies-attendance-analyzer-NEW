@@ -76,23 +76,39 @@ export default function SalaryTab({ project, finalReport }) {
             );
             const result = analysisResults.find(r => Number(r.attendance_id) === Number(emp.attendance_id));
 
-             // Leave Pay = LOP Days × (Basic + Allowance) ÷ 30
-             const leaveDays = result?.full_absence_count || 0;
-             const totalSalaryAmount = salary?.total_salary || 0;
-             const leavePay = (totalSalaryAmount / 30) * leaveDays;
+             // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
+                      const annualLeaveDays = result?.annual_leave_count || 0;
+                      const lopDays = result?.full_absence_count || 0;
+                      const leaveDays = annualLeaveDays + lopDays;
+                      const totalSalaryAmount = salary?.total_salary || 0;
+                      const workingHours = salary?.working_hours || 9;
 
-             // Sick leave (paid leave) - separate from LOP
-             const salaryLeaveDays = result?.sick_leave_count || 0;
-             const salaryLeaveAmount = 0; // To be calculated with formula
+                      // Leave Pay = (Total Salary / 30) × Leave Days
+                      const leavePay = (totalSalaryAmount / 30) * leaveDays;
 
-             // Only full_absence_count counts as LOP (Loss of Pay) - not sick leave or annual leave
-             const lopDays = result?.full_absence_count || 0;
-             const lopDeduction = 0; // To be calculated based on lopDays only
+                      // Salary Leave Days = Annual Leave Days (from exceptions)
+                      const salaryLeaveDays = annualLeaveDays;
 
-             // Deductible Hours = deductible_minutes ÷ 60
-             const deductibleMinutes = result?.deductible_minutes || 0;
-             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
-             const deductibleHoursPay = 0;
+                      // Salary Leave Amount calculation based on working hours
+                      let salaryLeaveAmount = 0;
+                      if (salaryLeaveDays > 0) {
+                          if (workingHours === 8) {
+                              // 8-hour: (Total Salary / 30) × Salary Leave Days
+                              salaryLeaveAmount = (totalSalaryAmount / 30) * salaryLeaveDays;
+                          } else if (workingHours === 9) {
+                              // 9-hour: ((Total Salary × 0.8767) / 30) × Salary Leave Days
+                              const adjustedSalary = totalSalaryAmount * 0.8767;
+                              salaryLeaveAmount = (adjustedSalary / 30) * salaryLeaveDays;
+                          }
+                      }
+
+                      // Deductible Hours = deductible_minutes ÷ 60
+                      const deductibleMinutes = result?.deductible_minutes || 0;
+                      const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+                      const deductibleHoursPay = 0;
+
+                      // Net Deduction = Leave Pay - Salary Leave Amount
+                      const lopDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
              // Other calculations
              const otHours = 0; // To be calculated
@@ -103,9 +119,10 @@ export default function SalaryTab({ project, finalReport }) {
              const advanceSalaryDeduction = 0; // To be set manually
              const deductibleMinutesAmount = 0; // To be calculated based on deductible minutes
 
-             // Total = (Basic + Allowance) - Leave Pay
-             const totalSalary = totalSalaryAmount + salaryLeaveAmount + otSalary + bonus + incentive 
-                                 - leavePay - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+             // Total = Total Salary - (Leave Pay - Salary Leave Amount)
+             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+             const totalSalary = totalSalaryAmount + otSalary + bonus + incentive 
+                                 - netDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
              const wpsPay = totalSalary; // WPS is typically the total
              const balance = 0; // Balance = Total - WPS Pay
 
@@ -214,8 +231,9 @@ export default function SalaryTab({ project, finalReport }) {
         const lopDeduction = getValue(row, 'lopDeduction');
         const deductibleMinutesAmount = getValue(row, 'deductibleMinutesAmount');
 
-        const total = row.total_salary - leavePay + salaryLeaveAmount + otSalary + bonus + incentive
-                      - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+        const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+              const total = row.total_salary + otSalary + bonus + incentive
+                      - netDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
         const wpsPay = total;
         const balance = 0;
 
