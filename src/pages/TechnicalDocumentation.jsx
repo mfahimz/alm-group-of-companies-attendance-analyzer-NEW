@@ -738,28 +738,33 @@ const finalEarlyMinutes = Math.max(0, earlyMinutes - totalAllowed);`}
                         <pre className="text-xs">
 {`// Implemented in components/project-tabs/SalaryTab.jsx
 
-const perDaySalary = basicSalary / 30;
+// Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
+const leaveDays = annual_leave_count + full_absence_count;
+const leavePay = (total_salary / 30) * leaveDays;
 
-// Full day deductions
-const fullDayDeduction = full_absence_count * perDaySalary;
+// Salary Leave Amount (paid annual leave only)
+let salaryLeaveAmount = 0;
+if (annual_leave_count > 0) {
+    if (working_hours === 8) {
+        // 8-hour employees: no special calculation
+        salaryLeaveAmount = (total_salary / 30) * annual_leave_count;
+    } else if (working_hours === 9) {
+        // 9-hour employees: deduct 12.33% first
+        const adjustedSalary = total_salary * 0.8767; // 1 - 0.1233
+        salaryLeaveAmount = (adjustedSalary / 30) * annual_leave_count;
+    }
+}
 
-// Half day deductions
-const halfDayDeduction = half_absence_count * (perDaySalary / 2);
+// Net Leave Deduction = Leave Pay - Salary Leave Amount
+const netLeaveDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-// Minute-based deductions (late + early + other - approved)
-const netMinutes = late_minutes + early_checkout_minutes + other_minutes - approved_minutes;
-const perMinuteRate = basicSalary / (30 * 8 * 60); // 30 days, 8 hours/day, 60 min/hour
-const minuteDeduction = Math.max(0, netMinutes) * perMinuteRate;
-
-// Total deduction
-const totalDeduction = fullDayDeduction + halfDayDeduction + minuteDeduction;
-
-// Rounding: Round to 2 decimal places
-const finalSalary = Math.round((basicSalary - totalDeduction) * 100) / 100;`}
+// Final Salary = Total Salary - Net Leave Deduction
+const finalSalary = Math.round((total_salary - netLeaveDeduction) * 100) / 100;`}
                         </pre>
                         <p className="text-xs text-blue-800 mt-2">
                             <strong>Critical:</strong> All salary calculations use 30-day month assumption. Rounding is applied only at 
-                            the final salary level, not intermediate calculations.
+                            the final salary level, not intermediate calculations. Leave Pay includes both LOP and Annual Leave days, 
+                            but Salary Leave Amount only applies to Annual Leave for 9-hour employees with 12.33% adjustment.
                         </p>
                     </div>
 
