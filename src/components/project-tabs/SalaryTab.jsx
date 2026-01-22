@@ -383,13 +383,12 @@ export default function SalaryTab({ project, finalReport }) {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            // Recalculate dependent fields before saving
+            // Recalculate dependent fields based on current edits
             const recalculatedData = recalculateDependentFields(editableData);
-            setEditableData(recalculatedData);
             
             // TODO: Save recalculatedData to backend (create a new entity or update existing records)
             toast.success('Salary data saved successfully');
-            setEditableData({});
+            setEditableData(recalculatedData);
         } catch (error) {
             toast.error('Failed to save salary data: ' + error.message);
         } finally {
