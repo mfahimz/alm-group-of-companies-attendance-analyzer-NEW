@@ -278,13 +278,27 @@ export default function SalaryTab({ project, finalReport }) {
 
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
-        setEditableData(prev => ({
-            ...prev,
+        const numValue = parseFloat(value) || 0;
+        const updatedEdits = {
             [hrmsId]: {
-                ...(prev[hrmsId] || {}),
-                [field]: parseFloat(value) || 0
+                ...(editableData[hrmsId] || {}),
+                [field]: numValue
             }
-        }));
+        };
+
+        // If leaveDays or salaryLeaveDays changed, immediately recalculate dependents
+        if (field === 'leaveDays' || field === 'salaryLeaveDays') {
+            const recalculated = recalculateDependentFields(updatedEdits);
+            setEditableData(prev => ({
+                ...prev,
+                ...recalculated
+            }));
+        } else {
+            setEditableData(prev => ({
+                ...prev,
+                [hrmsId]: updatedEdits[hrmsId]
+            }));
+        }
     };
 
     // Get value (either from editableData or original data)
