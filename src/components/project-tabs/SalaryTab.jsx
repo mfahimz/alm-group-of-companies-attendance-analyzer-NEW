@@ -558,8 +558,72 @@ export default function SalaryTab({ project, finalReport }) {
                                 )}
                             </div>
                         </div>
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                            <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
+                        <div className="space-y-3">
+                            {/* Active Filters Display */}
+                            {hasActiveFilters && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <p className="text-xs font-semibold text-amber-900 mb-2">Active Filters:</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {searchQuery && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Search: "{searchQuery}"
+                                                    </span>
+                                                )}
+                                                {departmentFilter !== 'all' && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Dept: {departmentFilter}
+                                                    </span>
+                                                )}
+                                                {advancedFilters.salaryMin && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Salary ≥ {advancedFilters.salaryMin}
+                                                    </span>
+                                                )}
+                                                {advancedFilters.salaryMax && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Salary ≤ {advancedFilters.salaryMax}
+                                                    </span>
+                                                )}
+                                                {advancedFilters.leaveDaysMin && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Leave ≥ {advancedFilters.leaveDaysMin}
+                                                    </span>
+                                                )}
+                                                {advancedFilters.leaveDaysMax && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Leave ≤ {advancedFilters.leaveDaysMax}
+                                                    </span>
+                                                )}
+                                                {advancedFilters.deductionMin && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Deduct ≥ {advancedFilters.deductionMin}
+                                                    </span>
+                                                )}
+                                                {advancedFilters.deductionMax && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
+                                                        Deduct ≤ {advancedFilters.deductionMax}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Results Count */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <p className="text-xs text-blue-800">
+                                    <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
+                                    {hasActiveFilters && ` (${dataToDisplay.length - filteredSalaryData.length} hidden by filters)`}
+                                </p>
+                            </div>
+
+                            {/* Formula Info */}
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+                                <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
+                            </div>
                         </div>
                     </div>
 
