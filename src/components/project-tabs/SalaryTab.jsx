@@ -313,6 +313,52 @@ export default function SalaryTab({ project, finalReport }) {
         return { total, wpsPay, balance };
     };
 
+    // Recalculate dependent fields when leaveDays or salaryLeaveDays change
+    const recalculateDependentFields = (updatedData) => {
+        const newEditableData = { ...editableData };
+
+        Object.keys(updatedData).forEach(hrmsId => {
+            const row = dataToDisplay.find(r => r.hrms_id === hrmsId);
+            if (!row) return;
+
+            const changes = updatedData[hrmsId];
+            const totalSalary = row.total_salary;
+            const workingHours = row.working_hours;
+
+            // If leaveDays changed, recalculate leavePay
+            if ('leaveDays' in changes) {
+                const leaveDays = changes.leaveDays;
+                const newLeavePay = (totalSalary / 30) * leaveDays;
+                newEditableData[hrmsId] = {
+                    ...(newEditableData[hrmsId] || {}),
+                    leaveDays,
+                    leavePay: newLeavePay
+                };
+            }
+
+            // If salaryLeaveDays changed, recalculate salaryLeaveAmount
+            if ('salaryLeaveDays' in changes) {
+                const salaryLeaveDays = changes.salaryLeaveDays;
+                let newSalaryLeaveAmount = 0;
+                if (salaryLeaveDays > 0) {
+                    if (workingHours === 8) {
+                        newSalaryLeaveAmount = (totalSalary / 30) * salaryLeaveDays;
+                    } else if (workingHours === 9) {
+                        const adjustedSalary = totalSalary * 0.8767;
+                        newSalaryLeaveAmount = (adjustedSalary / 30) * salaryLeaveDays;
+                    }
+                }
+                newEditableData[hrmsId] = {
+                    ...(newEditableData[hrmsId] || {}),
+                    salaryLeaveDays,
+                    salaryLeaveAmount: newSalaryLeaveAmount
+                };
+            }
+        });
+
+        return newEditableData;
+    };
+
     // Calculate salaries from finalized report
     const handleCalculateSalaries = async () => {
         if (!finalReport?.id) {
@@ -345,7 +391,11 @@ export default function SalaryTab({ project, finalReport }) {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            // TODO: Save editableData to backend (create a new entity or update existing records)
+            // Recalculate dependent fields before saving
+            const recalculatedData = recalculateDependentFields(editableData);
+            setEditableData(recalculatedData);
+            
+            // TODO: Save recalculatedData to backend (create a new entity or update existing records)
             toast.success('Salary data saved successfully');
             setEditableData({});
         } catch (error) {
