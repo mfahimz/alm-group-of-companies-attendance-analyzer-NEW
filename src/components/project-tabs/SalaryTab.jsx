@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, FileSpreadsheet, Save, Filter } from 'lucide-react';
+import { DollarSign, FileSpreadsheet, Save, Filter, X, Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
@@ -427,9 +427,94 @@ export default function SalaryTab({ project, finalReport }) {
                             <p className="text-sm text-slate-600 mb-4">
                                 <strong>Note:</strong> Salary calculations based on latest saved report. Data from salary master is read-only.
                             </p>
+                            {/* Search Box */}
+                            <div className="bg-white rounded-lg p-4 mb-4 border border-slate-200">
+                                <label className="text-sm font-medium text-slate-700 mb-2 block">Search Employees</label>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name, ID, or department..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Advanced Filters */}
+                            <div className="bg-white rounded-lg p-4 mb-4 border border-slate-200">
+                                <h3 className="text-sm font-semibold text-slate-900 mb-3">Advanced Filters</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {/* Salary Range */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-700">Total Salary</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="number"
+                                                placeholder="Min"
+                                                value={advancedFilters.salaryMin}
+                                                onChange={(e) => setAdvancedFilters({...advancedFilters, salaryMin: e.target.value})}
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Max"
+                                                value={advancedFilters.salaryMax}
+                                                onChange={(e) => setAdvancedFilters({...advancedFilters, salaryMax: e.target.value})}
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Leave Days Range */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-700">Leave Days</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="number"
+                                                placeholder="Min"
+                                                value={advancedFilters.leaveDaysMin}
+                                                onChange={(e) => setAdvancedFilters({...advancedFilters, leaveDaysMin: e.target.value})}
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Max"
+                                                value={advancedFilters.leaveDaysMax}
+                                                onChange={(e) => setAdvancedFilters({...advancedFilters, leaveDaysMax: e.target.value})}
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Deduction Range */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-700">Total Deductions</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="number"
+                                                placeholder="Min"
+                                                value={advancedFilters.deductionMin}
+                                                onChange={(e) => setAdvancedFilters({...advancedFilters, deductionMin: e.target.value})}
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Max"
+                                                value={advancedFilters.deductionMax}
+                                                onChange={(e) => setAdvancedFilters({...advancedFilters, deductionMax: e.target.value})}
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Department Filter & Action Buttons */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Department Filter</label>
+                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Department</label>
                                     <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                                         <SelectTrigger>
                                             <SelectValue />
@@ -460,6 +545,17 @@ export default function SalaryTab({ project, finalReport }) {
                                         {isSaving ? 'Saving...' : 'Save'}
                                     </Button>
                                 </div>
+
+                                {hasActiveFilters && (
+                                    <Button
+                                        onClick={handleClearFilters}
+                                        variant="outline"
+                                        className="md:col-span-3"
+                                    >
+                                        <X className="w-4 h-4 mr-2" />
+                                        Clear All Filters
+                                    </Button>
+                                )}
                             </div>
                         </div>
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
