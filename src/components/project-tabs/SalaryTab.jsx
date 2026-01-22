@@ -89,20 +89,10 @@ export default function SalaryTab({ project, finalReport }) {
              const lopDays = result?.full_absence_count || 0;
              const lopDeduction = 0; // To be calculated based on lopDays only
 
-             // Leave Hours Pay calculation (only for Al Maraghi)
-             let leaveHours = 0;
-             let leaveHoursPay = 0;
-             if (isAlMaraghi && result?.deductible_minutes !== undefined) {
-                 // Convert deductible minutes to hours (max 2 decimals)
-                 leaveHours = Math.round((result.deductible_minutes / 60) * 100) / 100;
-                 
-                 // Per-minute salary = (Basic + Allowance) ÷ (30 days × Working Hours × 60 minutes)
-                 const workingHours = salary?.working_hours || 9;
-                 const perMinuteSalary = totalSalaryAmount / (30 * workingHours * 60);
-                 
-                 // Leave Hours Pay = Leave Hours × Per-Minute Salary
-                 leaveHoursPay = leaveHours * perMinuteSalary;
-             }
+             // Deductible Hours = deductible_minutes ÷ 60
+             const deductibleMinutes = result?.deductible_minutes || 0;
+             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+             const deductibleHoursPay = 0;
 
              // Other calculations
              const otHours = 0; // To be calculated
