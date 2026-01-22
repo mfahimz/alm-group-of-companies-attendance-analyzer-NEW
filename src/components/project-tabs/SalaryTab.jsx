@@ -201,6 +201,42 @@ export default function SalaryTab({ project, finalReport }) {
             filtered = filtered.filter(item => item.department === departmentFilter);
         }
 
+        // Apply search filter (name, attendance_id, department)
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(item =>
+                item.name.toLowerCase().includes(query) ||
+                item.attendance_id.toString().includes(query) ||
+                (item.department && item.department.toLowerCase().includes(query))
+            );
+        }
+
+        // Apply advanced filters
+        if (advancedFilters.salaryMin) {
+            const min = parseFloat(advancedFilters.salaryMin);
+            filtered = filtered.filter(item => item.total_salary >= min);
+        }
+        if (advancedFilters.salaryMax) {
+            const max = parseFloat(advancedFilters.salaryMax);
+            filtered = filtered.filter(item => item.total_salary <= max);
+        }
+        if (advancedFilters.leaveDaysMin) {
+            const min = parseFloat(advancedFilters.leaveDaysMin);
+            filtered = filtered.filter(item => item.leaveDays >= min);
+        }
+        if (advancedFilters.leaveDaysMax) {
+            const max = parseFloat(advancedFilters.leaveDaysMax);
+            filtered = filtered.filter(item => item.leaveDays <= max);
+        }
+        if (advancedFilters.deductionMin) {
+            const min = parseFloat(advancedFilters.deductionMin);
+            filtered = filtered.filter(item => (item.total_salary - item.total) >= min);
+        }
+        if (advancedFilters.deductionMax) {
+            const max = parseFloat(advancedFilters.deductionMax);
+            filtered = filtered.filter(item => (item.total_salary - item.total) <= max);
+        }
+
         // Apply sorting
         const sorted = [...filtered].sort((a, b) => {
             let compareResult = 0;
@@ -219,7 +255,26 @@ export default function SalaryTab({ project, finalReport }) {
         });
         
         return sorted;
-    }, [dataToDisplay, departmentFilter, sortColumn]);
+    }, [dataToDisplay, departmentFilter, searchQuery, advancedFilters, sortColumn]);
+
+    // Check if any filters are active
+    const hasActiveFilters = searchQuery.trim() || 
+                            departmentFilter !== 'all' || 
+                            Object.values(advancedFilters).some(v => v);
+
+    // Handle clear all filters
+    const handleClearFilters = () => {
+        setSearchQuery('');
+        setDepartmentFilter('all');
+        setAdvancedFilters({
+            salaryMin: '',
+            salaryMax: '',
+            leaveDaysMin: '',
+            leaveDaysMax: '',
+            deductionMin: '',
+            deductionMax: ''
+        });
+    };
 
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
