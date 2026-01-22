@@ -488,8 +488,8 @@ export default function SalaryTab({ project, finalReport }) {
                                                     className="h-8 text-xs"
                                                 />
                                             </TableCell>
-                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.leaveHours.toFixed(2)}</TableCell>
-                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.leaveHoursPay.toFixed(2)}</TableCell>
+                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHours?.toFixed(2) || '0.00'}</TableCell>
+                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</TableCell>
                                             <TableCell className="bg-red-50 p-1">
                                                 <Input
                                                     type="number"
