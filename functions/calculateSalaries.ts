@@ -87,8 +87,8 @@ Deno.serve(async (req) => {
                 salaryLeaveAmount: 0,
                 otHours: 0,
                 otSalary: 0,
-                leaveHours: Math.round(leaveHours * 100) / 100,
-                leaveHoursPay: Math.round(leaveHoursPay * 100) / 100,
+                deductibleHours,
+                deductibleHoursPay: 0,
                 otherDeduction: 0,
                 bonus: 0,
                 incentive: 0,
@@ -97,8 +97,8 @@ Deno.serve(async (req) => {
                 lopDays: leaveDays,
                 deductibleMinutesAmount: 0,
                 // Total calculation
-                total: totalSalaryAmount - leavePay - leaveHoursPay,
-                wpsPay: totalSalaryAmount - leavePay - leaveHoursPay,
+                total: totalSalaryAmount - leavePay,
+                wpsPay: totalSalaryAmount - leavePay,
                 balance: 0
             };
         });
