@@ -81,6 +81,7 @@ export default function Layout({ children, currentPageName }) {
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isDepartmentHead = userRole === 'department_head';
+    const isHRManager = userRole === 'hr_manager';
 
     // Redirect department heads away from Dashboard before anything renders
     if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
