@@ -9,6 +9,7 @@ import { DollarSign, FileSpreadsheet, Save, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
+import SortableTableHead from '../ui/SortableTableHead';
 
 export default function SalaryTab({ project, finalReport }) {
     const { data: currentUser } = useQuery({
@@ -59,7 +60,7 @@ export default function SalaryTab({ project, finalReport }) {
     const [editableData, setEditableData] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
-    const [sortBy, setSortBy] = useState('department');
+    const [sortColumn, setSortColumn] = useState({ key: 'department', direction: 'asc' });
     const [salaryUnlocked, setSalaryUnlocked] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
     const [calculatedData, setCalculatedData] = useState(null);
@@ -190,18 +191,24 @@ export default function SalaryTab({ project, finalReport }) {
         }
 
         // Apply sorting
-        return [...filtered].sort((a, b) => {
-            if (sortBy === 'department') {
-                return (a.department || '').localeCompare(b.department || '') || 
-                       a.name.localeCompare(b.name);
-            } else if (sortBy === 'name') {
-                return a.name.localeCompare(b.name);
-            } else if (sortBy === 'attendance') {
-                return Number(a.attendance_id) - Number(b.attendance_id);
+        const sorted = [...filtered].sort((a, b) => {
+            let compareResult = 0;
+            
+            const key = sortColumn.key;
+            const aVal = a[key];
+            const bVal = b[key];
+            
+            if (typeof aVal === 'string') {
+                compareResult = (aVal || '').localeCompare(bVal || '');
+            } else if (typeof aVal === 'number') {
+                compareResult = aVal - bVal;
             }
-            return 0;
+            
+            return sortColumn.direction === 'asc' ? compareResult : -compareResult;
         });
-    }, [dataToDisplay, departmentFilter, sortBy]);
+        
+        return sorted;
+    }, [dataToDisplay, departmentFilter, sortColumn]);
 
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
@@ -354,9 +361,9 @@ export default function SalaryTab({ project, finalReport }) {
                             <p className="text-sm text-slate-600 mb-4">
                                 <strong>Note:</strong> Salary calculations based on latest saved report. Data from salary master is read-only.
                             </p>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Department</label>
+                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Department Filter</label>
                                     <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                                         <SelectTrigger>
                                             <SelectValue />
@@ -369,37 +376,22 @@ export default function SalaryTab({ project, finalReport }) {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div>
-                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Sort By</label>
-                                    <Select value={sortBy} onValueChange={setSortBy}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="department">Department (then Name)</SelectItem>
-                                            <SelectItem value="name">Employee Name</SelectItem>
-                                            <SelectItem value="attendance">Attendance ID</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="flex items-end">
+                                <div className="flex items-end gap-2">
                                     <Button 
                                         onClick={handleCalculateSalaries} 
                                         disabled={isCalculating || !finalReport}
-                                        className="w-full bg-indigo-600 hover:bg-indigo-700"
+                                        className="flex-1 bg-indigo-600 hover:bg-indigo-700"
                                     >
                                         <DollarSign className="w-4 h-4 mr-2" />
-                                        {isCalculating ? 'Calculating...' : 'Calculate Salary'}
+                                        {isCalculating ? 'Calculating...' : 'Calculate'}
                                     </Button>
-                                </div>
-                                <div className="flex items-end">
                                     <Button 
                                         onClick={handleSave} 
                                         disabled={isSaving || Object.keys(editableData).length === 0 || !calculatedData}
-                                        className="w-full bg-green-600 hover:bg-green-700"
+                                        className="flex-1 bg-green-600 hover:bg-green-700"
                                     >
                                         <Save className="w-4 h-4 mr-2" />
-                                        {isSaving ? 'Saving...' : 'Save Changes'}
+                                        {isSaving ? 'Saving...' : 'Save'}
                                     </Button>
                                 </div>
                             </div>
@@ -413,32 +405,32 @@ export default function SalaryTab({ project, finalReport }) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="whitespace-nowrap sticky left-0 bg-white z-10">Attendance ID</TableHead>
-                                    <TableHead className="whitespace-nowrap sticky left-16 bg-white z-10">Name</TableHead>
-                                    <TableHead className="whitespace-nowrap">Department</TableHead>
-                                    <TableHead className="whitespace-nowrap">Working Hours/Day</TableHead>
-                                    <TableHead className="whitespace-nowrap">Basic Salary</TableHead>
-                                    <TableHead className="whitespace-nowrap">Total Salary</TableHead>
-                                    <TableHead className="whitespace-nowrap">Working Days</TableHead>
-                                    <TableHead className="whitespace-nowrap">Present Days</TableHead>
-                                    <TableHead className="whitespace-nowrap">LOP Days</TableHead>
-                                    <TableHead className="whitespace-nowrap">Annual Leave Days</TableHead>
-                                    <TableHead className="whitespace-nowrap">Sick Leave Days</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-amber-50">Leave Days</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-amber-50">Leave Pay</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-green-50">Salary Leave Days</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-green-50">Salary Leave Amount</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-blue-50">OT Hours</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-blue-50">OT Salary</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-purple-50">Deductible Hours</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-red-50">Other Deduction</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-green-50">Bonus</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-green-50">Incentive</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-red-50">Advance Salary Deduction</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-indigo-100 font-bold">Total</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-indigo-100 font-bold">WPS Pay</TableHead>
-                                    <TableHead className="whitespace-nowrap bg-slate-100">Balance</TableHead>
+                                    <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-0 bg-white z-10">Attendance ID</SortableTableHead>
+                                    <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-16 bg-white z-10">Name</SortableTableHead>
+                                    <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Department</SortableTableHead>
+                                    <SortableTableHead sortKey="working_hours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Working Hours/Day</SortableTableHead>
+                                    <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Basic Salary</SortableTableHead>
+                                    <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Total Salary</SortableTableHead>
+                                    <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Working Days</SortableTableHead>
+                                    <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Present Days</SortableTableHead>
+                                    <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">LOP Days</SortableTableHead>
+                                    <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Annual Leave Days</SortableTableHead>
+                                    <SortableTableHead sortKey="sick_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Sick Leave Days</SortableTableHead>
+                                    <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
+                                    <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
+                                    <SortableTableHead sortKey="salaryLeaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Salary Leave Days</SortableTableHead>
+                                    <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Salary Leave Amount</SortableTableHead>
+                                    <SortableTableHead sortKey="otHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">OT Hours</SortableTableHead>
+                                    <SortableTableHead sortKey="otSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">OT Salary</SortableTableHead>
+                                    <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
+                                    <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
+                                    <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduction</SortableTableHead>
+                                    <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
+                                    <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
+                                    <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Salary Deduction</SortableTableHead>
+                                    <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
+                                    <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">WPS Pay</SortableTableHead>
+                                    <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100">Balance</SortableTableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
