@@ -53,16 +53,9 @@ Deno.serve(async (req) => {
             const leaveDays = result?.full_absence_count || 0;
             const leavePay = leaveDays > 0 ? (totalSalaryAmount / 30) * leaveDays : 0;
 
-            // Leave Hours = deductible_minutes ÷ 60
-            let leaveHours = 0;
-            let leaveHoursPay = 0;
-            if (isAlMaraghi && result?.deductible_minutes) {
-                leaveHours = Math.round((result.deductible_minutes / 60) * 100) / 100;
-                
-                // Per-minute salary = Total Salary ÷ (30 days × Working Hours × 60 minutes)
-                const perMinuteSalary = totalSalaryAmount / (30 * workingHours * 60);
-                leaveHoursPay = leaveHours * perMinuteSalary;
-            }
+            // Deductible Hours = deductible_minutes ÷ 60
+            const deductibleMinutes = result?.deductible_minutes || 0;
+            const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
 
             return {
                 attendance_id: emp.attendance_id,
