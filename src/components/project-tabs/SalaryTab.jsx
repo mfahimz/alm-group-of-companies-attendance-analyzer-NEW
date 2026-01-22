@@ -314,31 +314,27 @@ export default function SalaryTab({ project, finalReport }) {
     };
 
     // Recalculate dependent fields when leaveDays or salaryLeaveDays change
-    const recalculateDependentFields = (updatedData) => {
-        const newEditableData = { ...editableData };
+    const recalculateDependentFields = (dataToRecalculate) => {
+        const recalculated = { ...dataToRecalculate };
 
-        Object.keys(updatedData).forEach(hrmsId => {
+        Object.keys(recalculated).forEach(hrmsId => {
             const row = dataToDisplay.find(r => r.hrms_id === hrmsId);
             if (!row) return;
 
-            const changes = updatedData[hrmsId];
+            const employeeEdits = recalculated[hrmsId];
             const totalSalary = row.total_salary;
             const workingHours = row.working_hours;
 
-            // If leaveDays changed, recalculate leavePay
-            if ('leaveDays' in changes) {
-                const leaveDays = changes.leaveDays;
+            // If leaveDays was edited, recalculate leavePay based on edited leaveDays
+            if ('leaveDays' in employeeEdits) {
+                const leaveDays = employeeEdits.leaveDays;
                 const newLeavePay = (totalSalary / 30) * leaveDays;
-                newEditableData[hrmsId] = {
-                    ...(newEditableData[hrmsId] || {}),
-                    leaveDays,
-                    leavePay: newLeavePay
-                };
+                recalculated[hrmsId].leavePay = newLeavePay;
             }
 
-            // If salaryLeaveDays changed, recalculate salaryLeaveAmount
-            if ('salaryLeaveDays' in changes) {
-                const salaryLeaveDays = changes.salaryLeaveDays;
+            // If salaryLeaveDays was edited, recalculate salaryLeaveAmount
+            if ('salaryLeaveDays' in employeeEdits) {
+                const salaryLeaveDays = employeeEdits.salaryLeaveDays;
                 let newSalaryLeaveAmount = 0;
                 if (salaryLeaveDays > 0) {
                     if (workingHours === 8) {
@@ -348,15 +344,11 @@ export default function SalaryTab({ project, finalReport }) {
                         newSalaryLeaveAmount = (adjustedSalary / 30) * salaryLeaveDays;
                     }
                 }
-                newEditableData[hrmsId] = {
-                    ...(newEditableData[hrmsId] || {}),
-                    salaryLeaveDays,
-                    salaryLeaveAmount: newSalaryLeaveAmount
-                };
+                recalculated[hrmsId].salaryLeaveAmount = newSalaryLeaveAmount;
             }
         });
 
-        return newEditableData;
+        return recalculated;
     };
 
     // Calculate salaries from finalized report
