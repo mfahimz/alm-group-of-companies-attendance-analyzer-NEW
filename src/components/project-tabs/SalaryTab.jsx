@@ -103,9 +103,9 @@ export default function SalaryTab({ project, finalReport }) {
              const advanceSalaryDeduction = 0; // To be set manually
              const deductibleMinutesAmount = 0; // To be calculated based on deductible minutes
 
-             // Total = (Basic + Allowance) - (Leave Pay + Leave Hours Pay)
+             // Total = (Basic + Allowance) - Leave Pay
              const totalSalary = totalSalaryAmount + salaryLeaveAmount + otSalary + bonus + incentive 
-                                 - leavePay - leaveHoursPay - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+                                 - leavePay - lopDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
              const wpsPay = totalSalary; // WPS is typically the total
              const balance = 0; // Balance = Total - WPS Pay
 
