@@ -206,7 +206,7 @@ export default function Layout({ children, currentPageName }) {
                 return hasPageAccess(item.url) ? item : null;
             })
             .filter(item => item !== null);
-    }, [currentUser, permissions, isAdmin, isSupervisor, isCEO, isDepartmentHead, userRole, hasPageAccess]);
+    }, [currentUser, permissions, isAdmin, isSupervisor, isCEO, isDepartmentHead, isHRManager, userRole, hasPageAccess]);
 
     useEffect(() => {
         console.log('App Timezone: UAE (Asia/Dubai)');
