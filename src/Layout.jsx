@@ -149,10 +149,10 @@ export default function Layout({ children, currentPageName }) {
     }, [currentUser, permissions, userRole]);
 
     const sidebarMenu = React.useMemo(() => {
-        if (!currentUser) return [];
+            if (!currentUser) return [];
 
-        const menu = [
-            { title: 'Dashboard', url: isDepartmentHead ? 'DepartmentHeadDashboard' : 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+            const menu = [
+                { title: 'Dashboard', url: isDepartmentHead ? 'DepartmentHeadDashboard' : isHRManager ? 'HRManagerDashboard' : 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
             ...(isAdmin || isSupervisor || isCEO ? [
                 { title: 'Company Dashboard', url: 'CompanyDashboard', icon: <BarChart3 className="w-5 h-5" /> }
             ] : []),
