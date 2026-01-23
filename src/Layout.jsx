@@ -188,7 +188,6 @@ export default function Layout({ children, currentPageName }) {
                     items: [
                         { title: 'Users & Permissions', url: 'Users', icon: <Shield className="w-5 h-5" /> },
                         { title: 'Department Heads', url: 'DepartmentHeadSettings', icon: <Users className="w-5 h-5" /> },
-                        { title: 'HR Managers', url: 'HRManagerSettings', icon: <Users className="w-5 h-5" /> },
                     { title: 'Rules Settings', url: 'RulesSettings', icon: <Settings className="w-5 h-5" /> },
                     { title: 'Ramadan Schedules', url: 'RamadanSchedules', icon: <Calendar className="w-5 h-5" /> },
                     { title: 'Maintenance Mode', url: 'MaintenanceSettings', icon: <Settings className="w-5 h-5" /> },
@@ -306,27 +305,7 @@ export default function Layout({ children, currentPageName }) {
         }
     }
 
-    if (isHRManager) {
-        if (!currentUser.company) {
-            return (
-                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                    <div className="text-slate-600 text-center">
-                        No company is assigned. Wait for the administrator to assign a company.
-                    </div>
-                </div>
-            );
-        }
 
-        if (!currentUser.hrms_id) {
-            return (
-                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                    <div className="text-slate-600 text-center">
-                        Not linked to employee record. Wait for the administrator to link you to an employee.
-                    </div>
-                </div>
-            );
-        }
-    }
 
     const toggleMenu = (title) => {
         setExpandedMenus(prev => ({
