@@ -11,8 +11,10 @@ import Home from './pages/Home';
 import JobPositions from './pages/JobPositions';
 import Maintenance from './pages/Maintenance';
 import MaintenanceSettings from './pages/MaintenanceSettings';
+import MigrationTools from './pages/MigrationTools';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
+import QuarterlyMinutesDocumentation from './pages/QuarterlyMinutesDocumentation';
 import QuarterlyMinutesManagement from './pages/QuarterlyMinutesManagement';
 import RamadanSchedules from './pages/RamadanSchedules';
 import Recruitment from './pages/Recruitment';
@@ -26,8 +28,6 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import MigrationTools from './pages/MigrationTools';
-import QuarterlyMinutesDocumentation from './pages/QuarterlyMinutesDocumentation';
 import __Layout from './Layout.jsx';
 
 
@@ -45,8 +45,10 @@ export const PAGES = {
     "JobPositions": JobPositions,
     "Maintenance": Maintenance,
     "MaintenanceSettings": MaintenanceSettings,
+    "MigrationTools": MigrationTools,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
+    "QuarterlyMinutesDocumentation": QuarterlyMinutesDocumentation,
     "QuarterlyMinutesManagement": QuarterlyMinutesManagement,
     "RamadanSchedules": RamadanSchedules,
     "Recruitment": Recruitment,
@@ -60,8 +62,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "MigrationTools": MigrationTools,
-    "QuarterlyMinutesDocumentation": QuarterlyMinutesDocumentation,
 }
 
 export const pagesConfig = {

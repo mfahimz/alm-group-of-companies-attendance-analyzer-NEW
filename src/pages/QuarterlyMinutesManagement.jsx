@@ -142,7 +142,7 @@ export default function QuarterlyMinutesManagement() {
         });
 
         return filtered;
-    }, [combinedData, searchQuery, companyFilter, departmentFilter, yearFilter, quarterFilter, allocationTypeFilter, projectFilter, sortConfig, isAdminOrCEO, userCompany]);
+    }, [combinedData, searchQuery, companyFilter, departmentFilter, yearFilter, quarterFilter, sortConfig, isAdminOrCEO, userCompany]);
 
     const handleSort = (key) => {
         setSortConfig(prev => ({
@@ -224,7 +224,7 @@ export default function QuarterlyMinutesManagement() {
             {/* Filters */}
             <Card>
                 <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <Input
@@ -388,11 +388,11 @@ export default function QuarterlyMinutesManagement() {
                             </TableHeader>
                             <TableBody>
                                 {filteredAndSortedData.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={isAdminOrCEO ? 11 : 10} className="text-center py-8 text-slate-500">
-                                            No quarterly minutes records found
-                                        </TableCell>
-                                    </TableRow>
+                                   <TableRow>
+                                       <TableCell colSpan={isAdminOrCEO ? 12 : 11} className="text-center py-8 text-slate-500">
+                                           No quarterly minutes records found
+                                       </TableCell>
+                                   </TableRow>
                                 ) : (
                                     filteredAndSortedData.map(record => {
                                         const isEditing = editingValues[record.id];
