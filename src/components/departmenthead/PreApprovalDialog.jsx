@@ -223,14 +223,7 @@ export default function PreApprovalDialog({
                                     value={formData.allowed_minutes}
                                     onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
                                     min="1"
-                                    max={quarterlyMinutes?.remaining_minutes || 0}
                                 />
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Available in {quarterlyMinutes?.quarter_name || 'quarter'}: {quarterlyMinutes?.remaining_minutes || 0} minutes
-                                </p>
-                                <p className="text-xs text-blue-600 mt-1">
-                                    {quarterlyMinutes?.quarter_period || 'Select date to see quarter'}
-                                </p>
                             </div>
                             <div>
                                 <Label>Apply To *</Label>
@@ -249,7 +242,6 @@ export default function PreApprovalDialog({
                                 </Select>
                             </div>
                         </div>
-                        <p className="text-xs text-slate-500">Minutes to waive due to approved reasons</p>
                     </div>
 
                     <div className="border-t pt-4">
