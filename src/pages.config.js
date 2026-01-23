@@ -27,6 +27,7 @@ import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import MigrationTools from './pages/MigrationTools';
+import QuarterlyMinutesDocumentation from './pages/QuarterlyMinutesDocumentation';
 import __Layout from './Layout.jsx';
 
 
@@ -60,6 +61,7 @@ export const PAGES = {
     "UserProfile": UserProfile,
     "Users": Users,
     "MigrationTools": MigrationTools,
+    "QuarterlyMinutesDocumentation": QuarterlyMinutesDocumentation,
 }
 
 export const pagesConfig = {
