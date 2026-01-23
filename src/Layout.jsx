@@ -182,6 +182,7 @@ export default function Layout({ children, currentPageName }) {
                         navStructure={navStructure}
                         currentPageName={currentPageName}
                         canAccessPage={canAccessPage}
+                        userRole={userRole}
                     />
 
                     {/* Mobile Navigation */}
@@ -191,6 +192,7 @@ export default function Layout({ children, currentPageName }) {
                         canAccessPage={canAccessPage}
                         user={currentUser}
                         onLogout={handleLogout}
+                        userRole={userRole}
                     />
 
                     {/* Right Section */}

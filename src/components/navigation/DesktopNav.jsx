@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
  * - Hover dropdowns for other categories
  * - Active page highlighting
  */
-export default function DesktopNav({ navStructure, currentPageName, canAccessPage }) {
+export default function DesktopNav({ navStructure, currentPageName, canAccessPage, userRole }) {
     return (
         <nav className="hidden lg:flex items-center gap-1 flex-1">
             {/* Logo */}

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
  * - Flat list with category headers
  * - Active page highlighting
  */
-export default function MobileNav({ navStructure, currentPageName, canAccessPage, user, onLogout }) {
+export default function MobileNav({ navStructure, currentPageName, canAccessPage, user, onLogout, userRole }) {
     const [isOpen, setIsOpen] = useState(false);
 
     const closeDrawer = () => setIsOpen(false);
