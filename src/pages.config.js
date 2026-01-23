@@ -20,12 +20,12 @@ import ReportDetail from './pages/ReportDetail';
 import Reports from './pages/Reports';
 import RulesSettings from './pages/RulesSettings';
 import Salaries from './pages/Salaries';
+import SecurityAudit from './pages/SecurityAudit';
 import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import SecurityAudit from './pages/SecurityAudit';
 import __Layout from './Layout.jsx';
 
 
@@ -52,12 +52,12 @@ export const PAGES = {
     "Reports": Reports,
     "RulesSettings": RulesSettings,
     "Salaries": Salaries,
+    "SecurityAudit": SecurityAudit,
     "TechnicalDocumentation": TechnicalDocumentation,
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "SecurityAudit": SecurityAudit,
 }
 
 export const pagesConfig = {

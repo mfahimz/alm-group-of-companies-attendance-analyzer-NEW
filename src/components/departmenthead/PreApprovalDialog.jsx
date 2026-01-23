@@ -29,23 +29,41 @@ export default function PreApprovalDialog({
 
     const queryClient = useQueryClient();
 
-    // Fetch quarterly minutes for selected employee
+    // Fetch quarterly minutes for selected employee based on date
     const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);
     const { data: quarterlyMinutes } = useQuery({
-        queryKey: ['employeeQuarterlyMinutes', selectedEmployee?.hrms_id, projectId],
+        queryKey: ['employeeQuarterlyMinutes', selectedEmployee?.hrms_id, formData.date_from],
         queryFn: async () => {
-            if (!selectedEmployee || !projectId) return null;
-            const records = await base44.entities.EmployeeQuarterlyMinutes.filter({
+            if (!selectedEmployee || !formData.date_from) return null;
+            
+            // Get or create quarterly minutes for this employee and date
+            const response = await base44.functions.invoke('getOrCreateQuarterlyMinutes', {
                 employee_id: String(selectedEmployee.hrms_id),
-                project_id: projectId
+                company: selectedEmployee.company,
+                date: formData.date_from
             });
-            return records[0] || null;
+            
+            return response.data.success ? response.data : null;
         },
-        enabled: !!selectedEmployee && !!projectId
+        enabled: !!selectedEmployee && !!formData.date_from
     });
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
+            const minutesToApprove = parseInt(data.allowed_minutes);
+            
+            // Update quarterly minutes usage first
+            const updateResponse = await base44.functions.invoke('updateQuarterlyMinutes', {
+                employee_id: String(selectedEmployee.hrms_id),
+                company: selectedEmployee.company,
+                date: data.date_from,
+                minutes_to_add: minutesToApprove
+            });
+
+            if (!updateResponse.data.success) {
+                throw new Error(updateResponse.data.error || 'Failed to update quarterly minutes');
+            }
+
             // Check if approval already exists for this date
             const existing = await base44.entities.Exception.filter({
                 project_id: projectId,
@@ -58,7 +76,7 @@ export default function PreApprovalDialog({
             if (existing.length > 0) {
                 // Update existing
                 return await base44.entities.Exception.update(existing[0].id, {
-                    allowed_minutes: parseInt(data.allowed_minutes),
+                    allowed_minutes: minutesToApprove,
                     allowed_minutes_type: data.allowed_minutes_type,
                     details: data.details || null
                 });
@@ -70,7 +88,7 @@ export default function PreApprovalDialog({
                     date_from: data.date_from,
                     date_to: data.date_to,
                     type: 'ALLOWED_MINUTES',
-                    allowed_minutes: parseInt(data.allowed_minutes),
+                    allowed_minutes: minutesToApprove,
                     allowed_minutes_type: data.allowed_minutes_type || 'both',
                     approval_status: 'approved_dept_head',
                     approved_by_dept_head: deptHeadVerification.assignment.employee_id,
@@ -82,7 +100,9 @@ export default function PreApprovalDialog({
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['preApprovals', projectId]);
-            toast.success('Pre-approved minutes saved successfully');
+            queryClient.invalidateQueries(['employeeQuarterlyMinutes']);
+            queryClient.invalidateQueries(['quarterlyMinutes']);
+            toast.success('Pre-approved minutes saved and deducted from quarterly allowance');
             handleClose();
             onSuccess?.();
         },
@@ -209,7 +229,10 @@ export default function PreApprovalDialog({
                                     max={quarterlyMinutes?.remaining_minutes || 0}
                                 />
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Available: {quarterlyMinutes?.remaining_minutes || 0} minutes
+                                    Available in {quarterlyMinutes?.quarter_name || 'quarter'}: {quarterlyMinutes?.remaining_minutes || 0} minutes
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                    {quarterlyMinutes?.quarter_period || 'Select date to see quarter'}
                                 </p>
                             </div>
                             <div>
