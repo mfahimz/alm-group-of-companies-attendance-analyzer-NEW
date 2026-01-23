@@ -42,14 +42,15 @@ export const PAGES_CONFIG = {
         requiresAuth: true,
         availableToAll: true,
         defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'hr_manager'],
-        isDefaultLandingPage: true
+        isDefaultLandingPage: true,
+        smartRoute: true  // Routes to Dashboard or DepartmentHeadDashboard based on role
     },
     Dashboard: {
         name: 'Dashboard',
         title: 'Dashboard',
         icon: LayoutDashboard,
         category: 'Main',
-        showInNav: true,
+        showInNav: false,  // Hidden - accessible via Home button
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'user', 'ceo']

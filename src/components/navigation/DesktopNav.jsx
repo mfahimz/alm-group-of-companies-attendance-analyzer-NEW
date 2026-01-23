@@ -25,13 +25,20 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
             {navStructure.main?.map((item) => {
                 if (!canAccessPage(item.name)) return null;
 
-                const isActive = currentPageName === item.name;
+                // Smart routing for Home based on user role
+                let targetPage = item.name;
+                if (item.smartRoute && item.name === 'Home') {
+                    targetPage = userRole === 'department_head' ? 'DepartmentHeadDashboard' : 'Dashboard';
+                }
+
+                const isActive = currentPageName === item.name || 
+                                (item.name === 'Home' && (currentPageName === 'Dashboard' || currentPageName === 'DepartmentHeadDashboard'));
                 const isHome = item.name === 'Home';
 
                 return (
                     <Link
                         key={item.name}
-                        to={createPageUrl(item.name)}
+                        to={createPageUrl(targetPage)}
                         className={cn(
                             'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                             isActive && 'bg-slate-800 text-white',
