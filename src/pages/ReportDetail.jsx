@@ -21,6 +21,21 @@ export default function ReportDetailPage() {
         queryFn: () => base44.auth.me()
     });
 
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isDepartmentHead = userRole === 'department_head';
+
+    // Department head verification
+    const { data: deptHeadVerification } = useQuery({
+        queryKey: ['deptHeadVerification', isDepartmentHead, currentUser?.email],
+        queryFn: async () => {
+            if (!isDepartmentHead) return null;
+            const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
+            return data;
+        },
+        enabled: !!currentUser && isDepartmentHead,
+        retry: false
+    });
+
     const { data: reportRun, isLoading: reportLoading, error: reportError } = useQuery({
         queryKey: ['reportRun', reportRunId],
         queryFn: async () => {
@@ -89,7 +104,12 @@ export default function ReportDetailPage() {
             </div>
 
             {/* Report Detail View */}
-            <ReportDetailView reportRun={reportRun} project={project} />
+            <ReportDetailView 
+                reportRun={reportRun} 
+                project={project} 
+                isDepartmentHead={isDepartmentHead}
+                deptHeadVerification={deptHeadVerification}
+            />
         </div>
     );
 }

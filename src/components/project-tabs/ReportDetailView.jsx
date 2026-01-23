@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import * as XLSX from 'xlsx';
 
-export default function ReportDetailView({ reportRun, project }) {
+export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
@@ -40,7 +40,7 @@ export default function ReportDetailView({ reportRun, project }) {
     const isUser = userRole === 'user';
     const isAdmin = userRole === 'admin';
 
-    const { data: results = [] } = useQuery({
+    const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id],
         queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes
@@ -50,7 +50,7 @@ export default function ReportDetailView({ reportRun, project }) {
         refetchOnMount: false
     });
 
-    const { data: employees = [] } = useQuery({
+    const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company }),
         staleTime: 15 * 60 * 1000, // Cache for 15 minutes
@@ -59,6 +59,31 @@ export default function ReportDetailView({ reportRun, project }) {
         refetchOnReconnect: false,
         refetchOnMount: false
     });
+
+    // Filter employees and results for department heads
+    const employees = React.useMemo(() => {
+        if (!isDepartmentHead || !deptHeadVerification?.verified) {
+            return allEmployees;
+        }
+        
+        // Show only employees in department head's department, excluding the dept head themselves
+        return allEmployees.filter(emp => 
+            emp.department === deptHeadVerification.assignment.department &&
+            String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
+        );
+    }, [allEmployees, isDepartmentHead, deptHeadVerification]);
+
+    const results = React.useMemo(() => {
+        if (!isDepartmentHead || !deptHeadVerification?.verified) {
+            return allResults;
+        }
+        
+        // Filter results to only show department head's subordinates
+        const departmentAttendanceIds = employees.map(emp => String(emp.attendance_id));
+        return allResults.filter(result => 
+            departmentAttendanceIds.includes(String(result.attendance_id))
+        );
+    }, [allResults, isDepartmentHead, deptHeadVerification, employees]);
 
     // Only fetch punches and shifts if project is NOT closed (data is deleted on close)
     const { data: punches = [] } = useQuery({
