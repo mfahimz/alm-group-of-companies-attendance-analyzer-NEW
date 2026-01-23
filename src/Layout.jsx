@@ -47,23 +47,36 @@ export default function Layout({ children, currentPageName }) {
         queryFn: async () => {
             try {
                 const user = await base44.auth.me();
-                try {
-                    let ipAddress = 'Unknown';
+                
+                // Log activity only once per session
+                const sessionKey = `activity_logged_${user.email}`;
+                const alreadyLogged = sessionStorage.getItem(sessionKey);
+                
+                if (!alreadyLogged) {
                     try {
-                        const ipResponse = await fetch('https://api.ipify.org?format=json');
-                        const ipData = await ipResponse.json();
-                        ipAddress = ipData.ip;
-                    } catch {}
+                        let ipAddress = 'Unknown';
+                        try {
+                            const ipResponse = await fetch('https://api.ipify.org?format=json');
+                            const ipData = await ipResponse.json();
+                            ipAddress = ipData.ip;
+                        } catch {}
 
-                    await base44.entities.ActivityLog.create({
-                        user_email: user.email,
-                        user_name: user.full_name,
-                        user_role: user.role,
-                        ip_address: ipAddress,
-                        user_agent: navigator.userAgent,
-                        location: 'UAE'
-                    });
-                } catch (e) {}
+                        await base44.entities.ActivityLog.create({
+                            user_email: user.email,
+                            user_name: user.full_name,
+                            user_role: user.role,
+                            ip_address: ipAddress,
+                            user_agent: navigator.userAgent,
+                            location: 'UAE'
+                        });
+                        
+                        // Mark as logged for this session
+                        sessionStorage.setItem(sessionKey, 'true');
+                    } catch (e) {
+                        console.error('Activity log error:', e);
+                    }
+                }
+                
                 return user;
             } catch (err) {
                 console.error('Auth error:', err);
