@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { usePageTitle } from '@/components/ui/PageTitle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FolderKanban, Users, AlertCircle, CheckCircle, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
 import { SkeletonStat, SkeletonCard } from '../components/ui/SkeletonLoader';
@@ -15,6 +16,7 @@ import SupervisorDashboard from '../components/dashboard/SupervisorDashboard';
 import UserDashboard from '../components/dashboard/UserDashboard';
 
 export default function Dashboard() {
+    usePageTitle('Dashboard');
     const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()

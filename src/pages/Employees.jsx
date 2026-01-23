@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { usePageTitle } from '@/components/ui/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +21,7 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
 
 export default function Employees() {
+    usePageTitle('Employees');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showDialog, setShowDialog] = useState(false);
