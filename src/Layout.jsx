@@ -163,7 +163,7 @@ export default function Layout({ children, currentPageName }) {
                     { title: 'Projects', url: 'Projects', icon: <FolderKanban className="w-5 h-5" /> },
                     { title: 'Employees', url: 'Employees', icon: <Users className="w-5 h-5" /> },
                     { title: 'Salaries', url: 'Salaries', icon: <LayoutDashboard className="w-5 h-5" /> },
-                    { title: 'Quarterly Minutes', url: 'QuarterlyMinutesManagement', icon: <Clock className="w-5 h-5" /> },
+                    ...(isAdmin || isCEO ? [{ title: 'Quarterly Minutes', url: 'QuarterlyMinutesManagement', icon: <Clock className="w-5 h-5" /> }] : []),
                     ...(isAdmin || isSupervisor || isCEO ? [{ title: 'Reports & Analytics', url: 'Reports', icon: <BarChart3 className="w-5 h-5" /> }] : [])
                 ]
             }
@@ -191,11 +191,12 @@ export default function Layout({ children, currentPageName }) {
                     { title: 'Rules Settings', url: 'RulesSettings', icon: <Settings className="w-5 h-5" /> },
                     { title: 'Ramadan Schedules', url: 'RamadanSchedules', icon: <Calendar className="w-5 h-5" /> },
                     { title: 'Maintenance Mode', url: 'MaintenanceSettings', icon: <Settings className="w-5 h-5" /> },
+                    ...(isAdmin ? [{ title: 'Security Audit', url: 'SecurityAudit', icon: <Shield className="w-5 h-5" /> }] : []),
                     { title: 'Documentation', url: 'Documentation', icon: <Book className="w-5 h-5" /> },
                     { title: 'Training Guide', url: 'Training', icon: <Book className="w-5 h-5" /> }
                 ]
             });
-        }
+            }
 
         return menu
             .map(item => {

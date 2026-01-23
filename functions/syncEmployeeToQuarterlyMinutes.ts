@@ -45,8 +45,7 @@ Deno.serve(async (req) => {
                 employee_id: String(employee.hrms_id),
                 company: employee.company,
                 year: year,
-                quarter: quarter,
-                allocation_type: 'calendar_quarter'
+                quarter: quarter
             });
             
             if (existing.length === 0) {
@@ -55,7 +54,6 @@ Deno.serve(async (req) => {
                     company: employee.company,
                     year: year,
                     quarter: quarter,
-                    allocation_type: 'calendar_quarter',
                     total_minutes: totalMinutes,
                     used_minutes: 0,
                     remaining_minutes: totalMinutes
@@ -74,8 +72,7 @@ Deno.serve(async (req) => {
                 employee_id: String(employee.hrms_id),
                 company: employee.company,
                 year: year,
-                quarter: quarter,
-                allocation_type: 'calendar_quarter'
+                quarter: quarter
             });
             
             if (existing.length > 0) {
@@ -98,7 +95,6 @@ Deno.serve(async (req) => {
                     company: employee.company,
                     year: year,
                     quarter: quarter,
-                    allocation_type: 'calendar_quarter',
                     total_minutes: totalMinutes,
                     used_minutes: 0,
                     remaining_minutes: totalMinutes
