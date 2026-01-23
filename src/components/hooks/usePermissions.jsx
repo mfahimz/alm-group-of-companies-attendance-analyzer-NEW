@@ -94,25 +94,15 @@ export const usePermissions = () => {
 
         // Get page config
         const pageConfig = getPageConfig(pageName);
-        if (!pageConfig) return true; // Unknown page, allow
+        if (!pageConfig) return false;
 
-        // Check if page is available to all authenticated users
-        if (pageConfig.availableToAll) return true;
-
-        // Check default roles from config
-        if (pageConfig.defaultRoles && pageConfig.defaultRoles.includes(userRole)) {
-            return true;
-        }
-
-        // Check PagePermission entity overrides
+        // ONLY show pages that exist in PagePermission entity
         const permission = pagePermissions.find(p => p.page_name === pageName);
-        if (permission) {
-            const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-            return allowedRoles.includes(userRole);
-        }
+        if (!permission) return false; // No PagePermission record = hide from nav
 
-        // Default: deny access
-        return false;
+        // Check if user's role is in allowed_roles
+        const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
+        return allowedRoles.includes(userRole);
     };
 
     // Check if user has specific permission (can be extended)
