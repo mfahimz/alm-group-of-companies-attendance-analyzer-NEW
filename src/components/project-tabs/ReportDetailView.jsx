@@ -1842,18 +1842,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             {result.notes || '-'}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {project.status === 'closed' || !currentUser ? (
-                                                <span className="text-xs text-slate-400">—</span>
-                                            ) : (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => showDailyBreakdown(result)}
-                                                    title="View daily breakdown"
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                </Button>
-                                            )}
+                                           {project.status === 'closed' ? (
+                                               <span className="text-xs text-slate-400">—</span>
+                                           ) : (
+                                               <Button
+                                                   size="sm"
+                                                   variant="ghost"
+                                                   onClick={() => showDailyBreakdown(result)}
+                                                   title="View daily breakdown"
+                                               >
+                                                   <Eye className="w-4 h-4" />
+                                               </Button>
+                                           )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
