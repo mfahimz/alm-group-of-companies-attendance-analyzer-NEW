@@ -60,16 +60,23 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         refetchOnMount: false
     });
 
-    // Filter employees and results for department heads
+    // Filter employees and results for department heads - MUST use managed_employee_ids
     const employees = React.useMemo(() => {
         if (!isDepartmentHead || !deptHeadVerification?.verified) {
             return allEmployees;
         }
         
-        // Show only employees in department head's department, excluding the dept head themselves
+        const managedIds = deptHeadVerification.assignment.managed_employee_ids 
+            ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
+            : [];
+        
+        if (managedIds.length === 0) return [];
+        
+        // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
+        // CRITICAL: Exclude department head from the list
         return allEmployees.filter(emp => 
-            emp.department === deptHeadVerification.assignment.department &&
-            String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
+            managedIds.includes(String(emp.id)) && 
+            String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
         );
     }, [allEmployees, isDepartmentHead, deptHeadVerification]);
 

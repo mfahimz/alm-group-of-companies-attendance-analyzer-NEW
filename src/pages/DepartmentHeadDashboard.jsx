@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { usePageTitle } from '@/components/ui/PageTitle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,8 @@ import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog.jsx
 import AllowedMinutesHistory from '@/components/departmenthead/AllowedMinutesHistory.jsx';
 
 export default function DepartmentHeadDashboard() {
+    usePageTitle('DepartmentHeadDashboard');
+    
     const [showPreApprovalDialog, setShowPreApprovalDialog] = useState(false);
     const [viewingPreviousReport, setViewingPreviousReport] = useState(false);
 
