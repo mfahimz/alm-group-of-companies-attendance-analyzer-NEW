@@ -66,7 +66,13 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                         // Smart routing for Home based on user role
                         let targetPage = item.name;
                         if (item.smartRoute && item.name === 'Home') {
-                            targetPage = userRole === 'department_head' ? 'DepartmentHeadDashboard' : 'Dashboard';
+                            if (userRole === 'department_head') {
+                                targetPage = 'DepartmentHeadDashboard';
+                            } else if (userRole === 'hr_manager') {
+                                targetPage = 'HRManagerDashboard';
+                            } else {
+                                targetPage = 'Dashboard';
+                            }
                         }
 
                         const isActive = currentPageName === item.name || 

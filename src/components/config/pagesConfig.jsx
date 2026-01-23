@@ -55,13 +55,13 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'user', 'ceo']
     },
-    // Leadership Dashboards
+    // Leadership Dashboards (Hidden - accessed via Home smart routing)
     DepartmentHeadDashboard: {
         name: 'DepartmentHeadDashboard',
         title: 'Department Head Dashboard',
         icon: UserCog,
         category: 'Leadership',
-        showInNav: true,
+        showInNav: false,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['department_head']
@@ -71,7 +71,7 @@ export const PAGES_CONFIG = {
         title: 'HR Manager Dashboard',
         icon: ClipboardCheck,
         category: 'Leadership',
-        showInNav: true,
+        showInNav: false,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['hr_manager']
