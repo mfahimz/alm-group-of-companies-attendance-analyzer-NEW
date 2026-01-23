@@ -96,35 +96,42 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         }
     }, [resultsError]);
 
-    // Get employees for department head filtering
+    // Get employees for department head filtering - MUST use managed_employee_ids
     const { data: departmentEmployees = [], error: employeesError } = useQuery({
-        queryKey: ['departmentEmployees', project.id, isDepartmentHead, deptHeadVerification?.assignment?.department],
+        queryKey: ['departmentEmployees', project.id, isDepartmentHead, deptHeadVerification?.assignment?.managed_employee_ids],
         queryFn: async () => {
             if (!isDepartmentHead || !deptHeadVerification?.verified) {
                 console.log('[ReportTab] Skipping employee fetch - not dept head or not verified');
                 return [];
             }
             
-            console.log('[ReportTab] Fetching department employees for:', {
+            const managedIds = deptHeadVerification.assignment.managed_employee_ids 
+                ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
+                : [];
+            
+            console.log('[ReportTab] Managed employee IDs:', managedIds);
+            
+            if (managedIds.length === 0) {
+                console.log('[ReportTab] No managed employees found');
+                return [];
+            }
+            
+            // Fetch all employees for the company
+            const allEmployees = await base44.entities.Employee.filter({
                 company: deptHeadVerification.assignment.company,
-                department: deptHeadVerification.assignment.department
-            });
-
-            // Get all employees in this department, excluding the department head
-            const allEmpls = await base44.entities.Employee.filter({
-                company: deptHeadVerification.assignment.company,
-                department: deptHeadVerification.assignment.department,
                 active: true
             });
 
-            console.log('[ReportTab] Fetched', allEmpls.length, 'employees in department');
+            console.log('[ReportTab] Fetched', allEmployees.length, 'total employees in company');
 
-            // Exclude the department head themselves
-            const filtered = allEmpls.filter(emp => 
-                String(emp.hrms_id) !== String(deptHeadVerification.assignment.employee_id)
+            // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
+            // CRITICAL: Exclude department head from the list
+            const filtered = allEmployees.filter(emp => 
+                managedIds.includes(String(emp.id)) && 
+                String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
             );
 
-            console.log('[ReportTab] After excluding dept head:', filtered.length, 'employees');
+            console.log('[ReportTab] Filtered to', filtered.length, 'managed employees (excluding dept head)');
             return filtered;
         },
         enabled: isDepartmentHead && !!deptHeadVerification?.verified
