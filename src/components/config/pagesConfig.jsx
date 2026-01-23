@@ -12,7 +12,8 @@ import {
     UserCog,
     DollarSign,
     AlertCircle,
-    GraduationCap
+    GraduationCap,
+    ClipboardCheck
 } from 'lucide-react';
 
 /**
