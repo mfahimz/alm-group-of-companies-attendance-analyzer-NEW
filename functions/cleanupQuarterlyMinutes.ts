@@ -1,5 +1,16 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+/**
+ * Cleanup Quarterly Minutes - Calendar-Based System
+ * 
+ * Finds and removes quarterly minutes records that:
+ * 1. Have company mismatch with employee record
+ * 2. Reference non-existent employees
+ * 3. Are duplicates (same employee + company + year + quarter)
+ * 
+ * Admin only function.
+ */
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -27,14 +38,31 @@ Deno.serve(async (req) => {
         // Fetch ALL quarterly minutes
         const allMinutes = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.list();
 
-        // Find mismatches
+        // Find mismatches and duplicates
         const mismatches = [];
         const correctRecords = [];
+        const seenKeys = new Map(); // Track duplicates
 
         for (const record of allMinutes) {
             const employeeId = record.employee_id;
             const recordCompany = record.company;
             const employeeInfo = employeeCompanyMap[employeeId];
+
+            // Check for duplicates (same employee + company + year + quarter)
+            const uniqueKey = `${employeeId}-${recordCompany}-${record.year}-${record.quarter}`;
+            if (seenKeys.has(uniqueKey)) {
+                mismatches.push({
+                    id: record.id,
+                    employee_id: employeeId,
+                    record_company: recordCompany,
+                    actual_company: employeeInfo?.company || 'UNKNOWN',
+                    reason: 'Duplicate record',
+                    year: record.year,
+                    quarter: record.quarter
+                });
+                continue;
+            }
+            seenKeys.set(uniqueKey, record.id);
 
             if (!employeeInfo) {
                 mismatches.push({
@@ -44,8 +72,7 @@ Deno.serve(async (req) => {
                     actual_company: 'EMPLOYEE NOT FOUND',
                     reason: 'Employee does not exist',
                     year: record.year,
-                    quarter: record.quarter,
-                    allocation_type: record.allocation_type
+                    quarter: record.quarter
                 });
             } else if (employeeInfo.company !== recordCompany) {
                 mismatches.push({
@@ -56,13 +83,14 @@ Deno.serve(async (req) => {
                     actual_company: employeeInfo.company,
                     reason: 'Company mismatch',
                     year: record.year,
-                    quarter: record.quarter,
-                    allocation_type: record.allocation_type
+                    quarter: record.quarter
                 });
             } else {
                 correctRecords.push({
                     employee_id: employeeId,
-                    company: recordCompany
+                    company: recordCompany,
+                    year: record.year,
+                    quarter: record.quarter
                 });
             }
         }
