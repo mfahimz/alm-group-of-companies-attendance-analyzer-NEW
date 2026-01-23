@@ -927,7 +927,7 @@ if (!isAdmin && !isCEO) {
                     <h3 className="text-xl font-semibold mt-6">Why Department Head Workflow is Company-Specific</h3>
                     <p className="text-sm">
                         The department head pre-approval workflow (DepartmentHeadDashboard) is currently implemented only for 
-                        "Al Maraghi Auto Repairs" company. This is a deliberate design decision to:
+                        "Al Maraghi Auto Repairs" (one of the companies in the system: Al Maraghi Auto Repairs, Al Maraghi Automotive, Naser Mohsin Auto Parts). This is a deliberate design decision to:
                     </p>
                     <ul className="text-sm">
                         <li>Pilot the feature with a single company before rollout</li>
