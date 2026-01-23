@@ -22,6 +22,7 @@ export default function ReportDetailPage() {
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
     const isDepartmentHead = userRole === 'department_head';
 
     // Department head verification
@@ -53,9 +54,6 @@ export default function ReportDetailPage() {
         },
         enabled: !!projectId
     });
-
-    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isAdmin = userRole === 'admin';
 
     if (reportLoading || projectLoading) {
         return (
