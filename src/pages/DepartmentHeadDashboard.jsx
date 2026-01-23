@@ -248,25 +248,34 @@ export default function DepartmentHeadDashboard() {
 
     // No auto-initialization needed - using calendar quarters directly
 
-    // Get quarterly minutes for all managed employees (calendar-based Q4 2025)
+    // Get quarterly minutes for all managed employees (calendar-based - auto-determined from current date)
     const { data: quarterlyMinutes = [] } = useQuery({
         queryKey: ['quarterlyMinutes', currentProject?.company],
         queryFn: async () => {
             if (!currentProject) return [];
 
-            // For Al Maraghi Auto Repairs, use calendar quarter system
-            // November 2025 falls in Q4 2025
+            // Determine current quarter from today's date
+            const today = nowInUAE();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1; // 1-12
+            
+            let currentQuarter;
+            if (currentMonth >= 1 && currentMonth <= 3) currentQuarter = 1;
+            else if (currentMonth >= 4 && currentMonth <= 6) currentQuarter = 2;
+            else if (currentMonth >= 7 && currentMonth <= 9) currentQuarter = 3;
+            else currentQuarter = 4;
+
+            // Fetch quarterly minutes for current quarter
             const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
                 company: currentProject.company,
-                year: 2025,
-                quarter: 4,
-                allocation_type: 'calendar_quarter'
+                year: currentYear,
+                quarter: currentQuarter
             });
 
             return allMinutes;
         },
         enabled: !!currentProject && currentProject.company === 'Al Maraghi Auto Repairs',
-        staleTime: 2 * 60 * 1000, // Cache for 2 minutes (data changes frequently)
+        staleTime: 2 * 60 * 1000,
         gcTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
