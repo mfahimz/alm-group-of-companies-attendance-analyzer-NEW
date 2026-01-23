@@ -7,14 +7,9 @@ import {
     Shield,
     Book,
     Calendar,
-    FileSpreadsheet,
-    Briefcase,
     Clock,
     Home,
-    Building2,
     UserCog,
-    FileText,
-    ClipboardCheck,
     DollarSign,
     AlertCircle,
     GraduationCap
@@ -58,17 +53,6 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'user', 'ceo']
     },
-    CompanyDashboard: {
-        name: 'CompanyDashboard',
-        title: 'Company Dashboard',
-        icon: Building2,
-        category: 'Main',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'ceo']
-    },
-
     // Leadership Dashboards
     DepartmentHeadDashboard: {
         name: 'DepartmentHeadDashboard',
@@ -143,39 +127,7 @@ export const PAGES_CONFIG = {
         defaultRoles: ['admin', 'supervisor', 'ceo']
     },
 
-    // Recruitment Menu
-    Recruitment: {
-        name: 'Recruitment',
-        title: 'Recruitment Hub',
-        icon: Briefcase,
-        category: 'Recruitment',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    JobPositions: {
-        name: 'JobPositions',
-        title: 'Job Positions',
-        icon: FileText,
-        category: 'Recruitment',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    CandidateScreening: {
-        name: 'CandidateScreening',
-        title: 'Candidate Screening',
-        icon: ClipboardCheck,
-        category: 'Recruitment',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-
-    // Admin & Settings Menu
+    // Admin Menu
     Users: {
         name: 'Users',
         title: 'Users & Permissions',
@@ -343,16 +295,10 @@ export const NAV_CATEGORIES = {
         order: 3,
         renderAs: 'dropdown'
     },
-    Recruitment: {
-        label: 'Recruitment',
-        icon: Briefcase,
-        order: 4,
-        renderAs: 'dropdown'
-    },
     Admin: {
-        label: 'Admin & Settings',
+        label: 'Admin',
         icon: Settings,
-        order: 5,
+        order: 4,
         renderAs: 'dropdown'
     }
 };
