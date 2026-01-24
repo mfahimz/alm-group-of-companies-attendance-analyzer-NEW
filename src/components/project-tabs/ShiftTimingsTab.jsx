@@ -712,35 +712,27 @@ export default function ShiftTimingsTab({ project }) {
                                             type="date"
                                             value={blockDateRanges[blockId]?.from || ''}
                                             onChange={(e) => {
-                                                const newDate = e.target.value;
-                                                if (newDate >= project.date_from && newDate <= project.date_to) {
-                                                    setBlockDateRanges(prev => ({
-                                                        ...prev,
-                                                        [blockId]: { ...prev[blockId], from: newDate }
-                                                    }));
-                                                }
+                                                setBlockDateRanges(prev => ({
+                                                    ...prev,
+                                                    [blockId]: { ...prev[blockId], from: e.target.value }
+                                                }));
                                             }}
                                             min={project.date_from}
                                             max={project.date_to}
                                             className="w-40"
-                                            title="Date must be within project period"
                                         />
                                         <Input
                                             type="date"
                                             value={blockDateRanges[blockId]?.to || ''}
                                             onChange={(e) => {
-                                                const newDate = e.target.value;
-                                                if (newDate >= (blockDateRanges[blockId]?.from || project.date_from) && newDate <= project.date_to) {
-                                                    setBlockDateRanges(prev => ({
-                                                        ...prev,
-                                                        [blockId]: { ...prev[blockId], to: newDate }
-                                                    }));
-                                                }
+                                                setBlockDateRanges(prev => ({
+                                                    ...prev,
+                                                    [blockId]: { ...prev[blockId], to: e.target.value }
+                                                }));
                                             }}
                                             min={blockDateRanges[blockId]?.from || project.date_from}
                                             max={project.date_to}
                                             className="w-40"
-                                            title="Date must be within project period"
                                         />
                                         <Button
                                             size="sm"
