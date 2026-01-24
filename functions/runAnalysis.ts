@@ -28,8 +28,8 @@ Deno.serve(async (req) => {
         const project = projects[0];
         const userRole = user?.extended_role || user?.role || 'user';
         
-        // Security: Verify access
-        if (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'ceo') {
+        // Security: Verify access (User and Supervisor have full project access)
+        if (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'ceo' && userRole !== 'user') {
             if (project.company !== user.company) {
                 return Response.json({ error: 'Access denied' }, { status: 403 });
             }
@@ -404,6 +404,8 @@ Deno.serve(async (req) => {
                         const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
                         if (dayPunchesForLeave.length === 0) {
                             working_days--;
+                            // Count annual leave day - weekly holidays and public holidays during leave period are auto-excluded
+                            // by the fact that we skip weekly off days earlier in the loop and public holidays reduce working_days
                             annual_leave_count++;
                             continue;
                         } else {
