@@ -106,18 +106,20 @@ export default function SalaryTab({ project, finalReport }) {
                       // Salary Leave Days = Annual Leave Days (from exceptions)
                       const salaryLeaveDays = annualLeaveDays;
 
-                      // Salary Leave Amount calculation based on working hours
-                      let salaryLeaveAmount = 0;
-                      if (salaryLeaveDays > 0) {
-                          if (workingHours === 8) {
-                              // 8-hour: (Total Salary / 30) × Salary Leave Days
-                              salaryLeaveAmount = (totalSalaryAmount / 30) * salaryLeaveDays;
-                          } else if (workingHours === 9) {
-                              // 9-hour: ((Total Salary × 0.8767) / 30) × Salary Leave Days
-                              const adjustedSalary = totalSalaryAmount * 0.8767;
-                              salaryLeaveAmount = (adjustedSalary / 30) * salaryLeaveDays;
-                          }
+                      // Salary Leave Amount = (Basic Salary + Allowances) / 30 × Salary Leave Days
+                      // Parse allowances JSON
+                      let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0 };
+                      try {
+                          allowancesObj = JSON.parse(salary?.allowances || '{}');
+                      } catch (e) {
+                          // Keep defaults if parsing fails
                       }
+                      const allowancesSum = (allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
+                                           (allowancesObj.food || 0) + (allowancesObj.others || 0);
+                      const basicSalary = salary?.basic_salary || 0;
+                      const salaryForLeave = basicSalary + allowancesSum; // Excludes allowances_with_bonus
+                      
+                      const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
 
                       // Deductible Hours = deductible_minutes ÷ 60
                       const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
@@ -352,15 +354,15 @@ export default function SalaryTab({ project, finalReport }) {
             // Recalculate Salary Leave Amount if salaryLeaveDays was edited
             if ('salaryLeaveDays' in employeeEdits) {
                 const salaryLeaveDays = employeeEdits.salaryLeaveDays;
-                let newSalaryLeaveAmount = 0;
-                if (salaryLeaveDays > 0) {
-                    if (workingHours === 8) {
-                        newSalaryLeaveAmount = (totalSalary / 30) * salaryLeaveDays;
-                    } else if (workingHours === 9) {
-                        const adjustedSalary = totalSalary * 0.8767;
-                        newSalaryLeaveAmount = (adjustedSalary / 30) * salaryLeaveDays;
-                    }
-                }
+                // Get basic salary + allowances (excluding allowances_with_bonus)
+                let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0 };
+                try {
+                    allowancesObj = JSON.parse(row.allowances || '{}');
+                } catch (e) {}
+                const allowancesSum = (allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
+                                     (allowancesObj.food || 0) + (allowancesObj.others || 0);
+                const salaryForLeave = row.basic_salary + allowancesSum;
+                const newSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
                 recalculated[hrmsId].salaryLeaveAmount = newSalaryLeaveAmount;
             }
 
@@ -419,15 +421,15 @@ export default function SalaryTab({ project, finalReport }) {
 
                 // Recalculate Salary Leave Amount if salaryLeaveDays was edited
                 if ('salaryLeaveDays' in edits) {
-                    let newSalaryLeaveAmount = 0;
-                    if (updated.salaryLeaveDays > 0) {
-                        if (workingHours === 8) {
-                            newSalaryLeaveAmount = (totalSalary / 30) * updated.salaryLeaveDays;
-                        } else if (workingHours === 9) {
-                            const adjustedSalary = totalSalary * 0.8767;
-                            newSalaryLeaveAmount = (adjustedSalary / 30) * updated.salaryLeaveDays;
-                        }
-                    }
+                    // Get basic salary + allowances (excluding allowances_with_bonus)
+                    let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0 };
+                    try {
+                        allowancesObj = JSON.parse(updated.allowances || '{}');
+                    } catch (e) {}
+                    const allowancesSum = (allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
+                                         (allowancesObj.food || 0) + (allowancesObj.others || 0);
+                    const salaryForLeave = updated.basic_salary + allowancesSum;
+                    const newSalaryLeaveAmount = updated.salaryLeaveDays > 0 ? (salaryForLeave / 30) * updated.salaryLeaveDays : 0;
                     updated.salaryLeaveAmount = newSalaryLeaveAmount;
                 }
 

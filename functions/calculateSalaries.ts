@@ -86,19 +86,20 @@ Deno.serve(async (req) => {
                 }
             }
             
-            // Salary Leave Amount calculation based on working hours
-            let salaryLeaveAmount = 0;
-            if (salaryLeaveDays > 0) {
-                if (workingHours === 8) {
-                    // 8-hour employees: (Total Salary / 30) × Salary Leave Days
-                    salaryLeaveAmount = (totalSalaryAmount / 30) * salaryLeaveDays;
-                } else if (workingHours === 9) {
-                    // 9-hour employees: ((Total Salary × 0.8767) / 30) × Salary Leave Days
-                    // 0.8767 = 1 - 0.1233
-                    const adjustedSalary = totalSalaryAmount * 0.8767;
-                    salaryLeaveAmount = (adjustedSalary / 30) * salaryLeaveDays;
-                }
+            // Salary Leave Amount = (Basic Salary + Allowances) / 30 × Salary Leave Days
+            // Parse allowances (excludes allowances_with_bonus)
+            let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0 };
+            try {
+                allowancesObj = JSON.parse(salary?.allowances || '{}');
+            } catch (e) {
+                // Keep defaults if parsing fails
             }
+            const allowancesSum = (allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
+                                 (allowancesObj.food || 0) + (allowancesObj.others || 0);
+            const basicSalary = salary?.basic_salary || 0;
+            const salaryForLeave = basicSalary + allowancesSum;
+            
+            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
 
             // Net Deduction = Leave Pay - Salary Leave Amount
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
