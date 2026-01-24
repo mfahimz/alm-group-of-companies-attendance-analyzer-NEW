@@ -121,7 +121,10 @@ export default function SalaryTab({ project, finalReport }) {
 
                       // Deductible Hours = deductible_minutes ÷ 60
                       const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
-                      const deductibleHoursPay = 0;
+
+                      // Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours
+                      const hourlyRate = totalSalaryAmount / 30 / workingHours;
+                      const deductibleHoursPay = hourlyRate * deductibleHours;
 
                       // Net Deduction = Leave Pay - Salary Leave Amount
                       const lopDeduction = Math.max(0, leavePay - salaryLeaveAmount);
@@ -135,10 +138,10 @@ export default function SalaryTab({ project, finalReport }) {
              const advanceSalaryDeduction = 0; // To be set manually
              const deductibleMinutesAmount = 0; // To be calculated based on deductible minutes
 
-             // Total = Total Salary - (Leave Pay - Salary Leave Amount)
+             // Total = Total Salary + Additions - Deductions
              const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
              const totalSalary = totalSalaryAmount + otSalary + bonus + incentive 
-                                 - netDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+                                 - netDeduction - deductibleHoursPay - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
              const wpsPay = totalSalary; // WPS is typically the total
              const balance = 0; // Balance = Total - WPS Pay
 
@@ -306,12 +309,12 @@ export default function SalaryTab({ project, finalReport }) {
         const incentive = getValue(row, 'incentive');
         const otherDeduction = getValue(row, 'otherDeduction');
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction');
-        const lopDeduction = getValue(row, 'lopDeduction');
+        const deductibleHoursPay = getValue(row, 'deductibleHoursPay');
         const deductibleMinutesAmount = getValue(row, 'deductibleMinutesAmount');
 
         const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-              const total = row.total_salary + otSalary + bonus + incentive
-                      - netDeduction - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+        const total = row.total_salary + otSalary + bonus + incentive
+                      - netDeduction - deductibleHoursPay - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
         const wpsPay = total;
         const balance = 0;
 
