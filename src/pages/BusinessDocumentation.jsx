@@ -370,7 +370,13 @@ export default function BusinessDocumentation() {
                         <li>No deduction occurs</li>
                         <li>Days are tracked against employee's annual leave balance</li>
                         <li>These days don't count as working days</li>
+                        <li><strong>Auto-Deduction:</strong> Weekly holidays and public holidays that fall within annual leave periods are automatically excluded from the leave count</li>
                     </ul>
+                    <p className="text-sm bg-blue-50 border border-blue-200 rounded p-3 mt-2">
+                        <strong>Example:</strong> Employee takes annual leave from Monday to Sunday (7 calendar days). 
+                        If Sunday is their weekly off day, only 6 days count as annual leave. If a public holiday falls 
+                        on Wednesday during this period, only 5 days count as annual leave.
+                    </p>
 
                     <h3 className="text-xl font-semibold mt-6">Manual Corrections</h3>
                     <p>
@@ -599,24 +605,32 @@ export default function BusinessDocumentation() {
                         </div>
 
                         <div className="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
-                            <h4 className="text-lg font-bold text-blue-900 mb-2">Supervisor</h4>
+                            <h4 className="text-lg font-bold text-blue-900 mb-2">Supervisor & User Roles</h4>
                             <div className="text-sm text-blue-800">
-                                <p className="font-semibold mb-2">Responsibilities:</p>
+                                <p className="font-semibold mb-2">Responsibilities (Full Project Access):</p>
                                 <ul>
                                     <li>Create and manage projects</li>
                                     <li>Upload attendance and shift data</li>
                                     <li>Add and manage exceptions</li>
                                     <li>Run attendance analysis</li>
-                                    <li>Generate and review reports</li>
-                                    <li>View salary calculations</li>
+                                    <li>Generate, review, and edit reports</li>
+                                    <li>View salary calculations (Admin/CEO only for Salary tab)</li>
                                     <li>Export data for payroll processing</li>
+                                    <li>Edit daily breakdowns and apply manual corrections</li>
+                                    <li>Finalize reports and create exceptions</li>
                                 </ul>
                                 <p className="font-semibold mt-3 mb-2">Limitations:</p>
                                 <ul>
                                     <li>Cannot create or manage user accounts</li>
                                     <li>Cannot change system-wide settings or rules</li>
                                     <li>Cannot configure page permissions</li>
+                                    <li>Cannot access Salary tab (restricted to Admin/CEO)</li>
+                                    <li>Cannot reopen closed projects (Admin only)</li>
                                 </ul>
+                                <p className="text-xs bg-blue-100 rounded p-2 mt-2">
+                                    <strong>Project Permissions:</strong> User and Supervisor roles have full access within project operations - 
+                                    same permissions as Admin for creating, editing, analyzing, and reporting within projects.
+                                </p>
                             </div>
                         </div>
 
@@ -672,25 +686,7 @@ export default function BusinessDocumentation() {
                             </div>
                         </div>
 
-                        <div className="border-2 border-slate-300 rounded-lg p-4 bg-slate-50">
-                            <h4 className="text-lg font-bold text-slate-900 mb-2">Regular User</h4>
-                            <div className="text-sm text-slate-800">
-                                <p className="font-semibold mb-2">Responsibilities:</p>
-                                <ul>
-                                    <li>Access is configured by admin on per-page basis</li>
-                                    <li>Typically limited to viewing reports</li>
-                                    <li>May be granted specific operational tasks</li>
-                                    <li>Permissions vary based on company needs</li>
-                                </ul>
-                                <p className="font-semibold mt-3 mb-2">Limitations:</p>
-                                <ul>
-                                    <li>Cannot access pages not explicitly permitted</li>
-                                    <li>Usually read-only access</li>
-                                    <li>Cannot change system settings</li>
-                                    <li>Cannot manage other users</li>
-                                </ul>
-                            </div>
-                        </div>
+
                     </div>
                 </Section>
 

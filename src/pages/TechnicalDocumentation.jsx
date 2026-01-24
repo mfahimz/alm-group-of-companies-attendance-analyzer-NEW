@@ -828,10 +828,13 @@ const menu = baseMenu.filter(item => hasPageAccess(item.url));`}
                         </div>
 
                         <div className="border border-blue-300 rounded p-3 bg-blue-50">
-                            <h5 className="font-semibold text-blue-900">Supervisor</h5>
-                            <p className="text-xs text-blue-800"><strong>Can see:</strong> Projects, Employees, Reports, Salaries (all companies)</p>
-                            <p className="text-xs text-blue-800"><strong>Can modify:</strong> Create/edit projects, run analysis, generate reports</p>
-                            <p className="text-xs text-blue-800"><strong>Forbidden:</strong> User management, system settings, page permissions</p>
+                            <h5 className="font-semibold text-blue-900">Supervisor & User (Within Projects)</h5>
+                            <p className="text-xs text-blue-800"><strong>Can see:</strong> Projects, Employees, Reports (all companies)</p>
+                            <p className="text-xs text-blue-800"><strong>Can modify:</strong> Full project access - create/edit projects, upload data, run analysis, generate reports, edit daily breakdowns, manage exceptions, finalize reports</p>
+                            <p className="text-xs text-blue-800"><strong>Forbidden:</strong> User management, system settings, page permissions, Salary tab (Admin/CEO only), reopening closed projects (Admin only)</p>
+                            <p className="text-xs bg-blue-100 rounded p-2 mt-2">
+                                <strong>Note:</strong> Supervisor and User roles have identical project-level permissions. Both can perform all project operations except salary access and system administration.
+                            </p>
                         </div>
 
                         <div className="border border-green-300 rounded p-3 bg-green-50">
@@ -853,12 +856,7 @@ const menu = baseMenu.filter(item => hasPageAccess(item.url));`}
                             </p>
                         </div>
 
-                        <div className="border border-slate-300 rounded p-3 bg-slate-50">
-                            <h5 className="font-semibold text-slate-900">User</h5>
-                            <p className="text-xs text-slate-800"><strong>Can see:</strong> Pages configured in PagePermission entity</p>
-                            <p className="text-xs text-slate-800"><strong>Can modify:</strong> Limited to read-only unless specific permissions granted</p>
-                            <p className="text-xs text-slate-800"><strong>Forbidden:</strong> All admin/supervisor functions</p>
-                        </div>
+
                     </div>
 
                     <h4 className="text-lg font-semibold mt-4">Action-Level Access Control</h4>

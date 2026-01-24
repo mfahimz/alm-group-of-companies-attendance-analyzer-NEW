@@ -35,6 +35,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user';
+    const isSupervisor = userRole === 'supervisor';
 
     const { data: punches = [] } = useQuery({
        queryKey: ['punches', project?.id, attendanceId],
@@ -467,7 +468,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['results', project.id]);
-            toast.success(isUser ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');
+            toast.success((isUser && !isSupervisor) ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');
             if (onSave) onSave();
             onClose();
         },
@@ -558,15 +559,15 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 <DialogHeader>
                     <DialogTitle>Edit Day Record: {dayRecord.date}</DialogTitle>
                     <p className="text-sm text-slate-500 mt-1">
-                        {isUser 
-                            ? 'Your changes will be submitted for admin/supervisor approval' 
+                        {(isUser && !isSupervisor) 
+                            ? 'Your changes will be submitted for admin approval' 
                             : 'Changes apply only to this specific report'}
                     </p>
                 </DialogHeader>
-                {isUser && (
+                {(isUser && !isSupervisor) && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
                         <p className="text-sm text-amber-800">
-                            ⚠️ Your edits will be saved to this report and submitted for admin/supervisor approval when you click "Save Report".
+                            ⚠️ Your edits will be saved to this report and submitted for admin approval when you click "Save Report".
                         </p>
                     </div>
                 )}

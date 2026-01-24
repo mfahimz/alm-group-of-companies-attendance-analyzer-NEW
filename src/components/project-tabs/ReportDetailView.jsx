@@ -40,6 +40,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user';
     const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id],
@@ -912,7 +913,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const exceptionsToCreate = [];
             
             // Determine if current user made any edits that need approval
-            const isCurrentUserRegular = userRole === 'user';
+            const isCurrentUserRegular = userRole === 'user' && !isSupervisor;
             
             for (const result of results) {
                 if (!result.day_overrides) continue;
@@ -1868,7 +1869,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         <TableCell>
                                             <div className="flex items-center gap-2 group">
                                                 <span>{result.grace_minutes ?? 15}</span>
-                                                {!isUser && (
+                                                {(isAdmin || isSupervisor) && (
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -2139,8 +2140,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
                             <ul className="text-sm text-amber-700 space-y-1">
                                 <li>• All manual edits in daily breakdowns will be converted to exceptions</li>
-                                {isUser ? (
-                                    <li>• Your edits will be marked as pending and require admin/supervisor approval</li>
+                                {(isUser && !isSupervisor) ? (
+                                    <li>• Your edits will be marked as pending and require admin approval</li>
                                 ) : (
                                     <li>• Admin/supervisor edits will be automatically approved and used in future analysis</li>
                                 )}

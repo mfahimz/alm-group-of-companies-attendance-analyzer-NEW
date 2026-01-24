@@ -419,6 +419,8 @@ export default function RunAnalysisTab({ project }) {
                     const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
                     if (dayPunchesForLeave.length === 0) {
                         working_days--;
+                        // Count annual leave day - weekly holidays and public holidays during leave period are auto-excluded
+                        // by the fact that we skip weekly off days earlier in the loop and public holidays reduce working_days
                         annual_leave_count++;
                         continue;
                     } else {
