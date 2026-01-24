@@ -36,11 +36,11 @@ Deno.serve(async (req) => {
         }
 
         // Fetch all required data
-        const [punches, shifts, exceptions, employees, rulesData] = await Promise.all([
+        const [punches, shifts, exceptions, allEmployees, rulesData] = await Promise.all([
             base44.asServiceRole.entities.Punch.filter({ project_id }),
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id }),
             base44.asServiceRole.entities.Exception.filter({ project_id }),
-            base44.asServiceRole.entities.Employee.filter({ company: project.company }),
+            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
         ]);
 
@@ -58,8 +58,13 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'No attendance rules configured for this company' }, { status: 400 });
         }
 
-        // Get unique employee IDs from punches
-        const uniqueEmployeeIds = [...new Set(punches.map(p => p.attendance_id))];
+        // Get unique employee IDs from punches, filtered to only active employees
+        const activeEmployeeAttendanceIds = allEmployees.map(e => Number(e.attendance_id));
+        const uniqueEmployeeIds = [...new Set(punches.map(p => p.attendance_id))]
+            .filter(id => activeEmployeeAttendanceIds.includes(Number(id)));
+        
+        // Use active employees for analysis
+        const employees = allEmployees;
 
         // Create report run
         const reportRun = await base44.asServiceRole.entities.ReportRun.create({
