@@ -15,33 +15,30 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'project_id is required' }, { status: 400 });
         }
 
-        // Delete punches in parallel batches for much faster deletion
+        // Delete punches with rate limit handling
         const punches = await base44.asServiceRole.entities.Punch.filter({ project_id });
         
-        const batchSize = 100;
-        const parallelBatches = 5; // Process 5 batches simultaneously
+        const batchSize = 10; // Smaller batch to avoid rate limits
         let deletedCount = 0;
         
-        // Split into batches
-        const batches = [];
+        // Process in small sequential batches with delay
         for (let i = 0; i < punches.length; i += batchSize) {
-            batches.push(punches.slice(i, i + batchSize));
-        }
-        
-        // Process batches in parallel groups
-        for (let i = 0; i < batches.length; i += parallelBatches) {
-            const parallelGroup = batches.slice(i, i + parallelBatches);
+            const batch = punches.slice(i, i + batchSize);
             
-            await Promise.all(parallelGroup.map(async (batch) => {
-                await Promise.all(batch.map(async (punch) => {
-                    try {
-                        await base44.asServiceRole.entities.Punch.delete(punch.id);
-                        deletedCount++;
-                    } catch (error) {
-                        console.error('Failed to delete punch:', punch.id, error);
-                    }
-                }));
-            }));
+            // Delete batch items sequentially
+            for (const punch of batch) {
+                try {
+                    await base44.asServiceRole.entities.Punch.delete(punch.id);
+                    deletedCount++;
+                } catch (error) {
+                    console.error('Failed to delete punch:', punch.id, error);
+                }
+            }
+            
+            // Small delay between batches
+            if (i + batchSize < punches.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
         }
 
         return Response.json({ 
