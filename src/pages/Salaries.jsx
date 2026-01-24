@@ -26,6 +26,9 @@ export default function Salaries() {
     const [previewData, setPreviewData] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [salaryUnlocked, setSalaryUnlocked] = useState(false);
+    const [unmatchedRecords, setUnmatchedRecords] = useState([]);
+    const [showUnmatchedDialog, setShowUnmatchedDialog] = useState(false);
+    const [pendingValidRecords, setPendingValidRecords] = useState([]);
     
     const [formData, setFormData] = useState({
         employee_id: '',
@@ -327,8 +330,22 @@ export default function Salaries() {
             }
 
             setUploadProgress(null);
-            setPreviewData({ valid: validRecords, errors: errorRecords });
-            setShowPreview(true);
+            
+            // Separate unmatched HRMS IDs from other errors
+            const unmatchedHrmsRecords = errorRecords.filter(r => r.error === 'Employee not found in master data (check HRMS ID)');
+            const otherErrors = errorRecords.filter(r => r.error !== 'Employee not found in master data (check HRMS ID)');
+            
+            if (unmatchedHrmsRecords.length > 0) {
+                // Show unmatched dialog for manual correction
+                setUnmatchedRecords(unmatchedHrmsRecords.map(r => ({ ...r, correctedHrmsId: r.hrmsId })));
+                setPendingValidRecords(validRecords);
+                setPreviewData({ valid: validRecords, errors: otherErrors });
+                setShowUnmatchedDialog(true);
+            } else {
+                // No unmatched records, go directly to preview
+                setPreviewData({ valid: validRecords, errors: otherErrors });
+                setShowPreview(true);
+            }
 
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
@@ -406,6 +423,58 @@ export default function Salaries() {
         } catch (error) {
             toast.error('Failed to import: ' + error.message);
             setUploadProgress(null);
+        }
+    };
+
+    const handleUnmatchedCorrection = () => {
+        const correctedRecords = [];
+        const stillUnmatched = [];
+
+        unmatchedRecords.forEach(record => {
+            const correctedHrmsId = String(record.correctedHrmsId || '').trim();
+            
+            if (!correctedHrmsId) {
+                stillUnmatched.push({ ...record, error: 'HRMS ID is required' });
+                return;
+            }
+
+            // Find employee by corrected HRMS ID
+            const employee = employees.find(e => String(e.hrms_id) === correctedHrmsId);
+
+            if (!employee) {
+                stillUnmatched.push({ ...record, error: `HRMS ID ${correctedHrmsId} not found` });
+            } else {
+                // Check if there's already an active salary for this employee
+                const existingSalary = salaries.find(s => s.employee_id === employee.hrms_id && s.active);
+                
+                correctedRecords.push({
+                    ...record,
+                    hrmsId: correctedHrmsId,
+                    attendanceId: employee.attendance_id,
+                    company: employee.company,
+                    employee,
+                    existingSalary,
+                    action: existingSalary ? 'Update' : 'Create',
+                    error: null
+                });
+            }
+        });
+
+        if (stillUnmatched.length > 0) {
+            toast.error(`${stillUnmatched.length} records still have invalid HRMS IDs`);
+            setUnmatchedRecords(stillUnmatched.map(r => ({ ...r, correctedHrmsId: r.hrmsId })));
+        } else {
+            // All corrected successfully
+            const allValidRecords = [...pendingValidRecords, ...correctedRecords];
+            setPreviewData(prev => ({ 
+                valid: allValidRecords, 
+                errors: prev?.errors || [] 
+            }));
+            setShowUnmatchedDialog(false);
+            setShowPreview(true);
+            setUnmatchedRecords([]);
+            setPendingValidRecords([]);
+            toast.success(`${correctedRecords.length} records corrected and ready to import`);
         }
     };
 
@@ -853,6 +922,84 @@ export default function Salaries() {
                             className="bg-green-600 hover:bg-green-700"
                         >
                             {uploadProgress ? 'Importing...' : `Import ${previewData?.valid.length || 0} Records`}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showUnmatchedDialog} onOpenChange={setShowUnmatchedDialog}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Correct Unmatched HRMS IDs</DialogTitle>
+                        <p className="text-sm text-slate-600 mt-2">
+                            The following records have HRMS IDs that don't match any employee in the system. 
+                            Please enter the correct HRMS ID for each record.
+                        </p>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4">
+                        <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Row</TableHead>
+                                        <TableHead>Original HRMS ID</TableHead>
+                                        <TableHead>Employee Name</TableHead>
+                                        <TableHead>Correct HRMS ID</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {unmatchedRecords.map((record, idx) => (
+                                        <TableRow key={idx}>
+                                            <TableCell>{record.rowNumber}</TableCell>
+                                            <TableCell className="font-medium text-red-600">{record.hrmsId}</TableCell>
+                                            <TableCell>{record.name}</TableCell>
+                                            <TableCell>
+                                                <Input
+                                                    value={record.correctedHrmsId}
+                                                    onChange={(e) => {
+                                                        const updated = [...unmatchedRecords];
+                                                        updated[idx].correctedHrmsId = e.target.value;
+                                                        setUnmatchedRecords(updated);
+                                                    }}
+                                                    placeholder="Enter correct HRMS ID"
+                                                    className="w-40"
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                {record.error && (
+                                                    <span className="text-xs text-red-600">{record.error}</span>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p className="text-sm text-blue-900">
+                                <strong>Tip:</strong> You can find the correct HRMS ID in the Employees page. 
+                                Make sure the HRMS ID exists in the system before importing.
+                            </p>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setShowUnmatchedDialog(false);
+                            setUnmatchedRecords([]);
+                            setPendingValidRecords([]);
+                            setPreviewData(null);
+                        }}>
+                            Cancel Import
+                        </Button>
+                        <Button 
+                            onClick={handleUnmatchedCorrection}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            Validate & Continue
                         </Button>
                     </DialogFooter>
                 </DialogContent>
