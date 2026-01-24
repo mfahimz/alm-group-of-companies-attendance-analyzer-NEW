@@ -154,11 +154,12 @@ export default function PunchUploadTab({ project }) {
                         }
                     }
                     // Naser Mohsin Auto Parts format: ID, FirstName, Date, Time (4 columns)
+                    // Date format: MM/DD/YYYY
                     else if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
                         let dateStr = values[2].trim();
                         let timeStr = values[3].trim();
                         
-                        // Parse date and convert to DD/MM/YYYY
+                        // Parse date - expecting MM/DD/YYYY format
                         let day, month, year;
                         
                         // Check if date is in YYYY-MM-DD format
@@ -166,14 +167,14 @@ export default function PunchUploadTab({ project }) {
                         if (isoDateMatch) {
                             [, year, month, day] = isoDateMatch;
                         } else {
-                            // Check if date is in DD/MM/YYYY format
-                            const ddmmyyyyMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                            if (ddmmyyyyMatch) {
-                                [, day, month, year] = ddmmyyyyMatch;
+                            // Parse as MM/DD/YYYY (Naser Mohsin format)
+                            const mmddyyyyMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                            if (mmddyyyyMatch) {
+                                [, month, day, year] = mmddyyyyMatch;
                             }
                         }
                         
-                        // Convert to DD/MM/YYYY
+                        // Convert to DD/MM/YYYY for display
                         if (day && month && year) {
                             dateStr = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
                             punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
@@ -451,7 +452,7 @@ export default function PunchUploadTab({ project }) {
                                     CSV format: attendance_id, first_name, date, time
                                 </p>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Date format: DD/MM/YYYY, Time format: HH:MM (will be converted to AM/PM automatically)
+                                    Date format: MM/DD/YYYY, Time format: HH:MM (will be converted to AM/PM automatically)
                                 </p>
                             </>
                         ) : (
