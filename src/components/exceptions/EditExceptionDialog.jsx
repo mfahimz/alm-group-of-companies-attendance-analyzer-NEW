@@ -24,13 +24,24 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
         early_checkout_minutes: '',
         allowed_minutes: '',
         allowed_minutes_type: 'both',
-        include_friday: false
+        include_friday: false,
+        salary_leave_days: ''
     });
 
     const queryClient = useQueryClient();
 
     useEffect(() => {
         if (exception) {
+            // Calculate default salary_leave_days if not set
+            let calculatedDays = '';
+            if (exception.type === 'ANNUAL_LEAVE' && exception.date_from && exception.date_to) {
+                const from = new Date(exception.date_from);
+                const to = new Date(exception.date_to);
+                const diffTime = Math.abs(to - from);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                calculatedDays = exception.salary_leave_days ?? diffDays;
+            }
+
             setFormData({
                 type: exception.type || '',
                 date_from: exception.date_from || '',
@@ -44,7 +55,8 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 early_checkout_minutes: exception.early_checkout_minutes || '',
                 allowed_minutes: exception.allowed_minutes || '',
                 allowed_minutes_type: exception.allowed_minutes_type || 'both',
-                include_friday: exception.include_friday || false
+                include_friday: exception.include_friday || false,
+                salary_leave_days: calculatedDays
             });
         }
     }, [exception]);
@@ -91,6 +103,10 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.allowed_minutes_type = formData.allowed_minutes_type || 'both';
         }
 
+        if (formData.type === 'ANNUAL_LEAVE' && formData.salary_leave_days) {
+            cleanedData.salary_leave_days = parseFloat(formData.salary_leave_days);
+        }
+
         updateMutation.mutate(cleanedData);
     };
 
@@ -99,6 +115,19 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
+    const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
+    
+    // Calculate days between dates for annual leave
+    const calculateDaysBetween = () => {
+        if (formData.date_from && formData.date_to) {
+            const from = new Date(formData.date_from);
+            const to = new Date(formData.date_to);
+            const diffTime = Math.abs(to - from);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return diffDays;
+        }
+        return 0;
+    };
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
@@ -146,7 +175,17 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                             <Input
                                 type="date"
                                 value={formData.date_from}
-                                onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, date_from: e.target.value });
+                                    // Auto-calculate salary_leave_days for annual leave
+                                    if (needsSalaryLeaveDays && formData.date_to) {
+                                        const from = new Date(e.target.value);
+                                        const to = new Date(formData.date_to);
+                                        const diffTime = Math.abs(to - from);
+                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                                        setFormData(prev => ({ ...prev, salary_leave_days: diffDays.toFixed(2) }));
+                                    }
+                                }}
                             />
                         </div>
                         <div>
@@ -154,7 +193,17 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                             <Input
                                 type="date"
                                 value={formData.date_to}
-                                onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, date_to: e.target.value });
+                                    // Auto-calculate salary_leave_days for annual leave
+                                    if (needsSalaryLeaveDays && formData.date_from) {
+                                        const from = new Date(formData.date_from);
+                                        const to = new Date(e.target.value);
+                                        const diffTime = Math.abs(to - from);
+                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                                        setFormData(prev => ({ ...prev, salary_leave_days: diffDays.toFixed(2) }));
+                                    }
+                                }}
                             />
                         </div>
                     </div>
@@ -273,6 +322,26 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                 </div>
                             </div>
                             <p className="text-xs text-slate-500">Minutes to excuse due to natural calamity or personal reasons</p>
+                        </div>
+                    )}
+
+                    {needsSalaryLeaveDays && (
+                        <div className="border-t pt-4">
+                            <Label>Salary Leave Days (for salary calculation only) *</Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="e.g. 9.00"
+                                value={formData.salary_leave_days}
+                                onChange={(e) => setFormData({ ...formData, salary_leave_days: e.target.value })}
+                                min="0"
+                            />
+                            <p className="text-xs text-green-600 mt-1">
+                                💡 Calculated: {calculateDaysBetween()} days between selected dates. Edit if partial days needed.
+                            </p>
+                            <p className="text-xs text-amber-600 mt-1">
+                                ⚠️ This value is used ONLY for salary calculation, not for attendance reports.
+                            </p>
                         </div>
                     )}
 
