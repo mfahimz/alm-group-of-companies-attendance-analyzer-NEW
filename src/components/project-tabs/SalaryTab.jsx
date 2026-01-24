@@ -88,10 +88,15 @@ export default function SalaryTab({ project, finalReport }) {
             );
             const result = analysisResults.find(r => Number(r.attendance_id) === Number(emp.attendance_id));
 
-             // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
-                      const annualLeaveDays = result?.annual_leave_count || 0;
-                      const lopDays = result?.full_absence_count || 0;
-                      const leaveDays = annualLeaveDays + lopDays;
+            // Use manual overrides if present, otherwise use calculated values
+            const presentDays = result?.manual_present_days ?? result?.present_days ?? 0;
+            const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
+            const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
+            const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
+            const deductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+
+            // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
+            const leaveDays = annualLeaveDays + lopDays;
                       const totalSalaryAmount = salary?.total_salary || 0;
                       const workingHours = salary?.working_hours || 9;
 
@@ -115,7 +120,6 @@ export default function SalaryTab({ project, finalReport }) {
                       }
 
                       // Deductible Hours = deductible_minutes ÷ 60
-                      const deductibleMinutes = result?.deductible_minutes || 0;
                       const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
                       const deductibleHoursPay = 0;
 
@@ -151,12 +155,12 @@ export default function SalaryTab({ project, finalReport }) {
                 total_salary: salary?.total_salary || 0,
                 working_hours: salary?.working_hours || 9,
                 deduction_per_minute: salary?.deduction_per_minute || 0,
-                // Analysis results
+                // Analysis results (use manual overrides if present)
                 working_days: 30,
-                present_days: result?.present_days || 0,
-                full_absence_count: result?.full_absence_count || 0, // LOP days only
-                annual_leave_count: result?.annual_leave_count || 0, // Separate from LOP
-                sick_leave_count: result?.sick_leave_count || 0, // Separate from LOP
+                present_days: presentDays,
+                full_absence_count: lopDays, // LOP days only
+                annual_leave_count: annualLeaveDays, // Separate from LOP
+                sick_leave_count: sickLeaveDays, // Separate from LOP
                 late_minutes: result?.late_minutes || 0,
                 early_checkout_minutes: result?.early_checkout_minutes || 0,
                 other_minutes: result?.other_minutes || 0,
