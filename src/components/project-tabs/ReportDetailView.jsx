@@ -1021,9 +1021,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
                         } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes > 0) {
                             exceptionData.type = 'MANUAL_LATE';
-                        } else if (exceptionData.late_minutes > 0) {
+                        } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes === 0) {
                             exceptionData.type = 'MANUAL_LATE';
-                        } else if (exceptionData.early_checkout_minutes > 0) {
+                        } else if (exceptionData.early_checkout_minutes > 0 && exceptionData.late_minutes === 0) {
                             exceptionData.type = 'MANUAL_EARLY_CHECKOUT';
                         } else if (exceptionData.other_minutes > 0) {
                             exceptionData.type = 'MANUAL_OTHER_MINUTES';
