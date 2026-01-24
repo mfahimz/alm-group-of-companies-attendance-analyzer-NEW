@@ -176,7 +176,7 @@ export default function Projects() {
 
     const deleteMutation = useMutation({
         mutationFn: async (projectId) => {
-            // SECURITY: Verify user has access to this project
+            // Verify user has access to this project
             const projectToDelete = projects.find(p => p.id === projectId);
             if (!projectToDelete) {
                 throw new Error('Project not found or access denied');
@@ -261,7 +261,7 @@ export default function Projects() {
                     <p className="text-slate-600 mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
                 </div>
                 <div className="flex gap-2">
-                    {selectedProjects.length > 0 && isAdminOrSupervisor && (
+                    {selectedProjects.length > 0 && (
                         <Button
                             onClick={() => setShowBulkEdit(true)}
                             variant="outline"
@@ -271,15 +271,13 @@ export default function Projects() {
                             Bulk Edit ({selectedProjects.length})
                         </Button>
                     )}
-                    {!isDepartmentHead && (
-                        <Button 
-                            onClick={() => setShowCreateDialog(true)}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Project
-                        </Button>
-                    )}
+                    <Button 
+                        onClick={() => setShowCreateDialog(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        New Project
+                    </Button>
                 </div>
             </div>
 
@@ -354,15 +352,13 @@ export default function Projects() {
                                 : 'Create your first project to start tracking attendance'
                             }
                         </p>
-                        {!isDepartmentHead && (
-                            <Button 
-                                onClick={() => setShowCreateDialog(true)}
-                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                            >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Create First Project
-                            </Button>
-                        )}
+                        <Button 
+                            onClick={() => setShowCreateDialog(true)}
+                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create First Project
+                        </Button>
                     </CardContent>
                 </Card>
             ) : (
@@ -390,21 +386,19 @@ export default function Projects() {
                                 'from-red-400 to-red-500'
                             }`} />
                             <CardContent className="p-6 relative">
-                                {isAdminOrSupervisor && (
-                                    <div className="absolute top-4 right-4 z-10">
-                                        <Checkbox
-                                            checked={selectedProjects.some(p => p.id === project.id)}
-                                            onCheckedChange={(checked) => {
-                                                if (checked) {
-                                                    setSelectedProjects([...selectedProjects, project]);
-                                                } else {
-                                                    setSelectedProjects(selectedProjects.filter(p => p.id !== project.id));
-                                                }
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                    </div>
-                                )}
+                                <div className="absolute top-4 right-4 z-10">
+                                    <Checkbox
+                                        checked={selectedProjects.some(p => p.id === project.id)}
+                                        onCheckedChange={(checked) => {
+                                            if (checked) {
+                                                setSelectedProjects([...selectedProjects, project]);
+                                            } else {
+                                                setSelectedProjects(selectedProjects.filter(p => p.id !== project.id));
+                                            }
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                </div>
                                 <Link to={createPageUrl(`ProjectDetail?id=${project.id}`)} className="block">
                                     <div className="flex items-start justify-between mb-5">
                                         <div className="flex-1 min-w-0 pr-3">
@@ -458,36 +452,34 @@ export default function Projects() {
                                     </div>
                                 </Link>
                                 
-                                {isAdminOrSupervisor && (
-                                    <div className="mt-6 pt-4 border-t border-slate-100 flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 rounded-xl font-semibold transition-all"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleDuplicateClick(project);
-                                            }}
-                                        >
-                                            <Copy className="w-4 h-4 mr-2" />
-                                            Duplicate
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-3 rounded-xl transition-all"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                if (window.confirm('Delete this project? This action cannot be undone.')) {
-                                                    deleteMutation.mutate(project.id);
-                                                }
-                                            }}
-                                            disabled={deleteMutation.isPending}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                )}
+                                <div className="mt-6 pt-4 border-t border-slate-100 flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="flex-1 text-slate-600 hover:text-indigo-600 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 rounded-xl font-semibold transition-all"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handleDuplicateClick(project);
+                                        }}
+                                    >
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Duplicate
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-3 rounded-xl transition-all"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            if (window.confirm('Delete this project? This action cannot be undone.')) {
+                                                deleteMutation.mutate(project.id);
+                                            }
+                                        }}
+                                        disabled={deleteMutation.isPending}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
                             </CardContent>
                         </Card>
                                 ))}

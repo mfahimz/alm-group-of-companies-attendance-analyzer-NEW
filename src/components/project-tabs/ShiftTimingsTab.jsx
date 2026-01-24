@@ -62,7 +62,7 @@ export default function ShiftTimingsTab({ project }) {
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isUser = userRole === 'user';
+    const isUser = false; // Removed - all users can now create/edit shifts
 
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
@@ -783,7 +783,7 @@ export default function ShiftTimingsTab({ project }) {
                                 )}
                             </div>
                         </div>
-                        {editingBlockRange !== blockId && !isUser && (
+                        {editingBlockRange !== blockId && (
                             <div className="flex gap-2">
                                 <Button
                                     size="sm"
@@ -831,18 +831,7 @@ export default function ShiftTimingsTab({ project }) {
                                 )}
                             </div>
                         )}
-                        {editingBlockRange !== blockId && isUser && blockShifts.length > 0 && (
-                            <div className="flex gap-2">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => exportBlockShiftsToCSV(blockId, blockShifts)}
-                                >
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Export {blockLabel}
-                                </Button>
-                            </div>
-                        )}
+
                     </div>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -856,7 +845,7 @@ export default function ShiftTimingsTab({ project }) {
                                         <p className="text-sm text-slate-600">
                                             {filteredShifts.length !== blockShifts.length && `${filteredShifts.length} of ${blockShifts.length} shown`}
                                         </p>
-                                        {selectedShifts.length > 0 && !isUser && (
+                                        {selectedShifts.length > 0 && (
                                             <Button
                                                 size="sm"
                                                 onClick={() => setShowBulkEdit(true)}
@@ -951,7 +940,7 @@ export default function ShiftTimingsTab({ project }) {
                                                 <TableHead>Shift Type</TableHead>
                                                 <TableHead>Shift Times</TableHead>
                                                 <TableHead>Applicable Days</TableHead>
-                                                {!isUser && <TableHead className="text-right">Actions</TableHead>}
+                                                <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -959,20 +948,18 @@ export default function ShiftTimingsTab({ project }) {
                                                 const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
                                                 return (
                                                     <TableRow key={shift.id}>
-                                                        {!isUser && (
-                                                            <TableCell>
-                                                                <Checkbox
-                                                                    checked={selectedShifts.some(s => s.id === shift.id)}
-                                                                    onCheckedChange={(checked) => {
-                                                                        if (checked) {
-                                                                            setSelectedShifts([...selectedShifts, shift]);
-                                                                        } else {
-                                                                            setSelectedShifts(selectedShifts.filter(s => s.id !== shift.id));
-                                                                        }
-                                                                    }}
-                                                                />
-                                                                </TableCell>
-                                                                )}
+                                                        <TableCell>
+                                                            <Checkbox
+                                                                checked={selectedShifts.some(s => s.id === shift.id)}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setSelectedShifts([...selectedShifts, shift]);
+                                                                    } else {
+                                                                        setSelectedShifts(selectedShifts.filter(s => s.id !== shift.id));
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </TableCell>
                                                                 <TableCell className="text-xs text-slate-500 font-mono">
                                                                 {shift.id.substring(0, 8)}
                                                                 </TableCell>
@@ -1019,30 +1006,28 @@ export default function ShiftTimingsTab({ project }) {
                                                                 </span>
                                                             )}
                                                         </TableCell>
-                                                        {!isUser && (
-                                                            <TableCell className="text-right">
-                                                                <div className="flex gap-1 justify-end">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        onClick={() => setEditingShift(shift)}
-                                                                    >
-                                                                        <Edit className="w-4 h-4 text-indigo-600" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        onClick={() => {
-                                                                            if (window.confirm('Delete this shift record?')) {
-                                                                                deleteMutation.mutate(shift.id);
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4 text-red-600" />
-                                                                    </Button>
-                                                                </div>
-                                                            </TableCell>
-                                                        )}
+                                                        <TableCell className="text-right">
+                                                            <div className="flex gap-1 justify-end">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => setEditingShift(shift)}
+                                                                >
+                                                                    <Edit className="w-4 h-4 text-indigo-600" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => {
+                                                                        if (window.confirm('Delete this shift record?')) {
+                                                                            deleteMutation.mutate(shift.id);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
                                                     </TableRow>
                                                 );
                                             })}
@@ -1094,7 +1079,7 @@ export default function ShiftTimingsTab({ project }) {
             )}
 
             {/* Add Shift Form */}
-            {showAddForm && !isUser && (
+            {showAddForm && (
                 <Card className="border-0 shadow-sm">
                     <CardHeader>
                         <CardTitle>Add Shift Timing</CardTitle>
@@ -1228,7 +1213,7 @@ export default function ShiftTimingsTab({ project }) {
                                 <Download className="w-4 h-4 mr-2" />
                                 Export All Shifts
                             </Button>
-                            {!showAddForm && !isUser && (
+                            {!showAddForm && (
                                 <Button
                                     onClick={() => setShowAddForm(true)}
                                     size="sm"
