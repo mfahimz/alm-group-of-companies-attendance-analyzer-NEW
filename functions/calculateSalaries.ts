@@ -85,8 +85,15 @@ Deno.serve(async (req) => {
             // Deductible Hours = deductible_minutes ÷ 60
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
 
-            // Final Total = Total Salary - Net Deduction
-            const finalTotal = totalSalaryAmount - netDeduction;
+            // OT Salary Calculation (user enters OT Hours, system calculates OT Salary)
+            // Formula: OT Salary = (Total Salary ÷ 30 ÷ Working Hours) × 1.25 × OT Hours
+            const otHours = 0; // Will be manually entered in UI
+            const hourlyRate = totalSalaryAmount / 30 / workingHours;
+            const otRate = hourlyRate * 1.25;
+            const otSalary = otRate * otHours;
+
+            // Final Total = Total Salary + OT Salary - Net Deduction
+            const finalTotal = totalSalaryAmount + otSalary - netDeduction;
 
             return {
                 attendance_id: emp.attendance_id,
@@ -117,7 +124,7 @@ Deno.serve(async (req) => {
                 salaryLeaveDays,
                 salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
                 otHours: 0,
-                otSalary: 0,
+                otSalary: Math.round(otSalary * 100) / 100,
                 deductibleHours,
                 deductibleHoursPay: 0,
                 otherDeduction: 0,

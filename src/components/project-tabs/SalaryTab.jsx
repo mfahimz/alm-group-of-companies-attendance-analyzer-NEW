@@ -283,26 +283,13 @@ export default function SalaryTab({ project, finalReport }) {
     // Handle input change for editable fields
     const handleChange = (hrmsId, field, value) => {
         const numValue = parseFloat(value) || 0;
-        const updatedEdits = {
+        setEditableData(prev => ({
+            ...prev,
             [hrmsId]: {
-                ...(editableData[hrmsId] || {}),
+                ...(prev[hrmsId] || {}),
                 [field]: numValue
             }
-        };
-
-        // If leaveDays or salaryLeaveDays changed, immediately recalculate dependents
-        if (field === 'leaveDays' || field === 'salaryLeaveDays') {
-            const recalculated = recalculateDependentFields(updatedEdits);
-            setEditableData(prev => ({
-                ...prev,
-                ...recalculated
-            }));
-        } else {
-            setEditableData(prev => ({
-                ...prev,
-                [hrmsId]: updatedEdits[hrmsId]
-            }));
-        }
+        }));
     };
 
     // Get value (either from editableData or original data)
@@ -331,7 +318,7 @@ export default function SalaryTab({ project, finalReport }) {
         return { total, wpsPay, balance };
     };
 
-    // Recalculate dependent fields when leaveDays or salaryLeaveDays change
+    // Recalculate ALL dependent fields (leave pay, OT salary, etc.)
     const recalculateDependentFields = (dataToRecalculate) => {
         const recalculated = { ...dataToRecalculate };
 
@@ -343,14 +330,13 @@ export default function SalaryTab({ project, finalReport }) {
             const totalSalary = row.total_salary;
             const workingHours = row.working_hours;
 
-            // If leaveDays was edited, recalculate leavePay based on edited leaveDays
+            // Recalculate Leave Pay if leaveDays was edited
             if ('leaveDays' in employeeEdits) {
                 const leaveDays = employeeEdits.leaveDays;
-                const newLeavePay = (totalSalary / 30) * leaveDays;
-                recalculated[hrmsId].leavePay = newLeavePay;
+                recalculated[hrmsId].leavePay = (totalSalary / 30) * leaveDays;
             }
 
-            // If salaryLeaveDays was edited, recalculate salaryLeaveAmount
+            // Recalculate Salary Leave Amount if salaryLeaveDays was edited
             if ('salaryLeaveDays' in employeeEdits) {
                 const salaryLeaveDays = employeeEdits.salaryLeaveDays;
                 let newSalaryLeaveAmount = 0;
@@ -363,6 +349,15 @@ export default function SalaryTab({ project, finalReport }) {
                     }
                 }
                 recalculated[hrmsId].salaryLeaveAmount = newSalaryLeaveAmount;
+            }
+
+            // Recalculate OT Salary if otHours was edited
+            // Formula: OT Salary = (Total Salary ÷ 30 ÷ Working Hours) × 1.25 × OT Hours
+            if ('otHours' in employeeEdits) {
+                const otHours = employeeEdits.otHours;
+                const hourlyRate = totalSalary / 30 / workingHours;
+                const otRate = hourlyRate * 1.25;
+                recalculated[hrmsId].otSalary = otRate * otHours;
             }
         });
 
@@ -387,9 +382,46 @@ export default function SalaryTab({ project, finalReport }) {
                 throw new Error(response.data.error || 'Failed to calculate salaries');
             }
 
-            // Set calculated data but preserve any existing edits
-            setCalculatedData(response.data.data);
-            // Keep editableData intact so user edits are preserved
+            // Apply manual overrides from editableData and recalculate dependents
+            const calculatedWithEdits = response.data.data.map(emp => {
+                const edits = editableData[emp.hrms_id];
+                if (!edits) return emp;
+
+                // Apply edits and recalculate dependent fields
+                const updated = { ...emp, ...edits };
+                const totalSalary = updated.total_salary;
+                const workingHours = updated.working_hours;
+
+                // Recalculate Leave Pay if leaveDays was edited
+                if ('leaveDays' in edits) {
+                    updated.leavePay = (totalSalary / 30) * updated.leaveDays;
+                }
+
+                // Recalculate Salary Leave Amount if salaryLeaveDays was edited
+                if ('salaryLeaveDays' in edits) {
+                    let newSalaryLeaveAmount = 0;
+                    if (updated.salaryLeaveDays > 0) {
+                        if (workingHours === 8) {
+                            newSalaryLeaveAmount = (totalSalary / 30) * updated.salaryLeaveDays;
+                        } else if (workingHours === 9) {
+                            const adjustedSalary = totalSalary * 0.8767;
+                            newSalaryLeaveAmount = (adjustedSalary / 30) * updated.salaryLeaveDays;
+                        }
+                    }
+                    updated.salaryLeaveAmount = newSalaryLeaveAmount;
+                }
+
+                // Recalculate OT Salary if otHours was edited
+                if ('otHours' in edits) {
+                    const hourlyRate = totalSalary / 30 / workingHours;
+                    const otRate = hourlyRate * 1.25;
+                    updated.otSalary = otRate * updated.otHours;
+                }
+
+                return updated;
+            });
+
+            setCalculatedData(calculatedWithEdits);
             toast.success('Salaries calculated successfully');
         } catch (error) {
             toast.error('Failed to calculate salaries: ' + error.message);
@@ -768,14 +800,8 @@ export default function SalaryTab({ project, finalReport }) {
                                                     className="h-8 text-xs"
                                                 />
                                             </TableCell>
-                                            <TableCell className="bg-blue-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getValue(row, 'otSalary').toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'otSalary', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
+                                            <TableCell className="bg-blue-100 p-2 text-sm font-medium text-slate-700">
+                                                {getValue(row, 'otSalary').toFixed(2)}
                                             </TableCell>
                                             <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHours?.toFixed(2) || '0.00'}</TableCell>
                                             <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</TableCell>
