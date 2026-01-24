@@ -89,14 +89,21 @@ Deno.serve(async (req) => {
             const hourlyRate = totalSalaryAmount / 30 / workingHours;
             const deductibleHoursPay = hourlyRate * deductibleHours;
 
-            // OT Salary Calculation (user enters OT Hours, system calculates OT Salary)
-            // Formula: OT Salary = (Total Salary ÷ 30 ÷ Working Hours) × 1.25 × OT Hours
-            const otHours = 0; // Will be manually entered in UI
-            const otRate = hourlyRate * 1.25;
-            const otSalary = otRate * otHours;
+            // OT Salary Calculation - Split into Normal and Special
+            // Normal OT: (Total Salary ÷ 30 ÷ Working Hours) × 1.25 × Normal OT Hours
+            // Special OT: (Total Salary ÷ 30 ÷ Working Hours) × 1.5 × Special OT Hours
+            const normalOtHours = 0; // Will be manually entered in UI
+            const specialOtHours = 0; // Will be manually entered in UI
+            
+            const normalOtRate = hourlyRate * 1.25;
+            const specialOtRate = hourlyRate * 1.5;
+            
+            const normalOtSalary = normalOtRate * normalOtHours;
+            const specialOtSalary = specialOtRate * specialOtHours;
+            const totalOtSalary = normalOtSalary + specialOtSalary;
 
-            // Final Total = Total Salary + OT Salary - Net Deduction - Deductible Hours Pay
-            const finalTotal = totalSalaryAmount + otSalary - netDeduction - deductibleHoursPay;
+            // Final Total = Total Salary + Total OT Salary - Net Deduction - Deductible Hours Pay
+            const finalTotal = totalSalaryAmount + totalOtSalary - netDeduction - deductibleHoursPay;
 
             return {
                 attendance_id: emp.attendance_id,
@@ -126,8 +133,11 @@ Deno.serve(async (req) => {
                 leavePay: Math.round(leavePay * 100) / 100,
                 salaryLeaveDays,
                 salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
-                otHours: 0,
-                otSalary: Math.round(otSalary * 100) / 100,
+                normalOtHours: 0,
+                normalOtSalary: Math.round(normalOtSalary * 100) / 100,
+                specialOtHours: 0,
+                specialOtSalary: Math.round(specialOtSalary * 100) / 100,
+                totalOtSalary: Math.round(totalOtSalary * 100) / 100,
                 deductibleHours,
                 deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
                 otherDeduction: 0,
