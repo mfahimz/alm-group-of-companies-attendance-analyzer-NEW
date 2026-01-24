@@ -1908,6 +1908,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                 {total} - {grace} - {approved}
                                                             </span>
                                                         )}
+                                                        {!isManualOverride && other > 0 && (
+                                                            <span className="text-[10px] text-slate-500">
+                                                                ({late}+{early})-{other}-{grace}-{approved}
+                                                            </span>
+                                                        )}
                                                         {isManualOverride && (
                                                             <span className="text-[10px] text-purple-600">
                                                                 Manual Override
