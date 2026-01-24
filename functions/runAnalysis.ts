@@ -60,8 +60,15 @@ Deno.serve(async (req) => {
 
         // Get unique employee IDs from punches, filtered to only active employees
         const activeEmployeeAttendanceIds = allEmployees.map(e => Number(e.attendance_id));
-        const uniqueEmployeeIds = [...new Set(punches.map(p => p.attendance_id))]
-            .filter(id => activeEmployeeAttendanceIds.includes(Number(id)));
+        
+        // Extract attendance IDs from punches and ensure uniqueness with Set
+        const punchAttendanceIds = punches.map(p => Number(p.attendance_id));
+        const uniqueEmployeeIds = [...new Set(punchAttendanceIds)]
+            .filter(id => activeEmployeeAttendanceIds.includes(id));
+        
+        console.log('[runAnalysis] Total punches:', punches.length);
+        console.log('[runAnalysis] Unique attendance IDs from punches:', uniqueEmployeeIds.length);
+        console.log('[runAnalysis] Active employees:', allEmployees.length);
         
         // Use active employees for analysis
         const employees = allEmployees;
