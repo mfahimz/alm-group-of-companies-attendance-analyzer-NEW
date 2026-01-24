@@ -84,7 +84,8 @@ export default function Salaries() {
             };
             const allowancesTotal = allowances.housing + allowances.transport + allowances.food + allowances.others;
             const allowancesWithBonus = data.allowances_with_bonus || 0;
-            const total = data.basic_salary + allowancesTotal + allowancesWithBonus;
+            const total = Number((data.basic_salary + allowancesTotal + allowancesWithBonus).toFixed(2));
+            const deductionPerMinute = Number((total / (30 * (data.working_hours || 9) * 60)).toFixed(2));
             
             return base44.entities.EmployeeSalary.create({
                 employee_id: data.employee_id,
@@ -120,7 +121,8 @@ export default function Salaries() {
             };
             const allowancesTotal = allowances.housing + allowances.transport + allowances.food + allowances.others;
             const allowancesWithBonus = data.allowances_with_bonus || 0;
-            const total = data.basic_salary + allowancesTotal + allowancesWithBonus;
+            const total = Number((data.basic_salary + allowancesTotal + allowancesWithBonus).toFixed(2));
+            const deductionPerMinute = Number((total / (30 * (data.working_hours || 9) * 60)).toFixed(2));
             
             return base44.entities.EmployeeSalary.update(id, {
                 working_hours: data.working_hours || 9,
@@ -377,7 +379,7 @@ export default function Salaries() {
                         total: record.allowances
                     };
 
-                    const deductionPerMinute = record.totalSalary / (30 * record.workingHours * 60);
+                    const deductionPerMinute = Number((record.totalSalary / (30 * record.workingHours * 60)).toFixed(2));
 
                     const salaryData = {
                         employee_id: String(record.employee.hrms_id),
@@ -385,10 +387,10 @@ export default function Salaries() {
                         name: record.name,
                         company: record.company,
                         working_hours: record.workingHours,
-                        basic_salary: record.basicSalary,
+                        basic_salary: Number(record.basicSalary.toFixed(2)),
                         allowances: JSON.stringify(allowancesJson),
-                        allowances_with_bonus: record.bonus,
-                        total_salary: record.totalSalary,
+                        allowances_with_bonus: Number(record.bonus.toFixed(2)),
+                        total_salary: Number(record.totalSalary.toFixed(2)),
                         deduction_per_minute: deductionPerMinute
                     };
 
@@ -635,16 +637,16 @@ export default function Salaries() {
                                                 {salary.working_hours || 9} hrs/day
                                             </TableCell>
                                             <TableCell className="font-semibold">
-                                                AED {salary.basic_salary.toLocaleString()}
+                                                AED {Number(salary.basic_salary || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
-                                                AED {((allowances.housing || 0) + (allowances.transport || 0) + (allowances.food || 0) + (allowances.others || 0) + (allowances.total || 0)).toLocaleString()}
+                                                AED {Number((allowances.housing || 0) + (allowances.transport || 0) + (allowances.food || 0) + (allowances.others || 0) + (allowances.total || 0)).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
-                                                AED {(salary.allowances_with_bonus || 0).toLocaleString()}
+                                                AED {Number(salary.allowances_with_bonus || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="font-bold text-green-700">
-                                                AED {(salary.total_salary || 0).toLocaleString()}
+                                                AED {Number(salary.total_salary || 0).toFixed(2)}
                                             </TableCell>
                                             {(isAdmin || isSupervisor) && (
                                                 <TableCell className="text-right">
@@ -783,14 +785,14 @@ export default function Salaries() {
                         <div className="col-span-2 bg-slate-50 rounded-lg p-4">
                             <div className="text-sm text-slate-600">Total Salary</div>
                             <div className="text-2xl font-bold text-green-600">
-                                AED {(
+                                AED {Number(
                                     formData.basic_salary + 
                                     formData.housing_allowance + 
                                     formData.transport_allowance + 
                                     formData.food_allowance + 
                                     formData.other_allowances +
                                     formData.allowances_with_bonus
-                                ).toLocaleString()}
+                                ).toFixed(2)}
                             </div>
                         </div>
                     </div>
