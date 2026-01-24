@@ -1765,6 +1765,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort}>
                                         Approved Minutes
                                     </SortableTableHead>
+                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}>
+                                        Other Minutes
+                                    </SortableTableHead>
                                     <TableHead>Grace</TableHead>
                                     <TableHead>Deductible</TableHead>
                                     <TableHead>Notes</TableHead>
@@ -1858,6 +1861,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             </span>
                                         </TableCell>
                                         <TableCell>
+                                            <span className={`${result.other_minutes > 0 ? 'text-purple-600 font-medium' : 'text-slate-400'}`}>
+                                                {result.other_minutes || 0}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex items-center gap-2 group">
                                                 <span>{result.grace_minutes ?? 15}</span>
                                                 {!isUser && (
@@ -1873,11 +1881,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {(() => {
-                                                const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0) + (result.other_minutes || 0);
-                                                const grace = result.grace_minutes ?? 15;
-                                                const approved = result.approved_minutes || 0;
-                                                const calculatedDeductible = Math.max(0, total - grace - approved);
+                                             {(() => {
+                                                 const late = result.late_minutes || 0;
+                                                 const early = result.early_checkout_minutes || 0;
+                                                 const other = result.other_minutes || 0;
+                                                 const grace = result.grace_minutes ?? 15;
+                                                 const approved = result.approved_minutes || 0;
+                                                 const calculatedDeductible = Math.max(0, late + early - other - grace - approved);
                                                 const displayDeductible = result.manual_deductible_minutes ?? calculatedDeductible;
                                                 const isManualOverride = result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined;
                                                 
