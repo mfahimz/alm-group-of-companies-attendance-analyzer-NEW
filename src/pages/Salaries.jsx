@@ -37,7 +37,8 @@ export default function Salaries() {
         housing_allowance: 0,
         transport_allowance: 0,
         food_allowance: 0,
-        other_allowances: 0
+        other_allowances: 0,
+        allowances_with_bonus: 0
     });
 
     const queryClient = useQueryClient();
@@ -78,7 +79,9 @@ export default function Salaries() {
                 food: data.food_allowance || 0,
                 others: data.other_allowances || 0
             };
-            const total = data.basic_salary + allowances.housing + allowances.transport + allowances.food + allowances.others;
+            const allowancesTotal = allowances.housing + allowances.transport + allowances.food + allowances.others;
+            const allowancesWithBonus = data.allowances_with_bonus || 0;
+            const total = data.basic_salary + allowancesTotal + allowancesWithBonus;
             
             return base44.entities.EmployeeSalary.create({
                 employee_id: data.employee_id,
@@ -88,6 +91,7 @@ export default function Salaries() {
                 working_hours: data.working_hours || 9,
                 basic_salary: data.basic_salary,
                 allowances: JSON.stringify(allowances),
+                allowances_with_bonus: allowancesWithBonus,
                 total_salary: total,
                 deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
             });
@@ -111,12 +115,15 @@ export default function Salaries() {
                 food: data.food_allowance || 0,
                 others: data.other_allowances || 0
             };
-            const total = data.basic_salary + allowances.housing + allowances.transport + allowances.food + allowances.others;
+            const allowancesTotal = allowances.housing + allowances.transport + allowances.food + allowances.others;
+            const allowancesWithBonus = data.allowances_with_bonus || 0;
+            const total = data.basic_salary + allowancesTotal + allowancesWithBonus;
             
             return base44.entities.EmployeeSalary.update(id, {
                 working_hours: data.working_hours || 9,
                 basic_salary: data.basic_salary,
                 allowances: JSON.stringify(allowances),
+                allowances_with_bonus: allowancesWithBonus,
                 total_salary: total,
                 deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
             });
@@ -154,7 +161,8 @@ export default function Salaries() {
             housing_allowance: 0,
             transport_allowance: 0,
             food_allowance: 0,
-            other_allowances: 0
+            other_allowances: 0,
+            allowances_with_bonus: 0
         });
         setEditingSalary(null);
     };
@@ -184,7 +192,8 @@ export default function Salaries() {
             housing_allowance: allowances.housing || 0,
             transport_allowance: allowances.transport || 0,
             food_allowance: allowances.food || 0,
-            other_allowances: allowances.others || 0
+            other_allowances: allowances.others || 0,
+            allowances_with_bonus: salary.allowances_with_bonus || 0
         });
         setEditingSalary(salary);
         setShowDialog(true);
@@ -256,46 +265,48 @@ export default function Salaries() {
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 
-                const attendanceId = parseInt(row['Attendance ID'] || row['attendance_id']);
-                const name = String(row['Name'] || row['name'] || '').trim();
-                const company = String(row['Company'] || row['company'] || '').trim();
-                const workingHoursRaw = row['Working Hours'] || row['working_hours'];
+                // Map Excel columns to fields
+                const hrmsId = String(row['EMPLOYEE ID'] || row['employee_id'] || '').trim();
+                const name = String(row['EMPLOYEE NAME'] || row['name'] || '').trim();
+                const workingHoursRaw = row['ACTUAL WORKING HOURS'] || row['working_hours'];
                 const workingHours = workingHoursRaw !== undefined && workingHoursRaw !== null && workingHoursRaw !== '' 
                     ? parseFloat(workingHoursRaw) 
                     : 9;
-                const basicSalary = parseFloat(row['Basic'] || row['basic_salary']) || 0;
-                const allowance = parseFloat(row['Allowance'] || row['allowance']) || 0;
+                const basicSalary = parseFloat(row['BASIC'] || row['basic_salary']) || 0;
+                const allowances = parseFloat(row['ALLOWANCES'] || row['allowance']) || 0;
+                const bonus = parseFloat(row['BONUS'] || row['bonus']) || 0;
+                const total = parseFloat(row['TOTAL'] || row['total']) || (basicSalary + allowances + bonus);
 
                 let error = null;
                 let employee = null;
                 let existingSalary = null;
 
-                if (!attendanceId || isNaN(attendanceId) || !name || !company) {
-                    error = 'Missing required fields';
+                if (!hrmsId || !name) {
+                    error = 'Missing EMPLOYEE ID or EMPLOYEE NAME';
                 } else {
-                    employee = employees.find(e => 
-                        Number(e.attendance_id) === attendanceId && 
-                        e.company === company
-                    );
+                    // Find employee by hrms_id
+                    employee = employees.find(e => String(e.hrms_id) === hrmsId);
 
                     if (!employee) {
-                        error = 'Employee not found in master data';
+                        error = 'Employee not found in master data (check HRMS ID)';
                     } else {
                         existingSalary = salaries.find(s => 
-                            s.employee_id === employee.id && s.active
+                            s.employee_id === employee.hrms_id && s.active
                         );
                     }
                 }
 
                 const record = {
                     rowNumber: i + 2,
-                    attendanceId,
+                    hrmsId,
+                    attendanceId: employee?.attendance_id || '',
                     name,
-                    company,
+                    company: employee?.company || '',
                     workingHours,
                     basicSalary,
-                    allowance,
-                    totalSalary: basicSalary + allowance,
+                    allowances,
+                    bonus,
+                    totalSalary: total,
                     employee,
                     existingSalary,
                     action: existingSalary ? 'Update' : 'Create',
@@ -344,23 +355,22 @@ export default function Salaries() {
                 const record = previewData.valid[i];
                 
                 try {
-                    const allowances = {
-                        housing: 0,
-                        transport: 0,
-                        food: 0,
-                        others: record.allowance
+                    // Store ALLOWANCES as JSON with total
+                    const allowancesJson = {
+                        total: record.allowances
                     };
 
                     const deductionPerMinute = record.totalSalary / (30 * record.workingHours * 60);
 
                     const salaryData = {
-                        employee_id: record.employee.id,
-                        attendance_id: record.attendanceId,
+                        employee_id: record.employee.hrms_id,
+                        attendance_id: String(record.employee.attendance_id),
                         name: record.name,
                         company: record.company,
                         working_hours: record.workingHours,
                         basic_salary: record.basicSalary,
-                        allowances: JSON.stringify(allowances),
+                        allowances: JSON.stringify(allowancesJson),
+                        allowances_with_bonus: record.bonus,
                         total_salary: record.totalSalary,
                         deduction_per_minute: deductionPerMinute
                     };
@@ -402,12 +412,13 @@ export default function Salaries() {
     const downloadTemplate = () => {
         const template = [
             {
-                'Attendance ID': 'EMP001',
-                'Name': 'John Doe',
-                'Company': 'Al Maraghi Auto Repairs',
-                'Working Hours': 9,
-                'Basic': 5000,
-                'Allowance': 2000
+                'EMPLOYEE ID': '10001',
+                'EMPLOYEE NAME': 'John Doe',
+                'ACTUAL WORKING HOURS': 9,
+                'BASIC': 5000,
+                'ALLOWANCES': 2000,
+                'BONUS': 500,
+                'TOTAL': 7500
             }
         ];
 
@@ -537,7 +548,9 @@ export default function Salaries() {
                                     <SortableTableHead sortKey="basic_salary" currentSort={sort} onSort={setSort}>
                                         Basic
                                     </SortableTableHead>
-                                    <TableHead>Allowance</TableHead>
+                                    <TableHead>Allowances</TableHead>
+                                    <TableHead>Allowances + Bonus</TableHead>
+                                    <TableHead>Total</TableHead>
                                     {(isAdmin || isSupervisor) && <TableHead className="text-right">Actions</TableHead>}
                                 </TableRow>
                             </TableHeader>
@@ -555,8 +568,14 @@ export default function Salaries() {
                                             <TableCell className="font-semibold">
                                                 AED {salary.basic_salary.toLocaleString()}
                                             </TableCell>
-                                            <TableCell className="font-semibold">
-                                                AED {((allowances.housing || 0) + (allowances.transport || 0) + (allowances.food || 0) + (allowances.others || 0)).toLocaleString()}
+                                            <TableCell>
+                                                AED {((allowances.housing || 0) + (allowances.transport || 0) + (allowances.food || 0) + (allowances.others || 0) + (allowances.total || 0)).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell>
+                                                AED {(salary.allowances_with_bonus || 0).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="font-bold text-green-700">
+                                                AED {(salary.total_salary || 0).toLocaleString()}
                                             </TableCell>
                                             {(isAdmin || isSupervisor) && (
                                                 <TableCell className="text-right">
@@ -683,6 +702,15 @@ export default function Salaries() {
                             />
                         </div>
 
+                        <div>
+                            <Label>Allowances with Bonus (AED)</Label>
+                            <Input
+                                type="number"
+                                value={formData.allowances_with_bonus}
+                                onChange={(e) => setFormData({...formData, allowances_with_bonus: parseFloat(e.target.value) || 0})}
+                            />
+                        </div>
+
                         <div className="col-span-2 bg-slate-50 rounded-lg p-4">
                             <div className="text-sm text-slate-600">Total Salary</div>
                             <div className="text-2xl font-bold text-green-600">
@@ -691,7 +719,8 @@ export default function Salaries() {
                                     formData.housing_allowance + 
                                     formData.transport_allowance + 
                                     formData.food_allowance + 
-                                    formData.other_allowances
+                                    formData.other_allowances +
+                                    formData.allowances_with_bonus
                                 ).toLocaleString()}
                             </div>
                         </div>
@@ -739,12 +768,14 @@ export default function Salaries() {
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Row</TableHead>
+                                                    <TableHead>HRMS ID</TableHead>
                                                     <TableHead>Attendance ID</TableHead>
                                                     <TableHead>Name</TableHead>
                                                     <TableHead>Company</TableHead>
                                                     <TableHead>Hours</TableHead>
                                                     <TableHead>Basic</TableHead>
-                                                    <TableHead>Allowance</TableHead>
+                                                    <TableHead>Allowances</TableHead>
+                                                    <TableHead>Bonus</TableHead>
                                                     <TableHead>Total</TableHead>
                                                     <TableHead>Action</TableHead>
                                                 </TableRow>
@@ -753,12 +784,14 @@ export default function Salaries() {
                                                 {previewData.valid.map((record, idx) => (
                                                     <TableRow key={idx}>
                                                         <TableCell>{record.rowNumber}</TableCell>
-                                                        <TableCell className="font-medium">{record.attendanceId}</TableCell>
+                                                        <TableCell className="font-medium">{record.hrmsId}</TableCell>
+                                                        <TableCell>{record.attendanceId}</TableCell>
                                                         <TableCell>{record.name}</TableCell>
                                                         <TableCell>{record.company}</TableCell>
                                                         <TableCell>{record.workingHours}</TableCell>
                                                         <TableCell>AED {record.basicSalary}</TableCell>
-                                                        <TableCell>AED {record.allowance}</TableCell>
+                                                        <TableCell>AED {record.allowances}</TableCell>
+                                                        <TableCell>AED {record.bonus}</TableCell>
                                                         <TableCell className="font-semibold">AED {record.totalSalary}</TableCell>
                                                         <TableCell>
                                                             <span className={`px-2 py-1 rounded text-xs ${
@@ -785,9 +818,8 @@ export default function Salaries() {
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Row</TableHead>
-                                                    <TableHead>Attendance ID</TableHead>
+                                                    <TableHead>HRMS ID</TableHead>
                                                     <TableHead>Name</TableHead>
-                                                    <TableHead>Company</TableHead>
                                                     <TableHead>Error</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -795,9 +827,8 @@ export default function Salaries() {
                                                 {previewData.errors.map((record, idx) => (
                                                     <TableRow key={idx} className="bg-red-50">
                                                         <TableCell>{record.rowNumber}</TableCell>
-                                                        <TableCell>{record.attendanceId || '-'}</TableCell>
+                                                        <TableCell>{record.hrmsId || '-'}</TableCell>
                                                         <TableCell>{record.name || '-'}</TableCell>
-                                                        <TableCell>{record.company || '-'}</TableCell>
                                                         <TableCell className="text-red-600">{record.error}</TableCell>
                                                     </TableRow>
                                                 ))}
