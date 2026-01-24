@@ -92,7 +92,7 @@ export const PAGES_CONFIG = {
         name: 'Employees',
         title: 'Employees',
         icon: Users,
-        category: 'Projects',
+        category: 'HRManagement',
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
@@ -102,7 +102,7 @@ export const PAGES_CONFIG = {
         name: 'Salaries',
         title: 'Salaries',
         icon: DollarSign,
-        category: 'Projects',
+        category: 'HRManagement',
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
@@ -112,7 +112,7 @@ export const PAGES_CONFIG = {
         name: 'QuarterlyMinutesManagement',
         title: 'Quarterly Minutes',
         icon: Clock,
-        category: 'Projects',
+        category: 'HRManagement',
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
@@ -297,10 +297,16 @@ export const NAV_CATEGORIES = {
         order: 3,
         renderAs: 'dropdown'
     },
+    HRManagement: {
+        label: 'HR Management',
+        icon: Users,
+        order: 4,
+        renderAs: 'dropdown'
+    },
     Admin: {
         label: 'Admin',
         icon: Settings,
-        order: 4,
+        order: 5,
         renderAs: 'dropdown'
     }
 };
