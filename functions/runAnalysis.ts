@@ -58,8 +58,32 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'No attendance rules configured for this company' }, { status: 400 });
         }
 
-        // Get unique employee IDs from punches, filtered to only active employees
-        const activeEmployeeAttendanceIds = allEmployees.map(e => Number(e.attendance_id));
+        // Filter employees based on custom selection or department
+        let filteredEmployees = allEmployees;
+        
+        if (project.custom_employee_ids && project.custom_employee_ids.trim() !== '') {
+            // Parse custom employee IDs (HRMS IDs)
+            const customHrmsIds = project.custom_employee_ids
+                .split(',')
+                .map(id => id.trim())
+                .filter(id => id && id !== 'NULL')
+                .map(id => Number(id));
+            
+            console.log('[runAnalysis] Custom HRMS IDs:', customHrmsIds.length);
+            
+            // Filter employees by HRMS ID
+            filteredEmployees = allEmployees.filter(e => 
+                customHrmsIds.includes(Number(e.hrms_id))
+            );
+        } else if (project.department && project.department.trim() !== '') {
+            // Filter by department if specified
+            filteredEmployees = allEmployees.filter(e => 
+                e.department === project.department
+            );
+        }
+        
+        // Get attendance IDs of filtered employees
+        const activeEmployeeAttendanceIds = filteredEmployees.map(e => Number(e.attendance_id));
         
         // Extract attendance IDs from punches and ensure uniqueness with Set
         const punchAttendanceIds = punches.map(p => Number(p.attendance_id));
@@ -67,11 +91,11 @@ Deno.serve(async (req) => {
             .filter(id => activeEmployeeAttendanceIds.includes(id));
         
         console.log('[runAnalysis] Total punches:', punches.length);
+        console.log('[runAnalysis] Filtered employees:', filteredEmployees.length);
         console.log('[runAnalysis] Unique attendance IDs from punches:', uniqueEmployeeIds.length);
-        console.log('[runAnalysis] Active employees:', allEmployees.length);
         
-        // Use active employees for analysis
-        const employees = allEmployees;
+        // Use filtered employees for analysis
+        const employees = filteredEmployees;
 
         // Create report run
         const reportRun = await base44.asServiceRole.entities.ReportRun.create({
