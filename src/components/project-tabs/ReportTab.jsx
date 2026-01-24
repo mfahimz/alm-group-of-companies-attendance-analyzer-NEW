@@ -80,21 +80,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         lastSavedId: project.last_saved_report_id
     });
 
-    const { data: allResults = [], error: resultsError } = useQuery({
-        queryKey: ['results', project.id],
-        queryFn: async () => {
-            console.log('[ReportTab] Fetching analysis results for project:', project.id);
-            const results = await base44.entities.AnalysisResult.filter({ project_id: project.id });
-            console.log('[ReportTab] Fetched', results.length, 'analysis results');
-            return results;
-        }
-    });
-
-    React.useEffect(() => {
-        if (resultsError) {
-            console.error('[ReportTab] Analysis results fetch error:', resultsError);
-        }
-    }, [resultsError]);
+    // Don't fetch all results upfront - fetch per report when needed
+    // This prevents loading hundreds of duplicate analysis results from all historical runs
 
     // Get employees for department head filtering - MUST use managed_employee_ids
     const { data: departmentEmployees = [], error: employeesError } = useQuery({
@@ -145,13 +132,17 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const deleteReportMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            const resultsToDelete = allResults.filter(r => r.report_run_id === reportRunId);
+            // Fetch results only for this specific report run to delete
+            const resultsToDelete = await base44.entities.AnalysisResult.filter({ 
+                project_id: project.id, 
+                report_run_id: reportRunId 
+            });
             await Promise.all(resultsToDelete.map(r => base44.entities.AnalysisResult.delete(r.id)));
             await base44.entities.ReportRun.delete(reportRunId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['reportRuns', project.id]);
-            queryClient.invalidateQueries(['results', project.id]);
+            queryClient.invalidateQueries(['reportResults', project.id]);
             toast.success('Report deleted successfully');
         },
         onError: () => {
@@ -195,20 +186,31 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         }
     };
 
-    // For department heads: filter results to show only their subordinates
-    const filteredResults = isDepartmentHead && deptHeadVerification?.verified
-        ? allResults.filter(result => {
-            const empIdStr = String(result.attendance_id);
-            return departmentEmployees.some(emp => String(emp.attendance_id) === empIdStr);
-        })
-        : allResults;
-
-    console.log('[ReportTab] Results filtering:', {
-        isDepartmentHead,
-        verified: deptHeadVerification?.verified,
-        totalResults: allResults.length,
-        filteredResults: filteredResults.length,
-        departmentEmployees: departmentEmployees.length
+    // Use a query hook to fetch results for a specific report when displaying verification count
+    const { data: reportResults = {} } = useQuery({
+        queryKey: ['reportResults', project.id, reportRuns.map(r => r.id)],
+        queryFn: async () => {
+            // Fetch results only for displayed reports
+            const resultsByReport = {};
+            for (const run of reportRuns) {
+                const results = await base44.entities.AnalysisResult.filter({ 
+                    project_id: project.id,
+                    report_run_id: run.id 
+                });
+                
+                // Filter for department heads
+                const filteredForDeptHead = isDepartmentHead && deptHeadVerification?.verified
+                    ? results.filter(result => {
+                        const empIdStr = String(result.attendance_id);
+                        return departmentEmployees.some(emp => String(emp.attendance_id) === empIdStr);
+                    })
+                    : results;
+                
+                resultsByReport[run.id] = filteredForDeptHead;
+            }
+            return resultsByReport;
+        },
+        enabled: reportRuns.length > 0
     });
 
     return (
@@ -238,7 +240,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 </TableHeader>
                                 <TableBody>
                                     {reportRuns.map((run) => {
-                                        const runResults = filteredResults.filter(r => r.report_run_id === run.id);
+                                        const runResults = reportResults[run.id] || [];
                                         const verifiedCount = isDepartmentHead
                                             ? runResults.length // For dept heads, show results count as verification
                                             : (run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0);
