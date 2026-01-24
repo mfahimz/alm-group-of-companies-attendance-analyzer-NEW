@@ -380,7 +380,7 @@ export default function Salaries() {
                     const deductionPerMinute = record.totalSalary / (30 * record.workingHours * 60);
 
                     const salaryData = {
-                        employee_id: record.employee.hrms_id,
+                        employee_id: String(record.employee.hrms_id),
                         attendance_id: String(record.employee.attendance_id),
                         name: record.name,
                         company: record.company,
