@@ -49,9 +49,14 @@ Deno.serve(async (req) => {
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || 9;
 
+            // Use manual overrides if present, otherwise use calculated values
+            const presentDays = result?.manual_present_days ?? result?.present_days ?? 0;
+            const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
+            const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
+            const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
+            const deductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+
             // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
-            const annualLeaveDays = result?.annual_leave_count || 0;
-            const lopDays = result?.full_absence_count || 0;
             const leaveDays = annualLeaveDays + lopDays;
             
             // Leave Pay = (Total Salary / 30) × Leave Days
@@ -78,7 +83,6 @@ Deno.serve(async (req) => {
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
             // Deductible Hours = deductible_minutes ÷ 60
-            const deductibleMinutes = result?.deductible_minutes || 0;
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
 
             // Final Total = Total Salary - Net Deduction
@@ -95,12 +99,12 @@ Deno.serve(async (req) => {
                 total_salary: totalSalaryAmount,
                 working_hours: workingHours,
                 deduction_per_minute: salary?.deduction_per_minute || 0,
-                // Analysis data
+                // Analysis data (use manual overrides if present)
                 working_days: 30,
-                present_days: result?.present_days || 0,
-                full_absence_count: result?.full_absence_count || 0,
-                annual_leave_count: result?.annual_leave_count || 0,
-                sick_leave_count: result?.sick_leave_count || 0,
+                present_days: presentDays,
+                full_absence_count: lopDays,
+                annual_leave_count: annualLeaveDays,
+                sick_leave_count: sickLeaveDays,
                 late_minutes: result?.late_minutes || 0,
                 early_checkout_minutes: result?.early_checkout_minutes || 0,
                 other_minutes: result?.other_minutes || 0,

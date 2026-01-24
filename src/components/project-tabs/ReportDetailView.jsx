@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import EditDayRecordDialog from './EditDayRecordDialog';
+import InlineEditableCell from './InlineEditableCell';
 import * as XLSX from 'xlsx';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
@@ -1585,6 +1586,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
+    const updateManualOverrideMutation = useMutation({
+        mutationFn: async ({ id, field, value }) => {
+            await base44.entities.AnalysisResult.update(id, { [field]: value });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['results', reportRun.id]);
+            toast.success('Value updated - will be used in salary calculation');
+        },
+        onError: () => {
+            toast.error('Failed to update value');
+        }
+    });
+
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
     const verifiedCount = verifiedEmployees.length;
 
@@ -1769,21 +1783,59 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         <TableCell className="font-medium">{result.attendance_id}</TableCell>
                                         <TableCell>{result.name}</TableCell>
                                         <TableCell>{result.working_days}</TableCell>
-                                        <TableCell>{result.present_days}</TableCell>
                                         <TableCell>
-                                            <span className={`${result.annual_leave_count > 0 ? 'text-blue-600 font-medium' : ''}`}>
-                                                {result.annual_leave_count || 0}
-                                            </span>
+                                            <InlineEditableCell
+                                                value={result.manual_present_days ?? result.present_days}
+                                                onSave={(value) => updateManualOverrideMutation.mutate({ 
+                                                    id: result.id, 
+                                                    field: 'manual_present_days', 
+                                                    value 
+                                                })}
+                                                isEditable={isAdmin}
+                                                className={result.manual_present_days !== null && result.manual_present_days !== undefined ? 'text-blue-600 font-bold' : ''}
+                                            />
                                         </TableCell>
                                         <TableCell>
-                                            <span className={`${result.sick_leave_count > 0 ? 'text-purple-600 font-medium' : ''}`}>
-                                                {result.sick_leave_count || 0}
-                                            </span>
+                                            <InlineEditableCell
+                                                value={result.manual_annual_leave_count ?? result.annual_leave_count ?? 0}
+                                                onSave={(value) => updateManualOverrideMutation.mutate({ 
+                                                    id: result.id, 
+                                                    field: 'manual_annual_leave_count', 
+                                                    value 
+                                                })}
+                                                isEditable={isAdmin}
+                                                className={result.manual_annual_leave_count !== null && result.manual_annual_leave_count !== undefined 
+                                                    ? 'text-blue-600 font-bold' 
+                                                    : (result.annual_leave_count > 0 ? 'text-blue-600 font-medium' : '')}
+                                            />
                                         </TableCell>
                                         <TableCell>
-                                            <span className={`${result.full_absence_count > 0 ? 'text-red-600 font-medium' : ''}`}>
-                                                {result.full_absence_count}
-                                            </span>
+                                            <InlineEditableCell
+                                                value={result.manual_sick_leave_count ?? result.sick_leave_count ?? 0}
+                                                onSave={(value) => updateManualOverrideMutation.mutate({ 
+                                                    id: result.id, 
+                                                    field: 'manual_sick_leave_count', 
+                                                    value 
+                                                })}
+                                                isEditable={isAdmin}
+                                                className={result.manual_sick_leave_count !== null && result.manual_sick_leave_count !== undefined 
+                                                    ? 'text-purple-600 font-bold' 
+                                                    : (result.sick_leave_count > 0 ? 'text-purple-600 font-medium' : '')}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <InlineEditableCell
+                                                value={result.manual_full_absence_count ?? result.full_absence_count}
+                                                onSave={(value) => updateManualOverrideMutation.mutate({ 
+                                                    id: result.id, 
+                                                    field: 'manual_full_absence_count', 
+                                                    value 
+                                                })}
+                                                isEditable={isAdmin}
+                                                className={result.manual_full_absence_count !== null && result.manual_full_absence_count !== undefined 
+                                                    ? 'text-red-600 font-bold' 
+                                                    : (result.full_absence_count > 0 ? 'text-red-600 font-medium' : '')}
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             <span className={`${result.half_absence_count > 0 ? 'text-amber-600 font-medium' : ''}`}>
@@ -1825,15 +1877,32 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0) + (result.other_minutes || 0);
                                                 const grace = result.grace_minutes ?? 15;
                                                 const approved = result.approved_minutes || 0;
-                                                const deductible = Math.max(0, total - grace - approved);
+                                                const calculatedDeductible = Math.max(0, total - grace - approved);
+                                                const displayDeductible = result.manual_deductible_minutes ?? calculatedDeductible;
+                                                const isManualOverride = result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined;
+                                                
                                                 return (
                                                     <div className="flex flex-col">
-                                                        <span className={`font-bold ${deductible > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                            {deductible} min
-                                                        </span>
-                                                        <span className="text-[10px] text-slate-500">
-                                                            {total} - {grace} - {approved}
-                                                        </span>
+                                                        <InlineEditableCell
+                                                            value={displayDeductible}
+                                                            onSave={(value) => updateManualOverrideMutation.mutate({ 
+                                                                id: result.id, 
+                                                                field: 'manual_deductible_minutes', 
+                                                                value 
+                                                            })}
+                                                            isEditable={isAdmin}
+                                                            className={`font-bold ${isManualOverride ? 'text-purple-600' : (displayDeductible > 0 ? 'text-red-600' : 'text-green-600')}`}
+                                                        />
+                                                        {!isManualOverride && (
+                                                            <span className="text-[10px] text-slate-500">
+                                                                {total} - {grace} - {approved}
+                                                            </span>
+                                                        )}
+                                                        {isManualOverride && (
+                                                            <span className="text-[10px] text-purple-600">
+                                                                Manual Override
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 );
                                             })()}
