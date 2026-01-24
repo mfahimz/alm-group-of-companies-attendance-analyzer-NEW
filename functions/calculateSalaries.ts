@@ -36,6 +36,12 @@ Deno.serve(async (req) => {
             })
         ]);
 
+        // Fetch all annual leave exceptions to get salary_leave_days overrides
+        const annualLeaveExceptions = await base44.entities.Exception.filter({
+            project_id: project_id,
+            type: 'ANNUAL_LEAVE'
+        });
+
         // Calculate salary for each employee
         const salaryCalculations = employees.map(emp => {
             const salary = salaries.find(s => 
@@ -62,8 +68,23 @@ Deno.serve(async (req) => {
             // Leave Pay = (Total Salary / 30) × Leave Days
             const leavePay = leaveDays > 0 ? (totalSalaryAmount / 30) * leaveDays : 0;
 
-            // Salary Leave Days = Annual Leave Days (from exceptions ANNUAL_LEAVE type)
-            const salaryLeaveDays = annualLeaveDays;
+            // Salary Leave Days = Get override from annual leave exceptions if present
+            let salaryLeaveDays = annualLeaveDays;
+            
+            // Check if any exception has salary_leave_days override for this employee
+            const empAnnualLeaveExceptions = annualLeaveExceptions.filter(exc => 
+                String(exc.attendance_id) === String(emp.attendance_id)
+            );
+            
+            if (empAnnualLeaveExceptions.length > 0) {
+                const totalSalaryLeaveDaysOverride = empAnnualLeaveExceptions.reduce((sum, exc) => {
+                    return sum + (exc.salary_leave_days ?? 0);
+                }, 0);
+                
+                if (totalSalaryLeaveDaysOverride > 0) {
+                    salaryLeaveDays = totalSalaryLeaveDaysOverride;
+                }
+            }
             
             // Salary Leave Amount calculation based on working hours
             let salaryLeaveAmount = 0;

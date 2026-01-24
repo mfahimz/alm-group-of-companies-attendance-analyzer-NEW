@@ -129,9 +129,12 @@ export default function SalaryTab({ project, finalReport }) {
                       // Net Deduction = Leave Pay - Salary Leave Amount
                       const lopDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-             // Other calculations
-             const otHours = 0; // To be calculated
-             const otSalary = 0; // To be calculated
+             // OT calculations - split into normal and special
+             const normalOtHours = 0; // To be manually entered
+             const specialOtHours = 0; // To be manually entered
+             const normalOtSalary = 0; // To be calculated
+             const specialOtSalary = 0; // To be calculated
+             const totalOtSalary = 0; // Sum of normal + special
              const otherDeduction = 0; // To be set manually
              const bonus = 0; // To be set manually
              const incentive = 0; // To be set manually
@@ -140,7 +143,7 @@ export default function SalaryTab({ project, finalReport }) {
 
              // Total = Total Salary + Additions - Deductions
              const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-             const totalSalary = totalSalaryAmount + otSalary + bonus + incentive 
+             const totalSalary = totalSalaryAmount + totalOtSalary + bonus + incentive 
                                  - netDeduction - deductibleHoursPay - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
              const wpsPay = totalSalary; // WPS is typically the total
              const balance = 0; // Balance = Total - WPS Pay
@@ -174,8 +177,11 @@ export default function SalaryTab({ project, finalReport }) {
                 leavePay,
                 salaryLeaveDays,
                 salaryLeaveAmount,
-                otHours,
-                otSalary,
+                normalOtHours,
+                specialOtHours,
+                normalOtSalary,
+                specialOtSalary,
+                totalOtSalary,
                 deductibleHours,
                 deductibleHoursPay,
                 otherDeduction,
@@ -283,16 +289,18 @@ export default function SalaryTab({ project, finalReport }) {
         });
     };
 
-    // Handle input change for editable fields
+    // Handle input change for editable fields - fix focus issue
     const handleChange = (hrmsId, field, value) => {
-        const numValue = parseFloat(value) || 0;
-        setEditableData(prev => ({
-            ...prev,
-            [hrmsId]: {
-                ...(prev[hrmsId] || {}),
-                [field]: numValue
-            }
-        }));
+        setEditableData(prev => {
+            const numValue = value === '' ? 0 : parseFloat(value) || 0;
+            return {
+                ...prev,
+                [hrmsId]: {
+                    ...(prev[hrmsId] || {}),
+                    [field]: numValue
+                }
+            };
+        });
     };
 
     // Get value (either from editableData or original data)
@@ -304,7 +312,9 @@ export default function SalaryTab({ project, finalReport }) {
     const calculateTotals = (row) => {
         const leavePay = getValue(row, 'leavePay');
         const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount');
-        const otSalary = getValue(row, 'otSalary');
+        const normalOtSalary = getValue(row, 'normalOtSalary');
+        const specialOtSalary = getValue(row, 'specialOtSalary');
+        const totalOtSalary = normalOtSalary + specialOtSalary;
         const bonus = getValue(row, 'bonus');
         const incentive = getValue(row, 'incentive');
         const otherDeduction = getValue(row, 'otherDeduction');
@@ -313,7 +323,7 @@ export default function SalaryTab({ project, finalReport }) {
         const deductibleMinutesAmount = getValue(row, 'deductibleMinutesAmount');
 
         const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-        const total = row.total_salary + otSalary + bonus + incentive
+        const total = row.total_salary + totalOtSalary + bonus + incentive
                       - netDeduction - deductibleHoursPay - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
         const wpsPay = total;
         const balance = 0;
@@ -354,13 +364,20 @@ export default function SalaryTab({ project, finalReport }) {
                 recalculated[hrmsId].salaryLeaveAmount = newSalaryLeaveAmount;
             }
 
-            // Recalculate OT Salary if otHours was edited
-            // Formula: OT Salary = (Total Salary ÷ 30 ÷ Working Hours) × 1.25 × OT Hours
-            if ('otHours' in employeeEdits) {
-                const otHours = employeeEdits.otHours;
+            // Recalculate Normal OT Salary if normalOtHours was edited
+            if ('normalOtHours' in employeeEdits) {
+                const normalOtHours = employeeEdits.normalOtHours;
                 const hourlyRate = totalSalary / 30 / workingHours;
-                const otRate = hourlyRate * 1.25;
-                recalculated[hrmsId].otSalary = otRate * otHours;
+                const normalOtRate = hourlyRate * 1.25;
+                recalculated[hrmsId].normalOtSalary = normalOtRate * normalOtHours;
+            }
+
+            // Recalculate Special OT Salary if specialOtHours was edited
+            if ('specialOtHours' in employeeEdits) {
+                const specialOtHours = employeeEdits.specialOtHours;
+                const hourlyRate = totalSalary / 30 / workingHours;
+                const specialOtRate = hourlyRate * 1.5;
+                recalculated[hrmsId].specialOtSalary = specialOtRate * specialOtHours;
             }
         });
 
@@ -414,11 +431,18 @@ export default function SalaryTab({ project, finalReport }) {
                     updated.salaryLeaveAmount = newSalaryLeaveAmount;
                 }
 
-                // Recalculate OT Salary if otHours was edited
-                if ('otHours' in edits) {
+                // Recalculate Normal OT Salary if normalOtHours was edited
+                if ('normalOtHours' in edits) {
                     const hourlyRate = totalSalary / 30 / workingHours;
-                    const otRate = hourlyRate * 1.25;
-                    updated.otSalary = otRate * updated.otHours;
+                    const normalOtRate = hourlyRate * 1.25;
+                    updated.normalOtSalary = normalOtRate * updated.normalOtHours;
+                }
+
+                // Recalculate Special OT Salary if specialOtHours was edited
+                if ('specialOtHours' in edits) {
+                    const hourlyRate = totalSalary / 30 / workingHours;
+                    const specialOtRate = hourlyRate * 1.5;
+                    updated.specialOtSalary = specialOtRate * updated.specialOtHours;
                 }
 
                 return updated;
@@ -741,8 +765,11 @@ export default function SalaryTab({ project, finalReport }) {
                                     <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
                                     <SortableTableHead sortKey="salaryLeaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Salary Leave Days</SortableTableHead>
                                     <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Salary Leave Amount</SortableTableHead>
-                                    <SortableTableHead sortKey="otHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">OT Hours</SortableTableHead>
-                                    <SortableTableHead sortKey="otSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">OT Salary</SortableTableHead>
+                                    <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hours</SortableTableHead>
+                                    <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
+                                    <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Hours</SortableTableHead>
+                                    <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Salary</SortableTableHead>
+                                    <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-100 font-bold">Total OT Salary</SortableTableHead>
                                     <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
                                     <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
                                     <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduction</SortableTableHead>
@@ -798,13 +825,28 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'otHours').toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'otHours', e.target.value)}
+                                                    value={getValue(row, 'normalOtHours')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'normalOtHours', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
                                             </TableCell>
                                             <TableCell className="bg-blue-100 p-2 text-sm font-medium text-slate-700">
-                                                {getValue(row, 'otSalary').toFixed(2)}
+                                                {getValue(row, 'normalOtSalary').toFixed(2)}
+                                            </TableCell>
+                                            <TableCell className="bg-cyan-50 p-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getValue(row, 'specialOtHours')}
+                                                    onChange={(e) => handleChange(row.hrms_id, 'specialOtHours', e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="bg-cyan-100 p-2 text-sm font-medium text-slate-700">
+                                                {getValue(row, 'specialOtSalary').toFixed(2)}
+                                            </TableCell>
+                                            <TableCell className="bg-blue-200 p-2 text-sm font-bold text-slate-900">
+                                                {(getValue(row, 'normalOtSalary') + getValue(row, 'specialOtSalary')).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHours?.toFixed(2) || '0.00'}</TableCell>
                                             <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</TableCell>
