@@ -690,20 +690,18 @@ Deno.serve(async (req) => {
             };
         };
 
-        // Delete any existing results for this report run (in case of re-analysis)
-        const existingResults = await base44.asServiceRole.entities.AnalysisResult.filter({
-            project_id,
-            report_run_id: reportRun.id
-        });
-        if (existingResults.length > 0) {
-            await Promise.all(existingResults.map(r => 
-                base44.asServiceRole.entities.AnalysisResult.delete(r.id)
-            ));
-        }
-
-        // Process all employees
+        // Process all employees and build results array
         const allResults = [];
+        const processedAttendanceIds = new Set();
+        
         for (const attendance_id of uniqueEmployeeIds) {
+            // Double-check for duplicates
+            if (processedAttendanceIds.has(Number(attendance_id))) {
+                console.warn('[runAnalysis] Skipping duplicate attendance_id:', attendance_id);
+                continue;
+            }
+            
+            processedAttendanceIds.add(Number(attendance_id));
             const result = await analyzeEmployee(attendance_id);
             allResults.push({
                 project_id,
@@ -711,6 +709,9 @@ Deno.serve(async (req) => {
                 ...result
             });
         }
+        
+        console.log('[runAnalysis] Processed employees:', allResults.length);
+        console.log('[runAnalysis] Unique attendance IDs processed:', processedAttendanceIds.size);
 
         // Save results in batches with delay to avoid rate limits
         const batchSize = 50;
