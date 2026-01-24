@@ -683,6 +683,17 @@ Deno.serve(async (req) => {
             };
         };
 
+        // Delete any existing results for this report run (in case of re-analysis)
+        const existingResults = await base44.asServiceRole.entities.AnalysisResult.filter({
+            project_id,
+            report_run_id: reportRun.id
+        });
+        if (existingResults.length > 0) {
+            await Promise.all(existingResults.map(r => 
+                base44.asServiceRole.entities.AnalysisResult.delete(r.id)
+            ));
+        }
+
         // Process all employees
         const allResults = [];
         for (const attendance_id of uniqueEmployeeIds) {
