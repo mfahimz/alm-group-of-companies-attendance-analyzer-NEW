@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Pencil, Shield, User as UserIcon, Lock, RefreshCw, LayoutDashboard, FolderKanban, Briefcase, Settings, Book } from 'lucide-react';
+import { Plus, Search, Pencil, Shield, User as UserIcon, Lock, RefreshCw, LayoutDashboard, FolderKanban, Briefcase, Settings, Book, Users as UsersIcon, Home as HomeIcon } from 'lucide-react';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import { toast } from 'sonner';
 import UserDialog from '../components/users/UserDialog';
@@ -16,6 +16,7 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
 
 const PAGE_DISPLAY_NAMES = {
+    'Home': 'Home (Smart Dashboard)',
     'Dashboard': 'Main Dashboard',
     'DepartmentHeadDashboard': 'Department Head Dashboard',
     'CompanyDashboard': 'Company Dashboard',
@@ -23,6 +24,7 @@ const PAGE_DISPLAY_NAMES = {
     'ProjectDetail': 'Project Details',
     'Employees': 'Employees Management',
     'Salaries': 'Salary Management',
+    'QuarterlyMinutesManagement': 'Quarterly Minutes Management',
     'Users': 'Users & Permissions',
     'RulesSettings': 'Attendance Rules Settings',
     'RamadanSchedules': 'Ramadan Schedules',
@@ -33,7 +35,6 @@ const PAGE_DISPLAY_NAMES = {
     'ReportDetail': 'Report Details View',
     'Reports': 'Reports & Analytics',
     'DepartmentHeadSettings': 'Department Heads Settings',
-    'QuarterlyMinutesManagement': 'Quarterly Minutes Management',
     'Recruitment': 'Recruitment Hub',
     'JobPositions': 'Job Positions',
     'CandidateScreening': 'Candidate Screening',
@@ -479,7 +480,7 @@ export default function Users() {
                                     {/* Dashboard Pages */}
                                     <div>
                                         <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <LayoutDashboard className="w-4 h-4" />
+                                            <HomeIcon className="w-4 h-4" />
                                             Dashboard & Overview
                                         </h3>
                                         <Table>
@@ -495,7 +496,7 @@ export default function Users() {
                                             </TableHeader>
                                             <TableBody>
                                                 {pagePermissions
-                                                    .filter(p => ['Dashboard', 'DepartmentHeadDashboard', 'CompanyDashboard'].includes(p.page_name))
+                                                    .filter(p => ['Home', 'Dashboard', 'DepartmentHeadDashboard', 'CompanyDashboard'].includes(p.page_name))
                                                     .map((permission) => (
                                                         <TableRow key={permission.id}>
                                                             <TableCell className="font-medium">
@@ -571,7 +572,59 @@ export default function Users() {
                                             </TableHeader>
                                             <TableBody>
                                                 {pagePermissions
-                                                    .filter(p => ['Projects', 'ProjectDetail', 'Employees', 'Salaries', 'QuarterlyMinutesManagement', 'Reports', 'ReportDetail'].includes(p.page_name))
+                                                    .filter(p => ['Projects', 'ProjectDetail', 'Reports', 'ReportDetail'].includes(p.page_name))
+                                                    .map((permission) => (
+                                                        <TableRow key={permission.id}>
+                                                            <TableCell className="font-medium">
+                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
+                                                            </TableCell>
+                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
+                                                            <TableCell className="text-center">
+                                                                <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
+                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                                </Button>
+                                                            </TableCell>
+                                                            <TableCell className="text-center">
+                                                                <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
+                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                                </Button>
+                                                            </TableCell>
+                                                            <TableCell className="text-center">
+                                                                <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
+                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                                </Button>
+                                                            </TableCell>
+                                                            <TableCell className="text-center">
+                                                                <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
+                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                                </Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+
+                                    {/* HR Management */}
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
+                                            <UsersIcon className="w-4 h-4" />
+                                            HR Management
+                                        </h3>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Page Name</TableHead>
+                                                    <TableHead>Description</TableHead>
+                                                    <TableHead className="text-center">Admin</TableHead>
+                                                    <TableHead className="text-center">Supervisor</TableHead>
+                                                    <TableHead className="text-center">Dept Head</TableHead>
+                                                    <TableHead className="text-center">User</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {pagePermissions
+                                                    .filter(p => ['Employees', 'Salaries', 'QuarterlyMinutesManagement'].includes(p.page_name))
                                                     .map((permission) => (
                                                         <TableRow key={permission.id}>
                                                             <TableCell className="font-medium">
