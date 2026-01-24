@@ -370,16 +370,13 @@ export default function ShiftTimingsTab({ project }) {
                 return false;
             });
             
-            // Update all shifts with new date range - use batch update
-            if (blockShifts.length > 0) {
-                await base44.entities.ShiftTiming.updateMany(
-                    { id: { $in: blockShifts.map(s => s.id) } },
-                    {
-                        effective_from: newRange.from,
-                        effective_to: newRange.to,
-                        shift_block: block
-                    }
-                );
+            // Update all shifts with new date range
+            for (const shift of blockShifts) {
+                await base44.entities.ShiftTiming.update(shift.id, {
+                    effective_from: newRange.from,
+                    effective_to: newRange.to,
+                    shift_block: block
+                });
             }
             
             // Save date ranges to project configuration
