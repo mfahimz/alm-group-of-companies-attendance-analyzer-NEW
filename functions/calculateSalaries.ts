@@ -45,11 +45,11 @@ Deno.serve(async (req) => {
         // Calculate salary for each employee
         const salaryCalculations = employees.map(emp => {
             const salary = salaries.find(s => 
-                s.employee_id === emp.hrms_id || 
-                Number(s.attendance_id) === Number(emp.attendance_id)
+                String(s.employee_id) === String(emp.hrms_id) || 
+                String(s.attendance_id) === String(emp.attendance_id)
             );
             const result = analysisResults.find(r => 
-                Number(r.attendance_id) === Number(emp.attendance_id)
+                String(r.attendance_id) === String(emp.attendance_id)
             );
 
             const totalSalaryAmount = salary?.total_salary || 0;

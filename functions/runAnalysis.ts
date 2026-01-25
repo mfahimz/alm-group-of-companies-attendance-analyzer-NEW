@@ -62,31 +62,25 @@ Deno.serve(async (req) => {
         let filteredEmployees = allEmployees;
         
         if (project.custom_employee_ids && project.custom_employee_ids.trim() !== '') {
-            // Parse custom employee IDs (HRMS IDs)
+            // Parse custom employee IDs (HRMS IDs) - keep as strings
             const customHrmsIds = project.custom_employee_ids
                 .split(',')
                 .map(id => id.trim())
-                .filter(id => id && id !== 'NULL')
-                .map(id => Number(id));
+                .filter(id => id && id !== 'NULL');
             
             console.log('[runAnalysis] Custom HRMS IDs:', customHrmsIds.length);
             
-            // Filter employees by HRMS ID
+            // Filter employees by HRMS ID - string comparison
             filteredEmployees = allEmployees.filter(e => 
-                customHrmsIds.includes(Number(e.hrms_id))
-            );
-        } else if (project.department && project.department.trim() !== '') {
-            // Filter by department if specified
-            filteredEmployees = allEmployees.filter(e => 
-                e.department === project.department
+                customHrmsIds.includes(String(e.hrms_id))
             );
         }
         
-        // Get attendance IDs of filtered employees
-        const activeEmployeeAttendanceIds = filteredEmployees.map(e => Number(e.attendance_id));
+        // Get attendance IDs of filtered employees - keep as strings
+        const activeEmployeeAttendanceIds = filteredEmployees.map(e => String(e.attendance_id));
         
-        // Extract attendance IDs from punches and ensure uniqueness with Set
-        const punchAttendanceIds = punches.map(p => Number(p.attendance_id));
+        // Extract attendance IDs from punches and ensure uniqueness with Set - strings
+        const punchAttendanceIds = punches.map(p => String(p.attendance_id));
         const uniqueEmployeeIds = [...new Set(punchAttendanceIds)]
             .filter(id => activeEmployeeAttendanceIds.includes(id));
         
@@ -305,16 +299,16 @@ Deno.serve(async (req) => {
 
         // Analyze employee function
         const analyzeEmployee = async (attendance_id) => {
-            const attendanceIdNum = Number(attendance_id);
+            const attendanceIdStr = String(attendance_id);
             const employeePunches = punches.filter(p => 
-                Number(p.attendance_id) === attendanceIdNum && 
+                String(p.attendance_id) === attendanceIdStr && 
                 p.punch_date >= date_from && 
                 p.punch_date <= date_to
             );
-            const employeeShifts = shifts.filter(s => Number(s.attendance_id) === attendanceIdNum);
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
             const employeeExceptions = exceptions.filter(e => {
                 try {
-                    return (String(e.attendance_id) === 'ALL' || Number(e.attendance_id) === attendanceIdNum) &&
+                    return (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
                            e.use_in_analysis !== false &&
                            e.is_custom_type !== true;
                 } catch {
@@ -322,7 +316,7 @@ Deno.serve(async (req) => {
                 }
             });
             
-            const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
+            const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
             const includeSeconds = project.company === 'Al Maraghi Automotive';
 
             let workingDays = 0;
@@ -734,13 +728,14 @@ Deno.serve(async (req) => {
         const processedAttendanceIds = new Set();
         
         for (const attendance_id of uniqueEmployeeIds) {
-            // Double-check for duplicates
-            if (processedAttendanceIds.has(Number(attendance_id))) {
+            // Double-check for duplicates - string comparison
+            const idStr = String(attendance_id);
+            if (processedAttendanceIds.has(idStr)) {
                 console.warn('[runAnalysis] Skipping duplicate attendance_id:', attendance_id);
                 continue;
             }
             
-            processedAttendanceIds.add(Number(attendance_id));
+            processedAttendanceIds.add(idStr);
             const result = await analyzeEmployee(attendance_id);
             allResults.push({
                 project_id,
