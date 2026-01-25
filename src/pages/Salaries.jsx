@@ -628,6 +628,10 @@ export default function Salaries() {
                             <TableBody>
                                 {filteredSalaries.map((salary) => {
                                     const allowances = JSON.parse(salary.allowances || '{}');
+                                    // Handle both formats: {"total": X} OR {"housing": X, "transport": Y, ...}
+                                    const allowancesDisplay = allowances.total || 
+                                        ((allowances.housing || 0) + (allowances.transport || 0) + 
+                                         (allowances.food || 0) + (allowances.others || 0));
                                     return (
                                         <TableRow key={salary.id}>
                                             <TableCell className="font-medium">{salary.attendance_id}</TableCell>
@@ -640,7 +644,7 @@ export default function Salaries() {
                                                 AED {Number(salary.basic_salary || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
-                                                AED {Number((allowances.housing || 0) + (allowances.transport || 0) + (allowances.food || 0) + (allowances.others || 0) + (allowances.total || 0)).toFixed(2)}
+                                                AED {Number(allowancesDisplay).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
                                                 AED {Number(salary.allowances_with_bonus || 0).toFixed(2)}

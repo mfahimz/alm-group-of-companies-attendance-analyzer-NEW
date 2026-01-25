@@ -107,15 +107,17 @@ export default function SalaryTab({ project, finalReport }) {
                       const salaryLeaveDays = annualLeaveDays;
 
                       // Salary Leave Amount = (Basic Salary + Allowances) / 30 × Salary Leave Days
-                      // Parse allowances JSON
-                      let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0 };
+                      // Parse allowances JSON - handle both formats
+                      let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0, total: 0 };
                       try {
                           allowancesObj = JSON.parse(salary?.allowances || '{}');
                       } catch (e) {
                           // Keep defaults if parsing fails
                       }
-                      const allowancesSum = (allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
-                                           (allowancesObj.food || 0) + (allowancesObj.others || 0);
+                      // Handle both formats: {"total": X} OR {"housing": X, "transport": Y, ...}
+                      const allowancesSum = allowancesObj.total || 
+                                           ((allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
+                                            (allowancesObj.food || 0) + (allowancesObj.others || 0));
                       const basicSalary = salary?.basic_salary || 0;
                       const salaryForLeave = basicSalary + allowancesSum; // Excludes allowances_with_bonus
                       
@@ -355,12 +357,14 @@ export default function SalaryTab({ project, finalReport }) {
             if ('salaryLeaveDays' in employeeEdits) {
                 const salaryLeaveDays = employeeEdits.salaryLeaveDays;
                 // Get basic salary + allowances (excluding allowances_with_bonus)
-                let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0 };
+                let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0, total: 0 };
                 try {
                     allowancesObj = JSON.parse(row.allowances || '{}');
                 } catch (e) {}
-                const allowancesSum = (allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
-                                     (allowancesObj.food || 0) + (allowancesObj.others || 0);
+                // Handle both formats: {"total": X} OR {"housing": X, "transport": Y, ...}
+                const allowancesSum = allowancesObj.total || 
+                                     ((allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
+                                      (allowancesObj.food || 0) + (allowancesObj.others || 0));
                 const salaryForLeave = row.basic_salary + allowancesSum;
                 const newSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
                 recalculated[hrmsId].salaryLeaveAmount = newSalaryLeaveAmount;
@@ -422,12 +426,14 @@ export default function SalaryTab({ project, finalReport }) {
                 // Recalculate Salary Leave Amount if salaryLeaveDays was edited
                 if ('salaryLeaveDays' in edits) {
                     // Get basic salary + allowances (excluding allowances_with_bonus)
-                    let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0 };
+                    let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0, total: 0 };
                     try {
                         allowancesObj = JSON.parse(updated.allowances || '{}');
                     } catch (e) {}
-                    const allowancesSum = (allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
-                                         (allowancesObj.food || 0) + (allowancesObj.others || 0);
+                    // Handle both formats: {"total": X} OR {"housing": X, "transport": Y, ...}
+                    const allowancesSum = allowancesObj.total || 
+                                         ((allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
+                                          (allowancesObj.food || 0) + (allowancesObj.others || 0));
                     const salaryForLeave = updated.basic_salary + allowancesSum;
                     const newSalaryLeaveAmount = updated.salaryLeaveDays > 0 ? (salaryForLeave / 30) * updated.salaryLeaveDays : 0;
                     updated.salaryLeaveAmount = newSalaryLeaveAmount;
