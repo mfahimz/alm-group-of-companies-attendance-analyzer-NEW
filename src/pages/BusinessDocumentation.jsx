@@ -363,19 +363,19 @@ export default function BusinessDocumentation() {
 
                     <h3 className="text-xl font-semibold mt-6">Annual Leave</h3>
                     <p>
-                        Pre-approved vacation days follow the same pattern:
+                        Pre-approved vacation days follow calendar-based counting:
                     </p>
                     <ul>
                         <li>HR marks dates as "Annual Leave"</li>
                         <li>No deduction occurs</li>
                         <li>Days are tracked against employee's annual leave balance</li>
                         <li>These days don't count as working days</li>
-                        <li><strong>Auto-Deduction:</strong> Weekly holidays and public holidays that fall within annual leave periods are automatically excluded from the leave count</li>
+                        <li><strong>Calendar Day Counting:</strong> All calendar days within the annual leave date range are counted, including weekly holidays and public holidays</li>
                     </ul>
                     <p className="text-sm bg-blue-50 border border-blue-200 rounded p-3 mt-2">
-                        <strong>Example:</strong> Employee takes annual leave from Monday to Sunday (7 calendar days). 
-                        If Sunday is their weekly off day, only 6 days count as annual leave. If a public holiday falls 
-                        on Wednesday during this period, only 5 days count as annual leave.
+                        <strong>Example:</strong> Employee takes annual leave from January 25 to January 30 (6 calendar days). 
+                        If Sunday (January 26) is their weekly off day, the annual leave count is still 6 days. If a public holiday falls 
+                        on Wednesday (January 29), the annual leave count remains 6 days. The attendance report shows the full calendar duration of the leave.
                     </p>
 
                     <h3 className="text-xl font-semibold mt-6">Manual Corrections</h3>

@@ -400,17 +400,6 @@ Deno.serve(async (req) => {
                         working_days--;
                         sick_leave_count++;
                         continue;
-                    } else if (dateException.type === 'ANNUAL_LEAVE') {
-                        const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
-                        if (dayPunchesForLeave.length === 0) {
-                            working_days--;
-                            // Count annual leave day - weekly holidays and public holidays during leave period are auto-excluded
-                            // by the fact that we skip weekly off days earlier in the loop and public holidays reduce working_days
-                            annual_leave_count++;
-                            continue;
-                        } else {
-                            present_days++;
-                        }
                     }
                 }
 
@@ -429,6 +418,29 @@ Deno.serve(async (req) => {
 
                 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 const currentDayName = dayNames[dayOfWeek];
+
+                // CRITICAL: Check for ANNUAL_LEAVE FIRST before weekly off or public holidays
+                // Annual leave counts ALL calendar days in the date range
+                const annualLeaveException = employeeExceptions.find(ex => {
+                    try {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        return ex.type === 'ANNUAL_LEAVE' && currentDate >= exFrom && currentDate <= exTo;
+                    } catch {
+                        return false;
+                    }
+                });
+
+                if (annualLeaveException) {
+                    // Check if employee worked on this day despite annual leave
+                    const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
+                    if (dayPunchesForLeave.length === 0) {
+                        // Count this day as annual leave regardless of weekly off or public holiday
+                        annualLeaveCount++;
+                        continue; // Skip remaining logic for this day
+                    }
+                    // If employee worked, continue normal analysis
+                }
 
                 let shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
 
