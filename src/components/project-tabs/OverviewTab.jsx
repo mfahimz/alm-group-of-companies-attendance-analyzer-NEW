@@ -268,8 +268,8 @@ export default function OverviewTab({ project }) {
 
     return (
         <div className="space-y-6">
-            {/* Close & Finalize Button - Admin/Supervisor Only */}
-            {canCloseProject && !isUser && (
+            {/* Close & Finalize Button - Admin Only */}
+            {canCloseProject && isAdmin && (
                 <Card className="border-red-200 bg-red-50">
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -317,7 +317,7 @@ export default function OverviewTab({ project }) {
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-slate-900">Project Details</CardTitle>
-                        {!isUser && (
+                        {(isAdmin || isSupervisor || isUser) && (
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -405,7 +405,7 @@ export default function OverviewTab({ project }) {
                     <CardTitle className="text-slate-900">Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-3">
-                    {!isUser && (
+                    {(isAdmin || isSupervisor || isUser) && (
                     <>
                         <Button
                             onClick={() => lockMutation.mutate()}
@@ -416,7 +416,7 @@ export default function OverviewTab({ project }) {
                             {project.status === 'locked' ? 'Locked' : 'Lock Project'}
                         </Button>
 
-                        {isAdminOrSupervisor && project.status === 'analyzed' && (
+                        {isAdmin && project.status === 'analyzed' && (
                             <Button
                                 onClick={() => {
                                     if (window.confirm('This will finalize the project and update employee grace minutes. Continue?')) {
@@ -452,9 +452,6 @@ export default function OverviewTab({ project }) {
                             </Button>
                         )}
                     </>
-                    )}
-                    {isUser && (
-                        <p className="text-sm text-slate-500">View-only mode. Contact an administrator to modify this project.</p>
                     )}
                 </CardContent>
             </Card>
