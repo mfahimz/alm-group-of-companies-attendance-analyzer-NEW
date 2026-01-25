@@ -201,8 +201,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 // Filter for department heads
                 const filteredForDeptHead = isDepartmentHead && deptHeadVerification?.verified
                     ? results.filter(result => {
-                        const empIdStr = String(result.attendance_id);
-                        return departmentEmployees.some(emp => String(emp.attendance_id) === empIdStr);
+                        const resultAttIdStr = String(result.attendance_id);
+                        return departmentEmployees.some(emp => String(emp.attendance_id) === resultAttIdStr);
                     })
                     : results;
                 

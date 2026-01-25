@@ -254,7 +254,7 @@ export default function ShiftTimingsTab({ project }) {
                         applicableDays = '';
                     }
 
-                    const employeeExists = employees.some(e => e.attendance_id === Number(attendance_id));
+                    const employeeExists = employees.some(e => String(e.attendance_id) === String(attendance_id));
                     if (!employeeExists) {
                         newWarnings.push(`Unknown employee: ${attendance_id}`);
                     }
@@ -277,7 +277,7 @@ export default function ShiftTimingsTab({ project }) {
                     }
 
                     data.push({
-                        attendance_id: Number(attendance_id),
+                        attendance_id: String(attendance_id),
                         date: null,
                         is_friday_shift,
                         applicable_days: applicableDays,
@@ -544,7 +544,7 @@ export default function ShiftTimingsTab({ project }) {
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
             
             const data = shifts.map(shift => {
-                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
+                const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                 return {
                     'Attendance ID': shift.attendance_id,
                     'Employee Name': employee?.name || '-',
@@ -593,7 +593,7 @@ export default function ShiftTimingsTab({ project }) {
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
             
             const data = blockShifts.map(shift => {
-                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
+                const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                 return {
                     'Attendance ID': shift.attendance_id,
                     'Employee Name': employee?.name || '-',
@@ -634,7 +634,7 @@ export default function ShiftTimingsTab({ project }) {
         
         const filteredShifts = blockShifts
             .filter(shift => {
-                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
+                const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                 const matchesSearch = !searchTerm || 
                     String(shift.attendance_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                     employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -677,8 +677,8 @@ export default function ShiftTimingsTab({ project }) {
             .sort((a, b) => {
                 let aVal, bVal;
                 if (sort.key === 'name') {
-                    aVal = employees.find(e => Number(e.attendance_id) === Number(a.attendance_id))?.name || '';
-                    bVal = employees.find(e => Number(e.attendance_id) === Number(b.attendance_id))?.name || '';
+                    aVal = employees.find(e => String(e.attendance_id) === String(a.attendance_id))?.name || '';
+                    bVal = employees.find(e => String(e.attendance_id) === String(b.attendance_id))?.name || '';
                 } else {
                     aVal = a[sort.key];
                     bVal = b[sort.key];
@@ -945,7 +945,7 @@ export default function ShiftTimingsTab({ project }) {
                                         </TableHeader>
                                         <TableBody>
                                             {paginatedShifts.map((shift) => {
-                                                const employee = employees.find(e => Number(e.attendance_id) === Number(shift.attendance_id));
+                                                const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                                                 return (
                                                     <TableRow key={shift.id}>
                                                         <TableCell>

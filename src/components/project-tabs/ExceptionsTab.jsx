@@ -425,7 +425,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
             
             const exportData = filteredExceptions.map(ex => {
-                const employee = employees.find(e => Number(e.attendance_id) === Number(ex.attendance_id));
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
                 return {
                     'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
                     'Employee Name': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
@@ -559,7 +559,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             if (reportFilter.search) {
                 const searchLower = reportFilter.search.toLowerCase();
                 const matchesId = String(ex.attendance_id).toLowerCase().includes(searchLower);
-                const employee = employees.find(e => Number(e.attendance_id) === Number(ex.attendance_id));
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
                 const matchesName = employee?.name?.toLowerCase().includes(searchLower);
                 if (!matchesId && !matchesName) return false;
             }
@@ -596,7 +596,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             if (filter.search) {
                 const searchLower = filter.search.toLowerCase();
                 const matchesId = String(ex.attendance_id).toLowerCase().includes(searchLower);
-                const employee = employees.find(e => Number(e.attendance_id) === Number(ex.attendance_id));
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
                 const matchesName = employee?.name?.toLowerCase().includes(searchLower);
                 const matchesDetails = ex.details?.toLowerCase().includes(searchLower);
                 if (!matchesId && !matchesName && !matchesDetails) return false;
@@ -616,7 +616,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             // Department filter
             if (filter.department && filter.department !== 'all') {
                 if (ex.attendance_id === 'ALL') return false;
-                const employee = employees.find(e => Number(e.attendance_id) === Number(ex.attendance_id));
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
                 if (employee?.department !== filter.department) return false;
             }
             
@@ -1227,7 +1227,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 </TableHeader>
                                 <TableBody>
                                     {paginatedExceptions.map((exception) => {
-                                        const employeeName = employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id) && e.company === project.company)?.name || '—';
+                                        const employeeName = employees.find(e => String(e.attendance_id) === String(exception.attendance_id) && e.company === project.company)?.name || '—';
                                         return (
                                             <TableRow key={exception.id}>
                                             {!isUser && (
@@ -1413,7 +1413,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                                 </TableCell>
                                             <TableCell className="p-1">
                                                 <span className="text-sm text-slate-900">
-                                                   {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => Number(e.attendance_id) === Number(exception.attendance_id) && e.company === project.company)?.name || '—')}
+                                                   {exception.attendance_id === 'ALL' ? '—' : (employees.find(e => String(e.attendance_id) === String(exception.attendance_id) && e.company === project.company)?.name || '—')}
                                                 </span>
                                                 </TableCell>
                                                 <TableCell className="p-1">
@@ -1519,7 +1519,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     <p className="font-medium text-slate-900">
                                         {viewingException.attendance_id === 'ALL' 
                                             ? '—' 
-                                            : employees.find(e => Number(e.attendance_id) === Number(viewingException.attendance_id) && e.company === project.company)?.name || '—'}
+                                            : employees.find(e => String(e.attendance_id) === String(viewingException.attendance_id) && e.company === project.company)?.name || '—'}
                                     </p>
                                 </div>
                                 <div>

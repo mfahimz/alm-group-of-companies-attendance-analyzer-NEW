@@ -211,7 +211,7 @@ export default function PunchUploadTab({ project }) {
                     }
 
                     // Check if employee exists
-                    const employeeExists = employees.some(e => e.attendance_id === Number(attendance_id));
+                    const employeeExists = employees.some(e => String(e.attendance_id) === String(attendance_id));
                     if (!employeeExists && !newWarnings.includes(`Row ${i + 1}: Unknown employee ${attendance_id}`)) {
                         newWarnings.push(`Row ${i + 1}: Unknown employee ${attendance_id}`);
                     }
@@ -224,7 +224,7 @@ export default function PunchUploadTab({ project }) {
                     }
 
                     data.push({
-                        attendance_id: Number(attendance_id),
+                        attendance_id: String(attendance_id),
                         timestamp_raw,
                         punch_date,
                         employeeExists,
@@ -359,7 +359,7 @@ export default function PunchUploadTab({ project }) {
         return filtered
             .map(punch => ({
                 ...punch,
-                employee_name: employees.find(e => Number(e.attendance_id) === Number(punch.attendance_id))?.name || '-'
+                employee_name: employees.find(e => String(e.attendance_id) === String(punch.attendance_id))?.name || '-'
             }))
             .sort((a, b) => {
                 let aVal = a[sort.key];
@@ -706,7 +706,7 @@ export default function PunchUploadTab({ project }) {
                                 </TableHeader>
                                 <TableBody>
                                     {parsedData.map((row, index) => {
-                                        const employee = employees.find(e => Number(e.attendance_id) === Number(row.attendance_id));
+                                        const employee = employees.find(e => String(e.attendance_id) === String(row.attendance_id));
                                         const rowClass = !row.employeeExists ? 'bg-red-50' : row.hasInvalidTimestamp ? 'bg-amber-50' : '';
                                         
                                         return (
