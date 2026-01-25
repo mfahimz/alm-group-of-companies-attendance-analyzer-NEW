@@ -87,19 +87,10 @@ Deno.serve(async (req) => {
             }
             
             // Salary Leave Amount = (Basic Salary + Allowances) / 30 × Salary Leave Days
-            // Parse allowances (excludes allowances_with_bonus) - handle both formats
-            let allowancesObj = { housing: 0, transport: 0, food: 0, others: 0, total: 0 };
-            try {
-                allowancesObj = JSON.parse(salary?.allowances || '{}');
-            } catch (e) {
-                // Keep defaults if parsing fails
-            }
-            // Handle both formats: {"total": X} OR {"housing": X, "transport": Y, ...}
-            const allowancesSum = allowancesObj.total || 
-                                 ((allowancesObj.housing || 0) + (allowancesObj.transport || 0) + 
-                                  (allowancesObj.food || 0) + (allowancesObj.others || 0));
+            // For Al Maraghi Auto Repairs: allowances is now a direct number, not JSON
             const basicSalary = salary?.basic_salary || 0;
-            const salaryForLeave = basicSalary + allowancesSum;
+            const allowancesAmount = Number(salary?.allowances) || 0;
+            const salaryForLeave = basicSalary + allowancesAmount;
             
             const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
 

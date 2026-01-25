@@ -37,10 +37,7 @@ export default function Salaries() {
         company: '',
         working_hours: 9,
         basic_salary: 0,
-        housing_allowance: 0,
-        transport_allowance: 0,
-        food_allowance: 0,
-        other_allowances: 0,
+        allowances: 0,
         allowances_with_bonus: 0
     });
 
@@ -76,16 +73,9 @@ export default function Salaries() {
 
     const createSalaryMutation = useMutation({
         mutationFn: (data) => {
-            const allowances = {
-                housing: data.housing_allowance || 0,
-                transport: data.transport_allowance || 0,
-                food: data.food_allowance || 0,
-                others: data.other_allowances || 0
-            };
-            const allowancesTotal = allowances.housing + allowances.transport + allowances.food + allowances.others;
-            const allowancesWithBonus = data.allowances_with_bonus || 0;
-            const total = Number((data.basic_salary + allowancesTotal + allowancesWithBonus).toFixed(2));
-            const deductionPerMinute = Number((total / (30 * (data.working_hours || 9) * 60)).toFixed(2));
+            const allowancesAmount = Number(data.allowances) || 0;
+            const allowancesWithBonus = Number(data.allowances_with_bonus) || 0;
+            const total = Number((data.basic_salary + allowancesAmount + allowancesWithBonus).toFixed(2));
             
             return base44.entities.EmployeeSalary.create({
                 employee_id: data.employee_id,
@@ -94,7 +84,7 @@ export default function Salaries() {
                 company: data.company,
                 working_hours: data.working_hours || 9,
                 basic_salary: data.basic_salary,
-                allowances: JSON.stringify(allowances),
+                allowances: allowancesAmount,
                 allowances_with_bonus: allowancesWithBonus,
                 total_salary: total,
                 deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
@@ -113,21 +103,14 @@ export default function Salaries() {
 
     const updateSalaryMutation = useMutation({
         mutationFn: ({ id, data }) => {
-            const allowances = {
-                housing: data.housing_allowance || 0,
-                transport: data.transport_allowance || 0,
-                food: data.food_allowance || 0,
-                others: data.other_allowances || 0
-            };
-            const allowancesTotal = allowances.housing + allowances.transport + allowances.food + allowances.others;
-            const allowancesWithBonus = data.allowances_with_bonus || 0;
-            const total = Number((data.basic_salary + allowancesTotal + allowancesWithBonus).toFixed(2));
-            const deductionPerMinute = Number((total / (30 * (data.working_hours || 9) * 60)).toFixed(2));
+            const allowancesAmount = Number(data.allowances) || 0;
+            const allowancesWithBonus = Number(data.allowances_with_bonus) || 0;
+            const total = Number((data.basic_salary + allowancesAmount + allowancesWithBonus).toFixed(2));
             
             return base44.entities.EmployeeSalary.update(id, {
                 working_hours: data.working_hours || 9,
                 basic_salary: data.basic_salary,
-                allowances: JSON.stringify(allowances),
+                allowances: allowancesAmount,
                 allowances_with_bonus: allowancesWithBonus,
                 total_salary: total,
                 deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
@@ -163,10 +146,7 @@ export default function Salaries() {
             company: '',
             working_hours: 9,
             basic_salary: 0,
-            housing_allowance: 0,
-            transport_allowance: 0,
-            food_allowance: 0,
-            other_allowances: 0,
+            allowances: 0,
             allowances_with_bonus: 0
         });
         setEditingSalary(null);
@@ -186,7 +166,6 @@ export default function Salaries() {
     };
 
     const handleEdit = (salary) => {
-        const allowances = JSON.parse(salary.allowances || '{}');
         setFormData({
             employee_id: salary.employee_id,
             attendance_id: salary.attendance_id,
@@ -194,10 +173,7 @@ export default function Salaries() {
             company: salary.company,
             working_hours: salary.working_hours || 9,
             basic_salary: salary.basic_salary,
-            housing_allowance: allowances.housing || 0,
-            transport_allowance: allowances.transport || 0,
-            food_allowance: allowances.food || 0,
-            other_allowances: allowances.others || 0,
+            allowances: Number(salary.allowances) || 0,
             allowances_with_bonus: salary.allowances_with_bonus || 0
         });
         setEditingSalary(salary);
@@ -374,11 +350,6 @@ export default function Salaries() {
                 const record = previewData.valid[i];
                 
                 try {
-                    // Store ALLOWANCES as JSON with total
-                    const allowancesJson = {
-                        total: record.allowances
-                    };
-
                     const deductionPerMinute = Number((record.totalSalary / (30 * record.workingHours * 60)).toFixed(2));
 
                     const salaryData = {
@@ -388,7 +359,7 @@ export default function Salaries() {
                         company: record.company,
                         working_hours: record.workingHours,
                         basic_salary: Number(record.basicSalary.toFixed(2)),
-                        allowances: JSON.stringify(allowancesJson),
+                        allowances: Number(record.allowances.toFixed(2)),
                         allowances_with_bonus: Number(record.bonus.toFixed(2)),
                         total_salary: Number(record.totalSalary.toFixed(2)),
                         deduction_per_minute: deductionPerMinute
@@ -627,11 +598,6 @@ export default function Salaries() {
                             </TableHeader>
                             <TableBody>
                                 {filteredSalaries.map((salary) => {
-                                    const allowances = JSON.parse(salary.allowances || '{}');
-                                    // Handle both formats: {"total": X} OR {"housing": X, "transport": Y, ...}
-                                    const allowancesDisplay = allowances.total || 
-                                        ((allowances.housing || 0) + (allowances.transport || 0) + 
-                                         (allowances.food || 0) + (allowances.others || 0));
                                     return (
                                         <TableRow key={salary.id}>
                                             <TableCell className="font-medium">{salary.attendance_id}</TableCell>
@@ -644,7 +610,7 @@ export default function Salaries() {
                                                 AED {Number(salary.basic_salary || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
-                                                AED {Number(allowancesDisplay).toFixed(2)}
+                                                AED {Number(salary.allowances || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
                                                 AED {Number(salary.allowances_with_bonus || 0).toFixed(2)}
@@ -742,42 +708,15 @@ export default function Salaries() {
                         </div>
 
                         <div>
-                            <Label>Housing Allowance (AED)</Label>
+                            <Label>Allowances (AED)</Label>
                             <Input
                                 type="number"
-                                value={formData.housing_allowance}
-                                onChange={(e) => setFormData({...formData, housing_allowance: parseFloat(e.target.value) || 0})}
+                                value={formData.allowances}
+                                onChange={(e) => setFormData({...formData, allowances: parseFloat(e.target.value) || 0})}
                             />
                         </div>
 
-                        <div>
-                            <Label>Transport Allowance (AED)</Label>
-                            <Input
-                                type="number"
-                                value={formData.transport_allowance}
-                                onChange={(e) => setFormData({...formData, transport_allowance: parseFloat(e.target.value) || 0})}
-                            />
-                        </div>
-
-                        <div>
-                            <Label>Food Allowance (AED)</Label>
-                            <Input
-                                type="number"
-                                value={formData.food_allowance}
-                                onChange={(e) => setFormData({...formData, food_allowance: parseFloat(e.target.value) || 0})}
-                            />
-                        </div>
-
-                        <div>
-                            <Label>Other Allowances (AED)</Label>
-                            <Input
-                                type="number"
-                                value={formData.other_allowances}
-                                onChange={(e) => setFormData({...formData, other_allowances: parseFloat(e.target.value) || 0})}
-                            />
-                        </div>
-
-                        <div>
+                        <div className="col-span-2">
                             <Label>Allowances with Bonus (AED)</Label>
                             <Input
                                 type="number"
@@ -791,10 +730,7 @@ export default function Salaries() {
                             <div className="text-2xl font-bold text-green-600">
                                 AED {Number(
                                     formData.basic_salary + 
-                                    formData.housing_allowance + 
-                                    formData.transport_allowance + 
-                                    formData.food_allowance + 
-                                    formData.other_allowances +
+                                    formData.allowances +
                                     formData.allowances_with_bonus
                                 ).toFixed(2)}
                             </div>
