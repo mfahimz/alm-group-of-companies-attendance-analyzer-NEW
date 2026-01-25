@@ -325,16 +325,16 @@ Deno.serve(async (req) => {
             const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
             const includeSeconds = project.company === 'Al Maraghi Automotive';
 
-            let working_days = 0;
-            let present_days = 0;
-            let full_absence_count = 0;
-            let half_absence_count = 0;
-            let sick_leave_count = 0;
-            let annual_leave_count = 0;
-            let late_minutes = 0;
-            let early_checkout_minutes = 0;
-            let other_minutes = 0;
-            let total_approved_minutes = 0;
+            let workingDays = 0;
+            let presentDays = 0;
+            let fullAbsenceCount = 0;
+            let halfAbsenceCount = 0;
+            let sickLeaveCount = 0;
+            let annualLeaveCount = 0;
+            let lateMinutes = 0;
+            let earlyCheckoutMinutes = 0;
+            let otherMinutes = 0;
+            let totalApprovedMinutes = 0;
             const abnormal_dates_list = [];
             const critical_abnormal_dates = [];
             const auto_resolutions = [];
@@ -363,7 +363,7 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
-                working_days++;
+                workingDays++;
 
                 let dateException = null;
                 try {
@@ -386,19 +386,19 @@ Deno.serve(async (req) => {
 
                 if (dateException) {
                     if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
-                        working_days--;
+                        workingDays--;
                         continue;
                     } else if (dateException.type === 'MANUAL_PRESENT') {
-                        present_days++;
+                        presentDays++;
                     } else if (dateException.type === 'MANUAL_ABSENT') {
-                        full_absence_count++;
+                        fullAbsenceCount++;
                         continue;
                     } else if (dateException.type === 'MANUAL_HALF') {
-                        present_days++;
-                        half_absence_count++;
+                        presentDays++;
+                        halfAbsenceCount++;
                     } else if (dateException.type === 'SICK_LEAVE') {
-                        working_days--;
-                        sick_leave_count++;
+                        workingDays--;
+                        sickLeaveCount++;
                         continue;
                     }
                 }
@@ -520,30 +520,30 @@ Deno.serve(async (req) => {
 
                 if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
                     if (filteredPunches.length === 0) {
-                        present_days++;
+                        presentDays++;
                     }
                 }
 
                 if (filteredPunches.length > 0) {
                     if (partialDayResult.isPartial) {
-                        present_days++;
-                        half_absence_count++;
+                        presentDays++;
+                        halfAbsenceCount++;
                         auto_resolutions.push({
                             date: dateStr,
                             type: 'PARTIAL_DAY_DETECTED',
                             details: partialDayResult.reason
                         });
                     } else {
-                        present_days++;
+                        presentDays++;
                     }
 
                     if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
                         if (filteredPunches.length < 2 && !isSingleShift) {
-                            half_absence_count++;
+                            halfAbsenceCount++;
                         }
                     }
                 } else {
-                    full_absence_count++;
+                    fullAbsenceCount++;
                 }
 
                 // Check for approved minutes (foundation for all companies, currently enabled for Al Maraghi Auto Repairs only)
@@ -554,7 +554,7 @@ Deno.serve(async (req) => {
                         dateException.type === 'ALLOWED_MINUTES' && 
                         dateException.approval_status === 'approved_dept_head') {
                         approvedMinutesForDay = dateException.allowed_minutes || 0;
-                        total_approved_minutes += approvedMinutesForDay;
+                        totalApprovedMinutes += approvedMinutesForDay;
                     }
                 } catch {
                     approvedMinutesForDay = 0;
@@ -574,13 +574,13 @@ Deno.serve(async (req) => {
 
                 if (hasManualTimeException) {
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        late_minutes += dateException.late_minutes;
+                        lateMinutes += dateException.late_minutes;
                     }
                     if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        early_checkout_minutes += dateException.early_checkout_minutes;
+                        earlyCheckoutMinutes += dateException.early_checkout_minutes;
                     }
                     if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        other_minutes += dateException.other_minutes;
+                        otherMinutes += dateException.other_minutes;
                     }
                 } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
                     let dayLateMinutes = 0;
@@ -623,8 +623,8 @@ Deno.serve(async (req) => {
                         }
                     }
                     
-                    late_minutes += dayLateMinutes;
-                    early_checkout_minutes += dayEarlyMinutes;
+                    lateMinutes += dayLateMinutes;
+                    earlyCheckoutMinutes += dayEarlyMinutes;
                 }
 
                 const expectedPunches = isSingleShift ? 2 : 4;
@@ -707,21 +707,21 @@ Deno.serve(async (req) => {
             
             // Calculate deductible_minutes for salary (for Al Maraghi Auto Repairs)
             // other_minutes are subtracted as they reduce the penalty amount
-            const deductible_minutes = late_minutes + early_checkout_minutes - total_approved_minutes - other_minutes;
+            const deductibleMinutes = lateMinutes + earlyCheckoutMinutes - totalApprovedMinutes - otherMinutes;
 
             return {
                 attendance_id,
-                working_days,
-                present_days,
-                full_absence_count,
-                half_absence_count,
-                sick_leave_count,
-                annual_leave_count,
-                late_minutes,
-                early_checkout_minutes,
-                other_minutes,
-                approved_minutes: total_approved_minutes,
-                deductible_minutes: Math.max(0, deductible_minutes),
+                working_days: workingDays,
+                present_days: presentDays,
+                full_absence_count: fullAbsenceCount,
+                half_absence_count: halfAbsenceCount,
+                sick_leave_count: sickLeaveCount,
+                annual_leave_count: annualLeaveCount,
+                late_minutes: lateMinutes,
+                early_checkout_minutes: earlyCheckoutMinutes,
+                other_minutes: otherMinutes,
+                approved_minutes: totalApprovedMinutes,
+                deductible_minutes: Math.max(0, deductibleMinutes),
                 grace_minutes: baseGrace + carriedGrace,
                 abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
                 notes: criticalDatesFormatted,
