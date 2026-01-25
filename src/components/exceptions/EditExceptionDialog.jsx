@@ -9,8 +9,17 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import TimePicker from '../ui/TimePicker';
+import { useQuery } from '@tanstack/react-query';
 
 export default function EditExceptionDialog({ open, onClose, exception, projectId }) {
+    const { data: project } = useQuery({
+        queryKey: ['project', projectId],
+        queryFn: async () => {
+            const projects = await base44.entities.Project.filter({ id: projectId });
+            return projects[0];
+        },
+        enabled: !!projectId
+    });
     const [formData, setFormData] = useState({
         type: '',
         date_from: '',
