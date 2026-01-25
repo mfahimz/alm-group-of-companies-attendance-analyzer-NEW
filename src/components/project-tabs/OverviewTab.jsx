@@ -35,7 +35,6 @@ export default function OverviewTab({ project }) {
         company: project.company,
         date_from: project.date_from,
         date_to: project.date_to,
-        department: project.department || '',
         custom_employee_ids: project.custom_employee_ids || '',
         use_carried_grace_minutes: project.use_carried_grace_minutes || false,
         shift_blocks_count: project.shift_blocks_count || 2
@@ -324,14 +323,13 @@ export default function OverviewTab({ project }) {
                                 size="sm"
                                 onClick={() => {
                                     setEditData({
-                                        name: project.name,
-                                        company: project.company,
-                                        date_from: project.date_from,
-                                        date_to: project.date_to,
-                                        department: project.department || '',
-                                        custom_employee_ids: project.custom_employee_ids || '',
-                                        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
-                                        shift_blocks_count: project.shift_blocks_count || 2
+                                       name: project.name,
+                                       company: project.company,
+                                       date_from: project.date_from,
+                                       date_to: project.date_to,
+                                       custom_employee_ids: project.custom_employee_ids || '',
+                                       use_carried_grace_minutes: project.use_carried_grace_minutes || false,
+                                       shift_blocks_count: project.shift_blocks_count || 2
                                     });
                                     setShowEditDialog(true);
                                 }}
@@ -359,10 +357,7 @@ export default function OverviewTab({ project }) {
                                 {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
                             </p>
                         </div>
-                        <div>
-                            <p className="text-sm text-slate-600">Department</p>
-                            <p className="font-medium text-slate-900 mt-1">{project.department || 'All'}</p>
-                        </div>
+
                         <div>
                             <p className="text-sm text-slate-600">Created By</p>
                             <p className="font-medium text-slate-900 mt-1">{project.created_by || '-'}</p>
@@ -513,14 +508,6 @@ export default function OverviewTab({ project }) {
                                     onChange={(e) => setEditData({ ...editData, date_to: e.target.value })}
                                 />
                             </div>
-                        </div>
-                        <div>
-                            <Label>Department</Label>
-                            <Input
-                                value={editData.department}
-                                onChange={(e) => setEditData({ ...editData, department: e.target.value })}
-                                placeholder="Leave empty for all departments"
-                            />
                         </div>
                         {editData.company && (
                             <div>

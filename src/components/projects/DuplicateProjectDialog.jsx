@@ -36,7 +36,6 @@ export default function DuplicateProjectDialog({ open, onClose, sourceProject, p
             const newProject = await base44.entities.Project.create({
                 ...data,
                 company: sourceProject.company,
-                department: sourceProject.department,
                 status: 'draft',
                 use_carried_grace_minutes: sourceProject.use_carried_grace_minutes,
                 shift_blocks_count: sourceProject.shift_blocks_count,

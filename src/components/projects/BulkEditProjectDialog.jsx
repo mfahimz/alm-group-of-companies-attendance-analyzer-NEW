@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 export default function BulkEditProjectDialog({ open, onClose, selectedProjects }) {
     const [updates, setUpdates] = useState({
         status: { enabled: false, value: '' },
-        department: { enabled: false, value: '' },
         company: { enabled: false, value: '' }
     });
 
@@ -22,7 +21,6 @@ export default function BulkEditProjectDialog({ open, onClose, selectedProjects 
         mutationFn: async () => {
             const updateData = {};
             if (updates.status.enabled) updateData.status = updates.status.value;
-            if (updates.department.enabled) updateData.department = updates.department.value;
             if (updates.company.enabled) updateData.company = updates.company.value;
 
             await Promise.all(
@@ -112,28 +110,6 @@ export default function BulkEditProjectDialog({ open, onClose, selectedProjects 
                                         <SelectItem value="closed">Closed</SelectItem>
                                     </SelectContent>
                                 </Select>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center space-x-3">
-                            <Checkbox
-                                checked={updates.department.enabled}
-                                onCheckedChange={(checked) => setUpdates(prev => ({
-                                    ...prev,
-                                    department: { ...prev.department, enabled: checked }
-                                }))}
-                            />
-                            <div className="flex-1">
-                                <Label>Department</Label>
-                                <Input
-                                    value={updates.department.value}
-                                    onChange={(e) => setUpdates(prev => ({
-                                        ...prev,
-                                        department: { ...prev.department, value: e.target.value }
-                                    }))}
-                                    disabled={!updates.department.enabled}
-                                    placeholder="e.g., Operations"
-                                />
                             </div>
                         </div>
                     </div>

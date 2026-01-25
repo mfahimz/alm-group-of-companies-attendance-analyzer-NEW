@@ -24,7 +24,6 @@ export default function CreateProjectDialog({ open, onClose }) {
         company: '',
         date_from: '',
         date_to: '',
-        department: '',
         custom_employee_ids: '',
         use_carried_grace_minutes: false,
         weekly_off_override: ''
@@ -66,7 +65,6 @@ export default function CreateProjectDialog({ open, onClose }) {
                 setFormData(prev => ({
                     ...prev,
                     company: prev.company || lastProject.company,
-                    department: lastProject.department || '',
                     use_carried_grace_minutes: lastProject.use_carried_grace_minutes || false,
                     weekly_off_override: lastProject.weekly_off_override || ''
                 }));
