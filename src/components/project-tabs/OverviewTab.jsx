@@ -71,7 +71,7 @@ export default function OverviewTab({ project }) {
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
-    const uniqueEmployees = new Set(punches.map(p => p.attendance_id)).size;
+    const uniqueEmployees = new Set(punches.map(p => String(p.attendance_id))).size;
 
     // Calculate working days (Monday to Saturday, excluding Sundays)
     const calculateWorkingDays = () => {
