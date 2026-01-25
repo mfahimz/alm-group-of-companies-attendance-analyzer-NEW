@@ -319,14 +319,14 @@ export default function Employees() {
             
             for (const item of hrmsData) {
                 try {
-                    // Find employee by attendance_id
+                    // Find employee by attendance_id - string comparison
                     const existingEmployee = employees.find(emp => 
-                        Number(emp.attendance_id) === Number(item.attendance_id)
+                        String(emp.attendance_id) === String(item.attendance_id)
                     );
                     
                     if (existingEmployee) {
                         await base44.entities.Employee.update(existingEmployee.id, {
-                            hrms_id: item.hrms_id
+                            hrms_id: String(item.hrms_id)
                         });
                         matched++;
                         results.push(existingEmployee.id);
