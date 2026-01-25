@@ -31,7 +31,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const queryClient = useQueryClient();
 
     useEffect(() => {
-        if (exception) {
+        if (exception && project) {
             // Calculate default salary_leave_days if not set
             let calculatedDays = '';
             if (exception.type === 'ANNUAL_LEAVE' && exception.date_from && exception.date_to) {
@@ -59,7 +59,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 salary_leave_days: calculatedDays
             });
         }
-    }, [exception]);
+    }, [exception, project]);
 
     const updateMutation = useMutation({
         mutationFn: (data) => base44.entities.Exception.update(exception.id, data),
@@ -331,7 +331,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                             <Input
                                 type="number"
                                 step="0.01"
-                                placeholder="e.g. 9.00"
+                                placeholder={project?.company === 'Al Maraghi Auto Repairs' ? "e.g. 9.00" : "e.g. 9"}
                                 value={formData.salary_leave_days}
                                 onChange={(e) => setFormData({ ...formData, salary_leave_days: e.target.value })}
                                 min="0"
@@ -339,9 +339,11 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                             <p className="text-xs text-green-600 mt-1">
                                 💡 Calculated: {calculateDaysBetween()} days between selected dates. Edit if partial days needed.
                             </p>
-                            <p className="text-xs text-amber-600 mt-1">
-                                ⚠️ This value is used ONLY for salary calculation, not for attendance reports.
-                            </p>
+                            {project?.company === 'Al Maraghi Auto Repairs' && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                    ⚠️ This value is used ONLY for salary calculation, not for attendance reports.
+                                </p>
+                            )}
                         </div>
                     )}
 

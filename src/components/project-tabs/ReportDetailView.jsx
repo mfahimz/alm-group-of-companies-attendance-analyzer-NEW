@@ -342,20 +342,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const calculateEmployeeTotals = (result, dateFrom, dateTo) => {
-        const attendanceIdNum = Number(result.attendance_id);
+        const attendanceIdStr = String(result.attendance_id);
         const employeePunches = punches.filter(p => 
-            Number(p.attendance_id) === attendanceIdNum &&
+            String(p.attendance_id) === attendanceIdStr &&
             p.punch_date >= dateFrom && 
             p.punch_date <= dateTo
         );
-        const employeeShifts = shifts.filter(s => Number(s.attendance_id) === attendanceIdNum);
+        const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
         const employeeExceptions = exceptions.filter(e => 
-            (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
+            (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
             e.use_in_analysis !== false &&
             e.is_custom_type !== true
         );
 
-        const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
+        const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
         
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
@@ -414,12 +414,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const matchingExceptionsCalc = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo &&
-                       (String(ex.attendance_id) === 'ALL' || Number(ex.attendance_id) === attendanceIdNum);
+                return currentDate >= exFrom && currentDate <= exTo;
             });
 
-            const dateException = matchingExceptionsCalc.length > 0
-                ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+            const dateException = matchingExceptionsCalc && matchingExceptionsCalc.length > 0
+                ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
                 : null;
 
             const isShiftEffective = (s) => {
@@ -705,7 +704,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // Separate calculation from verification state to prevent unnecessary recalculations
     const baseEnrichedResults = React.useMemo(() => {
         return results.map(result => {
-            const employee = employees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
+            const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
             
             // For closed projects, use saved data from AnalysisResult (punches are deleted)
             if (project.status === 'closed') {
@@ -1173,20 +1172,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }
         }
         
-        const attendanceIdNum = Number(currentResult.attendance_id);
+        const attendanceIdStr = String(currentResult.attendance_id);
         const employeePunches = punches.filter(p => 
-            Number(p.attendance_id) === attendanceIdNum &&
+            String(p.attendance_id) === attendanceIdStr &&
             p.punch_date >= reportRun.date_from && 
             p.punch_date <= reportRun.date_to
         );
-        const employeeShifts = shifts.filter(s => Number(s.attendance_id) === attendanceIdNum);
+        const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
         const employeeExceptions = exceptions.filter(e => 
-            (Number(e.attendance_id) === attendanceIdNum || e.attendance_id === 'ALL') &&
+            (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
             e.use_in_analysis !== false &&
             e.is_custom_type !== true
         );
 
-        const employee = employees.find(e => Number(e.attendance_id) === attendanceIdNum);
+        const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
         
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
@@ -1223,13 +1222,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const matchingExceptionsDaily = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo &&
-                       (String(ex.attendance_id) === 'ALL' || Number(ex.attendance_id) === attendanceIdNum);
+                return currentDate >= exFrom && currentDate <= exTo;
             });
 
-            const dateException = matchingExceptionsDaily.length > 0
-                ? matchingExceptionsDaily.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
-                : null;
+            const dateException = matchingExceptionsDaily && matchingExceptionsDaily.length > 0
+            ? matchingExceptionsDaily.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+            : null;
 
             const isShiftEffective = (s) => {
                 if (!s.effective_from || !s.effective_to) return true;
@@ -1763,9 +1761,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
                                         Early Checkout
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort}>
-                                        Approved Minutes
-                                    </SortableTableHead>
+                                    {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
+                                        <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort}>
+                                            Approved Minutes
+                                        </SortableTableHead>
+                                    )}
                                     <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}>
                                         Other Minutes
                                     </SortableTableHead>
@@ -1856,11 +1856,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 {result.early_checkout_minutes || 0}
                                             </span>
                                         </TableCell>
-                                        <TableCell>
-                                            <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
-                                                {result.approved_minutes || 0}
-                                            </span>
-                                        </TableCell>
+                                        {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
+                                            <TableCell>
+                                                <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
+                                                    {result.approved_minutes || 0}
+                                                </span>
+                                            </TableCell>
+                                        )}
                                         <TableCell>
                                             <span className={`${result.other_minutes > 0 ? 'text-purple-600 font-medium' : 'text-slate-400'}`}>
                                                 {result.other_minutes || 0}
