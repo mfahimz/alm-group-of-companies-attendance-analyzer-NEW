@@ -286,16 +286,6 @@ export default function CreateProjectDialog({ open, onClose }) {
                             </div>
                             )}
 
-                    <div>
-                        <Label htmlFor="department">Department</Label>
-                        <Input
-                            id="department"
-                            value={formData.department}
-                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                            placeholder="Optional"
-                        />
-                    </div>
-
                     {formData.company && (
                         <div>
                             <Label>Custom Employee Selection</Label>
