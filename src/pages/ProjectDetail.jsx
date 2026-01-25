@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, LockOpen, RefreshCw } from 'lucide-react';
+import { Calendar, LockOpen } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
@@ -85,25 +85,6 @@ export default function ProjectDetail() {
     }
   });
 
-  const initializeMinutesMutation = useMutation({
-    mutationFn: async () => {
-      const response = await base44.functions.invoke('initializeProjectQuarterlyMinutes', {
-        project_id: project.id
-      });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      if (data.stats) {
-        toast.success(`Initialized ${data.stats.initialized} employees with ${data.stats.total_minutes_per_employee} minutes each (${data.stats.quarters_spanned} quarter${data.stats.quarters_spanned > 1 ? 's' : ''})`);
-      } else {
-        toast.success(data.message);
-      }
-    },
-    onError: (error) => {
-      toast.error('Failed to initialize quarterly minutes: ' + error.message);
-    }
-  });
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -164,22 +145,6 @@ export default function ProjectDetail() {
 
                             {project.status}
                         </span>
-                        {isAdmin && project.company === "Al Maraghi Auto Repairs" &&
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (window.confirm('Initialize/reinitialize quarterly minutes for this project?\n\nThis will create minute allocations based on project duration (120 minutes per quarter).')) {
-                  initializeMinutesMutation.mutate();
-                }
-              }}
-              disabled={initializeMinutesMutation.isPending}
-              className="border-indigo-300 hover:bg-indigo-50">
-
-                                <RefreshCw className={`w-4 h-4 mr-2 ${initializeMinutesMutation.isPending ? 'animate-spin' : ''}`} />
-                                {initializeMinutesMutation.isPending ? 'Initializing...' : 'Init Quarterly Minutes'}
-                            </Button>
-            }
                         {project.status === 'closed' && isAdmin &&
             <Button
               size="sm"
