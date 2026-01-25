@@ -25,16 +25,16 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
     useEffect(() => {
         if (open && company) {
             if (initialIds) {
-                // Load existing custom IDs
-                const idsArray = initialIds.split(',').map(id => id.trim()).filter(Boolean);
+                // Load existing custom IDs - convert to strings to match HRMS ID format
+                const idsArray = initialIds.split(',').map(id => String(id).trim()).filter(Boolean);
                 setSelectedIds(new Set(idsArray));
             } else {
-                // Select all company employees by default
-                const allIds = companyEmployees.map(e => e.hrms_id);
+                // Select all company employees by default - convert to strings
+                const allIds = companyEmployees.map(e => String(e.hrms_id));
                 setSelectedIds(new Set(allIds));
             }
         }
-    }, [open, company, initialIds]);
+    }, [open, company, initialIds, companyEmployees.length]);
 
     const employeesToSearch = searchAllCompanies ? allActiveEmployees : companyEmployees;
     
@@ -45,16 +45,18 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
     );
 
     const toggleEmployee = (hrmsId) => {
-        // Prevent unselecting - always keep all employees selected
+        // Convert to string for consistency
+        const idStr = String(hrmsId);
         const newSelected = new Set(selectedIds);
-        if (!newSelected.has(hrmsId)) {
-            newSelected.add(hrmsId);
+        if (!newSelected.has(idStr)) {
+            newSelected.add(idStr);
         }
         setSelectedIds(newSelected);
     };
 
     const selectAll = () => {
-        const allIds = companyEmployees.map(e => e.hrms_id);
+        // Convert all IDs to strings
+        const allIds = companyEmployees.map(e => String(e.hrms_id));
         setSelectedIds(new Set(allIds));
     };
 
@@ -117,17 +119,18 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
                             ) : (
                                 filteredEmployees.map((employee) => {
                                     const isFromDifferentCompany = employee.company !== company;
+                                    const employeeHrmsIdStr = String(employee.hrms_id);
                                     return (
                                         <div
                                             key={employee.id}
                                             className={`flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer ${
                                                 isFromDifferentCompany ? 'bg-amber-50/50' : ''
                                             }`}
-                                            onClick={() => toggleEmployee(employee.hrms_id)}
+                                            onClick={() => toggleEmployee(employeeHrmsIdStr)}
                                         >
                                             <Checkbox
-                                                checked={selectedIds.has(employee.hrms_id)}
-                                                onCheckedChange={() => toggleEmployee(employee.hrms_id)}
+                                                checked={selectedIds.has(employeeHrmsIdStr)}
+                                                onCheckedChange={() => toggleEmployee(employeeHrmsIdStr)}
                                             />
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
