@@ -90,6 +90,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
             : formData.applicable_days.toLowerCase().includes('friday');
         
         updateMutation.mutate({
+            attendance_id: String(shift.attendance_id),
             am_start: formData.am_start,
             am_end: formData.is_single_shift ? null : formData.am_end,
             pm_start: formData.is_single_shift ? null : formData.pm_start,

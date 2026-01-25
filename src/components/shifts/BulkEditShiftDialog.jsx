@@ -34,7 +34,10 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
 
             await Promise.all(
                 selectedShifts.map(shift => 
-                    base44.entities.ShiftTiming.update(shift.id, updateData)
+                    base44.entities.ShiftTiming.update(shift.id, {
+                        ...updateData,
+                        attendance_id: String(shift.attendance_id)
+                    })
                 )
             );
         },

@@ -304,7 +304,7 @@ export default function ShiftTimingsTab({ project }) {
             const blockRange = blockDateRanges[selectedBlock];
             const shiftRecords = parsedData.map(s => ({
                 project_id: project.id,
-                attendance_id: s.attendance_id,
+                attendance_id: String(s.attendance_id),
                 date: s.date,
                 is_friday_shift: s.is_friday_shift,
                 applicable_days: s.applicable_days,
@@ -373,6 +373,7 @@ export default function ShiftTimingsTab({ project }) {
             // Update all shifts with new date range
             for (const shift of blockShifts) {
                 await base44.entities.ShiftTiming.update(shift.id, {
+                    attendance_id: String(shift.attendance_id),
                     effective_from: newRange.from,
                     effective_to: newRange.to,
                     shift_block: block
@@ -462,7 +463,7 @@ export default function ShiftTimingsTab({ project }) {
             const targetRange = blockDateRanges[targetBlockId];
             const newShifts = sourceShifts.map(shift => ({
                 project_id: project.id,
-                attendance_id: shift.attendance_id,
+                attendance_id: String(shift.attendance_id),
                 date: shift.date,
                 is_friday_shift: shift.is_friday_shift,
                 applicable_days: shift.applicable_days,
@@ -497,6 +498,7 @@ export default function ShiftTimingsTab({ project }) {
     const createShiftMutation = useMutation({
         mutationFn: (data) => base44.entities.ShiftTiming.create({
             ...data,
+            attendance_id: String(data.attendance_id),
             project_id: project.id,
             shift_block: selectedBlock,
             effective_from: blockDateRanges[selectedBlock].from,
