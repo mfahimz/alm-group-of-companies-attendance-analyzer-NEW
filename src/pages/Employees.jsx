@@ -498,38 +498,42 @@ export default function Employees() {
                             Bulk Edit ({selectedEmployeeIds.length})
                         </Button>
                     )}
-                    <label>
-                        <input
-                            type="file"
-                            accept=".csv"
-                            onChange={handleHrmsIdImport}
-                            className="hidden"
-                        />
-                        <Button 
-                            onClick={(e) => e.currentTarget.previousElementSibling.click()}
-                            variant="outline"
-                            disabled={importHrmsIdMutation.isPending}
-                        >
-                            <UserCheck className="w-4 h-4 mr-2" />
-                            {importHrmsIdMutation.isPending ? 'Updating...' : 'Import HRMS IDs'}
-                        </Button>
-                    </label>
-                    <label>
-                        <input
-                            type="file"
-                            accept=".csv,.xlsx,.xls"
-                            onChange={handleImport}
-                            className="hidden"
-                        />
-                        <Button 
-                            onClick={(e) => e.currentTarget.previousElementSibling.click()}
-                            variant="outline"
-                            disabled={importMutation.isPending}
-                        >
-                            <Upload className="w-4 h-4 mr-2" />
-                            {importMutation.isPending ? 'Importing...' : 'Import'}
-                        </Button>
-                    </label>
+                    {(isAdmin || isSupervisor || isCEO) && (
+                        <>
+                            <label>
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    onChange={handleHrmsIdImport}
+                                    className="hidden"
+                                />
+                                <Button 
+                                    onClick={(e) => e.currentTarget.previousElementSibling.click()}
+                                    variant="outline"
+                                    disabled={importHrmsIdMutation.isPending}
+                                >
+                                    <UserCheck className="w-4 h-4 mr-2" />
+                                    {importHrmsIdMutation.isPending ? 'Updating...' : 'Import HRMS IDs'}
+                                </Button>
+                            </label>
+                            <label>
+                                <input
+                                    type="file"
+                                    accept=".csv,.xlsx,.xls"
+                                    onChange={handleImport}
+                                    className="hidden"
+                                />
+                                <Button 
+                                    onClick={(e) => e.currentTarget.previousElementSibling.click()}
+                                    variant="outline"
+                                    disabled={importMutation.isPending}
+                                >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    {importMutation.isPending ? 'Importing...' : 'Import'}
+                                </Button>
+                            </label>
+                        </>
+                    )}
                     <Button 
                         onClick={() => {
                             setSelectedEmployee(null);
@@ -554,18 +558,20 @@ export default function Employees() {
                         className="pl-10"
                     />
                 </div>
-                <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                    <SelectTrigger className="w-64">
-                        <SelectValue placeholder="All Companies" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Companies</SelectItem>
-                        <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
-                        <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
-                        <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
-                        <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
-                    </SelectContent>
-                </Select>
+                {(isAdmin || isSupervisor || isCEO) && (
+                    <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                        <SelectTrigger className="w-64">
+                            <SelectValue placeholder="All Companies" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Companies</SelectItem>
+                            <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                            <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                            <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                            <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                        </SelectContent>
+                    </Select>
+                )}
                 <Button
                     variant={showOnlyDuplicates ? "default" : "outline"}
                     onClick={() => setShowOnlyDuplicates(!showOnlyDuplicates)}
