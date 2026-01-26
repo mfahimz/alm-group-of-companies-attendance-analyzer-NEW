@@ -238,10 +238,17 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             return;
         }
 
+        // Ensure hrms_id and attendance_id are strings
+        const cleanedData = {
+            ...formData,
+            hrms_id: String(formData.hrms_id).trim(),
+            attendance_id: String(formData.attendance_id).trim()
+        };
+
         if (employee) {
-            updateMutation.mutate({ id: employee.id, data: formData, oldData: employee });
+            updateMutation.mutate({ id: employee.id, data: cleanedData, oldData: employee });
         } else {
-            createMutation.mutate(formData);
+            createMutation.mutate(cleanedData);
         }
     };
 
