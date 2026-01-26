@@ -424,12 +424,16 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const updatedTotals = recalculateTotals(latestResult, overrides);
 
             const updatePayload = {
-                attendance_id: String(analysisResult.attendance_id),
-                day_overrides: JSON.stringify(overrides),
-                abnormal_dates: updatedTotals.abnormal_dates
+                day_overrides: JSON.stringify(overrides)
             };
+            
+            // Only include abnormal_dates if not empty
+            if (updatedTotals.abnormal_dates && updatedTotals.abnormal_dates.length > 0) {
+                updatePayload.abnormal_dates = updatedTotals.abnormal_dates;
+            }
 
-            console.log('Update payload:', updatePayload);
+            console.log('🔧 EditDayRecord Update Payload:', JSON.stringify(updatePayload, null, 2));
+            console.log('🔧 Result ID:', analysisResult.id);
 
             await base44.entities.AnalysisResult.update(analysisResult.id, updatePayload);
 
