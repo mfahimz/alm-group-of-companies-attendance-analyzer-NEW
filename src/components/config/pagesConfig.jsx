@@ -191,6 +191,26 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin']
     },
+    SystemHealth: {
+        name: 'SystemHealth',
+        title: 'System Health',
+        icon: Database,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+    MigrationTools: {
+        name: 'MigrationTools',
+        title: 'Migration Tools',
+        icon: Database,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
     Documentation: {
         name: 'Documentation',
         title: 'Documentation',
