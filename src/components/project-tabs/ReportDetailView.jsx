@@ -1791,12 +1791,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <TableBody>
                                 {filteredResults.map((result) => (
                                     <TableRow key={result.id}>
-                                        <TableCell>
-                                            <Checkbox
-                                                checked={result.isVerified}
-                                                onCheckedChange={() => toggleVerification(result.attendance_id)}
-                                            />
-                                        </TableCell>
+                                         <TableCell>
+                                             <Checkbox
+                                                 checked={result.isVerified}
+                                                 onCheckedChange={() => toggleVerification(result.attendance_id)}
+                                                 disabled={hasRedAbnormalities(result)}
+                                                 title={hasRedAbnormalities(result) ? 'Cannot verify - Red abnormalities found' : 'Mark as verified'}
+                                             />
+                                         </TableCell>
                                         <TableCell className="font-medium">{result.attendance_id}</TableCell>
                                         <TableCell>{result.name}</TableCell>
                                         <TableCell>{result.working_days}</TableCell>
