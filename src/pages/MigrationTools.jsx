@@ -112,6 +112,49 @@ export default function MigrationTools() {
                 <p className="text-lg text-slate-600 mt-3">One-time data migration utilities (Admin only)</p>
             </div>
 
+            {/* Fix Attendance IDs Card */}
+            <Card className="border-2 border-blue-300 bg-blue-50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-blue-900">
+                        <Database className="w-6 h-6" />
+                        Fix Attendance ID Data Types
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <div className="bg-white border border-blue-200 rounded-lg p-4">
+                            <p className="text-sm text-blue-800 mb-3">
+                                This tool fixes AnalysisResult records where attendance_id is stored as a number instead of a string.
+                                This prevents "422 validation error" when editing daily records.
+                            </p>
+                            <p className="text-sm text-blue-700">
+                                <strong>Safe operation:</strong> Recreates records with correct data types.
+                            </p>
+                        </div>
+
+                        <Button
+                            onClick={fixAttendanceIds}
+                            disabled={fixingAttendance}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            <Database className="w-4 h-4 mr-2" />
+                            {fixingAttendance ? 'Fixing...' : 'Fix Attendance ID Types'}
+                        </Button>
+
+                        {fixResult && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <p className="text-sm font-semibold text-green-900 mb-2">✓ Complete</p>
+                                <div className="text-sm text-green-800 space-y-1">
+                                    <p>Total records: {fixResult.total}</p>
+                                    <p>Fixed: {fixResult.fixed}</p>
+                                    <p>Already correct: {fixResult.skipped}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Migration Card */}
             <Card className="border-2 border-red-300 bg-red-50">
                 <CardHeader>
