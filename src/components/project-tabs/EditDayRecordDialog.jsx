@@ -488,7 +488,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         },
         onError: (error) => {
             console.error('Update day record error:', error);
-            toast.error('Failed to update day record: ' + (error?.message || 'Unknown error'));
+            toast.error('Failed to save changes. Please try again.');
         }
     });
 
