@@ -489,18 +489,26 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const recalculateTotals = (result, overrides) => {
         // Only update abnormal_dates - the late/early/absence totals are stored in day_overrides
         // and calculated when displaying the report table
-        const abnormalDates = new Set((result.abnormal_dates || '').split(',').filter(Boolean));
+        const abnormalDates = new Set();
         
-        Object.entries(overrides).forEach(([dateStr, override]) => {
-            if (override.isAbnormal) {
-                abnormalDates.add(dateStr);
-            } else {
-                abnormalDates.delete(dateStr);
-            }
-        });
+        // Parse existing abnormal dates
+        if (result.abnormal_dates && typeof result.abnormal_dates === 'string') {
+            result.abnormal_dates.split(',').filter(Boolean).forEach(d => abnormalDates.add(d));
+        }
+        
+        // Update based on overrides
+        if (overrides && typeof overrides === 'object') {
+            Object.entries(overrides).forEach(([dateStr, override]) => {
+                if (override && override.isAbnormal === true) {
+                    abnormalDates.add(dateStr);
+                } else if (override && override.isAbnormal === false) {
+                    abnormalDates.delete(dateStr);
+                }
+            });
+        }
 
         return {
-            abnormal_dates: Array.from(abnormalDates).join(',')
+            abnormal_dates: Array.from(abnormalDates).filter(Boolean).join(',') || ''
         };
     };
 
