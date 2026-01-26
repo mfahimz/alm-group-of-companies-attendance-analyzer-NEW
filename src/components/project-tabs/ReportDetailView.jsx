@@ -28,6 +28,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
+    const [showFinalizeConfirmation, setShowFinalizeConfirmation] = useState(false);
 
 
     const queryClient = useQueryClient();
