@@ -1702,10 +1702,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                    </Button>
                                    {isAdmin && (
                                        <Button
-                                           onClick={() => finalizeReportMutation.mutate()}
+                                           onClick={() => {
+                                               // Admin can finalize without all verified, show confirmation if needed
+                                               if (verifiedCount < results.length) {
+                                                   setShowFinalizeConfirmation(true);
+                                               } else {
+                                                   finalizeReportMutation.mutate();
+                                               }
+                                           }}
                                            disabled={finalizeReportMutation.isPending}
                                            className="bg-purple-600 hover:bg-purple-700"
-                                           title="Finalize report without generating approval links"
+                                           title="Finalize report for salary calculation"
                                        >
                                            {finalizeReportMutation.isPending ? (
                                                <>
