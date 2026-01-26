@@ -10,6 +10,7 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 export default function SystemHealth() {
     const [isScanning, setIsScanning] = useState(false);
     const [healthReport, setHealthReport] = useState(null);
+    const [fixingIssue, setFixingIssue] = useState(null);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
