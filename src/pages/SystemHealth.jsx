@@ -382,25 +382,48 @@ export default function SystemHealth() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {healthReport.issues.map((issue, idx) => (
-                                        <div key={idx} className="bg-white border border-red-200 rounded-lg p-4">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div>
-                                                    <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded">
-                                                        {issue.entity}
-                                                    </span>
-                                                    <h4 className="font-semibold text-red-900 mt-2">{issue.issue}</h4>
+                                    {healthReport.issues.map((issue, idx) => {
+                                        let mutation = null;
+                                        if (issue.entity === 'AnalysisResult' && issue.issue.includes('Duplicate')) {
+                                            mutation = fixDuplicatesMutation;
+                                        }
+                                        
+                                        return (
+                                            <div key={idx} className="bg-white border border-red-200 rounded-lg p-4">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex-1">
+                                                        <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded">
+                                                            {issue.entity}
+                                                        </span>
+                                                        <h4 className="font-semibold text-red-900 mt-2">{issue.issue}</h4>
+                                                    </div>
+                                                    <span className="text-2xl font-bold text-red-600">{issue.count}</span>
                                                 </div>
-                                                <span className="text-2xl font-bold text-red-600">{issue.count}</span>
+                                                <p className="text-sm text-red-800 mb-2">
+                                                    <strong>Impact:</strong> {issue.impact}
+                                                </p>
+                                                <div className="flex justify-between items-center">
+                                                    <p className="text-sm text-red-700">
+                                                        <strong>Fix:</strong> {issue.fix}
+                                                    </p>
+                                                    {mutation && (
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setFixingIssue(issue.entity);
+                                                                mutation.mutate();
+                                                            }}
+                                                            disabled={mutation.isPending}
+                                                            className="bg-red-600 hover:bg-red-700 ml-2"
+                                                        >
+                                                            <Wrench className="w-3 h-3 mr-1" />
+                                                            {mutation.isPending ? 'Fixing...' : 'Auto-Fix'}
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <p className="text-sm text-red-800 mb-2">
-                                                <strong>Impact:</strong> {issue.impact}
-                                            </p>
-                                            <p className="text-sm text-red-700">
-                                                <strong>Fix:</strong> {issue.fix}
-                                            </p>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </CardContent>
                         </Card>
