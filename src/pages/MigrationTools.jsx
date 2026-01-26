@@ -42,6 +42,48 @@ export default function MigrationTools() {
         }
     };
 
+    const fixAttendanceIds = async () => {
+        if (!confirm('This will fix all numeric attendance_id values in AnalysisResult records. Continue?')) {
+            return;
+        }
+
+        setFixingAttendance(true);
+        setFixResult(null);
+        try {
+            const allResults = await base44.entities.AnalysisResult.list();
+            let fixed = 0;
+            let skipped = 0;
+
+            for (const result of allResults) {
+                if (typeof result.attendance_id === 'number') {
+                    try {
+                        const updated = { ...result };
+                        delete updated.id;
+                        delete updated.created_date;
+                        delete updated.updated_date;
+                        delete updated.created_by;
+                        updated.attendance_id = String(result.attendance_id);
+                        
+                        await base44.entities.AnalysisResult.delete(result.id);
+                        await base44.entities.AnalysisResult.create(updated);
+                        fixed++;
+                    } catch (err) {
+                        console.error('Failed to fix:', result.id, err);
+                    }
+                } else {
+                    skipped++;
+                }
+            }
+
+            setFixResult({ total: allResults.length, fixed, skipped });
+            toast.success(`Fixed ${fixed} records`);
+        } catch (error) {
+            toast.error('Error: ' + error.message);
+        } finally {
+            setFixingAttendance(false);
+        }
+    };
+
     if (currentUser?.role !== 'admin') {
         return (
             <div className="max-w-5xl mx-auto p-6">
