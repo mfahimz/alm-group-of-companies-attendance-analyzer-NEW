@@ -423,7 +423,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
             const updatedTotals = recalculateTotals(latestResult, overrides);
 
+            // CRITICAL: Force attendance_id to be a string (fixes legacy numeric values in DB)
             const updatePayload = {
+                attendance_id: String(analysisResult.attendance_id),
+                project_id: analysisResult.project_id,
+                report_run_id: analysisResult.report_run_id,
                 day_overrides: JSON.stringify(overrides)
             };
             
