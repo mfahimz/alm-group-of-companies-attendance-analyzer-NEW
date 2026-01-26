@@ -816,8 +816,21 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const debounceTimeoutRef = React.useRef(null);
     const pendingVerifiedRef = React.useRef(null);
     
+    const hasRedAbnormalities = (result) => {
+        // RED abnormalities = critical issues in the notes field
+        return !!result.notes && result.notes.trim().length > 0;
+    };
+
     const toggleVerification = (attendanceId) => {
         const attendanceIdStr = String(attendanceId);
+        const result = enrichedResults.find(r => String(r.attendance_id) === attendanceIdStr);
+        
+        // Prevent toggling if employee has RED abnormalities
+        if (result && hasRedAbnormalities(result)) {
+            toast.error(`Cannot verify ${result.attendance_id} - Red abnormalities must be resolved first`);
+            return;
+        }
+        
         const newVerified = verifiedEmployees.includes(attendanceIdStr) 
             ? verifiedEmployees.filter(id => id !== attendanceIdStr)
             : [...verifiedEmployees, attendanceIdStr];
