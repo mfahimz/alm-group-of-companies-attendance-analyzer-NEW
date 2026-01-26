@@ -10,6 +10,8 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 export default function MigrationTools() {
     const [migrationResult, setMigrationResult] = useState(null);
     const [isMigrating, setIsMigrating] = useState(false);
+    const [fixingAttendance, setFixingAttendance] = useState(false);
+    const [fixResult, setFixResult] = useState(null);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
