@@ -17,6 +17,73 @@ export default function SystemHealth() {
         queryFn: () => base44.auth.me()
     });
 
+    // Fix mutations
+    const fixDuplicatesMutation = useMutation({
+        mutationFn: () => base44.functions.invoke('fixDuplicateAnalysisResults'),
+        onSuccess: (response) => {
+            toast.success(`Fixed ${response.data.recordsDeleted} duplicate records`);
+            setFixingIssue(null);
+            // Re-run health check
+            setTimeout(runHealthCheck, 500);
+        },
+        onError: (error) => {
+            toast.error('Failed to fix duplicates: ' + error.message);
+            setFixingIssue(null);
+        }
+    });
+
+    const fixPunchIdsMutation = useMutation({
+        mutationFn: () => base44.functions.invoke('fixNumericPunchAttendanceIds'),
+        onSuccess: (response) => {
+            toast.success(`Fixed ${response.data.recordsFixed} punch records`);
+            setFixingIssue(null);
+            setTimeout(runHealthCheck, 500);
+        },
+        onError: (error) => {
+            toast.error('Failed to fix punches: ' + error.message);
+            setFixingIssue(null);
+        }
+    });
+
+    const fixEmployeeIdsMutation = useMutation({
+        mutationFn: () => base44.functions.invoke('fixNumericEmployeeAttendanceIds'),
+        onSuccess: (response) => {
+            toast.success(`Fixed ${response.data.recordsFixed} employee records`);
+            setFixingIssue(null);
+            setTimeout(runHealthCheck, 500);
+        },
+        onError: (error) => {
+            toast.error('Failed to fix employees: ' + error.message);
+            setFixingIssue(null);
+        }
+    });
+
+    const cleanupSalariesMutation = useMutation({
+        mutationFn: () => base44.functions.invoke('cleanupOrphanedSalaries'),
+        onSuccess: (response) => {
+            toast.success(`Deactivated ${response.data.recordsDeactivated} orphaned salary records`);
+            setFixingIssue(null);
+            setTimeout(runHealthCheck, 500);
+        },
+        onError: (error) => {
+            toast.error('Failed to cleanup salaries: ' + error.message);
+            setFixingIssue(null);
+        }
+    });
+
+    const cleanupShiftsMutation = useMutation({
+        mutationFn: () => base44.functions.invoke('cleanupOrphanedShifts'),
+        onSuccess: (response) => {
+            toast.success(`Deleted ${response.data.recordsDeleted} orphaned shift records`);
+            setFixingIssue(null);
+            setTimeout(runHealthCheck, 500);
+        },
+        onError: (error) => {
+            toast.error('Failed to cleanup shifts: ' + error.message);
+            setFixingIssue(null);
+        }
+    });
+
     const runHealthCheck = async () => {
         setIsScanning(true);
         setHealthReport(null);
