@@ -423,11 +423,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
             const updatedTotals = recalculateTotals(latestResult, overrides);
 
-            // CRITICAL: Force attendance_id to be a string (fixes legacy numeric values in DB)
+            // Only send the fields we're actually changing (NOT attendance_id - it's immutable)
             const updatePayload = {
-                attendance_id: String(analysisResult.attendance_id),
-                project_id: analysisResult.project_id,
-                report_run_id: analysisResult.report_run_id,
                 day_overrides: JSON.stringify(overrides)
             };
             
@@ -438,6 +435,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
             console.log('🔧 EditDayRecord Update Payload:', JSON.stringify(updatePayload, null, 2));
             console.log('🔧 Result ID:', analysisResult.id);
+            console.log('🔧 Analysis Result attendance_id type:', typeof analysisResult.attendance_id, analysisResult.attendance_id);
 
             await base44.entities.AnalysisResult.update(analysisResult.id, updatePayload);
 
