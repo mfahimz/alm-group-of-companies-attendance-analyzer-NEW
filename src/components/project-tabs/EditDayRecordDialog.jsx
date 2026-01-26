@@ -39,7 +39,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
     const { data: punches = [] } = useQuery({
        queryKey: ['punches', project?.id, attendanceId],
-       queryFn: () => base44.entities.Punch.filter({ project_id: project.id, attendance_id: attendanceId }),
+       queryFn: () => base44.entities.Punch.filter({ 
+           project_id: project.id, 
+           attendance_id: String(attendanceId) 
+       }),
        enabled: !!dayRecord && !!project?.id && !!attendanceId,
        staleTime: 0
     });
@@ -258,7 +261,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     const exFrom = new Date(ex.date_from);
                     const exTo = new Date(ex.date_to);
                     return currentDateObj >= exFrom && currentDateObj <= exTo &&
-                           (ex.attendance_id === attendanceId || ex.attendance_id === 'ALL');
+                           (ex.attendance_id === 'ALL' || String(ex.attendance_id) === String(attendanceId));
                 });
 
                 // If exception has manual time values, use those exclusively
@@ -381,7 +384,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const updateDayMutation = useMutation({
         mutationFn: async (data) => {
             const [day, month, year] = dayRecord.date.split('/');
-            const dateStr = `${year}-${month}-${day}`;
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
             // Both users and admins store edits in day_overrides
             // Exceptions are only created when "Save Report" is clicked
@@ -402,28 +405,32 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const existingOverride = overrides[dateStr];
             overrides[dateStr] = {
                 type: data.type,
-                details: data.details,
-                lateMinutes: data.lateMinutes,
-                earlyCheckoutMinutes: data.earlyCheckoutMinutes,
-                otherMinutes: data.otherMinutes,
-                isAbnormal: data.isAbnormal,
-                originalLateMinutes: existingOverride?.originalLateMinutes ?? data.originalLateMinutes,
-                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? data.originalEarlyCheckout,
-                originalOtherMinutes: existingOverride?.originalOtherMinutes ?? data.originalOtherMinutes,
+                details: data.details || '',
+                lateMinutes: Number(data.lateMinutes) || 0,
+                earlyCheckoutMinutes: Number(data.earlyCheckoutMinutes) || 0,
+                otherMinutes: Number(data.otherMinutes) || 0,
+                isAbnormal: Boolean(data.isAbnormal),
+                originalLateMinutes: existingOverride?.originalLateMinutes ?? (Number(data.originalLateMinutes) || 0),
+                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? (Number(data.originalEarlyCheckout) || 0),
+                originalOtherMinutes: existingOverride?.originalOtherMinutes ?? (Number(data.originalOtherMinutes) || 0),
                 shiftOverride: data.shiftOverride?.enabled ? {
-                    am_start: data.shiftOverride.am_start,
-                    am_end: data.shiftOverride.am_end,
-                    pm_start: data.shiftOverride.pm_start,
-                    pm_end: data.shiftOverride.pm_end
+                    am_start: data.shiftOverride.am_start || '',
+                    am_end: data.shiftOverride.am_end || '',
+                    pm_start: data.shiftOverride.pm_start || '',
+                    pm_end: data.shiftOverride.pm_end || ''
                 } : null
             };
 
             const updatedTotals = recalculateTotals(latestResult, overrides);
 
-            await base44.entities.AnalysisResult.update(analysisResult.id, {
+            const updatePayload = {
                 day_overrides: JSON.stringify(overrides),
-                ...updatedTotals
-            });
+                abnormal_dates: updatedTotals.abnormal_dates
+            };
+
+            console.log('Update payload:', updatePayload);
+
+            await base44.entities.AnalysisResult.update(analysisResult.id, updatePayload);
 
             // Log the edit to audit trail
             const changes = [];
@@ -472,8 +479,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             if (onSave) onSave();
             onClose();
         },
-        onError: () => {
-            toast.error('Failed to update day record');
+        onError: (error) => {
+            console.error('Update day record error:', error);
+            toast.error('Failed to update day record: ' + (error?.message || 'Unknown error'));
         }
     });
 
