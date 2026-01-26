@@ -1692,9 +1692,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                            {project.status !== 'closed' && (
                                <>
                                    <Button
-                                       onClick={() => setShowSaveConfirmation(true)}
-                                       disabled={isSaving}
+                                       onClick={handleSaveReport}
+                                       disabled={isSaving || (!isAdmin && verifiedCount < results.length)}
                                        className="bg-green-600 hover:bg-green-700"
+                                       title={!isAdmin && verifiedCount < results.length ? `${results.length - verifiedCount} employee(s) not verified` : ''}
                                    >
                                        <Save className="w-4 h-4 mr-2" />
                                        {isSaving ? 'Saving...' : 'Save Report'}
