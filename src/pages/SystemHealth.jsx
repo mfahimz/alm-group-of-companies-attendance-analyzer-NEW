@@ -439,25 +439,54 @@ export default function SystemHealth() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {healthReport.warnings.map((warning, idx) => (
-                                        <div key={idx} className="bg-white border border-amber-200 rounded-lg p-4">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div>
-                                                    <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-2 py-1 rounded">
-                                                        {warning.entity}
-                                                    </span>
-                                                    <h4 className="font-semibold text-amber-900 mt-2">{warning.issue}</h4>
+                                    {healthReport.warnings.map((warning, idx) => {
+                                        let mutation = null;
+                                        if (warning.entity === 'Punch' && warning.issue.includes('Numeric')) {
+                                            mutation = fixPunchIdsMutation;
+                                        } else if (warning.entity === 'Employee' && warning.issue.includes('Numeric')) {
+                                            mutation = fixEmployeeIdsMutation;
+                                        } else if (warning.entity === 'EmployeeSalary') {
+                                            mutation = cleanupSalariesMutation;
+                                        } else if (warning.entity === 'ShiftTiming') {
+                                            mutation = cleanupShiftsMutation;
+                                        }
+                                        
+                                        return (
+                                            <div key={idx} className="bg-white border border-amber-200 rounded-lg p-4">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex-1">
+                                                        <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-2 py-1 rounded">
+                                                            {warning.entity}
+                                                        </span>
+                                                        <h4 className="font-semibold text-amber-900 mt-2">{warning.issue}</h4>
+                                                    </div>
+                                                    <span className="text-2xl font-bold text-amber-600">{warning.count}</span>
                                                 </div>
-                                                <span className="text-2xl font-bold text-amber-600">{warning.count}</span>
+                                                <p className="text-sm text-amber-800 mb-2">
+                                                    <strong>Impact:</strong> {warning.impact}
+                                                </p>
+                                                <div className="flex justify-between items-center">
+                                                    <p className="text-sm text-amber-700">
+                                                        <strong>Fix:</strong> {warning.fix}
+                                                    </p>
+                                                    {mutation && (
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setFixingIssue(warning.entity);
+                                                                mutation.mutate();
+                                                            }}
+                                                            disabled={mutation.isPending}
+                                                            className="bg-amber-600 hover:bg-amber-700 ml-2"
+                                                        >
+                                                            <Wrench className="w-3 h-3 mr-1" />
+                                                            {mutation.isPending ? 'Fixing...' : 'Auto-Fix'}
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <p className="text-sm text-amber-800 mb-2">
-                                                <strong>Impact:</strong> {warning.impact}
-                                            </p>
-                                            <p className="text-sm text-amber-700">
-                                                <strong>Fix:</strong> {warning.fix}
-                                            </p>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </CardContent>
                         </Card>
