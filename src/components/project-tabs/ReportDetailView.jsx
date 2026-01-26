@@ -900,6 +900,34 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
+    const canSaveReport = () => {
+        // Check if all employees are verified (admins can override)
+        const allVerified = results.every(r => verifiedEmployees.includes(String(r.attendance_id)));
+        return allVerified || isAdmin;
+    };
+
+    const handleSaveReport = () => {
+        // Check verification status for non-admins
+        if (!isAdmin) {
+            const unverifiedCount = results.filter(r => !verifiedEmployees.includes(String(r.attendance_id))).length;
+            if (unverifiedCount > 0) {
+                toast.error(`Cannot save - ${unverifiedCount} employee(s) not verified`);
+                return;
+            }
+        }
+        
+        // For admins, show confirmation if not all verified
+        if (isAdmin && verifiedCount < results.length) {
+            const unverifiedCount = results.length - verifiedCount;
+            setShowSaveConfirmation(true);
+            return;
+        }
+        
+        // Proceed with save
+        setShowSaveConfirmation(false);
+        saveReportMutation.mutate();
+    };
+
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
