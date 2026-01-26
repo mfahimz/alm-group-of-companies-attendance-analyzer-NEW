@@ -2190,6 +2190,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <p className="text-slate-700">
                             Are you sure you want to save this report?
                         </p>
+                        {verifiedCount < results.length && !isAdmin && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                <p className="text-sm text-red-800 font-medium">❌ Verification Required</p>
+                                <p className="text-sm text-red-700 mt-1">
+                                    All {results.length} employees must be verified before saving. Currently {verifiedCount} verified.
+                                </p>
+                            </div>
+                        )}
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
                             <ul className="text-sm text-amber-700 space-y-1">
@@ -2219,8 +2227,42 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 saveReportMutation.mutate();
                             }}
                             className="bg-green-600 hover:bg-green-700"
+                            disabled={!isAdmin && verifiedCount < results.length}
                         >
                             Confirm & Save
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showFinalizeConfirmation} onOpenChange={setShowFinalizeConfirmation}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Finalize Report Without All Verified?</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p className="text-sm text-amber-800 font-medium">⚠️ Admin Override</p>
+                            <p className="text-sm text-amber-700 mt-2">
+                                {results.length - verifiedCount} of {results.length} employees are not verified.
+                            </p>
+                            <p className="text-sm text-amber-700 mt-2">
+                                As admin, you can proceed with finalization. This report will be locked and ready for salary calculation.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setShowFinalizeConfirmation(false)}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={() => {
+                                setShowFinalizeConfirmation(false);
+                                finalizeReportMutation.mutate();
+                            }}
+                            className="bg-purple-600 hover:bg-purple-700"
+                        >
+                            Proceed with Finalization
                         </Button>
                     </div>
                 </DialogContent>
