@@ -263,6 +263,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         <Label htmlFor="hrms_id">HRMS ID *</Label>
                         <Input
                             id="hrms_id"
+                            type="text"
                             value={formData.hrms_id}
                             onChange={(e) => setFormData({ ...formData, hrms_id: e.target.value })}
                             placeholder="Auto-generated"
@@ -276,6 +277,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         <Label htmlFor="attendance_id">Attendance ID *</Label>
                         <Input
                             id="attendance_id"
+                            type="text"
                             value={formData.attendance_id}
                             onChange={(e) => setFormData({ ...formData, attendance_id: e.target.value })}
                             placeholder="e.g. EMP001"
