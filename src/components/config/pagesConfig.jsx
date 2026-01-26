@@ -13,7 +13,8 @@ import {
     DollarSign,
     AlertCircle,
     GraduationCap,
-    ClipboardCheck
+    ClipboardCheck,
+    Database
 } from 'lucide-react';
 
 /**
