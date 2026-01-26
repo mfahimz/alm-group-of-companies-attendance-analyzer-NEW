@@ -424,6 +424,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const updatedTotals = recalculateTotals(latestResult, overrides);
 
             const updatePayload = {
+                attendance_id: String(analysisResult.attendance_id),
                 day_overrides: JSON.stringify(overrides),
                 abnormal_dates: updatedTotals.abnormal_dates
             };
