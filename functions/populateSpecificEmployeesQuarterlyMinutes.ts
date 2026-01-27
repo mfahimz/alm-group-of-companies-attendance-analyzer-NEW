@@ -23,13 +23,18 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'year and company are required' }, { status: 400 });
         }
 
-        // Fetch employees to validate
+        // Fetch employees to validate (convert to numbers for query)
+        const numericIds = hrms_ids.map(id => Number(id));
         const employees = await base44.asServiceRole.entities.Employee.filter({
-            company,
-            hrms_id: hrms_ids
+            company
         });
+        
+        // Filter to only requested employees
+        const targetEmployees = employees.filter(emp => 
+            numericIds.includes(Number(emp.hrms_id))
+        );
 
-        if (employees.length === 0) {
+        if (targetEmployees.length === 0) {
             return Response.json({ error: 'No employees found with provided HRMS IDs' }, { status: 404 });
         }
 
@@ -40,15 +45,15 @@ Deno.serve(async (req) => {
         };
 
         // Process each employee
-        for (const employee of employees) {
+        for (const employee of targetEmployees) {
             const hrms_id = employee.hrms_id;
             
             // Process all 4 quarters
             for (let quarter = 1; quarter <= 4; quarter++) {
                 try {
-                    // Check if record already exists
+                    // Check if record already exists (use string for employee_id)
                     const existing = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
-                        employee_id: hrms_id,
+                        employee_id: String(hrms_id),
                         company,
                         year,
                         quarter
@@ -66,9 +71,9 @@ Deno.serve(async (req) => {
                     // Get the limit from employee record
                     const quarterlyLimit = employee.approved_other_minutes_limit || 120;
 
-                    // Create new record
+                    // Create new record (employee_id as string)
                     await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.create({
-                        employee_id: hrms_id,
+                        employee_id: String(hrms_id),
                         company,
                         year,
                         quarter,
@@ -96,7 +101,7 @@ Deno.serve(async (req) => {
         return Response.json({
             success: true,
             summary: {
-                total_employees: employees.length,
+                total_employees: targetEmployees.length,
                 records_created: results.created.length,
                 records_skipped: results.skipped.length,
                 errors: results.errors.length
