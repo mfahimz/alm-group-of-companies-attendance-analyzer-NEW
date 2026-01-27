@@ -1884,7 +1884,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </TableHeader>
                             <TableBody>
                                 {getDailyBreakdown.map((day, idx) => (
-                                    <TableRow key={idx} className={`${day.hasUnmatchedPunch ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                    <TableRow key={idx} className={`${day.hasUnmatchedPunch ? 'bg-red-50 border-l-4 border-l-red-500' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.hasUnmatchedPunch ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
                                         <TableCell className="text-xs max-w-xs">
