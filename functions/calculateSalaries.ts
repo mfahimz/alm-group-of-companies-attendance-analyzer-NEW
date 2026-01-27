@@ -17,175 +17,45 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        // Fetch project, employees, salaries, and analysis results
-        const projects = await base44.entities.Project.filter({ id: project_id });
+        // DEPRECATED: This function is deprecated in favor of SalarySnapshot entity
+        // =========================================================================
+        // Salary snapshots are now created when a report is marked final.
+        // This function is kept only for backward compatibility.
+        // Use SalarySnapshot entity directly for all salary calculations.
+        // =========================================================================
+
+        // Fetch salary snapshots (immutable source of truth)
+        const snapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
+            project_id: project_id,
+            report_run_id: report_run_id
+        });
+
+        if (snapshots.length === 0) {
+            return Response.json({ 
+                error: 'No salary snapshots found. Please mark the report as final first.',
+                success: false
+            }, { status: 404 });
+        }
+
+        // Fetch project for divisor
+        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id });
         if (projects.length === 0) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
 
         const project = projects[0];
-        const isAlMaraghi = project.company === 'Al Maraghi Auto Repairs';
         const divisor = project.salary_calculation_days || 30;
 
-        // Verify report exists
-        const reports = await base44.entities.ReportRun.filter({ id: report_run_id, project_id: project_id });
-        if (reports.length === 0) {
-            return Response.json({ error: 'Report not found for this project' }, { status: 404 });
-        }
-
-        // Fetch all related data
-        const [employees, salaries, analysisResults] = await Promise.all([
-            base44.entities.Employee.filter({ company: project.company, active: true }),
-            base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
-            base44.entities.AnalysisResult.filter({ 
-                project_id: project_id,
-                report_run_id: report_run_id
-            })
-        ]);
-
-        // Fetch all annual leave exceptions to get salary_leave_days overrides
-        const annualLeaveExceptions = await base44.entities.Exception.filter({
-            project_id: project_id,
-            type: 'ANNUAL_LEAVE'
-        });
-
-        // Calculate salary for each employee
-        const salaryCalculations = employees.map(emp => {
-            const salary = salaries.find(s => 
-                String(s.employee_id) === String(emp.hrms_id) || 
-                String(s.attendance_id) === String(emp.attendance_id)
-            );
-            // Fetch EXACT analysis result for this employee from the finalized report
-            const result = analysisResults.find(r => 
-                String(r.attendance_id) === String(emp.attendance_id) &&
-                String(r.report_run_id) === String(report_run_id)
-            );
-
-            const totalSalaryAmount = salary?.total_salary || 0;
-            const workingHours = salary?.working_hours || 9;
-
-            // Use manual overrides if present, otherwise use calculated values
-            const presentDays = result?.manual_present_days ?? result?.present_days ?? 0;
-            const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
-            const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
-            const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
-            
-            // ============================================================================
-            // CRITICAL: FINALIZED REPORT IS IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs)
-            // ============================================================================
-            // For finalized reports, deductible_minutes already includes all calculations:
-            // deductible_minutes = (late + early) - grace - approved - other
-            // DO NOT recalculate, DO NOT add other_minutes back
-            // The finalized report is the single source of truth for salary calculations
-            // Any edits to grace/deductible in report are locked, preventing cascading errors
-            // ============================================================================
-            const salaryDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
-
-            // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
-            const leaveDays = annualLeaveDays + lopDays;
-            
-            // Leave Pay = (Total Salary / divisor) × Leave Days
-            const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
-
-            // Salary Leave Days = Get override from annual leave exceptions if present
-            let salaryLeaveDays = annualLeaveDays;
-            
-            // Check if any exception has salary_leave_days override for this employee
-            const empAnnualLeaveExceptions = annualLeaveExceptions.filter(exc => 
-                String(exc.attendance_id) === String(emp.attendance_id)
-            );
-            
-            if (empAnnualLeaveExceptions.length > 0) {
-                const totalSalaryLeaveDaysOverride = empAnnualLeaveExceptions.reduce((sum, exc) => {
-                    return sum + (exc.salary_leave_days ?? 0);
-                }, 0);
-                
-                if (totalSalaryLeaveDaysOverride > 0) {
-                    salaryLeaveDays = totalSalaryLeaveDaysOverride;
-                }
-            }
-            
-            // Salary Leave Amount = (Basic Salary + Allowances) / divisor × Salary Leave Days
-            // For Al Maraghi Auto Repairs: allowances is now a direct number, not JSON
-            const basicSalary = salary?.basic_salary || 0;
-            const allowancesAmount = Number(salary?.allowances) || 0;
-            const salaryForLeave = basicSalary + allowancesAmount;
-            
-            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
-
-            // Net Deduction = Leave Pay - Salary Leave Amount
-            const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-
-            // Deductible Hours = deductible_minutes ÷ 60 (direct conversion from finalized report)
-            // NO OTHER PROCESSING - finalized report values are final
-            const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
-
-            // Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours
-            const hourlyRate = totalSalaryAmount / divisor / workingHours;
-            const deductibleHoursPay = hourlyRate * deductibleHours;
-
-            // OT Salary Calculation - Split into Normal and Special
-            // Normal OT: (Total Salary ÷ divisor ÷ Working Hours) × 1.25 × Normal OT Hours
-            // Special OT: (Total Salary ÷ divisor ÷ Working Hours) × 1.5 × Special OT Hours
-            const normalOtHours = 0; // Will be manually entered in UI
-            const specialOtHours = 0; // Will be manually entered in UI
-            
-            const normalOtRate = hourlyRate * 1.25;
-            const specialOtRate = hourlyRate * 1.5;
-            
-            const normalOtSalary = normalOtRate * normalOtHours;
-            const specialOtSalary = specialOtRate * specialOtHours;
-            const totalOtSalary = normalOtSalary + specialOtSalary;
-
-            // Final Total = Total Salary + Total OT Salary - Net Deduction - Deductible Hours Pay
-            const finalTotal = totalSalaryAmount + totalOtSalary - netDeduction - deductibleHoursPay;
+        // Return snapshots as-is (they are the single source of truth)
+        const salaryCalculations = snapshots.map(snapshot => {
+            // Calculate totals from snapshot values
+            const totalSalary = snapshot.total_salary;
+            const finalTotal = totalSalary - snapshot.netDeduction - snapshot.deductibleHoursPay;
 
             return {
-                attendance_id: emp.attendance_id,
-                hrms_id: emp.hrms_id,
-                name: emp.name,
-                department: emp.department,
-                employee_id: salary?.employee_id || emp.hrms_id,
-                basic_salary: salary?.basic_salary || 0,
-                allowances: salary?.allowances || '{}',
-                total_salary: totalSalaryAmount,
-                working_hours: workingHours,
-                deduction_per_minute: salary?.deduction_per_minute || 0,
-                // Analysis data (use manual overrides if present)
-                working_days: 30,
-                present_days: presentDays,
-                full_absence_count: lopDays,
-                annual_leave_count: annualLeaveDays,
-                sick_leave_count: sickLeaveDays,
-                late_minutes: result?.late_minutes || 0,
-                early_checkout_minutes: result?.early_checkout_minutes || 0,
-                other_minutes: result?.other_minutes || 0,
-                approved_minutes: result?.approved_minutes || 0,
-                grace_minutes: result?.grace_minutes || 0,
-                deductible_minutes: result?.deductible_minutes || 0,
-                // Calculated salary fields
-                leaveDays,
-                leavePay: Math.round(leavePay * 100) / 100,
-                salaryLeaveDays,
-                salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
-                normalOtHours: 0,
-                normalOtSalary: Math.round(normalOtSalary * 100) / 100,
-                specialOtHours: 0,
-                specialOtSalary: Math.round(specialOtSalary * 100) / 100,
-                totalOtSalary: Math.round(totalOtSalary * 100) / 100,
-                deductibleHours,
-                deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
-                otherDeduction: 0,
-                bonus: 0,
-                incentive: 0,
-                advanceSalaryDeduction: 0,
-                lopDeduction: 0,
-                deductibleMinutesAmount: 0,
-                netDeduction: Math.round(netDeduction * 100) / 100,
-                // Total calculation
+                ...snapshot,
                 total: Math.round(finalTotal * 100) / 100,
-                wpsPay: Math.round(finalTotal * 100) / 100,
-                balance: 0
+                wpsPay: Math.round(finalTotal * 100) / 100
             };
         });
 
@@ -194,13 +64,15 @@ Deno.serve(async (req) => {
             data: salaryCalculations,
             project_company: project.company,
             report_run_id,
+            snapshots_used: true,
             calculated_at: new Date().toISOString()
         });
 
     } catch (error) {
         console.error('Calculate salaries error:', error);
         return Response.json({ 
-            error: error.message 
+            error: error.message,
+            success: false
         }, { status: 500 });
     }
 });
