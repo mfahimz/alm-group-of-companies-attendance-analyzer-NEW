@@ -232,6 +232,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             let closestMatch = null;
             let minDistance = Infinity;
             let isExtendedMatch = false;
+            let isFarExtendedMatch = false;
             
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
@@ -258,13 +259,28 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
             
+            if (!closestMatch) {
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    
+                    if (distance <= 180 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                        isFarExtendedMatch = true;
+                    }
+                }
+            }
+            
             if (closestMatch) {
                 matches.push({
                     punch,
                     matchedTo: closestMatch.type,
                     shiftTime: closestMatch.time,
                     distance: minDistance,
-                    isExtendedMatch
+                    isExtendedMatch,
+                    isFarExtendedMatch
                 });
                 usedShiftPoints.add(closestMatch.type);
             } else {
@@ -273,7 +289,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     matchedTo: null,
                     shiftTime: null,
                     distance: null,
-                    isExtendedMatch: false
+                    isExtendedMatch: false,
+                    isFarExtendedMatch: false
                 });
             }
         }
@@ -1310,9 +1327,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             
             let punchMatches = [];
             let hasUnmatchedPunch = false;
+            let hasFarExtendedMatch = false;
             if (shift && dayPunches.length > 0) {
                 punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
                 hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+                hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
             }
 
             let lateInfo = '';
@@ -1445,7 +1464,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
-            if (hasUnmatchedPunch || hasExtendedMatch) {
+            const hasFarExtendedMatchDay = punchMatches.some(m => m.isFarExtendedMatch);
+            if (hasUnmatchedPunch || hasExtendedMatch || hasFarExtendedMatchDay) {
                 isAbnormal = true;
             }
             const expectedPunchCount = isSingleShift ? 2 : 4;
@@ -1564,7 +1584,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 hasOverride: !!dayOverride,
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
-                hasUnmatchedPunch
+                hasUnmatchedPunch,
+                hasFarExtendedMatch: hasFarExtendedMatchDay
             });
         }
 
@@ -1976,7 +1997,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </TableHeader>
                             <TableBody>
                                 {getDailyBreakdown.map((day, idx) => (
-                                    <TableRow key={idx} className={`${day.hasUnmatchedPunch ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                   <TableRow key={idx} className={`${day.hasUnmatchedPunch || day.hasFarExtendedMatch ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
                                         <TableCell className="text-xs max-w-xs">
@@ -1996,18 +2017,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                            };
                                                            return (
                                                                 <div key={matchIdx} className="flex items-center gap-1">
-                                                                    <span className={match.matchedTo ? (match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') : 'text-red-600 font-bold'}>
+                                                                    <span className={match.matchedTo ? (match.isFarExtendedMatch ? 'text-red-600 font-bold' : match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') : 'text-red-600 font-bold'}>
                                                                         {extractTime(match.punch.timestamp_raw)}
                                                                     </span>
                                                                     {match.matchedTo && (
-                                                                        <span className={`text-[9px] ${match.isExtendedMatch ? 'text-amber-600' : 'text-slate-500'}`}>
+                                                                        <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : 'text-slate-500'}`}>
                                                                             →{match.matchedTo.replace(/_/g, ' ')}
-                                                                            {match.isExtendedMatch && ' ⚠️'}
+                                                                            {match.isFarExtendedMatch && ' 🔴'}
+                                                                            {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
                                                                         </span>
                                                                     )}
                                                                     {!match.matchedTo && (
                                                                         <span className="text-[9px] text-red-600 font-bold">
-                                                                            ⚠️ NO MATCH
+                                                                            🔴 NO MATCH
                                                                         </span>
                                                                     )}
                                                                 </div>
