@@ -725,7 +725,7 @@ export default function SalaryTab({ project, finalReport }) {
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                                 <p className="text-xs text-blue-800">
                                     <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
-                                    {hasActiveFilters && ` (${dataToDisplay.length - filteredSalaryData.length} hidden by filters)`}
+                                    {isAdminOrCEO && hasActiveFilters && ` (${dataToDisplay.length - filteredSalaryData.length} hidden by filters)`}
                                 </p>
                             </div>
 
