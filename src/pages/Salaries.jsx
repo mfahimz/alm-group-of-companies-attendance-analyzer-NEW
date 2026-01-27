@@ -20,6 +20,7 @@ export default function Salaries() {
     const [companyFilter, setCompanyFilter] = useState('all');
     const [showDialog, setShowDialog] = useState(false);
     const [editingSalary, setEditingSalary] = useState(null);
+    const [selectedCompany, setSelectedCompany] = useState('');
     const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
     const fileInputRef = React.useRef(null);
@@ -150,6 +151,7 @@ export default function Salaries() {
             allowances_with_bonus: 0
         });
         setEditingSalary(null);
+        setSelectedCompany('');
     };
 
     const handleEmployeeSelect = (employeeId) => {
@@ -157,8 +159,8 @@ export default function Salaries() {
         if (employee) {
             setFormData(prev => ({
                 ...prev,
-                employee_id: employee.id,
-                attendance_id: employee.attendance_id,
+                employee_id: String(employee.hrms_id),
+                attendance_id: String(employee.attendance_id),
                 name: employee.name,
                 company: employee.company
             }));
@@ -216,7 +218,8 @@ export default function Salaries() {
         });
 
     const availableEmployees = employees.filter(emp => {
-        const hasExistingSalary = salaries.some(s => s.employee_id === emp.id && s.active);
+        if (selectedCompany && emp.company !== selectedCompany) return false;
+        const hasExistingSalary = salaries.some(s => String(s.employee_id) === String(emp.hrms_id) && s.active);
         return !hasExistingSalary;
     });
 
@@ -660,24 +663,51 @@ export default function Salaries() {
                     
                     <div className="grid grid-cols-2 gap-4 py-4">
                         {!editingSalary && (
-                            <div className="col-span-2">
-                                <Label>Employee</Label>
-                                <Select 
-                                    value={formData.employee_id} 
-                                    onValueChange={handleEmployeeSelect}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select employee" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableEmployees.map(emp => (
-                                            <SelectItem key={emp.id} value={emp.id}>
-                                                {emp.name} ({emp.attendance_id}) - {emp.company}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            <>
+                                <div className="col-span-2">
+                                    <Label>Company</Label>
+                                    <Select 
+                                        value={selectedCompany} 
+                                        onValueChange={setSelectedCompany}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select company first" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {companies.map(company => (
+                                                <SelectItem key={company} value={company}>
+                                                    {company}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                
+                                <div className="col-span-2">
+                                    <Label>Employee</Label>
+                                    <Select 
+                                        value={formData.employee_id} 
+                                        onValueChange={handleEmployeeSelect}
+                                        disabled={!selectedCompany}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={selectedCompany ? "Select employee" : "Select company first"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableEmployees.map(emp => (
+                                                <SelectItem key={emp.id} value={emp.id}>
+                                                    {emp.name} ({emp.attendance_id}) - HRMS: {emp.hrms_id}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {selectedCompany && availableEmployees.length === 0 && (
+                                        <p className="text-xs text-amber-600 mt-1">
+                                            All employees in {selectedCompany} already have salary records
+                                        </p>
+                                    )}
+                                </div>
+                            </>
                         )}
 
                         {editingSalary && (
