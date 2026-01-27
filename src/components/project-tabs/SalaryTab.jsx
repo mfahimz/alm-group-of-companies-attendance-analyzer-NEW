@@ -468,17 +468,22 @@ export default function SalaryTab({ project, finalReport }) {
                         <>
                             {!finalReport && (
                                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-                                    <strong>⚠️ No Final Report:</strong> Finalize the report first, then click "Calculate Salary" to populate salary calculations.
+                                    <strong>⚠️ No Final Report:</strong> Finalize a report in the Report tab first to create salary snapshots.
                                 </div>
                             )}
-                            {finalReport && !calculatedData && (
+                            {finalReport && salarySnapshots.length === 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
+                                    <strong>⚠️ Creating Snapshots:</strong> Salary snapshots are being created from the finalized report. Please wait a moment and refresh.
+                                </div>
+                            )}
+                            {salarySnapshots.length > 0 && !calculatedData && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-                                    <strong>ℹ️ Ready to Calculate:</strong> Click "Calculate Salary" button to fetch finalized report data and calculate salaries.
+                                    <strong>ℹ️ Snapshots Ready:</strong> Click "Recalculate" to apply any OT hours, bonuses, or deductions you've entered.
                                 </div>
                             )}
                             {calculatedData && (
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                    <strong>✓ Calculated:</strong> Salary data has been calculated from the finalized report. Edit values as needed and click "Save Changes" to persist.
+                                    <strong>✓ Recalculated:</strong> Salary data has been recalculated. Edit OT hours, bonuses, or deductions as needed and click "Save Changes".
                                 </div>
                             )}
                             
