@@ -693,7 +693,8 @@ export default function SalaryTab({ project, finalReport }) {
                                  <br /><span className="text-xs mt-1 block"><strong>If Report Changes:</strong> Delete old final report and mark a new one final to create new snapshots. Salary data for deleted reports is also deleted.</span>
                              </div>
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
-                                <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
+                                <strong>Salary Total Formula:</strong> Total = Basic Salary + Allowances + OT Salary + Bonus + Incentive - Leave Deduction - Deductible Hours Pay - Other Deductions - Advance Salary.
+                                <br /><span className="text-xs mt-1 block">Report values (leave, deductible minutes) are immutable. Only OT hours, bonuses, and deductions can be edited.</span>
                             </div>
                         </div>
                     </div>
