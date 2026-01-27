@@ -592,12 +592,12 @@ export default function SalaryTab({ project, finalReport }) {
                                 </div>
                                 <div className="flex items-end gap-2">
                                         <Button 
-                                            onClick={handleRecalculateSalaries} 
+                                            onClick={handleRecalculateTotals} 
                                             disabled={isCalculating || !finalReport || salarySnapshots.length === 0}
                                             className="flex-1 bg-indigo-600 hover:bg-indigo-700"
                                         >
                                             <DollarSign className="w-4 h-4 mr-2" />
-                                            {isCalculating ? 'Recalculating...' : 'Recalculate'}
+                                            {isCalculating ? 'Recalculating...' : 'Recalculate Totals'}
                                         </Button>
                                     <Button 
                                         onClick={handleSave} 
