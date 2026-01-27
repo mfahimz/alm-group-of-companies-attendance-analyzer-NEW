@@ -28,6 +28,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
     const [showFinalizeConfirmation, setShowFinalizeConfirmation] = useState(false);
+    const [showVerificationWarning, setShowVerificationWarning] = useState(false);
+    const [verificationEmployee, setVerificationEmployee] = useState(null);
 
 
     const queryClient = useQueryClient();
@@ -805,6 +807,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     });
 
     const handleSaveReport = () => {
+        if (!canSaveReport) {
+            toast.error(`Cannot save: ${unverifiedCount} employee${unverifiedCount !== 1 ? 's' : ''} not verified`);
+            return;
+        }
         saveReportMutation.mutate();
     };
 
@@ -1525,7 +1531,39 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
+    const toggleVerificationMutation = useMutation({
+        mutationFn: async ({ id, verified }) => {
+            await base44.entities.AnalysisResult.update(id, { verified });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['results', reportRun.id]);
+            toast.success(verificationEmployee ? 'Verification updated' : 'Verification updated');
+            setShowVerificationWarning(false);
+            setVerificationEmployee(null);
+        },
+        onError: () => {
+            toast.error('Failed to update verification');
+        }
+    });
+
+    const handleVerificationClick = (result, newChecked) => {
+        // Check if there are abnormalities (red issues)
+        const hasAbnormalities = result.notes && result.notes.trim() !== '';
+        
+        if (newChecked && hasAbnormalities) {
+            // Show warning but allow checking
+            setVerificationEmployee(result);
+            setShowVerificationWarning(true);
+        } else {
+            // No abnormalities or unchecking - proceed directly
+            toggleVerificationMutation.mutate({ id: result.id, verified: newChecked });
+        }
+    };
+
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
+    
+    const unverifiedCount = filteredResults.filter(r => !r.verified).length;
+    const canSaveReport = isAdmin || unverifiedCount === 0;
 
     return (
         <div className="space-y-6">
@@ -1573,15 +1611,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                Export
                            </Button>
                            {project.status !== 'closed' && (
-                               <>
-                                   <Button
-                                       onClick={handleSaveReport}
-                                       disabled={isSaving}
-                                       className="bg-green-600 hover:bg-green-700"
-                                   >
-                                       <Save className="w-4 h-4 mr-2" />
-                                       {isSaving ? 'Saving...' : 'Save Report'}
-                                   </Button>
+                                <>
+                                    <Button
+                                        onClick={handleSaveReport}
+                                        disabled={isSaving || !canSaveReport}
+                                        className="bg-green-600 hover:bg-green-700"
+                                        title={!canSaveReport ? `${unverifiedCount} employee(s) not verified` : ''}
+                                    >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {isSaving ? 'Saving...' : 'Save Report'}
+                                    </Button>
                                    {isAdmin && (
                                        <Button
                                            onClick={() => finalizeReportMutation.mutate()}
@@ -1686,12 +1725,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <TableHead>Grace</TableHead>
                                     <TableHead>Deductible</TableHead>
                                     <TableHead>Notes</TableHead>
+                                    <TableHead className="text-center">Verified</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredResults.map((result) => (
-                                    <TableRow key={result.id}>
+                                {filteredResults.map((result) => {
+                                    const hasAbnormalities = result.notes && result.notes.trim() !== '';
+                                    const isUnverifiedWithAbnormalities = !result.verified && hasAbnormalities;
+                                    
+                                    return (
+                                    <TableRow key={result.id} className={isUnverifiedWithAbnormalities ? 'bg-red-50' : ''}>
                                         <TableCell className="font-medium">{result.attendance_id}</TableCell>
                                         <TableCell>{result.name}</TableCell>
                                         <TableCell>{result.working_days}</TableCell>
@@ -1836,6 +1880,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         <TableCell className="text-xs text-slate-600 max-w-xs truncate">
                                             {result.notes || '-'}
                                         </TableCell>
+                                        <TableCell className="text-center">
+                                            {project.status === 'closed' ? (
+                                                <span className="text-xs text-slate-400">—</span>
+                                            ) : (
+                                                <Checkbox
+                                                    checked={result.verified || false}
+                                                    onCheckedChange={(checked) => handleVerificationClick(result, checked)}
+                                                    disabled={project.status === 'closed'}
+                                                />
+                                            )}
+                                        </TableCell>
                                         <TableCell className="text-right">
                                            {project.status === 'closed' ? (
                                                <span className="text-xs text-slate-400">—</span>
@@ -1851,7 +1906,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                            )}
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </div>
@@ -2076,6 +2132,47 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             className="bg-green-600 hover:bg-green-700"
                         >
                             Confirm & Save
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showVerificationWarning} onOpenChange={setShowVerificationWarning}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Verification Warning</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                            <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Abnormalities Detected</p>
+                            <p className="text-sm text-amber-700">
+                                This employee has critical abnormalities (red issues) in their attendance record:
+                            </p>
+                            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+                                {verificationEmployee?.notes || 'Critical issues found'}
+                            </div>
+                        </div>
+                        <p className="text-sm text-slate-700">
+                            You can still verify this record, but please review the issues carefully before proceeding.
+                        </p>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => {
+                            setShowVerificationWarning(false);
+                            setVerificationEmployee(null);
+                        }}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={() => {
+                                toggleVerificationMutation.mutate({ 
+                                    id: verificationEmployee.id, 
+                                    verified: true 
+                                });
+                            }}
+                            className="bg-amber-600 hover:bg-amber-700"
+                        >
+                            Verify Anyway
                         </Button>
                     </div>
                 </DialogContent>
