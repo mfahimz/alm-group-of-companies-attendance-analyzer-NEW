@@ -14,56 +14,10 @@ import SortableTableHead from '../ui/SortableTableHead';
 export default function SalaryTab({ project, finalReport }) {
     const queryClient = useQueryClient();
     
-    const { data: currentUser } = useQuery({
-        queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
-    });
-
-    const { data: employees = [], isLoading: loadingEmployees } = useQuery({
-        queryKey: ['employees', project.company],
-        queryFn: () => base44.entities.Employee.filter({ company: project.company, active: true }),
-        enabled: !!project.company,
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
-
-    const { data: salaries = [], isLoading: loadingSalaries } = useQuery({
-        queryKey: ['salaries', project.company],
-        queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
-        enabled: !!project.company,
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
-
-    const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
-        queryKey: ['salarySnapshots', project.id, finalReport?.id],
-        queryFn: async () => {
-            const snapshots = await base44.entities.SalarySnapshot.filter({
-                project_id: project.id,
-                report_run_id: finalReport.id
-            });
-            return snapshots;
-        },
-        enabled: !!project.id && !!finalReport?.id,
-        staleTime: 0,
-        gcTime: 10 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: true
-    });
-
-
-
-    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
-
-    // State for editable values
+    // ============================================
+    // STATE DECLARATIONS (MUST BE FIRST)
+    // ============================================
+    const [blockingError, setBlockingError] = useState(null);
     const [editableData, setEditableData] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     const [departmentFilter, setDepartmentFilter] = useState('all');
@@ -71,8 +25,6 @@ export default function SalaryTab({ project, finalReport }) {
     const [salaryUnlocked, setSalaryUnlocked] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
     const [calculatedData, setCalculatedData] = useState(null);
-    
-    // Advanced search and filter state
     const [searchQuery, setSearchQuery] = useState('');
     const [advancedFilters, setAdvancedFilters] = useState({
         salaryMin: '',
@@ -82,8 +34,66 @@ export default function SalaryTab({ project, finalReport }) {
         deductionMin: '',
         deductionMax: ''
     });
-    const [blockingError, setBlockingError] = useState(null);
 
+    // ============================================
+    // QUERIES
+    // ============================================
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const { data: employees = [], isLoading: loadingEmployees } = useQuery({
+        queryKey: ['employees', project?.company],
+        queryFn: () => base44.entities.Employee.filter({ company: project.company, active: true }),
+        enabled: !!project?.company,
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const { data: salaries = [], isLoading: loadingSalaries } = useQuery({
+        queryKey: ['salaries', project?.company],
+        queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+        enabled: !!project?.company,
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
+        queryKey: ['salarySnapshots', project?.id, finalReport?.id],
+        queryFn: async () => {
+            console.log('[SalaryTab] Fetching snapshots for project:', project?.id, 'report:', finalReport?.id);
+            const snapshots = await base44.entities.SalarySnapshot.filter({
+                project_id: project.id,
+                report_run_id: finalReport.id
+            });
+            console.log('[SalaryTab] Fetched', snapshots.length, 'snapshots');
+            return snapshots;
+        },
+        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
+        staleTime: 0,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: true
+    });
+
+    // ============================================
+    // DERIVED VALUES
+    // ============================================
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
+
+    // ============================================
+    // EFFECTS
+    // ============================================
+    
     // Validate consistency of finalized report and snapshots
     useEffect(() => {
         let error = null;
@@ -93,7 +103,7 @@ export default function SalaryTab({ project, finalReport }) {
         } else if (finalReport.is_final !== true) {
             error = 'Selected report is not marked as final.';
         } else if (loadingSnapshots) {
-            error = null;
+            error = null; // Still loading, don't show error yet
         } else if (salarySnapshots.length === 0) {
             error = 'Salary snapshots not found. Report may need to be finalized again.';
         } else {
@@ -107,8 +117,8 @@ export default function SalaryTab({ project, finalReport }) {
     }, [finalReport, salarySnapshots, loadingSnapshots]);
 
     // DEBUG LOG - REMOVE AFTER VALIDATION
-    console.log('SalaryTab Debug', {
-        finalReport,
+    console.log('[SalaryTab Debug]', {
+        projectId: project?.id,
         finalReportId: finalReport?.id,
         finalReportIsFinal: finalReport?.is_final,
         snapshotsCount: salarySnapshots.length,
