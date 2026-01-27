@@ -21,6 +21,7 @@ export default function Salaries() {
     const [showDialog, setShowDialog] = useState(false);
     const [editingSalary, setEditingSalary] = useState(null);
     const [selectedCompany, setSelectedCompany] = useState('');
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
     const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
     const fileInputRef = React.useRef(null);
@@ -163,9 +164,11 @@ export default function Salaries() {
         });
         setEditingSalary(null);
         setSelectedCompany('');
+        setSelectedEmployeeId('');
     };
 
     const handleEmployeeSelect = (employeeId) => {
+        setSelectedEmployeeId(employeeId);
         const employee = employees.find(e => e.id === employeeId);
         if (employee) {
             setFormData(prev => ({
@@ -739,7 +742,7 @@ export default function Salaries() {
                                 <div className="col-span-2">
                                     <Label>Employee</Label>
                                     <Select 
-                                        value={formData.employee_id} 
+                                        value={selectedEmployeeId} 
                                         onValueChange={handleEmployeeSelect}
                                         disabled={!selectedCompany || availableEmployees.length === 0}
                                     >
