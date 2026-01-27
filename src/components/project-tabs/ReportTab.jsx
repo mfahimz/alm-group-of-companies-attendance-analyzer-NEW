@@ -144,19 +144,21 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 })
             ]);
             
-            // Delete all results and snapshots
-            await Promise.all([
+            // Delete all results and snapshots in parallel
+            const deletePromises = [
                 ...resultsToDelete.map(r => base44.entities.AnalysisResult.delete(r.id)),
                 ...snapshotsToDelete.map(s => base44.entities.SalarySnapshot.delete(s.id))
-            ]);
+            ];
+            
+            await Promise.all(deletePromises);
             
             // Finally, delete the report run itself
             await base44.entities.ReportRun.delete(reportRunId);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['reportRuns', project.id]);
-            queryClient.invalidateQueries(['reportResults', project.id]);
-            queryClient.invalidateQueries(['salarySnapshots', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id] });
+            queryClient.invalidateQueries({ queryKey: ['reportResults', project.id] });
+            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id] });
             toast.success('Report and associated salary data deleted successfully');
         },
         onError: () => {
@@ -166,25 +168,20 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const markFinalMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // First, unmark all other reports as final
-            const otherReports = allReportRuns.filter(r => r.id !== reportRunId);
-            await Promise.all(otherReports.map(r => 
-                base44.entities.ReportRun.update(r.id, { is_final: false })
-            ));
-            
-            // Mark this report as final
-            await base44.entities.ReportRun.update(reportRunId, { is_final: true });
-            
-            // Update project's last_saved_report_id
-            await base44.entities.Project.update(project.id, { last_saved_report_id: reportRunId });
+            // Call backend function to mark final and create snapshots
+            await base44.functions.invoke('markFinalReport', {
+                project_id: project.id,
+                report_run_id: reportRunId
+            });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['reportRuns', project.id]);
-            queryClient.invalidateQueries(['projects']);
-            toast.success('Report marked as final for salary calculation');
+            queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id] });
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id] });
+            toast.success('Report marked as final. Salary snapshots created.');
         },
-        onError: () => {
-            toast.error('Failed to mark report as final');
+        onError: (error) => {
+            toast.error('Failed to mark report as final: ' + error.message);
         }
     });
 
