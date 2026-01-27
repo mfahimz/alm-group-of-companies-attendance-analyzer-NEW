@@ -60,7 +60,12 @@ Deno.serve(async (req) => {
             const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
             const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
             const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
-            const deductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+            
+            // For salary: deductible_minutes from report + other_minutes
+            // (other_minutes was already subtracted in report, so we add it back for salary deduction)
+            const reportDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+            const reportOtherMinutes = result?.other_minutes ?? 0;
+            const salaryDeductibleMinutes = reportDeductibleMinutes + reportOtherMinutes;
 
             // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
             const leaveDays = annualLeaveDays + lopDays;
@@ -97,8 +102,8 @@ Deno.serve(async (req) => {
             // Net Deduction = Leave Pay - Salary Leave Amount
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-            // Deductible Hours = deductible_minutes ÷ 60
-            const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+            // Deductible Hours = (deductible_minutes + other_minutes) ÷ 60
+            const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
 
             // Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours
             const hourlyRate = totalSalaryAmount / 30 / workingHours;
