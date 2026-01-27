@@ -93,7 +93,12 @@ export default function SalaryTab({ project, finalReport }) {
             const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
             const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
             const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
-            const deductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+            
+            // For salary: deductible_minutes from report + other_minutes
+            // (other_minutes was already subtracted in report, so we add it back for salary deduction)
+            const reportDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+            const reportOtherMinutes = result?.other_minutes ?? 0;
+            const salaryDeductibleMinutes = reportDeductibleMinutes + reportOtherMinutes;
 
             // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
             const leaveDays = annualLeaveDays + lopDays;
@@ -114,8 +119,8 @@ export default function SalaryTab({ project, finalReport }) {
                       
                       const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
 
-                      // Deductible Hours = deductible_minutes ÷ 60
-                      const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+                      // Deductible Hours = (deductible_minutes + other_minutes) ÷ 60
+                      const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
 
                       // Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours
                       const hourlyRate = totalSalaryAmount / 30 / workingHours;
@@ -726,7 +731,8 @@ export default function SalaryTab({ project, finalReport }) {
 
                             {/* Formula Info */}
                             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 mb-3">
-                                <strong>Deductible Hours Formula:</strong> Deductible Minutes = (Late Minutes + Early Checkout Minutes) - Grace Minutes - Approved Minutes - Other Minutes. Then: Deductible Hours = Deductible Minutes ÷ 60. Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours.
+                                <strong>Deductible Hours Formula (For Salary):</strong> Salary Deductible Minutes = deductible_minutes (from report) + other_minutes (from report). Then: Deductible Hours = Salary Deductible Minutes ÷ 60. Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours.
+                                <br /><span className="text-xs mt-1 block">Note: In the report, deductible_minutes = (late + early) - grace - approved - other. For salary, we add other_minutes back.</span>
                             </div>
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
                                 <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
