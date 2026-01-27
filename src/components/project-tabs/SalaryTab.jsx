@@ -214,7 +214,7 @@ export default function SalaryTab({ project, finalReport }) {
                 balance
             };
         });
-    }, [employees, salaries, analysisResults]);
+    }, [employees, salaries, analysisResults, exceptions]);
 
     // Get unique departments for filter
     const departments = useMemo(() => {
