@@ -34,9 +34,13 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Mark the selected report as final
+        // Mark the selected report as final with audit info
+         const nowUAE = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString();
          await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-             is_final: true
+             is_final: true,
+             finalized_by: user.email,
+             finalized_date: nowUAE,
+             recalculation_version: 0
          });
 
          // Create salary snapshots for all employees from this finalized report

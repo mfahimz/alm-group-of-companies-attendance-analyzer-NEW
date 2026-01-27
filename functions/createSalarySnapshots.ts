@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
                 total: Math.round(finalTotal * 100) / 100,
                 wpsPay: Math.round(finalTotal * 100) / 100,
                 balance: 0,
-                snapshot_created_at: new Date().toISOString()
+                snapshot_created_at: new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString()
             };
         }).filter(Boolean); // Remove nulls (employees without analysis results)
 
