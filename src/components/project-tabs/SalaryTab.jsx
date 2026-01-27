@@ -95,156 +95,74 @@ export default function SalaryTab({ project, finalReport }) {
         deductionMax: ''
     });
 
-    // Combine all data for each employee
-    const salaryData = useMemo(() => {
-        // Only apply leave hours pay calculation for Al Maraghi Auto Repairs
-        const isAlMaraghi = project.company === 'Al Maraghi Auto Repairs';
-
-        return employees.map(emp => {
-            const salary = salaries.find(s => 
-                String(s.employee_id) === String(emp.hrms_id) || 
-                String(s.attendance_id) === String(emp.attendance_id)
-            );
-            const result = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
-            
-            // DEBUG: Log employee matching for problem employees
-            if ([206, 191].includes(Number(emp.attendance_id))) {
-                console.log(`🎯 SALARY TAB - Employee ${emp.attendance_id} (${emp.name}):`, {
-                    totalAnalysisResults: analysisResults.length,
-                    foundResult: !!result,
-                    result: result ? {
-                        attendance_id: result.attendance_id,
-                        report_run_id: result.report_run_id,
-                        present_days: result.present_days,
-                        annual_leave_count: result.annual_leave_count,
-                        full_absence_count: result.full_absence_count,
-                        deductible_minutes: result.deductible_minutes
-                    } : null
-                });
+    // Map salary snapshots to display format with editable overrides
+        const salaryData = useMemo(() => {
+            // If snapshots exist, use them directly - they are immutable and authoritative
+            if (salarySnapshots.length > 0) {
+                return salarySnapshots.map(snapshot => ({
+                    ...snapshot,
+                    // These are the only editable fields in salary tab
+                    // All other values come from immutable snapshot
+                    normalOtHours: editableData[snapshot.hrms_id]?.normalOtHours ?? 0,
+                    specialOtHours: editableData[snapshot.hrms_id]?.specialOtHours ?? 0,
+                    otherDeduction: editableData[snapshot.hrms_id]?.otherDeduction ?? 0,
+                    bonus: editableData[snapshot.hrms_id]?.bonus ?? 0,
+                    incentive: editableData[snapshot.hrms_id]?.incentive ?? 0,
+                    advanceSalaryDeduction: editableData[snapshot.hrms_id]?.advanceSalaryDeduction ?? 0
+                }));
             }
 
-            // ============================================================================
-            // CRITICAL: FINALIZED REPORT IS IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs)
-            // ============================================================================
-            // All values are fetched DIRECTLY from the finalized report
-            // NO recalculation, NO additional logic
-            // The report is locked for salary, so these values are final and immutable
-            // Admin can only edit grace/deductible in the report view, not in salary tab
-            // ============================================================================
-            const presentDays = result?.manual_present_days ?? result?.present_days ?? 0;
-            const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
-            const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
-            const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
-            
-            // Deductible minutes = direct fetch from finalized report (no conversion, no addition)
-            // = (late + early) - grace - approved, already calculated by backend
-            const salaryDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+            // Fallback if no snapshots (no finalized report yet)
+            return employees.map(emp => {
+                const salary = salaries.find(s => 
+                    String(s.employee_id) === String(emp.hrms_id) || 
+                    String(s.attendance_id) === String(emp.attendance_id)
+                );
 
-            // Leave Days = Annual Leave Days + LOP Days (READ-ONLY from report)
-            const leaveDays = annualLeaveDays + lopDays;
-            
-            // Salary Leave Days = Sum of all ANNUAL_LEAVE exceptions' salary_leave_days (READ-ONLY)
-            // or fallback to annual_leave_count if no exceptions exist
-            const empExceptions = exceptions.filter(e => String(e.attendance_id) === String(emp.attendance_id));
-            const exceptionSalaryLeaveDays = empExceptions.reduce((sum, e) => sum + (e.salary_leave_days || 0), 0);
-            const salaryLeaveDays = exceptionSalaryLeaveDays > 0 ? exceptionSalaryLeaveDays : annualLeaveDays;
-            
-            const totalSalaryAmount = salary?.total_salary || 0;
-            const workingHours = salary?.working_hours || 9;
-
-            // Use project's salary_calculation_days divisor (default 30)
-            const divisor = project.salary_calculation_days || 30;
-            
-            // Leave Pay = (Total Salary / divisor) × Leave Days
-            const leavePay = (totalSalaryAmount / divisor) * leaveDays;
-
-                      // Salary Leave Amount = (Basic Salary + Allowances) / divisor × Salary Leave Days
-                      // For Al Maraghi Auto Repairs: allowances is now a direct number
-                      const basicSalary = salary?.basic_salary || 0;
-                      const allowancesAmount = Number(salary?.allowances) || 0;
-                      const salaryForLeave = basicSalary + allowancesAmount; // Excludes allowances_with_bonus
-                      
-                      const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
-
-                      // Deductible Hours = deductible_minutes ÷ 60 (direct conversion)
-                      // NO OTHER MINUTES ADDED - finalized report is source of truth
-                      const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
-
-                      // Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours
-                      const hourlyRate = totalSalaryAmount / divisor / workingHours;
-                      const deductibleHoursPay = hourlyRate * deductibleHours;
-
-                      // Net Deduction = Leave Pay - Salary Leave Amount
-                      const lopDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-
-             // OT calculations - split into normal and special
-             const normalOtHours = 0; // To be manually entered
-             const specialOtHours = 0; // To be manually entered
-             const normalOtSalary = 0; // To be calculated
-             const specialOtSalary = 0; // To be calculated
-             const totalOtSalary = 0; // Sum of normal + special
-             const otherDeduction = 0; // To be set manually
-             const bonus = 0; // To be set manually
-             const incentive = 0; // To be set manually
-             const advanceSalaryDeduction = 0; // To be set manually
-             const deductibleMinutesAmount = 0; // To be calculated based on deductible minutes
-
-             // Total = Total Salary + Additions - Deductions
-             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-             const totalSalary = totalSalaryAmount + totalOtSalary + bonus + incentive 
-                                 - netDeduction - deductibleHoursPay - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
-             const wpsPay = totalSalary; // WPS is typically the total
-             const balance = 0; // Balance = Total - WPS Pay
-
-            return {
-                hrms_id: emp.hrms_id,
-                attendance_id: emp.attendance_id,
-                name: emp.name,
-                department: emp.department,
-                company: emp.company,
-                // From salary master - ALL columns
-                employee_id: salary?.employee_id || emp.hrms_id,
-                basic_salary: salary?.basic_salary || 0,
-                allowances: salary?.allowances || '{}',
-                total_salary: salary?.total_salary || 0,
-                working_hours: salary?.working_hours || 9,
-                deduction_per_minute: salary?.deduction_per_minute || 0,
-                // Analysis results (use manual overrides if present)
-                working_days: 30,
-                present_days: presentDays,
-                full_absence_count: lopDays, // LOP days only
-                annual_leave_count: annualLeaveDays, // Separate from LOP
-                sick_leave_count: sickLeaveDays, // Separate from LOP
-                late_minutes: result?.late_minutes || 0,
-                early_checkout_minutes: result?.early_checkout_minutes || 0,
-                other_minutes: result?.other_minutes || 0,
-                approved_minutes: result?.approved_minutes || 0,
-                grace_minutes: result?.grace_minutes || 0,
-                // Calculated fields (placeholders)
-                leaveDays,
-                leavePay,
-                salaryLeaveDays,
-                salaryLeaveAmount,
-                normalOtHours,
-                specialOtHours,
-                normalOtSalary,
-                specialOtSalary,
-                totalOtSalary,
-                deductibleHours,
-                deductibleHoursPay,
-                otherDeduction,
-                bonus,
-                incentive,
-                advanceSalaryDeduction,
-                lopDeduction,
-                lopDays,
-                deductibleMinutesAmount,
-                total: totalSalary,
-                wpsPay,
-                balance
-            };
-        });
-    }, [employees, salaries, analysisResults, exceptions]);
+                return {
+                    hrms_id: emp.hrms_id,
+                    attendance_id: emp.attendance_id,
+                    name: emp.name,
+                    department: emp.department,
+                    company: emp.company,
+                    employee_id: salary?.employee_id || emp.hrms_id,
+                    basic_salary: salary?.basic_salary || 0,
+                    allowances: salary?.allowances || '{}',
+                    total_salary: salary?.total_salary || 0,
+                    working_hours: salary?.working_hours || 9,
+                    deduction_per_minute: salary?.deduction_per_minute || 0,
+                    // Placeholder values when no snapshot exists
+                    working_days: 30,
+                    present_days: 0,
+                    full_absence_count: 0,
+                    annual_leave_count: 0,
+                    sick_leave_count: 0,
+                    late_minutes: 0,
+                    early_checkout_minutes: 0,
+                    other_minutes: 0,
+                    approved_minutes: 0,
+                    grace_minutes: 0,
+                    deductible_minutes: 0,
+                    salary_leave_days: 0,
+                    leaveDays: 0,
+                    leavePay: 0,
+                    salaryLeaveAmount: 0,
+                    deductibleHours: 0,
+                    deductibleHoursPay: 0,
+                    netDeduction: 0,
+                    normalOtHours: 0,
+                    specialOtHours: 0,
+                    totalOtSalary: 0,
+                    otherDeduction: 0,
+                    bonus: 0,
+                    incentive: 0,
+                    advanceSalaryDeduction: 0,
+                    total: salary?.total_salary || 0,
+                    wpsPay: salary?.total_salary || 0,
+                    balance: 0
+                };
+            });
+        }, [salarySnapshots, employees, salaries, editableData]);
 
     // Get unique departments for filter
     const departments = useMemo(() => {
