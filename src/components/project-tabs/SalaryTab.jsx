@@ -451,32 +451,26 @@ export default function SalaryTab({ project, finalReport }) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {salaryData.length === 0 ? (
+                    {blockingError ? (
                         <div className="text-center py-12">
                             <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                            <p className="text-slate-600 text-lg font-medium">No Employees Found</p>
-                            <p className="text-slate-500 text-sm mt-2">Add employees to this company first to see salary calculations.</p>
+                            <p className="text-slate-700 text-lg font-semibold">{blockingError}</p>
+                            <p className="text-slate-600 text-sm mt-3">
+                                No finalized attendance report exists for this date range.
+                            </p>
+                            <Button className="mt-4 bg-indigo-600 hover:bg-indigo-700" onClick={() => window.location.hash = '#?tab=report'}>
+                                Go to Report Tab
+                            </Button>
+                        </div>
+                    ) : loadingSnapshots ? (
+                        <div className="text-center py-12">
+                            <p className="text-slate-600">Loading salary data...</p>
                         </div>
                     ) : (
                         <>
-                            {!finalReport && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-                                    <strong>⚠️ No Final Report:</strong> Finalize a report in the Report tab first to create salary snapshots.
-                                </div>
-                            )}
-                            {finalReport && loadingSnapshots && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-                                    <strong>⏳ Loading Snapshots:</strong> Preparing salary data from finalized report...
-                                </div>
-                            )}
-                            {finalReport && !loadingSnapshots && salarySnapshots.length === 0 && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-                                    <strong>⚠️ No Snapshots:</strong> Salary snapshots not found. Please finalize the report again.
-                                </div>
-                            )}
                             {salarySnapshots.length > 0 && !calculatedData && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-                                    <strong>ℹ️ Snapshots Ready:</strong> Click "Recalculate" to apply any OT hours, bonuses, or deductions you've entered.
+                                    <strong>ℹ️ Snapshots Ready:</strong> Click "Recalculate Totals" to apply any OT hours, bonuses, or deductions you've entered.
                                 </div>
                             )}
                             {calculatedData && (
