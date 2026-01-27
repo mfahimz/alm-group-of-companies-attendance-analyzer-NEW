@@ -96,6 +96,11 @@ export default function SalaryTab({ project, finalReport }) {
         deductionMin: '',
         deductionMax: ''
     });
+    const [selectedDateRange, setSelectedDateRange] = useState({
+        from: project.date_from,
+        to: project.date_to
+    });
+    const [blockingError, setBlockingError] = useState(null);
 
     // Map salary snapshots to display format with editable overrides
         const salaryData = useMemo(() => {
