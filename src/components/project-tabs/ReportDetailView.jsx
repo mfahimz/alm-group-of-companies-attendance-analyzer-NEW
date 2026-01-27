@@ -1462,7 +1462,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             // Use backend's stored abnormality data (YELLOW warnings)
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
-            const isAbnormal = abnormalDatesArray.includes(dateStr);
+            let isAbnormal = abnormalDatesArray.includes(dateStr);
             
             // Use backend's stored critical abnormality data (RED critical issues)
             const notesText = currentResult.notes || '';
