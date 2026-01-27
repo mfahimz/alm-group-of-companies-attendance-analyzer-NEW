@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
 
         const project = projects[0];
         const isAlMaraghi = project.company === 'Al Maraghi Auto Repairs';
+        const divisor = project.salary_calculation_days || 30;
 
         // Fetch all related data
         const [employees, salaries, analysisResults] = await Promise.all([
@@ -70,8 +71,8 @@ Deno.serve(async (req) => {
             // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
             const leaveDays = annualLeaveDays + lopDays;
             
-            // Leave Pay = (Total Salary / 30) × Leave Days
-            const leavePay = leaveDays > 0 ? (totalSalaryAmount / 30) * leaveDays : 0;
+            // Leave Pay = (Total Salary / divisor) × Leave Days
+            const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
 
             // Salary Leave Days = Get override from annual leave exceptions if present
             let salaryLeaveDays = annualLeaveDays;
@@ -91,13 +92,13 @@ Deno.serve(async (req) => {
                 }
             }
             
-            // Salary Leave Amount = (Basic Salary + Allowances) / 30 × Salary Leave Days
+            // Salary Leave Amount = (Basic Salary + Allowances) / divisor × Salary Leave Days
             // For Al Maraghi Auto Repairs: allowances is now a direct number, not JSON
             const basicSalary = salary?.basic_salary || 0;
             const allowancesAmount = Number(salary?.allowances) || 0;
             const salaryForLeave = basicSalary + allowancesAmount;
             
-            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
+            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
 
             // Net Deduction = Leave Pay - Salary Leave Amount
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
@@ -105,13 +106,13 @@ Deno.serve(async (req) => {
             // Deductible Hours = (deductible_minutes + other_minutes) ÷ 60
             const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
 
-            // Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours
-            const hourlyRate = totalSalaryAmount / 30 / workingHours;
+            // Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours
+            const hourlyRate = totalSalaryAmount / divisor / workingHours;
             const deductibleHoursPay = hourlyRate * deductibleHours;
 
             // OT Salary Calculation - Split into Normal and Special
-            // Normal OT: (Total Salary ÷ 30 ÷ Working Hours) × 1.25 × Normal OT Hours
-            // Special OT: (Total Salary ÷ 30 ÷ Working Hours) × 1.5 × Special OT Hours
+            // Normal OT: (Total Salary ÷ divisor ÷ Working Hours) × 1.25 × Normal OT Hours
+            // Special OT: (Total Salary ÷ divisor ÷ Working Hours) × 1.5 × Special OT Hours
             const normalOtHours = 0; // Will be manually entered in UI
             const specialOtHours = 0; // Will be manually entered in UI
             

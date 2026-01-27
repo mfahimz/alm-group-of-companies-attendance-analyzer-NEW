@@ -126,22 +126,25 @@ export default function SalaryTab({ project, finalReport }) {
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || 9;
 
-            // Leave Pay = (Total Salary / 30) × Leave Days
-            const leavePay = (totalSalaryAmount / 30) * leaveDays;
+            // Use project's salary_calculation_days divisor (default 30)
+            const divisor = project.salary_calculation_days || 30;
+            
+            // Leave Pay = (Total Salary / divisor) × Leave Days
+            const leavePay = (totalSalaryAmount / divisor) * leaveDays;
 
-                      // Salary Leave Amount = (Basic Salary + Allowances) / 30 × Salary Leave Days
+                      // Salary Leave Amount = (Basic Salary + Allowances) / divisor × Salary Leave Days
                       // For Al Maraghi Auto Repairs: allowances is now a direct number
                       const basicSalary = salary?.basic_salary || 0;
                       const allowancesAmount = Number(salary?.allowances) || 0;
                       const salaryForLeave = basicSalary + allowancesAmount; // Excludes allowances_with_bonus
                       
-                      const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
+                      const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
 
                       // Deductible Hours = (deductible_minutes + other_minutes) ÷ 60
                       const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
 
-                      // Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours
-                      const hourlyRate = totalSalaryAmount / 30 / workingHours;
+                      // Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours
+                      const hourlyRate = totalSalaryAmount / divisor / workingHours;
                       const deductibleHoursPay = hourlyRate * deductibleHours;
 
                       // Net Deduction = Leave Pay - Salary Leave Amount
@@ -364,10 +367,12 @@ export default function SalaryTab({ project, finalReport }) {
             // NOTE: leaveDays and salaryLeaveDays are READ-ONLY and fetched from report/exceptions
             // They cannot be edited, so no recalculation needed here
 
+            const divisor = project.salary_calculation_days || 30;
+
             // Recalculate Normal OT Salary if normalOtHours was edited
             if ('normalOtHours' in employeeEdits) {
                 const normalOtHours = employeeEdits.normalOtHours;
-                const hourlyRate = totalSalary / 30 / workingHours;
+                const hourlyRate = totalSalary / divisor / workingHours;
                 const normalOtRate = hourlyRate * 1.25;
                 recalculated[hrmsId].normalOtSalary = normalOtRate * normalOtHours;
             }
@@ -375,7 +380,7 @@ export default function SalaryTab({ project, finalReport }) {
             // Recalculate Special OT Salary if specialOtHours was edited
             if ('specialOtHours' in employeeEdits) {
                 const specialOtHours = employeeEdits.specialOtHours;
-                const hourlyRate = totalSalary / 30 / workingHours;
+                const hourlyRate = totalSalary / divisor / workingHours;
                 const specialOtRate = hourlyRate * 1.5;
                 recalculated[hrmsId].specialOtSalary = specialOtRate * specialOtHours;
             }
@@ -403,6 +408,7 @@ export default function SalaryTab({ project, finalReport }) {
             }
 
             // Apply manual overrides from editableData and recalculate dependents
+            const divisor = project.salary_calculation_days || 30;
             const calculatedWithEdits = response.data.data.map(emp => {
                 const edits = editableData[emp.hrms_id];
                 if (!edits) return emp;
@@ -412,30 +418,16 @@ export default function SalaryTab({ project, finalReport }) {
                 const totalSalary = updated.total_salary;
                 const workingHours = updated.working_hours;
 
-                // Recalculate Leave Pay if leaveDays was edited
-                if ('leaveDays' in edits) {
-                    updated.leavePay = (totalSalary / 30) * updated.leaveDays;
-                }
-
-                // Recalculate Salary Leave Amount if salaryLeaveDays was edited
-                if ('salaryLeaveDays' in edits) {
-                    // Get basic salary + allowances (excluding allowances_with_bonus)
-                    const allowancesAmount = Number(updated.allowances) || 0;
-                    const salaryForLeave = updated.basic_salary + allowancesAmount;
-                    const newSalaryLeaveAmount = updated.salaryLeaveDays > 0 ? (salaryForLeave / 30) * updated.salaryLeaveDays : 0;
-                    updated.salaryLeaveAmount = newSalaryLeaveAmount;
-                }
-
                 // Recalculate Normal OT Salary if normalOtHours was edited
                 if ('normalOtHours' in edits) {
-                    const hourlyRate = totalSalary / 30 / workingHours;
+                    const hourlyRate = totalSalary / divisor / workingHours;
                     const normalOtRate = hourlyRate * 1.25;
                     updated.normalOtSalary = normalOtRate * updated.normalOtHours;
                 }
 
                 // Recalculate Special OT Salary if specialOtHours was edited
                 if ('specialOtHours' in edits) {
-                    const hourlyRate = totalSalary / 30 / workingHours;
+                    const hourlyRate = totalSalary / divisor / workingHours;
                     const specialOtRate = hourlyRate * 1.5;
                     updated.specialOtSalary = specialOtRate * updated.specialOtHours;
                 }
