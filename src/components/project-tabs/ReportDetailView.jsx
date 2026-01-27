@@ -1460,10 +1460,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
+            // Use backend's stored abnormality data (YELLOW warnings)
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
-            let isAbnormal = abnormalDatesArray.includes(dateStr);
+            const isAbnormal = abnormalDatesArray.includes(dateStr);
             
-            // Extract critical dates from notes field (RED abnormalities)
+            // Use backend's stored critical abnormality data (RED critical issues)
             const notesText = currentResult.notes || '';
             const criticalDatesArray = [];
             const dateMatches = notesText.match(/\d{4}-\d{2}-\d{2}/g);
@@ -1471,16 +1472,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 criticalDatesArray.push(...dateMatches);
             }
             const isCriticalAbnormal = criticalDatesArray.includes(dateStr);
-            
-            const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
-            const hasFarExtendedMatchDay = punchMatches.some(m => m.isFarExtendedMatch);
-            if (hasUnmatchedPunch || hasExtendedMatch || hasFarExtendedMatchDay) {
-                isAbnormal = true;
-            }
-            const expectedPunchCount = isSingleShift ? 2 : 4;
-            if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
-                isAbnormal = true;
-            }
             
             const dayOverride = dayOverrides[dateStr];
 
