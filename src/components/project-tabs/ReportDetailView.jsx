@@ -1566,6 +1566,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     isAbnormal = dayOverride.isAbnormal;
                 }
             }
+            
+            // If user explicitly unchecked abnormality, suppress partial day warning
+            if (dayOverride && dayOverride.isAbnormal === false) {
+                partialDayResult.isPartial = false;
+                partialDayResult.reason = null;
+            }
 
             const extractTime = (ts) => {
                 // For Al Maraghi Automotive: Handle seconds in timestamp (HH:MM:SS AM/PM)
