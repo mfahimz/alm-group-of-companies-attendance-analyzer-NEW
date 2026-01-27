@@ -1486,12 +1486,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
+            // Check for automatic abnormality conditions BEFORE applying override
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
-            if (hasUnmatchedPunch || hasExtendedMatch) {
-                isAbnormal = true;
-            }
             const expectedPunchCount = isSingleShift ? 2 : 4;
-            if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
+            const hasMissingPunches = dayPunches.length > 0 && dayPunches.length < expectedPunchCount;
+            
+            if (hasUnmatchedPunch || hasExtendedMatch || hasMissingPunches) {
                 isAbnormal = true;
             }
             
