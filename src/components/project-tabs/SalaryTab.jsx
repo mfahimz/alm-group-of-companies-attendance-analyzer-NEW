@@ -480,9 +480,47 @@ export default function SalaryTab({ project, finalReport }) {
                             )}
                             
                             <div className="space-y-4 mb-4">
+                        <div className="bg-white rounded-lg p-4 border border-slate-200">
+                            <label className="text-sm font-medium text-slate-700 mb-3 block">Select Date Range</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+                                <div>
+                                    <label className="text-xs text-slate-600 block mb-1">From</label>
+                                    <input
+                                        type="date"
+                                        value={selectedDateRange.from}
+                                        onChange={(e) => setSelectedDateRange({...selectedDateRange, from: e.target.value})}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-600 block mb-1">To</label>
+                                    <input
+                                        type="date"
+                                        value={selectedDateRange.to}
+                                        onChange={(e) => setSelectedDateRange({...selectedDateRange, to: e.target.value})}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                            </div>
+                            <Button 
+                                onClick={() => {
+                                    const matchingReport = reportRuns?.find(r => 
+                                        r.is_final === true && 
+                                        r.date_from === selectedDateRange.from && 
+                                        r.date_to === selectedDateRange.to
+                                    );
+                                    if (!matchingReport) {
+                                        setBlockingError(`No finalized report exists for ${selectedDateRange.from} to ${selectedDateRange.to}`);
+                                    }
+                                }}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                Load Report
+                            </Button>
+                        </div>
                         <div className="bg-white rounded-lg p-4">
                             <p className="text-sm text-slate-600 mb-4">
-                                <strong>Note:</strong> Salary calculations based on latest saved report. Data from salary master is read-only.
+                                <strong>Note:</strong> Salary calculations based on selected finalized report. Attendance data and salary master are read-only.
                             </p>
                             {/* Search Box */}
                             <div className="bg-white rounded-lg p-4 mb-4 border border-slate-200">
