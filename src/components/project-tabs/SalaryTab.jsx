@@ -101,7 +101,7 @@ export default function SalaryTab({ project, finalReport }) {
     const [blockingError, setBlockingError] = useState(null);
 
     // Validate consistency of finalized report and snapshots
-    useMemo(() => {
+    useEffect(() => {
         let error = null;
 
         if (!finalReport) {
