@@ -329,8 +329,8 @@ Deno.serve(async (req) => {
             let earlyCheckoutMinutes = 0;
             let otherMinutes = 0;
             let totalApprovedMinutes = 0;
-            const abnormal_dates_list = [];
-            const critical_abnormal_dates = [];
+            const abnormal_dates_set = new Set();
+            const critical_abnormal_dates_set = new Set();
             const auto_resolutions = [];
 
             const startDate = new Date(date_from);
@@ -665,16 +665,16 @@ Deno.serve(async (req) => {
 
                 const dateFormatted = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
                 if (rules.date_rules?.special_abnormal_dates?.includes(dateFormatted)) {
-                    abnormal_dates_list.push(dateStr);
+                    abnormal_dates_set.add(dateStr);
                 }
 
                 if (rules.date_rules?.always_mark_first_date_abnormal && currentDate.getTime() === startDate.getTime()) {
-                    abnormal_dates_list.push(dateStr);
+                    abnormal_dates_set.add(dateStr);
                 }
             }
 
-            const criticalDatesFormatted = critical_abnormal_dates.length > 0
-                ? [...new Set(critical_abnormal_dates)].map(d => new Date(d).toLocaleDateString()).join(', ')
+            const criticalDatesFormatted = critical_abnormal_dates_set.size > 0
+                ? [...critical_abnormal_dates_set].sort().map(d => new Date(d).toLocaleDateString()).join(', ')
                 : '';
             const autoResolutionNotes = auto_resolutions.length > 0 
                 ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
@@ -702,7 +702,7 @@ Deno.serve(async (req) => {
                 approved_minutes: totalApprovedMinutes,
                 deductible_minutes: Math.max(0, deductibleMinutes),
                 grace_minutes: baseGrace + carriedGrace,
-                abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
+                abnormal_dates: [...abnormal_dates_set].sort().join(', '),
                 notes: criticalDatesFormatted,
                 auto_resolutions: autoResolutionNotes
             };
