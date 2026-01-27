@@ -41,27 +41,25 @@ export default function SalaryTab({ project, finalReport }) {
         refetchOnMount: false
     });
 
+    // Fetch ReportRuns to enable date range selection
+    const { data: reportRuns = [] } = useQuery({
+        queryKey: ['reportRuns', project.id],
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
+        enabled: !!project.id,
+        staleTime: 0,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: true
+    });
+
     const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
         queryKey: ['salarySnapshots', project.id, finalReport?.id],
         queryFn: async () => {
-            console.log('🔍 SALARY TAB - Fetching SalarySnapshots with:', {
-                project_id: project.id,
-                report_run_id: finalReport?.id
-            });
             const snapshots = await base44.entities.SalarySnapshot.filter({
                 project_id: project.id,
                 report_run_id: finalReport.id
             });
-            console.log('📊 SALARY TAB - SalarySnapshots fetched:', snapshots.length, 'records');
-            if (snapshots.length > 0) {
-                console.log('First snapshot sample:', {
-                    attendance_id: snapshots[0].attendance_id,
-                    present_days: snapshots[0].present_days,
-                    annual_leave_count: snapshots[0].annual_leave_count,
-                    full_absence_count: snapshots[0].full_absence_count,
-                    deductible_minutes: snapshots[0].deductible_minutes
-                });
-            }
             return snapshots;
         },
         enabled: !!project.id && !!finalReport?.id,
