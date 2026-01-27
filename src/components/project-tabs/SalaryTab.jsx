@@ -687,8 +687,10 @@ export default function SalaryTab({ project, finalReport }) {
 
                             {/* Formula Info */}
                              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 mb-3">
-                                 <strong>Deductible Hours Formula (For Salary):</strong> All values are fetched DIRECTLY from the finalized report. Deductible Minutes (already calculated as late + early - grace - approved) ÷ 60 = Deductible Hours. Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours.
-                                 <br /><span className="text-xs mt-1 block"><strong>🔒 IMMUTABLE:</strong> Once report is finalized for Al Maraghi Auto Repairs, salary calculations use finalized values only. No recalculation. Report is source of truth.</span>
+                                 <strong>🔒 IMMUTABLE SALARY SNAPSHOT:</strong> When a report is marked final, salary snapshots are created capturing exact values from that moment. These snapshots are frozen and never change automatically.
+                                 <br /><span className="text-xs mt-1 block"><strong>What's Locked:</strong> Present Days, Leave Days, LOP Days, Deductible Minutes, and all related pay calculations.</span>
+                                 <br /><span className="text-xs mt-1 block"><strong>What's Editable:</strong> Normal OT Hours, Special OT Hours, Bonus, Incentive, Other Deductions only.</span>
+                                 <br /><span className="text-xs mt-1 block"><strong>If Report Changes:</strong> Delete old final report and mark a new one final to create new snapshots. Salary data for deleted reports is also deleted.</span>
                              </div>
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
                                 <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
