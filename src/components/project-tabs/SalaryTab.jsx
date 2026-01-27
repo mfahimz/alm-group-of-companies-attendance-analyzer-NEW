@@ -647,7 +647,7 @@ export default function SalaryTab({ project, finalReport }) {
                                     </Button>
                                     <Button 
                                         onClick={handleSave} 
-                                        disabled={isSaving || Object.keys(editableData).length === 0 || !calculatedData}
+                                        disabled={isSaving || Object.keys(editableData).length === 0}
                                         className="flex-1 bg-green-600 hover:bg-green-700"
                                     >
                                         <Save className="w-4 h-4 mr-2" />
