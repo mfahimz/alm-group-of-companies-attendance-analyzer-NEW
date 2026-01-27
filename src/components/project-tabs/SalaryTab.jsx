@@ -114,16 +114,20 @@ export default function SalaryTab({ project, finalReport }) {
             const reportOtherMinutes = result?.other_minutes ?? 0;
             const salaryDeductibleMinutes = reportDeductibleMinutes + reportOtherMinutes;
 
-            // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
+            // Leave Days = Annual Leave Days + LOP Days (READ-ONLY from report)
             const leaveDays = annualLeaveDays + lopDays;
-                      const totalSalaryAmount = salary?.total_salary || 0;
-                      const workingHours = salary?.working_hours || 9;
+            
+            // Salary Leave Days = Sum of all ANNUAL_LEAVE exceptions' salary_leave_days (READ-ONLY)
+            // or fallback to annual_leave_count if no exceptions exist
+            const empExceptions = exceptions.filter(e => String(e.attendance_id) === String(emp.attendance_id));
+            const exceptionSalaryLeaveDays = empExceptions.reduce((sum, e) => sum + (e.salary_leave_days || 0), 0);
+            const salaryLeaveDays = exceptionSalaryLeaveDays > 0 ? exceptionSalaryLeaveDays : annualLeaveDays;
+            
+            const totalSalaryAmount = salary?.total_salary || 0;
+            const workingHours = salary?.working_hours || 9;
 
-                      // Leave Pay = (Total Salary / 30) × Leave Days
-                      const leavePay = (totalSalaryAmount / 30) * leaveDays;
-
-                      // Salary Leave Days = Annual Leave Days (from exceptions)
-                      const salaryLeaveDays = annualLeaveDays;
+            // Leave Pay = (Total Salary / 30) × Leave Days
+            const leavePay = (totalSalaryAmount / 30) * leaveDays;
 
                       // Salary Leave Amount = (Basic Salary + Allowances) / 30 × Salary Leave Days
                       // For Al Maraghi Auto Repairs: allowances is now a direct number
