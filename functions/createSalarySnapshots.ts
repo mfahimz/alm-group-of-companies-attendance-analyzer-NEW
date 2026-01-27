@@ -84,7 +84,22 @@ Deno.serve(async (req) => {
             const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
             const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
             const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
-            const salaryDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
+            
+            // Calculate deductible minutes: (late + early + other) - grace - approved
+            // Use manual override if set, otherwise calculate from raw values
+            const lateMinutes = result?.late_minutes ?? 0;
+            const earlyCheckoutMinutes = result?.early_checkout_minutes ?? 0;
+            const otherMinutes = result?.other_minutes ?? 0;
+            const graceMinutes = result?.grace_minutes ?? 15;
+            const approvedMinutes = result?.approved_minutes ?? 0;
+            
+            // Calculate deductible: total time issues minus grace and approved
+            const totalTimeIssues = lateMinutes + earlyCheckoutMinutes + otherMinutes;
+            const calculatedDeductible = Math.max(0, totalTimeIssues - graceMinutes - approvedMinutes);
+            
+            // Use manual override if set, otherwise use calculated value
+            const salaryDeductibleMinutes = result?.manual_deductible_minutes ?? 
+                                            (result?.deductible_minutes > 0 ? result.deductible_minutes : calculatedDeductible);
 
             // Calculate derived values
             const leaveDays = annualLeaveDays + lopDays;
