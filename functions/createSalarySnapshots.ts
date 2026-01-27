@@ -166,15 +166,19 @@ Deno.serve(async (req) => {
         }).filter(Boolean); // Remove nulls (employees without analysis results)
 
         // Bulk create snapshots
-        if (snapshots.length > 0) {
-            await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
-        }
+         if (snapshots.length > 0) {
+             console.log(`Creating ${snapshots.length} salary snapshots for report ${report_run_id}`);
+             await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
+             console.log(`Successfully created ${snapshots.length} snapshots`);
+         } else {
+             console.warn(`No snapshots created: ${employees.length} employees, ${analysisResults.length} analysis results`);
+         }
 
-        return Response.json({
-            success: true,
-            snapshots_created: snapshots.length,
-            message: `Created ${snapshots.length} salary snapshots for report ${report_run_id}`
-        });
+         return Response.json({
+             success: true,
+             snapshots_created: snapshots.length,
+             message: `Created ${snapshots.length} salary snapshots for report ${report_run_id}`
+         });
 
     } catch (error) {
         console.error('Create salary snapshots error:', error);
