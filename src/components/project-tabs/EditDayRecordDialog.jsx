@@ -432,11 +432,6 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             if (updatedTotals.abnormal_dates && updatedTotals.abnormal_dates.length > 0) {
                 updatePayload.abnormal_dates = updatedTotals.abnormal_dates;
             }
-            
-            // Clear notes if no abnormal dates exist (removes RED highlighting)
-            if (!updatedTotals.abnormal_dates || updatedTotals.abnormal_dates.length === 0) {
-                updatePayload.notes = '';
-            }
 
             console.log('🔧 EditDayRecord Update Payload:', JSON.stringify(updatePayload, null, 2));
             console.log('🔧 Result ID:', analysisResult.id);
@@ -486,7 +481,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['results']);
+            queryClient.invalidateQueries(['results', project.id]);
             toast.success((isUser && !isSupervisor) ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');
             if (onSave) onSave();
             onClose();
@@ -691,26 +686,13 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         <Checkbox
                             id="isAbnormal"
                             checked={formData.isAbnormal}
-                            onCheckedChange={(checked) => {
-                                if (!checked) {
-                                    // When unchecking abnormality, clear all abnormality-related values
-                                    setFormData({ 
-                                        ...formData, 
-                                        isAbnormal: false,
-                                        lateMinutes: 0,
-                                        earlyCheckoutMinutes: 0,
-                                        otherMinutes: 0
-                                    });
-                                } else {
-                                    setFormData({ ...formData, isAbnormal: true });
-                                }
-                            }}
+                            onCheckedChange={(checked) => setFormData({ ...formData, isAbnormal: checked })}
                         />
                         <div className="flex-1">
                             <label htmlFor="isAbnormal" className="text-sm font-medium cursor-pointer">
                                 Mark as Abnormal
                             </label>
-                            <p className="text-xs text-slate-500">Flag this day for special attention (unchecking clears all late/early minutes)</p>
+                            <p className="text-xs text-slate-500">Flag this day for special attention</p>
                         </div>
                     </div>
 

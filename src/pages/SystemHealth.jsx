@@ -1,87 +1,19 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, Database, RefreshCw, AlertCircle, Wrench } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Database, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function SystemHealth() {
     const [isScanning, setIsScanning] = useState(false);
     const [healthReport, setHealthReport] = useState(null);
-    const [fixingIssue, setFixingIssue] = useState(null);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
-    });
-
-    // Fix mutations
-    const fixDuplicatesMutation = useMutation({
-        mutationFn: () => base44.functions.invoke('fixDuplicateAnalysisResults'),
-        onSuccess: (response) => {
-            toast.success(`Fixed ${response.data.recordsDeleted} duplicate records`);
-            setFixingIssue(null);
-            // Re-run health check
-            setTimeout(runHealthCheck, 500);
-        },
-        onError: (error) => {
-            toast.error('Failed to fix duplicates: ' + error.message);
-            setFixingIssue(null);
-        }
-    });
-
-    const fixPunchIdsMutation = useMutation({
-        mutationFn: () => base44.functions.invoke('fixNumericPunchAttendanceIds'),
-        onSuccess: (response) => {
-            toast.success(`Fixed ${response.data.recordsFixed} punch records`);
-            setFixingIssue(null);
-            setTimeout(runHealthCheck, 500);
-        },
-        onError: (error) => {
-            toast.error('Failed to fix punches: ' + error.message);
-            setFixingIssue(null);
-        }
-    });
-
-    const fixEmployeeIdsMutation = useMutation({
-        mutationFn: () => base44.functions.invoke('fixNumericEmployeeAttendanceIds'),
-        onSuccess: (response) => {
-            toast.success(`Fixed ${response.data.recordsFixed} employee records`);
-            setFixingIssue(null);
-            setTimeout(runHealthCheck, 500);
-        },
-        onError: (error) => {
-            toast.error('Failed to fix employees: ' + error.message);
-            setFixingIssue(null);
-        }
-    });
-
-    const cleanupSalariesMutation = useMutation({
-        mutationFn: () => base44.functions.invoke('cleanupOrphanedSalaries'),
-        onSuccess: (response) => {
-            toast.success(`Deactivated ${response.data.recordsDeactivated} orphaned salary records`);
-            setFixingIssue(null);
-            setTimeout(runHealthCheck, 500);
-        },
-        onError: (error) => {
-            toast.error('Failed to cleanup salaries: ' + error.message);
-            setFixingIssue(null);
-        }
-    });
-
-    const cleanupShiftsMutation = useMutation({
-        mutationFn: () => base44.functions.invoke('cleanupOrphanedShifts'),
-        onSuccess: (response) => {
-            toast.success(`Deleted ${response.data.recordsDeleted} orphaned shift records`);
-            setFixingIssue(null);
-            setTimeout(runHealthCheck, 500);
-        },
-        onError: (error) => {
-            toast.error('Failed to cleanup shifts: ' + error.message);
-            setFixingIssue(null);
-        }
     });
 
     const runHealthCheck = async () => {
@@ -382,48 +314,25 @@ export default function SystemHealth() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {healthReport.issues.map((issue, idx) => {
-                                        let mutation = null;
-                                        if (issue.entity === 'AnalysisResult' && issue.issue.includes('Duplicate')) {
-                                            mutation = fixDuplicatesMutation;
-                                        }
-                                        
-                                        return (
-                                            <div key={idx} className="bg-white border border-red-200 rounded-lg p-4">
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <div className="flex-1">
-                                                        <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded">
-                                                            {issue.entity}
-                                                        </span>
-                                                        <h4 className="font-semibold text-red-900 mt-2">{issue.issue}</h4>
-                                                    </div>
-                                                    <span className="text-2xl font-bold text-red-600">{issue.count}</span>
+                                    {healthReport.issues.map((issue, idx) => (
+                                        <div key={idx} className="bg-white border border-red-200 rounded-lg p-4">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div>
+                                                    <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded">
+                                                        {issue.entity}
+                                                    </span>
+                                                    <h4 className="font-semibold text-red-900 mt-2">{issue.issue}</h4>
                                                 </div>
-                                                <p className="text-sm text-red-800 mb-2">
-                                                    <strong>Impact:</strong> {issue.impact}
-                                                </p>
-                                                <div className="flex justify-between items-center">
-                                                    <p className="text-sm text-red-700">
-                                                        <strong>Fix:</strong> {issue.fix}
-                                                    </p>
-                                                    {mutation && (
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setFixingIssue(issue.entity);
-                                                                mutation.mutate();
-                                                            }}
-                                                            disabled={mutation.isPending}
-                                                            className="bg-red-600 hover:bg-red-700 ml-2"
-                                                        >
-                                                            <Wrench className="w-3 h-3 mr-1" />
-                                                            {mutation.isPending ? 'Fixing...' : 'Auto-Fix'}
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                                <span className="text-2xl font-bold text-red-600">{issue.count}</span>
                                             </div>
-                                        );
-                                    })}
+                                            <p className="text-sm text-red-800 mb-2">
+                                                <strong>Impact:</strong> {issue.impact}
+                                            </p>
+                                            <p className="text-sm text-red-700">
+                                                <strong>Fix:</strong> {issue.fix}
+                                            </p>
+                                        </div>
+                                    ))}
                                 </div>
                             </CardContent>
                         </Card>
@@ -439,54 +348,25 @@ export default function SystemHealth() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {healthReport.warnings.map((warning, idx) => {
-                                        let mutation = null;
-                                        if (warning.entity === 'Punch' && warning.issue.includes('Numeric')) {
-                                            mutation = fixPunchIdsMutation;
-                                        } else if (warning.entity === 'Employee' && warning.issue.includes('Numeric')) {
-                                            mutation = fixEmployeeIdsMutation;
-                                        } else if (warning.entity === 'EmployeeSalary') {
-                                            mutation = cleanupSalariesMutation;
-                                        } else if (warning.entity === 'ShiftTiming') {
-                                            mutation = cleanupShiftsMutation;
-                                        }
-                                        
-                                        return (
-                                            <div key={idx} className="bg-white border border-amber-200 rounded-lg p-4">
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <div className="flex-1">
-                                                        <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-2 py-1 rounded">
-                                                            {warning.entity}
-                                                        </span>
-                                                        <h4 className="font-semibold text-amber-900 mt-2">{warning.issue}</h4>
-                                                    </div>
-                                                    <span className="text-2xl font-bold text-amber-600">{warning.count}</span>
+                                    {healthReport.warnings.map((warning, idx) => (
+                                        <div key={idx} className="bg-white border border-amber-200 rounded-lg p-4">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div>
+                                                    <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-2 py-1 rounded">
+                                                        {warning.entity}
+                                                    </span>
+                                                    <h4 className="font-semibold text-amber-900 mt-2">{warning.issue}</h4>
                                                 </div>
-                                                <p className="text-sm text-amber-800 mb-2">
-                                                    <strong>Impact:</strong> {warning.impact}
-                                                </p>
-                                                <div className="flex justify-between items-center">
-                                                    <p className="text-sm text-amber-700">
-                                                        <strong>Fix:</strong> {warning.fix}
-                                                    </p>
-                                                    {mutation && (
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setFixingIssue(warning.entity);
-                                                                mutation.mutate();
-                                                            }}
-                                                            disabled={mutation.isPending}
-                                                            className="bg-amber-600 hover:bg-amber-700 ml-2"
-                                                        >
-                                                            <Wrench className="w-3 h-3 mr-1" />
-                                                            {mutation.isPending ? 'Fixing...' : 'Auto-Fix'}
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                                <span className="text-2xl font-bold text-amber-600">{warning.count}</span>
                                             </div>
-                                        );
-                                    })}
+                                            <p className="text-sm text-amber-800 mb-2">
+                                                <strong>Impact:</strong> {warning.impact}
+                                            </p>
+                                            <p className="text-sm text-amber-700">
+                                                <strong>Fix:</strong> {warning.fix}
+                                            </p>
+                                        </div>
+                                    ))}
                                 </div>
                             </CardContent>
                         </Card>

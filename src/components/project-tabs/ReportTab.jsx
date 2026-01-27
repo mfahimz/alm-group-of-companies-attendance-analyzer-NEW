@@ -4,25 +4,16 @@ import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Trash2, CheckCircle, Star, X } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function ReportTab({ project, isDepartmentHead = false }) {
     console.log('[ReportTab] Rendering with:', { projectId: project?.id, isDepartmentHead });
     
     const queryClient = useQueryClient();
-    const [showNewFeaturePopup, setShowNewFeaturePopup] = React.useState(true);
-
-    // Check if we should show the popup (until Jan 31, 2026)
-    const shouldShowPopup = React.useMemo(() => {
-        const now = new Date();
-        const endDate = new Date('2026-01-31T23:59:59');
-        return now <= endDate && showNewFeaturePopup;
-    }, [showNewFeaturePopup]);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -224,37 +215,6 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     return (
         <div className="space-y-6">
-            {/* New Feature Popup */}
-            {shouldShowPopup && (
-                <div className="fixed bottom-6 left-6 z-50 max-w-md animate-in slide-in-from-bottom-5">
-                    <Alert className="bg-white border-indigo-200 shadow-lg">
-                        <div className="flex items-start gap-3">
-                            <div className="flex-1">
-                                <AlertDescription className="text-sm space-y-2">
-                                    <p className="font-semibold text-indigo-900 mb-2">🎉 New Features Available</p>
-                                    <ul className="space-y-1 text-slate-700">
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-green-600 mt-0.5">✅</span>
-                                            <span><strong>Verification Checkbox</strong> - You can only verify employees without critical issues</span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-green-600 mt-0.5">✅</span>
-                                            <span><strong>Save Report</strong> - You must verify all employees before saving (admins can override)</span>
-                                        </li>
-                                    </ul>
-                                </AlertDescription>
-                            </div>
-                            <button
-                                onClick={() => setShowNewFeaturePopup(false)}
-                                className="text-slate-400 hover:text-slate-600 transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </Alert>
-                </div>
-            )}
-
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <CardTitle>Generated Reports</CardTitle>

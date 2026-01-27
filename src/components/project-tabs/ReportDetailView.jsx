@@ -28,7 +28,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
-    const [showFinalizeConfirmation, setShowFinalizeConfirmation] = useState(false);
 
 
     const queryClient = useQueryClient();
@@ -817,21 +816,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const debounceTimeoutRef = React.useRef(null);
     const pendingVerifiedRef = React.useRef(null);
     
-    const hasRedAbnormalities = (result) => {
-        // RED abnormalities = critical issues in the notes field
-        return !!result.notes && result.notes.trim().length > 0;
-    };
-
     const toggleVerification = (attendanceId) => {
         const attendanceIdStr = String(attendanceId);
-        const result = enrichedResults.find(r => String(r.attendance_id) === attendanceIdStr);
-        
-        // Prevent toggling if employee has RED abnormalities
-        if (result && hasRedAbnormalities(result)) {
-            toast.error(`Cannot verify ${result.attendance_id} - Red abnormalities must be resolved first`);
-            return;
-        }
-        
         const newVerified = verifiedEmployees.includes(attendanceIdStr) 
             ? verifiedEmployees.filter(id => id !== attendanceIdStr)
             : [...verifiedEmployees, attendanceIdStr];
@@ -900,34 +886,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             toast.error('Failed to finalize report: ' + error.message);
         }
     });
-
-    const canSaveReport = () => {
-        // Check if all employees are verified (admins can override)
-        const allVerified = results.every(r => verifiedEmployees.includes(String(r.attendance_id)));
-        return allVerified || isAdmin;
-    };
-
-    const handleSaveReport = () => {
-        // Check verification status for non-admins
-        if (!isAdmin) {
-            const unverifiedCount = results.filter(r => !verifiedEmployees.includes(String(r.attendance_id))).length;
-            if (unverifiedCount > 0) {
-                toast.error(`Cannot save - ${unverifiedCount} employee(s) not verified`);
-                return;
-            }
-        }
-        
-        // For admins, show confirmation if not all verified
-        if (isAdmin && verifiedCount < results.length) {
-            const unverifiedCount = results.length - verifiedCount;
-            setShowSaveConfirmation(true);
-            return;
-        }
-        
-        // Proceed with save
-        setShowSaveConfirmation(false);
-        saveReportMutation.mutate();
-    };
 
     const saveReportMutation = useMutation({
         mutationFn: async () => {
@@ -1486,12 +1444,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
-            // Check for automatic abnormality conditions BEFORE applying override
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
+            if (hasUnmatchedPunch || hasExtendedMatch) {
+                isAbnormal = true;
+            }
             const expectedPunchCount = isSingleShift ? 2 : 4;
-            const hasMissingPunches = dayPunches.length > 0 && dayPunches.length < expectedPunchCount;
-            
-            if (hasUnmatchedPunch || hasExtendedMatch || hasMissingPunches) {
+            if (dayPunches.length > 0 && dayPunches.length < expectedPunchCount) {
                 isAbnormal = true;
             }
             
@@ -1562,14 +1520,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes > 0) {
                     currentOtherMinutes = dayOverride.otherMinutes;
                 }
-                // Override abnormality LAST - this is the user's explicit choice
                 if (dayOverride.isAbnormal !== undefined) {
                     isAbnormal = dayOverride.isAbnormal;
-                    // If user explicitly said not abnormal, suppress all warnings
-                    if (dayOverride.isAbnormal === false) {
-                        partialDayResult.isPartial = false;
-                        partialDayResult.reason = null;
-                    }
                 }
             }
 
@@ -1699,27 +1651,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                            {project.status !== 'closed' && (
                                <>
                                    <Button
-                                       onClick={handleSaveReport}
-                                       disabled={isSaving || (!isAdmin && verifiedCount < results.length)}
+                                       onClick={() => setShowSaveConfirmation(true)}
+                                       disabled={isSaving}
                                        className="bg-green-600 hover:bg-green-700"
-                                       title={!isAdmin && verifiedCount < results.length ? `${results.length - verifiedCount} employee(s) not verified` : ''}
                                    >
                                        <Save className="w-4 h-4 mr-2" />
                                        {isSaving ? 'Saving...' : 'Save Report'}
                                    </Button>
                                    {isAdmin && (
                                        <Button
-                                           onClick={() => {
-                                               // Admin can finalize without all verified, show confirmation if needed
-                                               if (verifiedCount < results.length) {
-                                                   setShowFinalizeConfirmation(true);
-                                               } else {
-                                                   finalizeReportMutation.mutate();
-                                               }
-                                           }}
+                                           onClick={() => finalizeReportMutation.mutate()}
                                            disabled={finalizeReportMutation.isPending}
                                            className="bg-purple-600 hover:bg-purple-700"
-                                           title="Finalize report for salary calculation"
+                                           title="Finalize report without generating approval links"
                                        >
                                            {finalizeReportMutation.isPending ? (
                                                <>
@@ -1834,14 +1778,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <TableBody>
                                 {filteredResults.map((result) => (
                                     <TableRow key={result.id}>
-                                         <TableCell>
-                                             <Checkbox
-                                                 checked={result.isVerified}
-                                                 onCheckedChange={() => toggleVerification(result.attendance_id)}
-                                                 disabled={hasRedAbnormalities(result)}
-                                                 title={hasRedAbnormalities(result) ? 'Cannot verify - Red abnormalities found' : 'Mark as verified'}
-                                             />
-                                         </TableCell>
+                                        <TableCell>
+                                            <Checkbox
+                                                checked={result.isVerified}
+                                                onCheckedChange={() => toggleVerification(result.attendance_id)}
+                                            />
+                                        </TableCell>
                                         <TableCell className="font-medium">{result.attendance_id}</TableCell>
                                         <TableCell>{result.name}</TableCell>
                                         <TableCell>{result.working_days}</TableCell>
@@ -2196,14 +2138,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <p className="text-slate-700">
                             Are you sure you want to save this report?
                         </p>
-                        {verifiedCount < results.length && !isAdmin && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                <p className="text-sm text-red-800 font-medium">❌ Verification Required</p>
-                                <p className="text-sm text-red-700 mt-1">
-                                    All {results.length} employees must be verified before saving. Currently {verifiedCount} verified.
-                                </p>
-                            </div>
-                        )}
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
                             <ul className="text-sm text-amber-700 space-y-1">
@@ -2233,42 +2167,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 saveReportMutation.mutate();
                             }}
                             className="bg-green-600 hover:bg-green-700"
-                            disabled={!isAdmin && verifiedCount < results.length}
                         >
                             Confirm & Save
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={showFinalizeConfirmation} onOpenChange={setShowFinalizeConfirmation}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Finalize Report Without All Verified?</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                            <p className="text-sm text-amber-800 font-medium">⚠️ Admin Override</p>
-                            <p className="text-sm text-amber-700 mt-2">
-                                {results.length - verifiedCount} of {results.length} employees are not verified.
-                            </p>
-                            <p className="text-sm text-amber-700 mt-2">
-                                As admin, you can proceed with finalization. This report will be locked and ready for salary calculation.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setShowFinalizeConfirmation(false)}>
-                            Cancel
-                        </Button>
-                        <Button 
-                            onClick={() => {
-                                setShowFinalizeConfirmation(false);
-                                finalizeReportMutation.mutate();
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700"
-                        >
-                            Proceed with Finalization
                         </Button>
                     </div>
                 </DialogContent>
