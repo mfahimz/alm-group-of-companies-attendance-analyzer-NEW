@@ -626,22 +626,22 @@ Deno.serve(async (req) => {
                 const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
                 const hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
                 if (hasUnmatchedPunch) {
-                    abnormal_dates_list.push(dateStr);
-                    critical_abnormal_dates.push(dateStr);
+                    abnormal_dates_set.add(dateStr);
+                    critical_abnormal_dates_set.add(dateStr);
                 }
                 if (hasFarExtendedMatch) {
-                    abnormal_dates_list.push(dateStr);
-                    critical_abnormal_dates.push(dateStr);
+                    abnormal_dates_set.add(dateStr);
+                    critical_abnormal_dates_set.add(dateStr);
                 }
                 if (hasExtendedMatch) {
-                    abnormal_dates_list.push(dateStr);
+                    abnormal_dates_set.add(dateStr);
                 }
                 if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
-                    abnormal_dates_list.push(dateStr);
-                    critical_abnormal_dates.push(dateStr);
+                    abnormal_dates_set.add(dateStr);
+                    critical_abnormal_dates_set.add(dateStr);
                 }
                 if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
-                    abnormal_dates_list.push(dateStr);
+                    abnormal_dates_set.add(dateStr);
                 }
                 
                 // Check for extreme lateness - ONLY on matched start punches (not all punches)
@@ -651,7 +651,7 @@ Deno.serve(async (req) => {
                         if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                             const latenessMinutes = match.distance; // Distance already calculated in minutes
                             if (latenessMinutes > 120 && latenessMinutes < 480) {
-                                critical_abnormal_dates.push(dateStr);
+                                critical_abnormal_dates_set.add(dateStr);
                                 const shiftType = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
                                 auto_resolutions.push({
                                     date: dateStr,
