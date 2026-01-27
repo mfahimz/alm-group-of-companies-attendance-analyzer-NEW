@@ -315,8 +315,8 @@ export default function SalaryTab({ project, finalReport }) {
         return recalculated;
     };
 
-    // Recalculate derived salary fields based on edits (OT only, others are immutable)
-    const handleRecalculateSalaries = async () => {
+    // Recalculate totals based on edits (OT hours, bonuses, deductions only)
+    const handleRecalculateTotals = async () => {
         if (!finalReport?.id) {
             toast.error('No finalized report found');
             return;
