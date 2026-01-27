@@ -1127,42 +1127,66 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return;
         }
 
-        // If report is not final yet, finalize it first (which triggers snapshot creation)
-        if (!reportRun.is_final) {
-            toast.info('Finalizing report before export...');
-            finalizeReportMutation.mutate();
-            return;
-        }
+        // Build headers matching the visible table columns
+        const headers = [
+            'Attendance ID',
+            'Name',
+            'Working Days',
+            'Present Days',
+            'Annual Leave',
+            'Sick Leave',
+            'LOP Days',
+            'Half Days',
+            'Late Minutes',
+            'Early Checkout',
+            ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved Minutes'] : []),
+            'Other Minutes',
+            'Grace',
+            'Deductible',
+            'Notes'
+        ];
 
-        const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Grace', 'Approved Minutes', 'Deductible', 'Notes'];
         const rows = filteredResults.map(r => {
-            const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0) + (r.other_minutes || 0);
+            const late = r.late_minutes || 0;
+            const early = r.early_checkout_minutes || 0;
             const grace = r.grace_minutes ?? 15;
-            const approved = r.approved_minutes || 0;
-            const deductible = Math.max(0, total - grace - approved);
+            const calculatedDeductible = Math.max(0, late + early - grace);
+            const deductible = r.manual_deductible_minutes ?? calculatedDeductible;
 
-            return [
+            const baseRow = [
                 r.attendance_id,
                 r.name,
                 r.working_days,
-                r.annual_leave_count || 0,
-                r.sick_leave_count || 0,
-                r.full_absence_count,
-                r.late_minutes,
-                r.early_checkout_minutes || 0,
+                r.manual_present_days ?? r.present_days,
+                r.manual_annual_leave_count ?? r.annual_leave_count ?? 0,
+                r.manual_sick_leave_count ?? r.sick_leave_count ?? 0,
+                r.manual_full_absence_count ?? r.full_absence_count,
+                r.half_absence_count || 0,
+                r.late_minutes || 0,
+                r.early_checkout_minutes || 0
+            ];
+
+            // Add approved minutes only if company allows it
+            if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
+                baseRow.push(r.approved_minutes || 0);
+            }
+
+            baseRow.push(
+                r.other_minutes || 0,
                 grace,
-                approved,
                 deductible,
                 r.notes || ''
-            ];
+            );
+
+            return baseRow;
         });
 
         const data = [headers, ...rows];
         const ws = XLSX.utils.aoa_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Report');
-        XLSX.writeFile(wb, `report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
-        toast.success('Report exported');
+        XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
+        XLSX.writeFile(wb, `attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
+        toast.success('Attendance report exported');
     };
 
     const showDailyBreakdown = (result) => {
