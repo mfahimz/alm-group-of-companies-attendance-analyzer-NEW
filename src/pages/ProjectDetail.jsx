@@ -74,8 +74,8 @@ export default function ProjectDetail() {
 
   // Fetch the actual finalized report using project.last_saved_report_id
   const finalReport = project?.last_saved_report_id 
-    ? reportRuns.find(r => r.id === project.last_saved_report_id)
-    : reportRuns.find(r => r.is_final);
+    ? reportRuns.find(r => r.id === project.last_saved_report_id && r.is_final === true)
+    : null;
 
   const reopenProjectMutation = useMutation({
     mutationFn: async () => {
