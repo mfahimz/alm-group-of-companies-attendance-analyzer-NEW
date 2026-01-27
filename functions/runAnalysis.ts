@@ -644,34 +644,19 @@ Deno.serve(async (req) => {
                     abnormal_dates_list.push(dateStr);
                 }
                 
-                if (shift && filteredPunches.length > 0) {
-                    for (const punch of filteredPunches) {
-                        const punchTime = parseTime(punch.timestamp_raw, includeSeconds);
-                        if (!punchTime) continue;
-                        
-                        const amStartTime = parseTime(shift.am_start);
-                        const pmStartTime = parseTime(shift.pm_start);
-                        
-                        if (amStartTime) {
-                            const latenessMinutes = (punchTime - amStartTime) / (1000 * 60);
+                // Check for extreme lateness - ONLY on matched start punches (not all punches)
+                if (shift && punchMatches.length > 0) {
+                    for (const match of punchMatches) {
+                        // Only check punches matched to start times
+                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            const latenessMinutes = match.distance; // Distance already calculated in minutes
                             if (latenessMinutes > 120 && latenessMinutes < 480) {
                                 critical_abnormal_dates.push(dateStr);
+                                const shiftType = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
                                 auto_resolutions.push({
                                     date: dateStr,
                                     type: 'EXTREME_LATENESS',
-                                    details: `Punch at ${Math.round(latenessMinutes)} minutes past AM start`
-                                });
-                            }
-                        }
-                        
-                        if (pmStartTime) {
-                            const latenessMinutes = (punchTime - pmStartTime) / (1000 * 60);
-                            if (latenessMinutes > 120 && latenessMinutes < 480) {
-                                critical_abnormal_dates.push(dateStr);
-                                auto_resolutions.push({
-                                    date: dateStr,
-                                    type: 'EXTREME_LATENESS',
-                                    details: `Punch at ${Math.round(latenessMinutes)} minutes past PM start`
+                                    details: `${shiftType} start: ${Math.round(latenessMinutes)} minutes late`
                                 });
                             }
                         }
