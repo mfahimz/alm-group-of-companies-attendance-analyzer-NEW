@@ -43,6 +43,11 @@ Deno.serve(async (req) => {
              recalculation_version: 0
          });
 
+         // Update project.last_saved_report_id to point to the finalized report
+         await base44.asServiceRole.entities.Project.update(project_id, {
+             last_saved_report_id: report_run_id
+         });
+
          // Create salary snapshots for all employees from this finalized report
          // These snapshots are immutable and used for salary calculation
          await base44.functions.invoke('createSalarySnapshots', {
