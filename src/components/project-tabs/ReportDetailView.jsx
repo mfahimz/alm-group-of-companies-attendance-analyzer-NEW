@@ -1463,6 +1463,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
             let isAbnormal = abnormalDatesArray.includes(dateStr);
             
+            // Extract critical dates from notes field (RED abnormalities)
+            const notesText = currentResult.notes || '';
+            const criticalDatesArray = [];
+            const dateMatches = notesText.match(/\d{4}-\d{2}-\d{2}/g);
+            if (dateMatches) {
+                criticalDatesArray.push(...dateMatches);
+            }
+            const isCriticalAbnormal = criticalDatesArray.includes(dateStr);
+            
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
             const hasFarExtendedMatchDay = punchMatches.some(m => m.isFarExtendedMatch);
             if (hasUnmatchedPunch || hasExtendedMatch || hasFarExtendedMatchDay) {
@@ -1577,6 +1586,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 exception: dateException ? dateException.type : '-',
                 status,
                 abnormal: isAbnormal,
+                isCriticalAbnormal: isCriticalAbnormal,
                 lateInfo: lateInfo || '-',
                 lateMinutesTotal: lateMinutesTotal || 0,
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
@@ -1997,7 +2007,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </TableHeader>
                             <TableBody>
                                 {getDailyBreakdown.map((day, idx) => (
-                                   <TableRow key={idx} className={`${day.hasUnmatchedPunch || day.hasFarExtendedMatch ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                   <TableRow key={idx} className={`${day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
                                         <TableCell>{day.punches}</TableCell>
                                         <TableCell className="text-xs max-w-xs">
