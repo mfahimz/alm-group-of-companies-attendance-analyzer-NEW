@@ -132,18 +132,32 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const deleteReportMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // Fetch results only for this specific report run to delete
-            const resultsToDelete = await base44.entities.AnalysisResult.filter({ 
-                project_id: project.id, 
-                report_run_id: reportRunId 
-            });
-            await Promise.all(resultsToDelete.map(r => base44.entities.AnalysisResult.delete(r.id)));
+            // Fetch and delete all associated data for this report
+            const [resultsToDelete, snapshotsToDelete] = await Promise.all([
+                base44.entities.AnalysisResult.filter({ 
+                    project_id: project.id, 
+                    report_run_id: reportRunId 
+                }),
+                base44.entities.SalarySnapshot.filter({
+                    project_id: project.id,
+                    report_run_id: reportRunId
+                })
+            ]);
+            
+            // Delete all results and snapshots
+            await Promise.all([
+                ...resultsToDelete.map(r => base44.entities.AnalysisResult.delete(r.id)),
+                ...snapshotsToDelete.map(s => base44.entities.SalarySnapshot.delete(s.id))
+            ]);
+            
+            // Finally, delete the report run itself
             await base44.entities.ReportRun.delete(reportRunId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['reportRuns', project.id]);
             queryClient.invalidateQueries(['reportResults', project.id]);
-            toast.success('Report deleted successfully');
+            queryClient.invalidateQueries(['salarySnapshots', project.id]);
+            toast.success('Report and associated salary data deleted successfully');
         },
         onError: () => {
             toast.error('Failed to delete report');
