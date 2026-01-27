@@ -235,11 +235,11 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                     <ul className="space-y-1 text-slate-700">
                                         <li className="flex items-start gap-2">
                                             <span className="text-green-600 mt-0.5">✅</span>
-                                            <span><strong>Verification Checkbox</strong> - Disabled if employee has RED abnormalities (notes field filled)</span>
+                                            <span><strong>Verification Checkbox</strong> - You can only verify employees without critical issues</span>
                                         </li>
                                         <li className="flex items-start gap-2">
                                             <span className="text-green-600 mt-0.5">✅</span>
-                                            <span><strong>Save Report</strong> - Non-admins blocked until all verified; admins shown confirmation if incomplete</span>
+                                            <span><strong>Save Report</strong> - You must verify all employees before saving (admins can override)</span>
                                         </li>
                                     </ul>
                                 </AlertDescription>
