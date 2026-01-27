@@ -57,15 +57,14 @@ Deno.serve(async (req) => {
         }
 
         // Create salary snapshots for each employee
-        const snapshots = employees.map(emp => {
-            const salary = salaries.find(s => 
-                String(s.employee_id) === String(emp.hrms_id) || 
-                String(s.attendance_id) === String(emp.attendance_id)
-            );
-            const result = analysisResults.find(r => 
-                String(r.attendance_id) === String(emp.attendance_id) &&
-                String(r.report_run_id) === String(report_run_id)
-            );
+         const snapshots = employees.map(emp => {
+             const salary = salaries.find(s => 
+                 String(s.employee_id) === String(emp.hrms_id) || 
+                 String(s.attendance_id) === String(emp.attendance_id)
+             );
+             const result = analysisResults.find(r => 
+                 String(r.attendance_id) === String(emp.attendance_id)
+             );
 
             if (!result) {
                 // No analysis result for this employee, skip
