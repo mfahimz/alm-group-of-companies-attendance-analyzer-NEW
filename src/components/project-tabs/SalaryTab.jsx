@@ -63,16 +63,6 @@ export default function SalaryTab({ project, finalReport }) {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
 
-    // DEBUG LOG - REMOVE AFTER VALIDATION
-    console.log('SalaryTab Debug', {
-        finalReport,
-        finalReportId: finalReport?.id,
-        finalReportIsFinal: finalReport?.is_final,
-        snapshotsCount: salarySnapshots.length,
-        loadingSnapshots,
-        blockingError
-    });
-
     // State for editable values
     const [editableData, setEditableData] = useState({});
     const [isSaving, setIsSaving] = useState(false);
