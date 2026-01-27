@@ -106,6 +106,16 @@ export default function SalaryTab({ project, finalReport }) {
         setBlockingError(error);
     }, [finalReport, salarySnapshots, loadingSnapshots]);
 
+    // DEBUG LOG - REMOVE AFTER VALIDATION
+    console.log('SalaryTab Debug', {
+        finalReport,
+        finalReportId: finalReport?.id,
+        finalReportIsFinal: finalReport?.is_final,
+        snapshotsCount: salarySnapshots.length,
+        loadingSnapshots,
+        blockingError
+    });
+
     // Map salary snapshots to display format with editable overrides
     const salaryData = useMemo(() => {
         // Only return snapshots if all validations pass
