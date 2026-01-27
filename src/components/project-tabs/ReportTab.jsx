@@ -173,11 +173,15 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 project_id: project.id,
                 report_run_id: reportRunId
             });
+            return reportRunId;
         },
-        onSuccess: () => {
+        onSuccess: (reportRunId) => {
+            // Force refetch all relevant queries - do NOT rely on staleTime
+            queryClient.invalidateQueries({ queryKey: ['project', project.id] });
             queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id] });
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
             queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id] });
+            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id, reportRunId] });
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
             toast.success('Report marked as final. Salary snapshots created.');
         },
         onError: (error) => {
