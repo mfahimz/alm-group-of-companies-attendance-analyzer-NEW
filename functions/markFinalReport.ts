@@ -35,22 +35,29 @@ Deno.serve(async (req) => {
         }
 
         // Mark the selected report as final
-        await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-            is_final: true
-        });
+         await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
+             is_final: true
+         });
 
-        // Log audit
-        await base44.functions.invoke('logAudit', {
-            action: 'MARK_FINAL_REPORT',
-            entity_type: 'ReportRun',
-            entity_id: report_run_id,
-            details: `Marked report as final for project ${project_id}`
-        });
+         // Create salary snapshots for all employees from this finalized report
+         // These snapshots are immutable and used for salary calculation
+         await base44.functions.invoke('createSalarySnapshots', {
+             project_id: project_id,
+             report_run_id: report_run_id
+         });
 
-        return Response.json({ 
-            success: true,
-            message: 'Report marked as final successfully'
-        });
+         // Log audit
+         await base44.functions.invoke('logAudit', {
+             action: 'MARK_FINAL_REPORT',
+             entity_type: 'ReportRun',
+             entity_id: report_run_id,
+             details: `Marked report as final for project ${project_id} and created salary snapshots`
+         });
+
+         return Response.json({ 
+             success: true,
+             message: 'Report marked as final successfully. Salary snapshots created.'
+         });
 
     } catch (error) {
         console.error('Mark final report error:', error);
