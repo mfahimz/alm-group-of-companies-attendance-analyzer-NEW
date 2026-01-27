@@ -802,7 +802,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'otherDeduction').toFixed(2)}
+                                                    value={(getValue(row, 'otherDeduction') || 0).toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -811,7 +811,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'bonus').toFixed(2)}
+                                                    value={(getValue(row, 'bonus') || 0).toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -820,7 +820,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'incentive').toFixed(2)}
+                                                    value={(getValue(row, 'incentive') || 0).toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
@@ -829,7 +829,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={getValue(row, 'advanceSalaryDeduction').toFixed(2)}
+                                                    value={(getValue(row, 'advanceSalaryDeduction') || 0).toFixed(2)}
                                                     onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
