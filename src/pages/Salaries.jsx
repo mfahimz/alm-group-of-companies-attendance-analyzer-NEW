@@ -73,7 +73,17 @@ export default function Salaries() {
     });
 
     const createSalaryMutation = useMutation({
-        mutationFn: (data) => {
+        mutationFn: async (data) => {
+            // Check for existing active salary record
+            const existingActive = salaries.find(s => 
+                String(s.employee_id) === String(data.employee_id) && 
+                s.active === true
+            );
+            
+            if (existingActive) {
+                throw new Error(`Employee already has an active salary record (ID: ${existingActive.attendance_id})`);
+            }
+
             const allowancesAmount = Number(data.allowances) || 0;
             const allowancesWithBonus = Number(data.allowances_with_bonus) || 0;
             const total = Number((data.basic_salary + allowancesAmount + allowancesWithBonus).toFixed(2));
@@ -88,7 +98,8 @@ export default function Salaries() {
                 allowances: allowancesAmount,
                 allowances_with_bonus: allowancesWithBonus,
                 total_salary: total,
-                deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
+                deduction_per_minute: total / (30 * (data.working_hours || 9) * 60),
+                active: true
             });
         },
         onSuccess: () => {
@@ -97,8 +108,8 @@ export default function Salaries() {
             setShowDialog(false);
             resetForm();
         },
-        onError: () => {
-            toast.error('Failed to create salary record');
+        onError: (error) => {
+            toast.error(error.message || 'Failed to create salary record');
         }
     });
 
