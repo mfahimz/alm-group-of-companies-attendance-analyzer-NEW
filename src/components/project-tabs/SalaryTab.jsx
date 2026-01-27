@@ -361,21 +361,8 @@ export default function SalaryTab({ project, finalReport }) {
             const totalSalary = row.total_salary;
             const workingHours = row.working_hours;
 
-            // Recalculate Leave Pay if leaveDays was edited
-            if ('leaveDays' in employeeEdits) {
-                const leaveDays = employeeEdits.leaveDays;
-                recalculated[hrmsId].leavePay = (totalSalary / 30) * leaveDays;
-            }
-
-            // Recalculate Salary Leave Amount if salaryLeaveDays was edited
-            if ('salaryLeaveDays' in employeeEdits) {
-                const salaryLeaveDays = employeeEdits.salaryLeaveDays;
-                // Get basic salary + allowances (excluding allowances_with_bonus)
-                const allowancesAmount = Number(row.allowances) || 0;
-                const salaryForLeave = row.basic_salary + allowancesAmount;
-                const newSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / 30) * salaryLeaveDays : 0;
-                recalculated[hrmsId].salaryLeaveAmount = newSalaryLeaveAmount;
-            }
+            // NOTE: leaveDays and salaryLeaveDays are READ-ONLY and fetched from report/exceptions
+            // They cannot be edited, so no recalculation needed here
 
             // Recalculate Normal OT Salary if normalOtHours was edited
             if ('normalOtHours' in employeeEdits) {
