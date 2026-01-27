@@ -16,6 +16,8 @@ import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function ProjectDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -85,6 +87,24 @@ export default function ProjectDetail() {
     }
   });
 
+  const updateSalaryCalculationDaysMutation = useMutation({
+    mutationFn: async (days) => {
+      await base44.entities.Project.update(project.id, { salary_calculation_days: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['project', projectId]);
+      toast.success('Salary calculation days updated');
+    },
+    onError: () => {
+      toast.error('Failed to update salary calculation days');
+    }
+  });
+
+  const [salaryCalcDays, setSalaryCalcDays] = React.useState(project?.salary_calculation_days || 30);
+  React.useEffect(() => {
+    setSalaryCalcDays(project?.salary_calculation_days || 30);
+  }, [project?.salary_calculation_days]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -135,8 +155,8 @@ export default function ProjectDetail() {
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className="bg-gradient-to-r text-green-700 px-4 py-2.5 text-xs font-bold uppercase tracking-wider opacity-100 rounded-2xl shadow-lg ring-2 whitespace-nowrap from-green-50 to-green-100 ring-green-200">
+                    <div className="flex items-center gap-3 flex-wrap">
+                         <span className="bg-gradient-to-r text-green-700 px-4 py-2.5 text-xs font-bold uppercase tracking-wider opacity-100 rounded-2xl shadow-lg ring-2 whitespace-nowrap from-green-50 to-green-100 ring-green-200">
 
 
 
@@ -144,23 +164,51 @@ export default function ProjectDetail() {
 
 
                             {project.status}
-                        </span>
-                        {project.status === 'closed' && isAdmin &&
-            <Button
-              size="sm"
-              onClick={() => {
-                if (window.confirm('Reopen this project? This will allow editing again.')) {
-                  reopenProjectMutation.mutate();
-                }
-              }}
-              disabled={reopenProjectMutation.isPending}
-              className="bg-green-600 hover:bg-green-700">
+                            </span>
+                            {project.status === 'closed' && isAdmin &&
+                            <Button
+                            size="sm"
+                            onClick={() => {
+                            if (window.confirm('Reopen this project? This will allow editing again.')) {
+                            reopenProjectMutation.mutate();
+                            }
+                            }}
+                            disabled={reopenProjectMutation.isPending}
+                            className="bg-green-600 hover:bg-green-700">
 
-                                <LockOpen className="w-4 h-4 mr-2" />
-                                Reopen Project
+                                 <LockOpen className="w-4 h-4 mr-2" />
+                                 Reopen Project
+                             </Button>
+                            }
+                            </div>
+
+                            {project.company === 'Al Maraghi Auto Repairs' && isAdmin && (
+                            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <Label className="text-sm font-semibold text-blue-900 mb-2 block">
+                            Salary Calculation Days (Divisor)
+                            </Label>
+                            <div className="flex gap-2">
+                            <Input
+                             type="number"
+                             min="1"
+                             value={salaryCalcDays}
+                             onChange={(e) => setSalaryCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
+                             className="max-w-xs"
+                            />
+                            <Button
+                             onClick={() => updateSalaryCalculationDaysMutation.mutate(salaryCalcDays)}
+                             disabled={updateSalaryCalculationDaysMutation.isPending || salaryCalcDays === (project?.salary_calculation_days || 30)}
+                             size="sm"
+                             className="bg-blue-600 hover:bg-blue-700"
+                            >
+                             {updateSalaryCalculationDaysMutation.isPending ? 'Saving...' : 'Update'}
                             </Button>
-            }
-                    </div>
+                            </div>
+                            <p className="text-xs text-blue-700 mt-2">
+                            Used as divisor in salary calculations (Leave Pay, Salary Leave Amount, Hourly Rate)
+                            </p>
+                            </div>
+                            )}
                 </div>
             </div>
 
