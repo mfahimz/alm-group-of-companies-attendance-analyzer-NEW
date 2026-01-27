@@ -50,9 +50,17 @@ export default function PINLock({ onUnlock, storageKey = 'salary_pin_unlocked' }
         }
     }, [onUnlock, storageKey]);
 
-    // If no PIN set or already unlocked, don't show lock
+    // If no PIN set, auto-unlock
+    useEffect(() => {
+        if (loading === false && !systemPin) {
+            setIsUnlocked(true);
+            onUnlock?.(true);
+        }
+    }, [loading, systemPin, onUnlock]);
+
+    // If no PIN set or already unlocked, don't show lock modal
     if (loading) return null;
-    if (!systemPin || isUnlocked) return null;
+    if (isUnlocked) return null;
 
     const handleSubmit = (e) => {
         e.preventDefault();
