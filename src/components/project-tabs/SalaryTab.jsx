@@ -65,11 +65,11 @@ export default function SalaryTab({ project, finalReport }) {
             return snapshots;
         },
         enabled: !!project.id && !!finalReport?.id,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
-        refetchOnMount: false
+        refetchOnMount: true
     });
 
 
@@ -484,9 +484,14 @@ export default function SalaryTab({ project, finalReport }) {
                                     <strong>⚠️ No Final Report:</strong> Finalize a report in the Report tab first to create salary snapshots.
                                 </div>
                             )}
-                            {finalReport && salarySnapshots.length === 0 && (
+                            {finalReport && loadingSnapshots && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                                    <strong>⏳ Loading Snapshots:</strong> Preparing salary data from finalized report...
+                                </div>
+                            )}
+                            {finalReport && !loadingSnapshots && salarySnapshots.length === 0 && (
                                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-                                    <strong>⚠️ Creating Snapshots:</strong> Salary snapshots are being created from the finalized report. Please wait a moment and refresh.
+                                    <strong>⚠️ No Snapshots:</strong> Salary snapshots not found. Please finalize the report again.
                                 </div>
                             )}
                             {salarySnapshots.length > 0 && !calculatedData && (
