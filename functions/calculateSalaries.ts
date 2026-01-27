@@ -27,6 +27,12 @@ Deno.serve(async (req) => {
         const isAlMaraghi = project.company === 'Al Maraghi Auto Repairs';
         const divisor = project.salary_calculation_days || 30;
 
+        // Verify report exists
+        const reports = await base44.entities.ReportRun.filter({ id: report_run_id, project_id: project_id });
+        if (reports.length === 0) {
+            return Response.json({ error: 'Report not found for this project' }, { status: 404 });
+        }
+
         // Fetch all related data
         const [employees, salaries, analysisResults] = await Promise.all([
             base44.entities.Employee.filter({ company: project.company, active: true }),
@@ -49,8 +55,10 @@ Deno.serve(async (req) => {
                 String(s.employee_id) === String(emp.hrms_id) || 
                 String(s.attendance_id) === String(emp.attendance_id)
             );
+            // Fetch EXACT analysis result for this employee from the finalized report
             const result = analysisResults.find(r => 
-                String(r.attendance_id) === String(emp.attendance_id)
+                String(r.attendance_id) === String(emp.attendance_id) &&
+                String(r.report_run_id) === String(report_run_id)
             );
 
             const totalSalaryAmount = salary?.total_salary || 0;
