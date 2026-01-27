@@ -94,10 +94,6 @@ export default function SalaryTab({ project, finalReport }) {
         deductionMin: '',
         deductionMax: ''
     });
-    const [selectedDateRange, setSelectedDateRange] = useState({
-        from: project.date_from,
-        to: project.date_to
-    });
     const [blockingError, setBlockingError] = useState(null);
 
     // Validate consistency of finalized report and snapshots
@@ -105,15 +101,13 @@ export default function SalaryTab({ project, finalReport }) {
         let error = null;
 
         if (!finalReport) {
-            error = 'No finalized report found for selected date range.';
+            error = 'No finalized report found. Please finalize a report in the Report Tab first.';
         } else if (finalReport.is_final !== true) {
             error = 'Selected report is not marked as final.';
         } else if (loadingSnapshots) {
             error = null;
         } else if (salarySnapshots.length === 0) {
             error = 'Salary snapshots not found. Report may need to be finalized again.';
-        } else if (salarySnapshots.length < employees.length) {
-            error = `Incomplete snapshots: ${salarySnapshots.length} employees have snapshots, but ${employees.length} employees exist.`;
         } else {
             const allSameReportId = salarySnapshots.every(s => s.report_run_id === finalReport.id);
             if (!allSameReportId) {
@@ -122,7 +116,7 @@ export default function SalaryTab({ project, finalReport }) {
         }
 
         setBlockingError(error);
-    }, [finalReport, salarySnapshots, employees.length, loadingSnapshots]);
+    }, [finalReport, salarySnapshots, loadingSnapshots]);
 
     // Map salary snapshots to display format with editable overrides
     const salaryData = useMemo(() => {
