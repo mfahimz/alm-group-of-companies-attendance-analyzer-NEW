@@ -334,56 +334,65 @@ export default function SalaryTab({ project, finalReport }) {
         return recalculated;
     };
 
-    // Calculate salaries from finalized report
-    const handleCalculateSalaries = async () => {
+    // Recalculate derived salary fields based on edits (OT only, others are immutable)
+    const handleRecalculateSalaries = async () => {
         if (!finalReport?.id) {
             toast.error('No finalized report found');
             return;
         }
 
+        if (salarySnapshots.length === 0) {
+            toast.error('No salary snapshots available. Please finalize the report first.');
+            return;
+        }
+
         setIsCalculating(true);
         try {
-            const response = await base44.functions.invoke('calculateSalaries', {
-                project_id: project.id,
-                report_run_id: finalReport.id
-            });
-
-            if (!response.data.success) {
-                throw new Error(response.data.error || 'Failed to calculate salaries');
-            }
-
-            // Apply manual overrides from editableData and recalculate dependents
             const divisor = project.salary_calculation_days || 30;
-            const calculatedWithEdits = response.data.data.map(emp => {
-                const edits = editableData[emp.hrms_id];
-                if (!edits) return emp;
 
-                // Apply edits and recalculate dependent fields
-                const updated = { ...emp, ...edits };
-                const totalSalary = updated.total_salary;
-                const workingHours = updated.working_hours;
+            // Recalculate OT salaries based on editable hours
+            const calculatedWithEdits = salarySnapshots.map(snapshot => {
+                const edits = editableData[snapshot.hrms_id];
+                const updated = { ...snapshot };
 
-                // Recalculate Normal OT Salary if normalOtHours was edited
-                if ('normalOtHours' in edits) {
-                    const hourlyRate = totalSalary / divisor / workingHours;
-                    const normalOtRate = hourlyRate * 1.25;
-                    updated.normalOtSalary = normalOtRate * updated.normalOtHours;
-                }
+                // Get edited OT hours or use existing values
+                const normalOtHours = edits?.normalOtHours ?? snapshot.normalOtHours ?? 0;
+                const specialOtHours = edits?.specialOtHours ?? snapshot.specialOtHours ?? 0;
 
-                // Recalculate Special OT Salary if specialOtHours was edited
-                if ('specialOtHours' in edits) {
-                    const hourlyRate = totalSalary / divisor / workingHours;
-                    const specialOtRate = hourlyRate * 1.5;
-                    updated.specialOtSalary = specialOtRate * updated.specialOtHours;
-                }
+                // Recalculate OT salaries
+                const totalSalary = snapshot.total_salary;
+                const workingHours = snapshot.working_hours;
+                const hourlyRate = totalSalary / divisor / workingHours;
+
+                const normalOtRate = hourlyRate * 1.25;
+                const specialOtRate = hourlyRate * 1.5;
+
+                updated.normalOtHours = normalOtHours;
+                updated.normalOtSalary = Math.round(normalOtRate * normalOtHours * 100) / 100;
+                updated.specialOtHours = specialOtHours;
+                updated.specialOtSalary = Math.round(specialOtRate * specialOtHours * 100) / 100;
+                updated.totalOtSalary = Math.round((updated.normalOtSalary + updated.specialOtSalary) * 100) / 100;
+
+                // Apply other editable deductions and additions
+                updated.otherDeduction = edits?.otherDeduction ?? snapshot.otherDeduction ?? 0;
+                updated.bonus = edits?.bonus ?? snapshot.bonus ?? 0;
+                updated.incentive = edits?.incentive ?? snapshot.incentive ?? 0;
+                updated.advanceSalaryDeduction = edits?.advanceSalaryDeduction ?? snapshot.advanceSalaryDeduction ?? 0;
+
+                // Recalculate total
+                const finalTotal = snapshot.total_salary + updated.totalOtSalary + updated.bonus + updated.incentive
+                                    - snapshot.netDeduction - snapshot.deductibleHoursPay - updated.otherDeduction - updated.advanceSalaryDeduction;
+
+                updated.total = Math.round(finalTotal * 100) / 100;
+                updated.wpsPay = Math.round(finalTotal * 100) / 100;
 
                 return updated;
             });
 
             setCalculatedData(calculatedWithEdits);
-            toast.success('Salaries calculated successfully');
+            toast.success('Salary data recalculated successfully');
         } catch (error) {
-            toast.error('Failed to calculate salaries: ' + error.message);
+            toast.error('Failed to recalculate salaries: ' + error.message);
         } finally {
             setIsCalculating(false);
         }
