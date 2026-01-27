@@ -70,19 +70,7 @@ export default function SalaryTab({ project, finalReport }) {
         refetchOnMount: false
     });
 
-    const { data: exceptions = [], isLoading: loadingExceptions } = useQuery({
-        queryKey: ['exceptions', project.id],
-        queryFn: () => base44.entities.Exception.filter({
-            project_id: project.id,
-            type: 'ANNUAL_LEAVE'
-        }),
-        enabled: !!project.id,
-        staleTime: 5 * 60 * 1000,
-        gcTime: 10 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
+
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
