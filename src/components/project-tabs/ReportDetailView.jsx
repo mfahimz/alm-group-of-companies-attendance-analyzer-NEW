@@ -23,7 +23,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [editingDay, setEditingDay] = useState(null);
     const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
-    const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
@@ -128,12 +127,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         refetchOnMount: false
     });
 
-    // Load verified employees from report
-    React.useEffect(() => {
-        if (reportRun.verified_employees) {
-            setVerifiedEmployees(reportRun.verified_employees.split(',').filter(Boolean));
-        }
-    }, [reportRun]);
+
 
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
@@ -753,13 +747,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         });
     }, [results, employees, punches, shifts, exceptions, reportRun, project.status]);
 
-    // Add verification state separately to avoid expensive recalculations
-    const enrichedResults = React.useMemo(() => {
-        return baseEnrichedResults.map(result => ({
-            ...result,
-            isVerified: verifiedEmployees.includes(String(result.attendance_id))
-        }));
-    }, [baseEnrichedResults, verifiedEmployees]);
+    // Use base results directly
+    const enrichedResults = baseEnrichedResults;
 
     const filteredResults = React.useMemo(() => {
         return enrichedResults
@@ -778,9 +767,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 } else if (riskFilter === 'clean') {
                     const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
                     return result.full_absence_count === 0 && total === 0;
-                } else if (riskFilter === 'unverified') {
-                    return !result.isVerified;
-                }
+
                 
                 return true;
             })
@@ -797,91 +784,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             });
     }, [enrichedResults, searchTerm, sort]);
 
-    const updateVerificationMutation = useMutation({
-        mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
-            verified_employees: verifiedList.join(',')
-        }),
-        onSuccess: () => {
-            // Don't invalidate - local state is already updated
-        },
-        onError: () => {
-            // Only invalidate on error to refetch correct state
-            queryClient.invalidateQueries(['reportRun', reportRun.id]);
-            toast.error('Failed to update verification');
-        },
-        retry: 3,
-        retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000)
-    });
 
-    // Debounce verification updates to prevent rate limiting
-    const debounceTimeoutRef = React.useRef(null);
-    const pendingVerifiedRef = React.useRef(null);
-    
-    const hasRedAbnormalities = (result) => {
-        // RED abnormalities = critical issues in the notes field
-        return !!result.notes && result.notes.trim().length > 0;
-    };
-
-    const toggleVerification = (attendanceId) => {
-        const attendanceIdStr = String(attendanceId);
-        const result = enrichedResults.find(r => String(r.attendance_id) === attendanceIdStr);
-        
-        // Prevent toggling if employee has RED abnormalities
-        if (result && hasRedAbnormalities(result)) {
-            toast.error(`Cannot verify ${result.attendance_id} - Red abnormalities must be resolved first`);
-            return;
-        }
-        
-        const newVerified = verifiedEmployees.includes(attendanceIdStr) 
-            ? verifiedEmployees.filter(id => id !== attendanceIdStr)
-            : [...verifiedEmployees, attendanceIdStr];
-        
-        // Update local state immediately for instant UI feedback
-        setVerifiedEmployees(newVerified);
-        
-        // Store pending changes
-        pendingVerifiedRef.current = newVerified;
-        
-        // Clear existing timeout
-        if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current);
-        }
-        
-        // Debounce the API call by 1.5 seconds to batch multiple clicks
-        debounceTimeoutRef.current = setTimeout(() => {
-            if (pendingVerifiedRef.current) {
-                updateVerificationMutation.mutate(pendingVerifiedRef.current);
-                pendingVerifiedRef.current = null;
-            }
-        }, 1500);
-    };
-
-    // Cleanup timeout on unmount and save pending changes
-    React.useEffect(() => {
-        return () => {
-            if (debounceTimeoutRef.current) {
-                clearTimeout(debounceTimeoutRef.current);
-            }
-            // Save any pending changes before unmount
-            if (pendingVerifiedRef.current) {
-                updateVerificationMutation.mutate(pendingVerifiedRef.current);
-            }
-        };
-    }, []);
-
-    const verifyAllClean = () => {
-        const cleanEmployees = enrichedResults
-            .filter(r => {
-                const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0);
-                return r.full_absence_count === 0 && total === 0;
-            })
-            .map(r => String(r.attendance_id));
-        
-        const newVerified = [...new Set([...verifiedEmployees, ...cleanEmployees])];
-        setVerifiedEmployees(newVerified);
-        updateVerificationMutation.mutate(newVerified);
-        toast.success(`${cleanEmployees.length} employees verified`);
-    };
 
     const finalizeReportMutation = useMutation({
         mutationFn: async () => {
@@ -901,31 +804,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    const canSaveReport = () => {
-        // Check if all employees are verified (admins can override)
-        const allVerified = results.every(r => verifiedEmployees.includes(String(r.attendance_id)));
-        return allVerified || isAdmin;
-    };
-
     const handleSaveReport = () => {
-        // Check verification status for non-admins
-        if (!isAdmin) {
-            const unverifiedCount = results.filter(r => !verifiedEmployees.includes(String(r.attendance_id))).length;
-            if (unverifiedCount > 0) {
-                toast.error(`Cannot save - ${unverifiedCount} employee(s) not verified`);
-                return;
-            }
-        }
-        
-        // For admins, show confirmation if not all verified
-        if (isAdmin && verifiedCount < results.length) {
-            const unverifiedCount = results.length - verifiedCount;
-            setShowSaveConfirmation(true);
-            return;
-        }
-        
-        // Proceed with save
-        setShowSaveConfirmation(false);
         saveReportMutation.mutate();
     };
 
@@ -1647,7 +1526,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     });
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
-    const verifiedCount = verifiedEmployees.length;
 
     return (
         <div className="space-y-6">
@@ -1679,9 +1557,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <p className="text-sm text-slate-600">
                                 Period: <span className="font-medium text-slate-900">{new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}</span>
                             </p>
-                            <p className="text-sm text-slate-600">
-                                Verified: <span className="font-medium text-slate-900">{verifiedCount} / {results.length} employees</span>
-                            </p>
+
                             {hasEdits && (
                                 <p className="text-sm text-amber-600">
                                     ⚠️ This report has unsaved edits
@@ -1700,23 +1576,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                <>
                                    <Button
                                        onClick={handleSaveReport}
-                                       disabled={isSaving || (!isAdmin && verifiedCount < results.length)}
+                                       disabled={isSaving}
                                        className="bg-green-600 hover:bg-green-700"
-                                       title={!isAdmin && verifiedCount < results.length ? `${results.length - verifiedCount} employee(s) not verified` : ''}
                                    >
                                        <Save className="w-4 h-4 mr-2" />
                                        {isSaving ? 'Saving...' : 'Save Report'}
                                    </Button>
                                    {isAdmin && (
                                        <Button
-                                           onClick={() => {
-                                               // Admin can finalize without all verified, show confirmation if needed
-                                               if (verifiedCount < results.length) {
-                                                   setShowFinalizeConfirmation(true);
-                                               } else {
-                                                   finalizeReportMutation.mutate();
-                                               }
-                                           }}
+                                           onClick={() => finalizeReportMutation.mutate()}
                                            disabled={finalizeReportMutation.isPending}
                                            className="bg-purple-600 hover:bg-purple-700"
                                            title="Finalize report for salary calculation"
@@ -1762,17 +1630,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 <SelectItem value="all">All Employees</SelectItem>
                                 <SelectItem value="high-risk">High Risk (>2 LOP or >120 min)</SelectItem>
                                 <SelectItem value="clean">Clean Records (0 issues)</SelectItem>
-                                <SelectItem value="unverified">Unverified Only</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Button
-                            onClick={verifyAllClean}
-                            variant="outline"
-                            size="sm"
-                        >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Verify All Clean
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -1786,7 +1645,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-12">Verified</TableHead>
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                         ID
                                     </SortableTableHead>
@@ -1834,14 +1692,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <TableBody>
                                 {filteredResults.map((result) => (
                                     <TableRow key={result.id}>
-                                         <TableCell>
-                                             <Checkbox
-                                                 checked={result.isVerified}
-                                                 onCheckedChange={() => toggleVerification(result.attendance_id)}
-                                                 disabled={hasRedAbnormalities(result)}
-                                                 title={hasRedAbnormalities(result) ? 'Cannot verify - Red abnormalities found' : 'Mark as verified'}
-                                             />
-                                         </TableCell>
                                         <TableCell className="font-medium">{result.attendance_id}</TableCell>
                                         <TableCell>{result.name}</TableCell>
                                         <TableCell>{result.working_days}</TableCell>
@@ -2196,14 +2046,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <p className="text-slate-700">
                             Are you sure you want to save this report?
                         </p>
-                        {verifiedCount < results.length && !isAdmin && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                <p className="text-sm text-red-800 font-medium">❌ Verification Required</p>
-                                <p className="text-sm text-red-700 mt-1">
-                                    All {results.length} employees must be verified before saving. Currently {verifiedCount} verified.
-                                </p>
-                            </div>
-                        )}
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
                             <ul className="text-sm text-amber-700 space-y-1">
@@ -2213,7 +2055,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 ) : (
                                     <li>• Admin/supervisor edits will be automatically approved and used in future analysis</li>
                                 )}
-                                <li>• Verification status will be saved for all marked employees</li>
                                 <li>• This action cannot be easily undone</li>
                             </ul>
                         </div>
@@ -2233,42 +2074,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 saveReportMutation.mutate();
                             }}
                             className="bg-green-600 hover:bg-green-700"
-                            disabled={!isAdmin && verifiedCount < results.length}
                         >
                             Confirm & Save
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={showFinalizeConfirmation} onOpenChange={setShowFinalizeConfirmation}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Finalize Report Without All Verified?</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                            <p className="text-sm text-amber-800 font-medium">⚠️ Admin Override</p>
-                            <p className="text-sm text-amber-700 mt-2">
-                                {results.length - verifiedCount} of {results.length} employees are not verified.
-                            </p>
-                            <p className="text-sm text-amber-700 mt-2">
-                                As admin, you can proceed with finalization. This report will be locked and ready for salary calculation.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setShowFinalizeConfirmation(false)}>
-                            Cancel
-                        </Button>
-                        <Button 
-                            onClick={() => {
-                                setShowFinalizeConfirmation(false);
-                                finalizeReportMutation.mutate();
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700"
-                        >
-                            Proceed with Finalization
                         </Button>
                     </div>
                 </DialogContent>

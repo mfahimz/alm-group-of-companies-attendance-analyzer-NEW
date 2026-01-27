@@ -15,14 +15,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     console.log('[ReportTab] Rendering with:', { projectId: project?.id, isDepartmentHead });
     
     const queryClient = useQueryClient();
-    const [showNewFeaturePopup, setShowNewFeaturePopup] = React.useState(true);
 
-    // Check if we should show the popup (until Jan 31, 2026)
-    const shouldShowPopup = React.useMemo(() => {
-        const now = new Date();
-        const endDate = new Date('2026-01-31T23:59:59');
-        return now <= endDate && showNewFeaturePopup;
-    }, [showNewFeaturePopup]);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -224,37 +217,6 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     return (
         <div className="space-y-6">
-            {/* New Feature Popup */}
-            {shouldShowPopup && (
-                <div className="fixed bottom-6 left-6 z-50 max-w-md animate-in slide-in-from-bottom-5">
-                    <Alert className="bg-white border-indigo-200 shadow-lg">
-                        <div className="flex items-start gap-3">
-                            <div className="flex-1">
-                                <AlertDescription className="text-sm space-y-2">
-                                    <p className="font-semibold text-indigo-900 mb-2">🎉 New Features Available</p>
-                                    <ul className="space-y-1 text-slate-700">
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-green-600 mt-0.5">✅</span>
-                                            <span><strong>Verification Checkbox</strong> - You can only verify employees without critical issues</span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-green-600 mt-0.5">✅</span>
-                                            <span><strong>Save Report</strong> - You must verify all employees before saving (admins can override)</span>
-                                        </li>
-                                    </ul>
-                                </AlertDescription>
-                            </div>
-                            <button
-                                onClick={() => setShowNewFeaturePopup(false)}
-                                className="text-slate-400 hover:text-slate-600 transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </Alert>
-                </div>
-            )}
-
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <CardTitle>Generated Reports</CardTitle>
@@ -273,18 +235,12 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                         <TableHead>Generated On</TableHead>
                                         <TableHead>Period</TableHead>
                                         <TableHead>{isDepartmentHead ? 'Your Team' : 'Employees'}</TableHead>
-                                        <TableHead>Verified</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {reportRuns.map((run) => {
-                                        const runResults = reportResults[run.id] || [];
-                                        const verifiedCount = isDepartmentHead
-                                            ? runResults.length // For dept heads, show results count as verification
-                                            : (run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0);
-                                        
                                         return (
                                             <TableRow key={run.id}>
                                                 <TableCell className="font-medium">
@@ -306,19 +262,6 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                 </TableCell>
                                                 <TableCell>
                                                     {isDepartmentHead ? departmentEmployees.length : run.employee_count}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={isDepartmentHead 
-                                                            ? 'text-slate-600' 
-                                                            : (verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600')
-                                                        }>
-                                                            {isDepartmentHead ? runResults.length : verifiedCount} / {isDepartmentHead ? departmentEmployees.length : run.employee_count}
-                                                        </span>
-                                                        {!isDepartmentHead && verifiedCount === run.employee_count && (
-                                                            <CheckCircle className="w-4 h-4 text-green-600" />
-                                                        )}
-                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     {run.is_final && (
