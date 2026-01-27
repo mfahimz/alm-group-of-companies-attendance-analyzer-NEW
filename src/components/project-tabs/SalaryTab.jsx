@@ -502,7 +502,7 @@ export default function SalaryTab({ project, finalReport }) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {filteredSalaryData.length === 0 ? (
+                    {salaryData.length === 0 ? (
                         <div className="text-center py-12">
                             <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                             <p className="text-slate-600 text-lg font-medium">No Employees Found</p>
@@ -767,7 +767,14 @@ export default function SalaryTab({ project, finalReport }) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredSalaryData.map((row) => {
+                                {filteredSalaryData.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={28} className="text-center py-12">
+                                            <p className="text-slate-600 text-lg font-medium">No employees match your search criteria</p>
+                                            <p className="text-slate-500 text-sm mt-2">Try adjusting your filters</p>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredSalaryData.map((row) => {
                                     const { total, wpsPay, balance } = calculateTotals(row);
                                     return (
                                         <TableRow key={row.hrms_id}>
