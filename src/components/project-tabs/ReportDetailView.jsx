@@ -767,7 +767,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 } else if (riskFilter === 'clean') {
                     const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
                     return result.full_absence_count === 0 && total === 0;
-
+                }
                 
                 return true;
             })
