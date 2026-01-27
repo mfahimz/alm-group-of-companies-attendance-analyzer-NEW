@@ -29,11 +29,11 @@ export default function ProjectDetail() {
     queryKey: ['project', projectId],
     queryFn: () => base44.entities.Project.filter({ id: projectId }).then((res) => res[0]),
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false
+    refetchOnMount: true
   });
 
   const { data: currentUser } = useQuery({
@@ -65,11 +65,11 @@ export default function ProjectDetail() {
     queryKey: ['reportRuns', projectId],
     queryFn: () => base44.entities.ReportRun.filter({ project_id: projectId }),
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false
+    refetchOnMount: true
   });
 
   // Fetch the actual finalized report using project.last_saved_report_id
