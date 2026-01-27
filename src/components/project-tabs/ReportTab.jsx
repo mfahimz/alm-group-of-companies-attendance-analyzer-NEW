@@ -175,13 +175,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             });
             return reportRunId;
         },
-        onSuccess: (reportRunId) => {
+        onSuccess: async (reportRunId) => {
             // Force refetch all relevant queries - do NOT rely on staleTime
-            queryClient.invalidateQueries({ queryKey: ['project', project.id] });
-            queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id] });
-            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id] });
-            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id, reportRunId] });
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            // Use refetchType: 'all' to ensure immediate refetch even if data is "fresh"
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id, reportRunId], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['projects'], refetchType: 'all' })
+            ]);
             toast.success('Report marked as final. Salary snapshots created.');
         },
         onError: (error) => {
