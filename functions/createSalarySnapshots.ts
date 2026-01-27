@@ -172,16 +172,26 @@ Deno.serve(async (req) => {
 
         // Bulk create snapshots
          if (snapshots.length > 0) {
-             console.log(`Creating ${snapshots.length} salary snapshots for report ${report_run_id}`);
-             await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
-             console.log(`Successfully created ${snapshots.length} snapshots`);
+             console.log(`[createSalarySnapshots] Creating ${snapshots.length} salary snapshots for report ${report_run_id}`);
+             try {
+                 await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
+                 console.log(`[createSalarySnapshots] Successfully created ${snapshots.length} snapshots`);
+             } catch (bulkError) {
+                 console.error('[createSalarySnapshots] BulkCreate failed:', bulkError);
+                 throw bulkError;
+             }
          } else {
-             console.warn(`No snapshots created: ${employees.length} employees, ${analysisResults.length} analysis results`);
+             console.warn(`[createSalarySnapshots] No snapshots created: ${employees.length} employees, ${analysisResults.length} analysis results`);
+             // Log more details for debugging
+             console.log('[createSalarySnapshots] Employee attendance_ids:', employees.map(e => e.attendance_id));
+             console.log('[createSalarySnapshots] Analysis attendance_ids:', analysisResults.map(r => r.attendance_id));
          }
 
          return Response.json({
              success: true,
              snapshots_created: snapshots.length,
+             employees_count: employees.length,
+             analysis_results_count: analysisResults.length,
              message: `Created ${snapshots.length} salary snapshots for report ${report_run_id}`
          });
 
