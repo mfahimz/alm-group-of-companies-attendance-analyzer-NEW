@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,6 +12,8 @@ import PINLock from '../ui/PINLock';
 import SortableTableHead from '../ui/SortableTableHead';
 
 export default function SalaryTab({ project, finalReport }) {
+    const queryClient = useQueryClient();
+    
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
@@ -127,7 +129,7 @@ export default function SalaryTab({ project, finalReport }) {
                     company: emp.company,
                     employee_id: salary?.employee_id || emp.hrms_id,
                     basic_salary: salary?.basic_salary || 0,
-                    allowances: salary?.allowances || '{}',
+                    allowances: Number(salary?.allowances) || 0,
                     total_salary: salary?.total_salary || 0,
                     working_hours: salary?.working_hours || 9,
                     deduction_per_minute: salary?.deduction_per_minute || 0,
@@ -276,21 +278,20 @@ export default function SalaryTab({ project, finalReport }) {
 
     // Calculate totals dynamically
     const calculateTotals = (row) => {
-        const leavePay = getValue(row, 'leavePay');
-        const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount');
-        const normalOtSalary = getValue(row, 'normalOtSalary');
-        const specialOtSalary = getValue(row, 'specialOtSalary');
+        const leavePay = getValue(row, 'leavePay') || 0;
+        const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount') || 0;
+        const normalOtSalary = getValue(row, 'normalOtSalary') || 0;
+        const specialOtSalary = getValue(row, 'specialOtSalary') || 0;
         const totalOtSalary = normalOtSalary + specialOtSalary;
-        const bonus = getValue(row, 'bonus');
-        const incentive = getValue(row, 'incentive');
-        const otherDeduction = getValue(row, 'otherDeduction');
-        const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction');
-        const deductibleHoursPay = getValue(row, 'deductibleHoursPay');
-        const deductibleMinutesAmount = getValue(row, 'deductibleMinutesAmount');
+        const bonus = getValue(row, 'bonus') || 0;
+        const incentive = getValue(row, 'incentive') || 0;
+        const otherDeduction = getValue(row, 'otherDeduction') || 0;
+        const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
+        const deductibleHoursPay = getValue(row, 'deductibleHoursPay') || 0;
 
         const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
         const total = row.total_salary + totalOtSalary + bonus + incentive
-                      - netDeduction - deductibleHoursPay - deductibleMinutesAmount - otherDeduction - advanceSalaryDeduction;
+                      - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
         const wpsPay = total;
         const balance = 0;
 
@@ -398,16 +399,29 @@ export default function SalaryTab({ project, finalReport }) {
         }
     };
 
-    // Save all changes
+    // Save all changes to backend
     const handleSave = async () => {
+        if (Object.keys(editableData).length === 0) {
+            toast.info('No changes to save');
+            return;
+        }
+
         setIsSaving(true);
         try {
-            // Recalculate dependent fields based on current edits
-            const recalculatedData = recalculateDependentFields(editableData);
-            
-            // TODO: Save recalculatedData to backend (create a new entity or update existing records)
-            toast.success('Salary data saved successfully');
-            setEditableData(recalculatedData);
+            const response = await base44.functions.invoke('saveSalaryEdits', {
+                project_id: project.id,
+                report_run_id: finalReport.id,
+                edits: editableData
+            });
+
+            if (response.data.success) {
+                toast.success(`Saved editable values for ${response.data.updated_count} employees`);
+                setEditableData({}); // Clear editable data after save
+                // Refetch snapshots to get updated values
+                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id, finalReport?.id] });
+            } else {
+                toast.error('Failed to save: ' + (response.data.error || 'Unknown error'));
+            }
         } catch (error) {
             toast.error('Failed to save salary data: ' + error.message);
         } finally {
@@ -436,8 +450,7 @@ export default function SalaryTab({ project, finalReport }) {
         );
     }
 
-    // Show empty state for admin when no final report exists
-    const showEmptySalaryTab = !finalReport;
+
 
     return (
         <div className="space-y-6">
@@ -737,7 +750,7 @@ export default function SalaryTab({ project, finalReport }) {
                             <TableBody>
                                 {filteredSalaryData.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={28} className="text-center py-12">
+                                        <TableCell colSpan={30} className="text-center py-12">
                                             <p className="text-slate-600 text-lg font-medium">No employees match your search criteria</p>
                                             <p className="text-slate-500 text-sm mt-2">Try adjusting your filters</p>
                                         </TableCell>
