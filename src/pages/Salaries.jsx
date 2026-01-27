@@ -746,12 +746,18 @@ export default function Salaries() {
                                         <SelectTrigger>
                                             <SelectValue placeholder={selectedCompany ? "Select employee" : "Select company first"} />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            {availableEmployees.map(emp => (
-                                                <SelectItem key={emp.id} value={emp.id}>
-                                                    {emp.name} ({emp.attendance_id}) - HRMS: {emp.hrms_id}
-                                                </SelectItem>
-                                            ))}
+                                        <SelectContent filter={true}>
+                                            {availableEmployees.length === 0 ? (
+                                                <div className="p-2 text-sm text-slate-500">
+                                                    {selectedCompany ? 'All employees have salary records' : 'Select company first'}
+                                                </div>
+                                            ) : (
+                                                availableEmployees.map(emp => (
+                                                    <SelectItem key={emp.id} value={emp.id}>
+                                                        {emp.name} ({emp.attendance_id}) - HRMS: {emp.hrms_id}
+                                                    </SelectItem>
+                                                ))
+                                            )}
                                         </SelectContent>
                                     </Select>
                                     {selectedCompany && availableEmployees.length === 0 && (
