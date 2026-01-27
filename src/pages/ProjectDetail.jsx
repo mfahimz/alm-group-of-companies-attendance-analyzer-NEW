@@ -77,13 +77,7 @@ export default function ProjectDetail() {
     ? reportRuns.find(r => r.id === project.last_saved_report_id && r.is_final === true)
     : null;
 
-  // DEBUG LOG - REMOVE AFTER VALIDATION
-  console.log('ProjectDetail Debug', {
-    last_saved_report_id: project?.last_saved_report_id,
-    reportRunsCount: reportRuns.length,
-    reportRuns: reportRuns.map(r => ({ id: r.id, is_final: r.is_final, name: r.report_name })),
-    finalReport: finalReport ? { id: finalReport.id, is_final: finalReport.is_final, name: finalReport.report_name } : null
-  });
+
 
   const reopenProjectMutation = useMutation({
     mutationFn: async () => {
