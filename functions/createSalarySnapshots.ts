@@ -126,10 +126,10 @@ Deno.serve(async (req) => {
             const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
 
             return {
-                project_id: project_id,
-                report_run_id: report_run_id,
-                attendance_id: emp.attendance_id,
-                hrms_id: emp.hrms_id,
+                project_id: String(project_id),
+                report_run_id: String(report_run_id),
+                attendance_id: String(emp.attendance_id),
+                hrms_id: String(emp.hrms_id),
                 name: emp.name,
                 department: emp.department,
                 basic_salary: basicSalary,
