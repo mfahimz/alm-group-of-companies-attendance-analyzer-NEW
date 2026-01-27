@@ -41,10 +41,26 @@ export default function SalaryTab({ project, finalReport }) {
 
     const { data: analysisResults = [], isLoading: loadingResults } = useQuery({
         queryKey: ['results', project.id, finalReport?.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({
-            project_id: project.id,
-            report_run_id: finalReport.id
-        }),
+        queryFn: async () => {
+            console.log('🔍 SALARY TAB - Fetching AnalysisResult with:', {
+                project_id: project.id,
+                report_run_id: finalReport?.id
+            });
+            const results = await base44.entities.AnalysisResult.filter({
+                project_id: project.id,
+                report_run_id: finalReport.id
+            });
+            console.log('📊 SALARY TAB - AnalysisResult fetched:', results.length, 'records');
+            if (results.length > 0) {
+                console.log('First record sample:', {
+                    attendance_id: results[0].attendance_id,
+                    present_days: results[0].present_days,
+                    annual_leave_count: results[0].annual_leave_count,
+                    full_absence_count: results[0].full_absence_count
+                });
+            }
+            return results;
+        },
         enabled: !!project.id && !!finalReport?.id,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
