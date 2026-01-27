@@ -39,27 +39,28 @@ export default function SalaryTab({ project, finalReport }) {
         refetchOnMount: false
     });
 
-    const { data: analysisResults = [], isLoading: loadingResults } = useQuery({
-        queryKey: ['results', project.id, finalReport?.id],
+    const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
+        queryKey: ['salarySnapshots', project.id, finalReport?.id],
         queryFn: async () => {
-            console.log('🔍 SALARY TAB - Fetching AnalysisResult with:', {
+            console.log('🔍 SALARY TAB - Fetching SalarySnapshots with:', {
                 project_id: project.id,
                 report_run_id: finalReport?.id
             });
-            const results = await base44.entities.AnalysisResult.filter({
+            const snapshots = await base44.entities.SalarySnapshot.filter({
                 project_id: project.id,
                 report_run_id: finalReport.id
             });
-            console.log('📊 SALARY TAB - AnalysisResult fetched:', results.length, 'records');
-            if (results.length > 0) {
-                console.log('First record sample:', {
-                    attendance_id: results[0].attendance_id,
-                    present_days: results[0].present_days,
-                    annual_leave_count: results[0].annual_leave_count,
-                    full_absence_count: results[0].full_absence_count
+            console.log('📊 SALARY TAB - SalarySnapshots fetched:', snapshots.length, 'records');
+            if (snapshots.length > 0) {
+                console.log('First snapshot sample:', {
+                    attendance_id: snapshots[0].attendance_id,
+                    present_days: snapshots[0].present_days,
+                    annual_leave_count: snapshots[0].annual_leave_count,
+                    full_absence_count: snapshots[0].full_absence_count,
+                    deductible_minutes: snapshots[0].deductible_minutes
                 });
             }
-            return results;
+            return snapshots;
         },
         enabled: !!project.id && !!finalReport?.id,
         staleTime: 5 * 60 * 1000,
