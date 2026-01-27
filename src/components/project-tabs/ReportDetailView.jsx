@@ -1127,6 +1127,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return;
         }
 
+        // If report is not final yet, finalize it first (which triggers snapshot creation)
+        if (!reportRun.is_final) {
+            toast.info('Finalizing report before export...');
+            finalizeReportMutation.mutate();
+            return;
+        }
+
         const headers = ['Attendance ID', 'Name', 'Total Working Days', 'Annual Leave', 'Sick Leave', 'LOP Days', 'Late Minutes', 'Early Checkout', 'Grace', 'Approved Minutes', 'Deductible', 'Notes'];
         const rows = filteredResults.map(r => {
             const total = (r.late_minutes || 0) + (r.early_checkout_minutes || 0) + (r.other_minutes || 0);
