@@ -779,7 +779,7 @@ export default function SalaryTab({ project, finalReport }) {
                                                 />
                                             </TableCell>
                                             <TableCell className="bg-blue-100 p-2 text-sm font-medium text-slate-700">
-                                                {getValue(row, 'normalOtSalary').toFixed(2)}
+                                                {(getValue(row, 'normalOtSalary') || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="bg-cyan-50 p-1">
                                                 <Input
