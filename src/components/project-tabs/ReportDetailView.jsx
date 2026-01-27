@@ -1906,13 +1906,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                             {(() => {
+                                            {(() => {
                                                  const late = result.late_minutes || 0;
                                                  const early = result.early_checkout_minutes || 0;
                                                  const other = result.other_minutes || 0;
                                                  const grace = result.grace_minutes ?? 15;
                                                  const approved = result.approved_minutes || 0;
-                                                 const calculatedDeductible = Math.max(0, late + early - other - grace - approved);
+                                                 const calculatedDeductible = Math.max(0, late + early + other - grace - approved);
                                                 const displayDeductible = result.manual_deductible_minutes ?? calculatedDeductible;
                                                 const isManualOverride = result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined;
                                                 
@@ -1930,12 +1930,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                         />
                                                         {!isManualOverride && (
                                                             <span className="text-[10px] text-slate-500">
-                                                                {late + early} - {grace} - {approved}
-                                                            </span>
-                                                        )}
-                                                        {!isManualOverride && other > 0 && (
-                                                            <span className="text-[10px] text-slate-500">
-                                                                ({late}+{early})-{other}-{grace}-{approved}
+                                                                {late + early + other} - {grace} - {approved}
                                                             </span>
                                                         )}
                                                         {isManualOverride && (
