@@ -432,6 +432,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             if (updatedTotals.abnormal_dates && updatedTotals.abnormal_dates.length > 0) {
                 updatePayload.abnormal_dates = updatedTotals.abnormal_dates;
             }
+            
+            // Clear notes if no abnormal dates exist (removes RED highlighting)
+            if (!updatedTotals.abnormal_dates || updatedTotals.abnormal_dates.length === 0) {
+                updatePayload.notes = '';
+            }
 
             console.log('🔧 EditDayRecord Update Payload:', JSON.stringify(updatePayload, null, 2));
             console.log('🔧 Result ID:', analysisResult.id);
