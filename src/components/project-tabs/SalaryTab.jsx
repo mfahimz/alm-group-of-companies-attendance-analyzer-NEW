@@ -417,7 +417,7 @@ export default function SalaryTab({ project, finalReport }) {
         );
     }
 
-    if (loadingEmployees || loadingSalaries || loadingResults || loadingExceptions) {
+    if (loadingEmployees || loadingSalaries || loadingSnapshots) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
