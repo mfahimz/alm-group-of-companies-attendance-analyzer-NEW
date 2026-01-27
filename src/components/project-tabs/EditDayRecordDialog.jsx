@@ -686,13 +686,26 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         <Checkbox
                             id="isAbnormal"
                             checked={formData.isAbnormal}
-                            onCheckedChange={(checked) => setFormData({ ...formData, isAbnormal: checked })}
+                            onCheckedChange={(checked) => {
+                                if (!checked) {
+                                    // When unchecking abnormality, clear all abnormality-related values
+                                    setFormData({ 
+                                        ...formData, 
+                                        isAbnormal: false,
+                                        lateMinutes: 0,
+                                        earlyCheckoutMinutes: 0,
+                                        otherMinutes: 0
+                                    });
+                                } else {
+                                    setFormData({ ...formData, isAbnormal: true });
+                                }
+                            }}
                         />
                         <div className="flex-1">
                             <label htmlFor="isAbnormal" className="text-sm font-medium cursor-pointer">
                                 Mark as Abnormal
                             </label>
-                            <p className="text-xs text-slate-500">Flag this day for special attention</p>
+                            <p className="text-xs text-slate-500">Flag this day for special attention (unchecking clears all late/early minutes)</p>
                         </div>
                     </div>
 
