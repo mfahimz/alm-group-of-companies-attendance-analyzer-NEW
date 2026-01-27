@@ -108,7 +108,9 @@ export default function Layout({ children, currentPageName }) {
         );
     }
 
-    if (!isDesktop) {
+    // Allow admins on any device, but restrict other users to desktop only
+    const isAdminUser = userRole === 'admin';
+    if (!isDesktop && !isAdminUser) {
         return <DesktopOnlyScreen />;
     }
 
