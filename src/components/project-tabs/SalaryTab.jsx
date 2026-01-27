@@ -117,6 +117,22 @@ export default function SalaryTab({ project, finalReport }) {
                 String(s.attendance_id) === String(emp.attendance_id)
             );
             const result = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
+            
+            // DEBUG: Log employee matching for problem employees
+            if ([206, 191].includes(Number(emp.attendance_id))) {
+                console.log(`🎯 SALARY TAB - Employee ${emp.attendance_id} (${emp.name}):`, {
+                    totalAnalysisResults: analysisResults.length,
+                    foundResult: !!result,
+                    result: result ? {
+                        attendance_id: result.attendance_id,
+                        report_run_id: result.report_run_id,
+                        present_days: result.present_days,
+                        annual_leave_count: result.annual_leave_count,
+                        full_absence_count: result.full_absence_count,
+                        deductible_minutes: result.deductible_minutes
+                    } : null
+                });
+            }
 
             // ============================================================================
             // CRITICAL: FINALIZED REPORT IS IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs)
