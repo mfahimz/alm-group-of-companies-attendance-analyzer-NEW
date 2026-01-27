@@ -50,13 +50,17 @@ Deno.serve(async (req) => {
 
          // Create salary snapshots for all employees from this finalized report
          // These snapshots are immutable and used for salary calculation
-         await base44.functions.invoke('createSalarySnapshots', {
+         console.log(`[markFinalReport] Calling createSalarySnapshots for project ${project_id}, report ${report_run_id}`);
+         
+         const snapshotResult = await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
              project_id: project_id,
              report_run_id: report_run_id
          });
+         
+         console.log('[markFinalReport] createSalarySnapshots result:', snapshotResult);
 
          // Log audit
-         await base44.functions.invoke('logAudit', {
+         await base44.asServiceRole.functions.invoke('logAudit', {
              action: 'MARK_FINAL_REPORT',
              entity_type: 'ReportRun',
              entity_id: report_run_id,
@@ -65,7 +69,8 @@ Deno.serve(async (req) => {
 
          return Response.json({ 
              success: true,
-             message: 'Report marked as final successfully. Salary snapshots created.'
+             message: 'Report marked as final successfully. Salary snapshots created.',
+             snapshots: snapshotResult?.data || snapshotResult
          });
 
     } catch (error) {
