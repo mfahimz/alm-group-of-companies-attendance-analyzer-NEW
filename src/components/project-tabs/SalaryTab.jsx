@@ -871,11 +871,11 @@ export default function SalaryTab({ project, finalReport }) {
                             </TableBody>
                         </Table>
                     </div>
-                        </>
+                    </>
                     )}
-                </CardContent>
-            </Card>
-            )}
-        </div>
-    );
-}
+                    </CardContent>
+                    </Card>
+                    )}
+                    </div>
+                    );
+                    }
