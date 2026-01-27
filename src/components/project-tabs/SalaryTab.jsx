@@ -725,6 +725,9 @@ export default function SalaryTab({ project, finalReport }) {
                             </div>
 
                             {/* Formula Info */}
+                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 mb-3">
+                                <strong>Deductible Hours Formula:</strong> Deductible Minutes = (Late Minutes + Early Checkout Minutes) - Grace Minutes - Approved Minutes - Other Minutes. Then: Deductible Hours = Deductible Minutes ÷ 60. Deductible Hours Pay = (Total Salary ÷ 30 ÷ Working Hours) × Deductible Hours.
+                            </div>
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
                                 <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
                             </div>
