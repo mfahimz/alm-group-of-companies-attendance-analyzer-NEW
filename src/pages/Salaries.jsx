@@ -454,6 +454,44 @@ export default function Salaries() {
         }
     };
 
+    const handleSyncAll = async () => {
+        if (!window.confirm('Sync all salary records with latest employee data (attendance IDs, names, companies)?')) {
+            return;
+        }
+
+        try {
+            let syncedCount = 0;
+            const errors = [];
+
+            for (const employee of employees) {
+                try {
+                    const response = await base44.functions.invoke('syncEmployeeToSalary', {
+                        hrms_id: String(employee.hrms_id),
+                        attendance_id: String(employee.attendance_id),
+                        name: employee.name,
+                        company: employee.company
+                    });
+
+                    if (response.data.updated_count > 0) {
+                        syncedCount += response.data.updated_count;
+                    }
+                } catch (error) {
+                    errors.push({ employee: employee.name, error: error.message });
+                }
+            }
+
+            queryClient.invalidateQueries(['salaries']);
+            
+            if (errors.length > 0) {
+                toast.warning(`Synced ${syncedCount} records. ${errors.length} had errors.`);
+            } else {
+                toast.success(`Successfully synced ${syncedCount} salary records with employee data`);
+            }
+        } catch (error) {
+            toast.error('Sync failed: ' + error.message);
+        }
+    };
+
     const downloadTemplate = () => {
         const template = [
             {
@@ -508,6 +546,10 @@ export default function Salaries() {
                             onChange={handleFileUpload}
                             className="hidden"
                         />
+                        <Button onClick={handleSyncAll} variant="outline" title="Sync employee data to salary records">
+                            <Search className="w-4 h-4 mr-2" />
+                            Sync Employee Data
+                        </Button>
                         <Button onClick={() => setShowDialog(true)} className="bg-indigo-600 hover:bg-indigo-700">
                             <Plus className="w-4 h-4 mr-2" />
                             Add Salary Record
