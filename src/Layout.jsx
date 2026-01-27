@@ -4,8 +4,7 @@ import NotificationCenter from './components/ui/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { formatInUAE } from '@/components/ui/timezone';
-import { useDeviceDetection } from './components/ui/useDeviceDetection';
-import DesktopOnlyScreen from './components/ui/DesktopOnlyScreen';
+
 import { usePermissions } from './components/hooks/usePermissions';
 import DesktopNav from './components/navigation/DesktopNav';
 import MobileNav from './components/navigation/MobileNav';
@@ -14,7 +13,6 @@ import { LogOut } from 'lucide-react';
 
 
 export default function Layout({ children, currentPageName }) {
-    const { isDesktop, isChecking } = useDeviceDetection();
     const publicPages = ['Maintenance'];
     const isPublicPage = publicPages.includes(currentPageName);
 
@@ -100,19 +98,7 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
-    if (isChecking) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-500">Loading...</div>
-            </div>
-        );
-    }
 
-    // Allow admins on any device, but restrict other users to desktop only
-    const isAdminUser = userRole === 'admin';
-    if (!isDesktop && !isAdminUser) {
-        return <DesktopOnlyScreen />;
-    }
 
     if (isLoading || !currentUser) {
         return (
