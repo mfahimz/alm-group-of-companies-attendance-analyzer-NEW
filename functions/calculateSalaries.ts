@@ -70,11 +70,16 @@ Deno.serve(async (req) => {
             const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
             const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
             
-            // For salary: deductible_minutes from report + other_minutes
-            // (other_minutes was already subtracted in report, so we add it back for salary deduction)
-            const reportDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
-            const reportOtherMinutes = result?.other_minutes ?? 0;
-            const salaryDeductibleMinutes = reportDeductibleMinutes + reportOtherMinutes;
+            // ============================================================================
+            // CRITICAL: FINALIZED REPORT IS IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs)
+            // ============================================================================
+            // For finalized reports, deductible_minutes already includes all calculations:
+            // deductible_minutes = (late + early) - grace - approved - other
+            // DO NOT recalculate, DO NOT add other_minutes back
+            // The finalized report is the single source of truth for salary calculations
+            // Any edits to grace/deductible in report are locked, preventing cascading errors
+            // ============================================================================
+            const salaryDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
 
             // Leave Days = Annual Leave Days + LOP Days (NOT sick leave)
             const leaveDays = annualLeaveDays + lopDays;
@@ -111,7 +116,8 @@ Deno.serve(async (req) => {
             // Net Deduction = Leave Pay - Salary Leave Amount
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-            // Deductible Hours = (deductible_minutes + other_minutes) ÷ 60
+            // Deductible Hours = deductible_minutes ÷ 60 (direct conversion from finalized report)
+            // NO OTHER PROCESSING - finalized report values are final
             const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
 
             // Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours

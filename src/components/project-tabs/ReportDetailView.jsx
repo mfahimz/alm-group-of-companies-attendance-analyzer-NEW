@@ -1656,6 +1656,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <p className="text-sm text-slate-600">
                                 Verified: <span className="font-medium text-slate-900">{verifiedCount} / {results.length} employees</span>
                             </p>
+                            {/* IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs) */}
+                            {project.company === 'Al Maraghi Auto Repairs' && (
+                                <p className="text-xs text-purple-600 font-medium">
+                                    🔒 Finalized Report - Locked for Salary Calculation (edits: grace/deductible only)
+                                </p>
+                            )}
                             {hasEdits && (
                                 <p className="text-sm text-amber-600">
                                     ⚠️ This report has unsaved edits

@@ -684,8 +684,15 @@ Deno.serve(async (req) => {
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
             const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
             
-            // Calculate deductible_minutes for salary (for Al Maraghi Auto Repairs)
-            // other_minutes are subtracted as they reduce the penalty amount
+            // ============================================================================
+            // CRITICAL: DEDUCTIBLE_MINUTES CALCULATION (IMMUTABLE FOR SALARY)
+            // ============================================================================
+            // deductible_minutes = (late + early) - grace - approved - other
+            // This value is FINAL and stored in AnalysisResult for salary calculation
+            // Salary calculations fetch this directly, NO recalculation
+            // For Al Maraghi Auto Repairs, once report is finalized, this is locked
+            // DO NOT modify this formula without updating all downstream salary logic
+            // ============================================================================
             const deductibleMinutes = lateMinutes + earlyCheckoutMinutes - totalApprovedMinutes - otherMinutes;
 
             return {

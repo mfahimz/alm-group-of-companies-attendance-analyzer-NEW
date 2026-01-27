@@ -102,13 +102,21 @@ export default function SalaryTab({ project, finalReport }) {
             );
             const result = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
 
-            // Use manual overrides if present, otherwise use calculated values
+            // ============================================================================
+            // CRITICAL: FINALIZED REPORT IS IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs)
+            // ============================================================================
+            // All values are fetched DIRECTLY from the finalized report
+            // NO recalculation, NO additional logic
+            // The report is locked for salary, so these values are final and immutable
+            // Admin can only edit grace/deductible in the report view, not in salary tab
+            // ============================================================================
             const presentDays = result?.manual_present_days ?? result?.present_days ?? 0;
             const annualLeaveDays = result?.manual_annual_leave_count ?? result?.annual_leave_count ?? 0;
             const sickLeaveDays = result?.manual_sick_leave_count ?? result?.sick_leave_count ?? 0;
             const lopDays = result?.manual_full_absence_count ?? result?.full_absence_count ?? 0;
             
-            // For salary: Use deductible_minutes directly from report (already calculated: late + early - grace - approved)
+            // Deductible minutes = direct fetch from finalized report (no conversion, no addition)
+            // = (late + early) - grace - approved, already calculated by backend
             const salaryDeductibleMinutes = result?.manual_deductible_minutes ?? result?.deductible_minutes ?? 0;
 
             // Leave Days = Annual Leave Days + LOP Days (READ-ONLY from report)
@@ -137,7 +145,8 @@ export default function SalaryTab({ project, finalReport }) {
                       
                       const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
 
-                      // Deductible Hours = (deductible_minutes + other_minutes) ÷ 60
+                      // Deductible Hours = deductible_minutes ÷ 60 (direct conversion)
+                      // NO OTHER MINUTES ADDED - finalized report is source of truth
                       const deductibleHours = Math.round((salaryDeductibleMinutes / 60) * 100) / 100;
 
                       // Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours
@@ -725,7 +734,8 @@ export default function SalaryTab({ project, finalReport }) {
 
                             {/* Formula Info */}
                              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 mb-3">
-                                 <strong>Deductible Hours Formula (For Salary):</strong> Deductible Minutes = (late + early) - grace - approved (fetched directly from finalized report). Deductible Hours = Deductible Minutes ÷ 60. Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours.
+                                 <strong>Deductible Hours Formula (For Salary):</strong> All values are fetched DIRECTLY from the finalized report. Deductible Minutes (already calculated as late + early - grace - approved) ÷ 60 = Deductible Hours. Deductible Hours Pay = (Total Salary ÷ divisor ÷ Working Hours) × Deductible Hours.
+                                 <br /><span className="text-xs mt-1 block"><strong>🔒 IMMUTABLE:</strong> Once report is finalized for Al Maraghi Auto Repairs, salary calculations use finalized values only. No recalculation. Report is source of truth.</span>
                              </div>
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
                                 <strong>Salary Calculation Formula:</strong> Each row combines employee master (salary, working hours) + attendance report data (working/present days, absences, late/early minutes). Editable fields (amber/green/blue/purple/red backgrounds) allow manual adjustments for bonuses, deductions, and leave pay. Total = Base Salary + Additions - Deductions.
