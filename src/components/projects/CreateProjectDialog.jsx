@@ -26,7 +26,8 @@ export default function CreateProjectDialog({ open, onClose }) {
         date_to: '',
         custom_employee_ids: '',
         use_carried_grace_minutes: false,
-        weekly_off_override: ''
+        weekly_off_override: '',
+        salary_calculation_days: 30
     });
     const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
     const [showRamadanDialog, setShowRamadanDialog] = useState(false);
@@ -66,7 +67,8 @@ export default function CreateProjectDialog({ open, onClose }) {
                     ...prev,
                     company: prev.company || lastProject.company,
                     use_carried_grace_minutes: lastProject.use_carried_grace_minutes || false,
-                    weekly_off_override: lastProject.weekly_off_override || ''
+                    weekly_off_override: lastProject.weekly_off_override || '',
+                    salary_calculation_days: lastProject.salary_calculation_days || 30
                 }));
             }
         }
@@ -342,6 +344,22 @@ export default function CreateProjectDialog({ open, onClose }) {
                             </Select>
                             <p className="text-xs text-slate-500 mt-1">
                                 Override weekly off for all employees in this project
+                            </p>
+                        </div>
+                    )}
+
+                    {formData.company === 'Al Maraghi Auto Repairs' && currentUser && currentUser.role === 'admin' && (
+                        <div>
+                            <Label htmlFor="salary_calculation_days">Salary Calculation Days</Label>
+                            <Input
+                                id="salary_calculation_days"
+                                type="number"
+                                min="1"
+                                value={formData.salary_calculation_days}
+                                onChange={(e) => setFormData({ ...formData, salary_calculation_days: Math.max(1, parseInt(e.target.value) || 30) })}
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Number of days used as divisor for salary calculations (default: 30)
                             </p>
                         </div>
                     )}
