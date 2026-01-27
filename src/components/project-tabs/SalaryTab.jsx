@@ -41,18 +41,6 @@ export default function SalaryTab({ project, finalReport }) {
         refetchOnMount: false
     });
 
-    // Fetch ReportRuns to enable date range selection
-    const { data: reportRuns = [] } = useQuery({
-        queryKey: ['reportRuns', project.id],
-        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
-        enabled: !!project.id,
-        staleTime: 0,
-        gcTime: 10 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: true
-    });
-
     const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
         queryKey: ['salarySnapshots', project.id, finalReport?.id],
         queryFn: async () => {
