@@ -1562,15 +1562,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes > 0) {
                     currentOtherMinutes = dayOverride.otherMinutes;
                 }
+                // Override abnormality LAST - this is the user's explicit choice
                 if (dayOverride.isAbnormal !== undefined) {
                     isAbnormal = dayOverride.isAbnormal;
+                    // If user explicitly said not abnormal, suppress all warnings
+                    if (dayOverride.isAbnormal === false) {
+                        partialDayResult.isPartial = false;
+                        partialDayResult.reason = null;
+                    }
                 }
-            }
-            
-            // If user explicitly unchecked abnormality, suppress partial day warning
-            if (dayOverride && dayOverride.isAbnormal === false) {
-                partialDayResult.isPartial = false;
-                partialDayResult.reason = null;
             }
 
             const extractTime = (ts) => {
