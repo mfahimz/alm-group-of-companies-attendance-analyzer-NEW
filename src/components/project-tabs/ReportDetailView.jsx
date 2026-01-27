@@ -1586,7 +1586,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
                 hasUnmatchedPunch,
-                hasFarExtendedMatch: hasFarExtendedMatchDay
+                hasFarExtendedMatch: hasFarExtendedMatch
             });
         }
 
