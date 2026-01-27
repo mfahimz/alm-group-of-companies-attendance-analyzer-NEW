@@ -791,10 +791,10 @@ export default function SalaryTab({ project, finalReport }) {
                                                 />
                                             </TableCell>
                                             <TableCell className="bg-cyan-100 p-2 text-sm font-medium text-slate-700">
-                                                {getValue(row, 'specialOtSalary').toFixed(2)}
+                                                {(getValue(row, 'specialOtSalary') || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="bg-blue-200 p-2 text-sm font-bold text-slate-900">
-                                                {(getValue(row, 'normalOtSalary') + getValue(row, 'specialOtSalary')).toFixed(2)}
+                                                {((getValue(row, 'normalOtSalary') || 0) + (getValue(row, 'specialOtSalary') || 0)).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHours?.toFixed(2) || '0.00'}</TableCell>
                                             <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</TableCell>
