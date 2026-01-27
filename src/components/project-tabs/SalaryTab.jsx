@@ -102,74 +102,49 @@ export default function SalaryTab({ project, finalReport }) {
     });
     const [blockingError, setBlockingError] = useState(null);
 
-    // Map salary snapshots to display format with editable overrides
-        const salaryData = useMemo(() => {
-            // If snapshots exist, use them directly - they are immutable and authoritative
-            if (salarySnapshots.length > 0) {
-                return salarySnapshots.map(snapshot => ({
-                    ...snapshot,
-                    // These are the only editable fields in salary tab
-                    // All other values come from immutable snapshot
-                    normalOtHours: editableData[snapshot.hrms_id]?.normalOtHours ?? 0,
-                    specialOtHours: editableData[snapshot.hrms_id]?.specialOtHours ?? 0,
-                    otherDeduction: editableData[snapshot.hrms_id]?.otherDeduction ?? 0,
-                    bonus: editableData[snapshot.hrms_id]?.bonus ?? 0,
-                    incentive: editableData[snapshot.hrms_id]?.incentive ?? 0,
-                    advanceSalaryDeduction: editableData[snapshot.hrms_id]?.advanceSalaryDeduction ?? 0
-                }));
+    // Validate consistency of finalized report and snapshots
+    useMemo(() => {
+        let error = null;
+
+        if (!finalReport) {
+            error = 'No finalized report found for selected date range.';
+        } else if (finalReport.is_final !== true) {
+            error = 'Selected report is not marked as final.';
+        } else if (loadingSnapshots) {
+            error = null;
+        } else if (salarySnapshots.length === 0) {
+            error = 'Salary snapshots not found. Report may need to be finalized again.';
+        } else if (salarySnapshots.length < employees.length) {
+            error = `Incomplete snapshots: ${salarySnapshots.length} employees have snapshots, but ${employees.length} employees exist.`;
+        } else {
+            const allSameReportId = salarySnapshots.every(s => s.report_run_id === finalReport.id);
+            if (!allSameReportId) {
+                error = 'Snapshots belong to different reports. Data integrity error.';
             }
+        }
 
-            // Fallback if no snapshots (no finalized report yet)
-            return employees.map(emp => {
-                const salary = salaries.find(s => 
-                    String(s.employee_id) === String(emp.hrms_id) || 
-                    String(s.attendance_id) === String(emp.attendance_id)
-                );
+        setBlockingError(error);
+    }, [finalReport, salarySnapshots, employees.length, loadingSnapshots]);
 
-                return {
-                    hrms_id: emp.hrms_id,
-                    attendance_id: emp.attendance_id,
-                    name: emp.name,
-                    department: emp.department,
-                    company: emp.company,
-                    employee_id: salary?.employee_id || emp.hrms_id,
-                    basic_salary: salary?.basic_salary || 0,
-                    allowances: Number(salary?.allowances) || 0,
-                    total_salary: salary?.total_salary || 0,
-                    working_hours: salary?.working_hours || 9,
-                    deduction_per_minute: salary?.deduction_per_minute || 0,
-                    // Placeholder values when no snapshot exists
-                    working_days: 30,
-                    present_days: 0,
-                    full_absence_count: 0,
-                    annual_leave_count: 0,
-                    sick_leave_count: 0,
-                    late_minutes: 0,
-                    early_checkout_minutes: 0,
-                    other_minutes: 0,
-                    approved_minutes: 0,
-                    grace_minutes: 0,
-                    deductible_minutes: 0,
-                    salary_leave_days: 0,
-                    leaveDays: 0,
-                    leavePay: 0,
-                    salaryLeaveAmount: 0,
-                    deductibleHours: 0,
-                    deductibleHoursPay: 0,
-                    netDeduction: 0,
-                    normalOtHours: 0,
-                    specialOtHours: 0,
-                    totalOtSalary: 0,
-                    otherDeduction: 0,
-                    bonus: 0,
-                    incentive: 0,
-                    advanceSalaryDeduction: 0,
-                    total: salary?.total_salary || 0,
-                    wpsPay: salary?.total_salary || 0,
-                    balance: 0
-                };
-            });
-        }, [salarySnapshots, employees, salaries, editableData]);
+    // Map salary snapshots to display format with editable overrides
+    const salaryData = useMemo(() => {
+        // Only return snapshots if all validations pass
+        if (blockingError || !finalReport || salarySnapshots.length === 0) {
+            return [];
+        }
+
+        return salarySnapshots.map(snapshot => ({
+            ...snapshot,
+            // These are the only editable fields in salary tab
+            // All other values come from immutable snapshot
+            normalOtHours: editableData[snapshot.hrms_id]?.normalOtHours ?? 0,
+            specialOtHours: editableData[snapshot.hrms_id]?.specialOtHours ?? 0,
+            otherDeduction: editableData[snapshot.hrms_id]?.otherDeduction ?? 0,
+            bonus: editableData[snapshot.hrms_id]?.bonus ?? 0,
+            incentive: editableData[snapshot.hrms_id]?.incentive ?? 0,
+            advanceSalaryDeduction: editableData[snapshot.hrms_id]?.advanceSalaryDeduction ?? 0
+        }));
+    }, [salarySnapshots, editableData, blockingError, finalReport]);
 
     // Get unique departments for filter
     const departments = useMemo(() => {
