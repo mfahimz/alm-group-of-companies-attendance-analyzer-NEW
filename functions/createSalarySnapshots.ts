@@ -2,14 +2,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
     try {
+        console.log('[createSalarySnapshots] Function invoked');
         const base44 = createClientFromRequest(req);
-        const user = await base44.auth.me();
-
-        if (!user) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        
+        // Allow service role calls (from markFinalReport)
+        let user = null;
+        try {
+            user = await base44.auth.me();
+        } catch (authError) {
+            console.log('[createSalarySnapshots] No user auth, likely service role call');
         }
 
         const { project_id, report_run_id } = await req.json();
+        console.log('[createSalarySnapshots] Params:', { project_id, report_run_id });
 
         if (!project_id || !report_run_id) {
             return Response.json({ 
