@@ -648,13 +648,84 @@ export default function SalaryTab({ project, finalReport }) {
                                         <Save className="w-4 h-4 mr-2" />
                                         {isSaving ? 'Saving...' : 'Save'}
                                     </Button>
+                                    <Button 
+                                        onClick={() => setShowSaveReportDialog(true)}
+                                        disabled={dataToDisplay.length === 0}
+                                        variant="outline"
+                                        className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                                    >
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        Save Report
+                                    </Button>
+                                    <Button 
+                                        onClick={() => handleExportToExcel(calculatedData || dataToDisplay, `Salary_${project.company}_${finalReport?.date_from}_to_${finalReport?.date_to}`)}
+                                        disabled={dataToDisplay.length === 0}
+                                        variant="outline"
+                                        className="border-green-300 text-green-700 hover:bg-green-50"
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Export Excel
+                                    </Button>
                                 </div>
                             </div>
 
-                            {/* Results Count */}
-                            <div className="mt-4 text-sm text-slate-600">
-                                <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
+                            {/* Results Count and Saved Reports Toggle */}
+                            <div className="mt-4 flex justify-between items-center">
+                                <span className="text-sm text-slate-600">
+                                    <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
+                                </span>
+                                {savedSalaryReports.length > 0 && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowSavedReports(!showSavedReports)}
+                                        className="text-indigo-600"
+                                    >
+                                        <FileText className="w-4 h-4 mr-1" />
+                                        {showSavedReports ? 'Hide' : 'View'} Saved Reports ({savedSalaryReports.length})
+                                    </Button>
+                                )}
                             </div>
+
+                            {/* Saved Reports List */}
+                            {showSavedReports && savedSalaryReports.length > 0 && (
+                                <div className="mt-4 bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                    <h4 className="text-sm font-semibold text-slate-700 mb-3">Saved Salary Reports</h4>
+                                    <div className="space-y-2">
+                                        {savedSalaryReports.map(report => (
+                                            <div key={report.id} className="flex items-center justify-between bg-white p-3 rounded border border-slate-200">
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-slate-800">{report.report_name}</p>
+                                                    <p className="text-xs text-slate-500">
+                                                        {report.date_from} to {report.date_to} • {report.employee_count} employees • 
+                                                        Total: AED {report.total_salary_amount?.toLocaleString()}
+                                                    </p>
+                                                    {report.notes && <p className="text-xs text-slate-400 mt-1">{report.notes}</p>}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleViewSavedReport(report)}
+                                                        className="text-green-600 border-green-200"
+                                                    >
+                                                        <Download className="w-3 h-3 mr-1" />
+                                                        Export
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleDeleteSalaryReport(report.id, report.report_name)}
+                                                        className="text-red-600 border-red-200"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
 
