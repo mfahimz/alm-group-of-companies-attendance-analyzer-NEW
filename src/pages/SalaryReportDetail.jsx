@@ -231,21 +231,11 @@ export default function SalaryReportDetail() {
             'Attendance ID': row.attendance_id,
             'Name': row.name,
             'Department': row.department || '-',
-            'Working Hours/Day': row.working_hours || 9,
-            'Basic Salary': row.basic_salary || 0,
-            'Allowances': row.allowances || 0,
             'Total Salary': row.total_salary || 0,
             'Working Days': row.working_days || 0,
             'Present Days': row.present_days || 0,
             'LOP Days': row.full_absence_count || 0,
             'Annual Leave Days': row.annual_leave_count || 0,
-            'Sick Leave Days': row.sick_leave_count || 0,
-            'Late Minutes': row.late_minutes || 0,
-            'Early Checkout Minutes': row.early_checkout_minutes || 0,
-            'Other Minutes': row.other_minutes || 0,
-            'Approved Minutes': row.approved_minutes || 0,
-            'Grace Minutes': row.grace_minutes || 0,
-            'Deductible Minutes': row.deductible_minutes || 0,
             'Leave Days': row.leaveDays || 0,
             'Leave Pay': row.leavePay || 0,
             'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
@@ -397,40 +387,30 @@ export default function SalaryReportDetail() {
                             <Table>
                                 <TableHeader className="sticky top-0 bg-white z-20 shadow-sm">
                                     <TableRow>
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-0 bg-white z-10">Att ID</SortableTableHead>
-                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-16 bg-white z-10">Name</SortableTableHead>
-                                        <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Dept</SortableTableHead>
-                                        <SortableTableHead sortKey="working_hours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Hrs/Day</SortableTableHead>
-                                        <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Basic</SortableTableHead>
-                                        <SortableTableHead sortKey="allowances" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Allowances</SortableTableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-0 bg-white z-10">Attendance ID</SortableTableHead>
+                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-20 bg-white z-10">Name</SortableTableHead>
+                                        <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Department</SortableTableHead>
                                         <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Total Salary</SortableTableHead>
-                                        <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Work Days</SortableTableHead>
-                                        <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Present</SortableTableHead>
-                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700">LOP</SortableTableHead>
+                                        <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Working Days</SortableTableHead>
+                                        <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Present Days</SortableTableHead>
+                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700">LOP Days</SortableTableHead>
                                         <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700">Annual Leave</SortableTableHead>
-                                        <SortableTableHead sortKey="sick_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-purple-700">Sick Leave</SortableTableHead>
-                                        <SortableTableHead sortKey="late_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-orange-700">Late Min</SortableTableHead>
-                                        <SortableTableHead sortKey="early_checkout_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-orange-700">Early Min</SortableTableHead>
-                                        <SortableTableHead sortKey="other_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-orange-700">Other Min</SortableTableHead>
-                                        <SortableTableHead sortKey="approved_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-green-700">Approved Min</SortableTableHead>
-                                        <SortableTableHead sortKey="grace_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-green-700">Grace Min</SortableTableHead>
-                                        <SortableTableHead sortKey="deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700">Deduct Min</SortableTableHead>
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
                                         <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Sal Leave Days</SortableTableHead>
-                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Sal Leave Amt</SortableTableHead>
+                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days</SortableTableHead>
+                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Amount</SortableTableHead>
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deduct Hrs</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deduct Hrs Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Norm OT Hrs</SortableTableHead>
-                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Norm OT Sal</SortableTableHead>
-                                        <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Spec OT Hrs</SortableTableHead>
-                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Spec OT Sal</SortableTableHead>
-                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-100">Total OT Sal</SortableTableHead>
-                                        <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduct</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
+                                        <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hours</SortableTableHead>
+                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
+                                        <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Hours</SortableTableHead>
+                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Salary</SortableTableHead>
+                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-100">Total OT Salary</SortableTableHead>
+                                        <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduction</SortableTableHead>
                                         <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
                                         <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
-                                        <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Deduct</SortableTableHead>
+                                        <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Deduction</SortableTableHead>
                                         <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">WPS Pay</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Balance</SortableTableHead>
@@ -439,7 +419,7 @@ export default function SalaryReportDetail() {
                                 <TableBody>
                                     {filteredData.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={37} className="text-center py-12">
+                                            <TableCell colSpan={27} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </TableCell>
                                         </TableRow>
@@ -449,23 +429,13 @@ export default function SalaryReportDetail() {
                                         return (
                                             <TableRow key={row.hrms_id}>
                                                 <TableCell className="sticky left-0 bg-white z-10 font-medium">{row.attendance_id}</TableCell>
-                                                <TableCell className="sticky left-16 bg-white z-10 font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
+                                                <TableCell className="sticky left-20 bg-white z-10 font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
                                                 <TableCell className="text-sm text-slate-600">{row.department || '-'}</TableCell>
-                                                <TableCell>{row.working_hours || 9}</TableCell>
-                                                <TableCell>{row.basic_salary?.toFixed(2) || '0.00'}</TableCell>
-                                                <TableCell>{row.allowances?.toFixed(2) || '0.00'}</TableCell>
                                                 <TableCell className="font-semibold">{row.total_salary?.toFixed(2)}</TableCell>
                                                 <TableCell>{row.working_days?.toFixed(2)}</TableCell>
                                                 <TableCell>{row.present_days?.toFixed(2)}</TableCell>
                                                 <TableCell className="text-red-600 font-semibold">{row.full_absence_count?.toFixed(2)}</TableCell>
                                                 <TableCell className="text-blue-600">{row.annual_leave_count?.toFixed(2)}</TableCell>
-                                                <TableCell className="text-purple-600">{row.sick_leave_count?.toFixed(2) || '0.00'}</TableCell>
-                                                <TableCell className="text-orange-600">{row.late_minutes || 0}</TableCell>
-                                                <TableCell className="text-orange-600">{row.early_checkout_minutes || 0}</TableCell>
-                                                <TableCell className="text-orange-600">{row.other_minutes || 0}</TableCell>
-                                                <TableCell className="text-green-600">{row.approved_minutes || 0}</TableCell>
-                                                <TableCell className="text-green-600">{row.grace_minutes || 0}</TableCell>
-                                                <TableCell className="text-red-600 font-semibold">{row.deductible_minutes || 0}</TableCell>
                                                 <TableCell className="bg-amber-50">{row.leaveDays?.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-amber-100">{row.leavePay?.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-amber-50">{(row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)}</TableCell>
