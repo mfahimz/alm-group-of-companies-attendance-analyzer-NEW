@@ -91,6 +91,14 @@ export default function SalaryTab({ project, finalReport }) {
         refetchOnMount: true
     });
 
+    // Fetch saved salary reports
+    const { data: savedSalaryReports = [], isLoading: loadingSavedReports, refetch: refetchSavedReports } = useQuery({
+        queryKey: ['salaryReports', project?.id],
+        queryFn: () => base44.entities.SalaryReport.filter({ project_id: project.id }),
+        enabled: !!project?.id,
+        staleTime: 5 * 60 * 1000
+    });
+
     // ============================================
     // DERIVED VALUES
     // ============================================
