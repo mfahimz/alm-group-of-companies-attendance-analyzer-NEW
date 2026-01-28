@@ -389,57 +389,89 @@ export default function SalaryReportDetail() {
                             <Table>
                                 <TableHeader className="sticky top-0 bg-white z-20 shadow-sm">
                                     <TableRow>
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-0 bg-white z-10">Attendance ID</SortableTableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-0 bg-white z-10">Att ID</SortableTableHead>
                                         <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-16 bg-white z-10">Name</SortableTableHead>
-                                        <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Department</SortableTableHead>
+                                        <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Dept</SortableTableHead>
+                                        <SortableTableHead sortKey="working_hours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Hrs/Day</SortableTableHead>
+                                        <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Basic</SortableTableHead>
+                                        <SortableTableHead sortKey="allowances" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Allowances</SortableTableHead>
                                         <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Total Salary</SortableTableHead>
-                                        <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Working Days</SortableTableHead>
-                                        <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Present Days</SortableTableHead>
-                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">LOP Days</SortableTableHead>
-                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Annual Leave</SortableTableHead>
+                                        <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Work Days</SortableTableHead>
+                                        <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Present</SortableTableHead>
+                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700">LOP</SortableTableHead>
+                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700">Annual Leave</SortableTableHead>
+                                        <SortableTableHead sortKey="sick_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-purple-700">Sick Leave</SortableTableHead>
+                                        <SortableTableHead sortKey="late_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-orange-700">Late Min</SortableTableHead>
+                                        <SortableTableHead sortKey="early_checkout_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-orange-700">Early Min</SortableTableHead>
+                                        <SortableTableHead sortKey="other_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-orange-700">Other Min</SortableTableHead>
+                                        <SortableTableHead sortKey="approved_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-green-700">Approved Min</SortableTableHead>
+                                        <SortableTableHead sortKey="grace_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-green-700">Grace Min</SortableTableHead>
+                                        <SortableTableHead sortKey="deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700">Deduct Min</SortableTableHead>
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
                                         <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hrs</SortableTableHead>
-                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Sal</SortableTableHead>
-                                        <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Hrs</SortableTableHead>
-                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Sal</SortableTableHead>
+                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Sal Leave Days</SortableTableHead>
+                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Sal Leave Amt</SortableTableHead>
+                                        <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deduct Hrs</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deduct Hrs Pay</SortableTableHead>
+                                        <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Norm OT Hrs</SortableTableHead>
+                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Norm OT Sal</SortableTableHead>
+                                        <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Spec OT Hrs</SortableTableHead>
+                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Spec OT Sal</SortableTableHead>
+                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-100">Total OT Sal</SortableTableHead>
                                         <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduct</SortableTableHead>
                                         <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
                                         <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
                                         <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Deduct</SortableTableHead>
                                         <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">WPS Pay</SortableTableHead>
+                                        <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Balance</SortableTableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredData.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={21} className="text-center py-12">
+                                            <TableCell colSpan={37} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </TableCell>
                                         </TableRow>
                                     ) : filteredData.map((row) => {
                                         const { total, wpsPay } = calculateTotals(row);
+                                        const totalOtSalary = (getValue(row, 'normalOtSalary') || 0) + (getValue(row, 'specialOtSalary') || 0);
                                         return (
                                             <TableRow key={row.hrms_id}>
                                                 <TableCell className="sticky left-0 bg-white z-10 font-medium">{row.attendance_id}</TableCell>
                                                 <TableCell className="sticky left-16 bg-white z-10 font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
                                                 <TableCell className="text-sm text-slate-600">{row.department || '-'}</TableCell>
+                                                <TableCell>{row.working_hours || 9}</TableCell>
+                                                <TableCell>{row.basic_salary?.toFixed(2) || '0.00'}</TableCell>
+                                                <TableCell>{row.allowances?.toFixed(2) || '0.00'}</TableCell>
                                                 <TableCell className="font-semibold">{row.total_salary?.toFixed(2)}</TableCell>
                                                 <TableCell>{row.working_days?.toFixed(2)}</TableCell>
                                                 <TableCell>{row.present_days?.toFixed(2)}</TableCell>
                                                 <TableCell className="text-red-600 font-semibold">{row.full_absence_count?.toFixed(2)}</TableCell>
-                                                <TableCell className="text-green-600">{row.annual_leave_count?.toFixed(2)}</TableCell>
+                                                <TableCell className="text-blue-600">{row.annual_leave_count?.toFixed(2)}</TableCell>
+                                                <TableCell className="text-purple-600">{row.sick_leave_count?.toFixed(2) || '0.00'}</TableCell>
+                                                <TableCell className="text-orange-600">{row.late_minutes || 0}</TableCell>
+                                                <TableCell className="text-orange-600">{row.early_checkout_minutes || 0}</TableCell>
+                                                <TableCell className="text-orange-600">{row.other_minutes || 0}</TableCell>
+                                                <TableCell className="text-green-600">{row.approved_minutes || 0}</TableCell>
+                                                <TableCell className="text-green-600">{row.grace_minutes || 0}</TableCell>
+                                                <TableCell className="text-red-600 font-semibold">{row.deductible_minutes || 0}</TableCell>
                                                 <TableCell className="bg-amber-50">{row.leaveDays?.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-amber-100">{row.leavePay?.toFixed(2)}</TableCell>
+                                                <TableCell className="bg-amber-50">{(row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)}</TableCell>
+                                                <TableCell className="bg-amber-100">{row.salaryLeaveAmount?.toFixed(2) || '0.00'}</TableCell>
+                                                <TableCell className="bg-red-50 font-semibold">{row.netDeduction?.toFixed(2) || '0.00'}</TableCell>
+                                                <TableCell className="bg-purple-50">{row.deductibleHours?.toFixed(2) || '0.00'}</TableCell>
+                                                <TableCell className="bg-purple-100">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</TableCell>
                                                 <TableCell className="bg-blue-50 p-1">
                                                     <Input
                                                         type="number"
                                                         step="0.01"
                                                         value={getValue(row, 'normalOtHours')}
                                                         onChange={(e) => handleChange(row.hrms_id, 'normalOtHours', e.target.value)}
-                                                        className="h-8 text-xs w-20"
+                                                        className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
                                                 <TableCell className="bg-blue-100">{(getValue(row, 'normalOtSalary') || 0).toFixed(2)}</TableCell>
@@ -449,18 +481,18 @@ export default function SalaryReportDetail() {
                                                         step="0.01"
                                                         value={getValue(row, 'specialOtHours')}
                                                         onChange={(e) => handleChange(row.hrms_id, 'specialOtHours', e.target.value)}
-                                                        className="h-8 text-xs w-20"
+                                                        className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
                                                 <TableCell className="bg-cyan-100">{(getValue(row, 'specialOtSalary') || 0).toFixed(2)}</TableCell>
-                                                <TableCell className="bg-purple-50">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</TableCell>
+                                                <TableCell className="bg-cyan-200 font-semibold">{totalOtSalary.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-red-50 p-1">
                                                     <Input
                                                         type="number"
                                                         step="0.01"
                                                         value={getValue(row, 'otherDeduction')}
                                                         onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
-                                                        className="h-8 text-xs w-20"
+                                                        className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
                                                 <TableCell className="bg-green-50 p-1">
@@ -469,7 +501,7 @@ export default function SalaryReportDetail() {
                                                         step="0.01"
                                                         value={getValue(row, 'bonus')}
                                                         onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)}
-                                                        className="h-8 text-xs w-20"
+                                                        className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
                                                 <TableCell className="bg-green-50 p-1">
@@ -478,7 +510,7 @@ export default function SalaryReportDetail() {
                                                         step="0.01"
                                                         value={getValue(row, 'incentive')}
                                                         onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)}
-                                                        className="h-8 text-xs w-20"
+                                                        className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
                                                 <TableCell className="bg-red-50 p-1">
@@ -487,11 +519,12 @@ export default function SalaryReportDetail() {
                                                         step="0.01"
                                                         value={getValue(row, 'advanceSalaryDeduction')}
                                                         onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)}
-                                                        className="h-8 text-xs w-20"
+                                                        className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
                                                 <TableCell className="bg-indigo-100 font-bold">{total.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-indigo-100 font-bold">{wpsPay.toFixed(2)}</TableCell>
+                                                <TableCell className="bg-indigo-100 font-bold">{(row.balance || 0).toFixed(2)}</TableCell>
                                             </TableRow>
                                         );
                                     })}
