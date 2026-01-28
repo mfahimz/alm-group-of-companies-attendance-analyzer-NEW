@@ -768,6 +768,33 @@ const finalSalary = Math.round((total_salary - netLeaveDeduction) * 100) / 100;`
                         </p>
                     </div>
 
+                    <h3 className="text-xl font-semibold mt-6">Custom Date Range Salary Reports</h3>
+                    <div className="bg-purple-50 border border-purple-300 rounded p-3">
+                        <p className="text-sm text-purple-800 mb-2">
+                            <strong>Feature:</strong> Generate salary reports for custom date ranges within a finalized report period.
+                        </p>
+                        <p className="text-sm text-purple-800 mb-2"><strong>Implementation:</strong></p>
+                        <ul className="text-sm text-purple-700 mb-3">
+                            <li><strong>Page:</strong> pages/SalaryReportGenerator.jsx</li>
+                            <li><strong>Entity:</strong> SalaryReport (stores saved custom reports)</li>
+                            <li><strong>Access:</strong> From Salary Tab via "Custom Date Report" button</li>
+                        </ul>
+                        <p className="text-sm text-purple-800 mb-2"><strong>How It Works:</strong></p>
+                        <ol className="text-sm text-purple-700">
+                            <li>User selects date range within finalized report period</li>
+                            <li>System validates dates are within report boundaries</li>
+                            <li>System filters AnalysisResult data and exceptions by selected dates</li>
+                            <li>Recalculates attendance metrics (present days, leave days, deductible minutes) for date range</li>
+                            <li>Applies salary calculations using filtered data</li>
+                            <li>User can edit OT hours, bonuses, deductions</li>
+                            <li>Report can be saved with custom name and exported to Excel</li>
+                        </ol>
+                        <p className="text-xs text-purple-600 mt-3">
+                            <strong>Data Source:</strong> Uses finalized SalarySnapshot data combined with Exception filtering 
+                            to recalculate metrics for the custom date range. Does NOT re-run full attendance analysis.
+                        </p>
+                    </div>
+
                     <h3 className="text-xl font-semibold mt-6">Ramadan Schedule Handling</h3>
                     <p className="text-sm">
                         Ramadan schedules (defined in RamadanSchedule entity) override normal shift timings during Ramadan dates. 
