@@ -462,6 +462,187 @@ export default function SalaryTab({ project, finalReport }) {
         }
     };
 
+    // Recalculate attendance for custom date range from source data
+    const recalculateForCustomDateRange = async () => {
+        if (!customDateFrom || !customDateTo || !dateRangeValidation.valid) {
+            toast.error('Please select a valid date range within the finalized report period');
+            return;
+        }
+
+        if (!finalReport || salarySnapshots.length === 0) {
+            toast.error('No finalized report data available');
+            return;
+        }
+
+        setIsCalculating(true);
+        try {
+            const divisor = project.salary_calculation_days || 30;
+            const fromDate = new Date(customDateFrom);
+            const toDate = new Date(customDateTo);
+
+            // Calculate working days in custom range (excluding weekly offs)
+            const getWorkingDaysInRange = (from, to, weeklyOff) => {
+                let count = 0;
+                const current = new Date(from);
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                
+                while (current <= to) {
+                    const dayName = dayNames[current.getDay()];
+                    if (dayName !== weeklyOff) {
+                        count++;
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+                return count;
+            };
+
+            // Get total working days in full report period
+            const fullReportFrom = new Date(finalReport.date_from);
+            const fullReportTo = new Date(finalReport.date_to);
+
+            const recalculatedData = salarySnapshots.map(snapshot => {
+                const employee = employees.find(e => e.hrms_id === snapshot.hrms_id);
+                const weeklyOff = employee?.weekly_off || 'Sunday';
+
+                // Calculate working days for both periods
+                const fullWorkingDays = getWorkingDaysInRange(fullReportFrom, fullReportTo, weeklyOff);
+                const customWorkingDays = getWorkingDaysInRange(fromDate, toDate, weeklyOff);
+
+                // Get employee-specific exceptions within the custom date range
+                const employeeExceptions = exceptions.filter(ex => 
+                    (ex.attendance_id === snapshot.attendance_id || ex.attendance_id === 'ALL') &&
+                    new Date(ex.date_from) <= toDate &&
+                    new Date(ex.date_to) >= fromDate
+                );
+
+                // Count specific exception types within custom range
+                let annualLeaveCount = 0;
+                let sickLeaveCount = 0;
+                let fullAbsenceCount = 0;
+                let publicHolidayCount = 0;
+                let salaryLeaveDays = 0;
+
+                employeeExceptions.forEach(ex => {
+                    const exFrom = new Date(Math.max(new Date(ex.date_from), fromDate));
+                    const exTo = new Date(Math.min(new Date(ex.date_to), toDate));
+                    
+                    // Count days in range
+                    let daysInRange = 0;
+                    const current = new Date(exFrom);
+                    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    
+                    while (current <= exTo) {
+                        const dayName = dayNames[current.getDay()];
+                        if (dayName !== weeklyOff) {
+                            daysInRange++;
+                        }
+                        current.setDate(current.getDate() + 1);
+                    }
+
+                    if (ex.type === 'ANNUAL_LEAVE') {
+                        annualLeaveCount += daysInRange;
+                        if (ex.salary_leave_days !== null && ex.salary_leave_days !== undefined) {
+                            // Pro-rate salary leave days based on overlap
+                            const totalExceptionDays = Math.ceil((new Date(ex.date_to) - new Date(ex.date_from)) / (1000 * 60 * 60 * 24)) + 1;
+                            const ratio = daysInRange / totalExceptionDays;
+                            salaryLeaveDays += (ex.salary_leave_days * ratio);
+                        }
+                    } else if (ex.type === 'SICK_LEAVE') {
+                        sickLeaveCount += daysInRange;
+                    } else if (ex.type === 'MANUAL_ABSENT') {
+                        fullAbsenceCount += daysInRange;
+                    } else if (ex.type === 'PUBLIC_HOLIDAY') {
+                        publicHolidayCount += daysInRange;
+                    }
+                });
+
+                // Calculate present days (approximate: working days - leaves - absences)
+                const leaveDays = annualLeaveCount + fullAbsenceCount;
+                const presentDays = Math.max(0, customWorkingDays - leaveDays - publicHolidayCount);
+
+                // Pro-rate deductible minutes based on date ratio
+                const dateRatio = customWorkingDays / Math.max(1, fullWorkingDays);
+                const proRatedDeductibleMinutes = (snapshot.deductible_minutes || 0) * dateRatio;
+                const deductibleHours = proRatedDeductibleMinutes / 60;
+
+                // Recalculate salary values
+                const totalSalary = snapshot.total_salary;
+                const workingHours = snapshot.working_hours;
+                const hourlyRate = totalSalary / divisor / workingHours;
+
+                const leavePay = (totalSalary / divisor) * leaveDays;
+                const salaryLeaveAmount = (totalSalary / divisor) * salaryLeaveDays;
+                const deductibleHoursPay = hourlyRate * deductibleHours;
+                const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+
+                // Get OT and other editable values
+                const edits = editableData[snapshot.hrms_id];
+                const normalOtHours = edits?.normalOtHours ?? snapshot.normalOtHours ?? 0;
+                const specialOtHours = edits?.specialOtHours ?? snapshot.specialOtHours ?? 0;
+                const normalOtRate = hourlyRate * 1.25;
+                const specialOtRate = hourlyRate * 1.5;
+                const normalOtSalary = normalOtRate * normalOtHours;
+                const specialOtSalary = specialOtRate * specialOtHours;
+                const totalOtSalary = normalOtSalary + specialOtSalary;
+
+                const bonus = edits?.bonus ?? snapshot.bonus ?? 0;
+                const incentive = edits?.incentive ?? snapshot.incentive ?? 0;
+                const otherDeduction = edits?.otherDeduction ?? snapshot.otherDeduction ?? 0;
+                const advanceSalaryDeduction = edits?.advanceSalaryDeduction ?? snapshot.advanceSalaryDeduction ?? 0;
+
+                const total = totalSalary + totalOtSalary + bonus + incentive - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+
+                return {
+                    ...snapshot,
+                    working_days: customWorkingDays,
+                    present_days: presentDays,
+                    full_absence_count: fullAbsenceCount,
+                    annual_leave_count: annualLeaveCount,
+                    sick_leave_count: sickLeaveCount,
+                    leaveDays: leaveDays,
+                    leavePay: Math.round(leavePay * 100) / 100,
+                    salaryLeaveDays: Math.round(salaryLeaveDays * 100) / 100,
+                    salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
+                    deductible_minutes: Math.round(proRatedDeductibleMinutes),
+                    deductibleHours: Math.round(deductibleHours * 100) / 100,
+                    deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
+                    netDeduction: Math.round(netDeduction * 100) / 100,
+                    normalOtHours,
+                    normalOtSalary: Math.round(normalOtSalary * 100) / 100,
+                    specialOtHours,
+                    specialOtSalary: Math.round(specialOtSalary * 100) / 100,
+                    totalOtSalary: Math.round(totalOtSalary * 100) / 100,
+                    bonus,
+                    incentive,
+                    otherDeduction,
+                    advanceSalaryDeduction,
+                    total: Math.round(total * 100) / 100,
+                    wpsPay: Math.round(total * 100) / 100,
+                    balance: 0
+                };
+            });
+
+            setCustomRangeData(recalculatedData);
+            setCalculatedData(recalculatedData);
+            toast.success(`Salary recalculated for ${customDateFrom} to ${customDateTo}`);
+        } catch (error) {
+            toast.error('Failed to recalculate: ' + error.message);
+        } finally {
+            setIsCalculating(false);
+        }
+    };
+
+    // Reset to full report period
+    const resetToFullPeriod = () => {
+        if (finalReport) {
+            setCustomDateFrom(finalReport.date_from);
+            setCustomDateTo(finalReport.date_to);
+            setCustomRangeData(null);
+            setCalculatedData(null);
+            toast.info('Reset to full report period');
+        }
+    };
+
     // Save salary report (store current data as a named report)
     const handleSaveSalaryReport = async () => {
         if (!reportName.trim()) {
@@ -469,7 +650,12 @@ export default function SalaryTab({ project, finalReport }) {
             return;
         }
 
-        const dataToSave = calculatedData || dataToDisplay;
+        if (!dateRangeValidation.valid) {
+            toast.error('Cannot save report with invalid date range');
+            return;
+        }
+
+        const dataToSave = customRangeData || calculatedData || dataToDisplay;
         if (dataToSave.length === 0) {
             toast.error('No salary data to save');
             return;
@@ -492,8 +678,8 @@ export default function SalaryTab({ project, finalReport }) {
                 project_id: project.id,
                 report_run_id: finalReport.id,
                 report_name: reportName.trim(),
-                date_from: finalReport.date_from,
-                date_to: finalReport.date_to,
+                date_from: customDateFrom || finalReport.date_from,
+                date_to: customDateTo || finalReport.date_to,
                 company: project.company,
                 employee_count: dataToSave.length,
                 total_salary_amount: Math.round(totalSalaryAmount * 100) / 100,
