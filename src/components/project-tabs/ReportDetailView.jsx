@@ -1717,7 +1717,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                        <Save className="w-4 h-4 mr-2" />
                                        {isSaving ? 'Saving...' : 'Save Report'}
                                    </Button>
-                                   {isAdmin && (
+                                   {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && (
                                        <Button
                                            onClick={() => finalizeReportMutation.mutate()}
                                            disabled={finalizeReportMutation.isPending}
