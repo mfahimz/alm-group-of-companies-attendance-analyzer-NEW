@@ -104,24 +104,7 @@ export default function SalaryTab({ project, finalReport }) {
         staleTime: 5 * 60 * 1000
     });
 
-    // Fetch analysis results for date validation
-    const { data: analysisResults = [] } = useQuery({
-        queryKey: ['analysisResults', project?.id, finalReport?.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({
-            project_id: project.id,
-            report_run_id: finalReport.id
-        }),
-        enabled: !!project?.id && !!finalReport?.id,
-        staleTime: 5 * 60 * 1000
-    });
 
-    // Fetch exceptions for the project
-    const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions', project?.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        enabled: !!project?.id,
-        staleTime: 5 * 60 * 1000
-    });
 
     // ============================================
     // DERIVED VALUES
