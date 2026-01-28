@@ -125,26 +125,35 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                         </Card>
                     )}
 
-                    {/* Grace Minutes Capture Option */}
-                    <Card className="border-slate-200 bg-slate-50">
-                        <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                                <Checkbox
-                                    id="capture-grace"
-                                    checked={captureGraceMinutes}
-                                    onCheckedChange={setCaptureGraceMinutes}
-                                />
-                                <div className="flex-1">
-                                    <Label htmlFor="capture-grace" className="cursor-pointer font-medium text-slate-900">
-                                        Capture unused grace minutes for next project
-                                    </Label>
-                                    <p className="text-sm text-slate-600 mt-1">
-                                        Calculate remaining grace minutes from this report and carry them forward to each employee's profile for future projects.
-                                    </p>
+                    {/* Grace Minutes Carry-Forward Option - Al Maraghi Auto Repairs only */}
+                    {showGraceOption && (
+                        <Card className="border-amber-200 bg-amber-50">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <Checkbox
+                                        id="carry-forward-grace"
+                                        checked={carryForwardGraceMinutes}
+                                        onCheckedChange={setCarryForwardGraceMinutes}
+                                    />
+                                    <div className="flex-1">
+                                        <Label htmlFor="carry-forward-grace" className="cursor-pointer font-medium text-amber-900">
+                                            Carry forward unused grace minutes to employees
+                                        </Label>
+                                        <p className="text-sm text-amber-800 mt-1">
+                                            Calculate remaining grace minutes using the formula:<br/>
+                                            <code className="text-xs bg-amber-100 px-1 rounded">
+                                                Carried = Available - (Late + Early + Other - Approved)
+                                            </code>
+                                        </p>
+                                        <p className="text-xs text-amber-700 mt-2">
+                                            This creates an audit record and updates employee profiles for future projects.
+                                            This action runs once and cannot be undone.
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Confirmation Question */}
                     <p className="text-slate-700 font-medium">
