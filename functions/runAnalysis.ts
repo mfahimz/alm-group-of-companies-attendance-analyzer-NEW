@@ -442,8 +442,8 @@ Deno.serve(async (req) => {
                 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 const currentDayName = dayNames[dayOfWeek];
 
-                // CRITICAL: Check for ANNUAL_LEAVE FIRST before weekly off or public holidays
-                // Annual leave counts ALL calendar days in the date range
+                // Check for ANNUAL_LEAVE - already counted as calendar days upfront
+                // Just skip this day if employee is on annual leave and didn't work
                 const annualLeaveException = employeeExceptions.find(ex => {
                     try {
                         const exFrom = new Date(ex.date_from);
@@ -458,9 +458,8 @@ Deno.serve(async (req) => {
                     // Check if employee worked on this day despite annual leave
                     const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
                     if (dayPunchesForLeave.length === 0) {
-                        // Count this day as annual leave regardless of weekly off or public holiday
-                        annualLeaveCount++;
-                        continue; // Skip remaining logic for this day
+                        // Skip this day - annual leave already counted as calendar days
+                        continue;
                     }
                     // If employee worked, continue normal analysis
                 }
