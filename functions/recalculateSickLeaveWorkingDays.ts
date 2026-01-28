@@ -77,11 +77,15 @@ Deno.serve(async (req) => {
             }
 
             // Log audit
-            await base44.asServiceRole.functions.invoke('logAudit', {
-                action: 'RECALCULATE_SICK_LEAVE_WORKING_DAYS',
-                entity_type: 'AnalysisResult',
-                details: `Updated ${updates.length} analysis results. Sick leave days now count as working days.`
-            });
+            try {
+                await base44.asServiceRole.functions.invoke('logAudit', {
+                    action: 'RECALCULATE_SICK_LEAVE_WORKING_DAYS',
+                    entity_type: 'AnalysisResult',
+                    details: `Updated ${updates.length} analysis results. Sick leave days now count as working days.`
+                });
+            } catch (auditError) {
+                console.warn('[recalculateSickLeaveWorkingDays] Audit log failed:', auditError.message);
+            }
         }
 
         // Also update SalarySnapshots
