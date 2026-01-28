@@ -17,7 +17,8 @@ Deno.serve(async (req) => {
         const user = await base44.auth.me();
 
         // SECURITY: Admin only
-        if (!user || user.role !== 'admin') {
+        const userRole = user?.extended_role || user?.role || 'user';
+        if (!user || userRole !== 'admin') {
             return Response.json({ error: 'Unauthorized - Admin only' }, { status: 403 });
         }
 
