@@ -1837,16 +1837,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <tbody className="[&_tr:last-child]:border-0">
                                 {filteredResults.map((result) => (
                                     <tr key={result.id} className="border-b transition-colors hover:bg-muted/50">
-                                        <TableCell>
+                                        <td className="p-2 align-middle">
                                             <Checkbox
                                                 checked={result.isVerified}
                                                 onCheckedChange={() => toggleVerification(result.attendance_id)}
                                             />
-                                        </TableCell>
-                                        <TableCell className="font-medium">{result.attendance_id}</TableCell>
-                                        <TableCell>{result.name}</TableCell>
-                                        <TableCell>{result.working_days}</TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle font-medium">{result.attendance_id}</td>
+                                        <td className="p-2 align-middle">{result.name}</td>
+                                        <td className="p-2 align-middle">{result.working_days}</td>
+                                        <td className="p-2 align-middle">
                                             <InlineEditableCell
                                                 value={result.manual_present_days ?? result.present_days}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
