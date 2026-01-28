@@ -1857,8 +1857,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 isEditable={isAdmin}
                                                 className={result.manual_present_days !== null && result.manual_present_days !== undefined ? 'text-blue-600 font-bold' : ''}
                                             />
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             <InlineEditableCell
                                                 value={result.manual_annual_leave_count ?? result.annual_leave_count ?? 0}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
@@ -1871,8 +1871,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     ? 'text-blue-600 font-bold' 
                                                     : (result.annual_leave_count > 0 ? 'text-blue-600 font-medium' : '')}
                                             />
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             <InlineEditableCell
                                                 value={result.manual_sick_leave_count ?? result.sick_leave_count ?? 0}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
@@ -1885,8 +1885,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     ? 'text-purple-600 font-bold' 
                                                     : (result.sick_leave_count > 0 ? 'text-purple-600 font-medium' : '')}
                                             />
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             <InlineEditableCell
                                                 value={result.manual_full_absence_count ?? result.full_absence_count}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
@@ -1899,35 +1899,35 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     ? 'text-red-600 font-bold' 
                                                     : (result.full_absence_count > 0 ? 'text-red-600 font-medium' : '')}
                                             />
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             <span className={`${result.half_absence_count > 0 ? 'text-amber-600 font-medium' : ''}`}>
                                                 {result.half_absence_count || 0}
                                             </span>
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             <span className={`${result.late_minutes > 0 ? 'text-orange-600 font-medium' : ''}`}>
                                                 {result.late_minutes}
                                             </span>
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             <span className={`${result.early_checkout_minutes > 0 ? 'text-blue-600 font-medium' : ''}`}>
                                                 {result.early_checkout_minutes || 0}
                                             </span>
-                                        </TableCell>
+                                        </td>
                                         {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
-                                            <TableCell>
+                                            <td className="p-2 align-middle">
                                                 <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
                                                     {result.approved_minutes || 0}
                                                 </span>
-                                            </TableCell>
+                                            </td>
                                         )}
-                                        <TableCell>
+                                        <td className="p-2 align-middle">
                                             <span className={`${result.other_minutes > 0 ? 'text-purple-600 font-medium' : 'text-slate-400'}`}>
                                                 {result.other_minutes || 0}
                                             </span>
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             <div className="flex items-center gap-2 group">
                                                 <span>{result.grace_minutes ?? 15}</span>
                                                 {(isAdmin || isSupervisor) && (
@@ -1941,8 +1941,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     </Button>
                                                 )}
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
+                                        </td>
+                                        <td className="p-2 align-middle">
                                             {(() => {
                                                  const late = result.late_minutes || 0;
                                                  const early = result.early_checkout_minutes || 0;
@@ -1976,11 +1976,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     </div>
                                                 );
                                             })()}
-                                        </TableCell>
-                                        <TableCell className="text-xs text-slate-600 max-w-xs truncate">
+                                        </td>
+                                        <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
                                             {result.notes || '-'}
-                                        </TableCell>
-                                        <TableCell className="text-right">
+                                        </td>
+                                        <td className="p-2 align-middle text-right">
                                            {project.status === 'closed' ? (
                                                <span className="text-xs text-slate-400">—</span>
                                            ) : (
@@ -1993,8 +1993,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                    <Eye className="w-4 h-4" />
                                                </Button>
                                            )}
-                                        </TableCell>
-                                    </tr>
+                                           </td>
+                                           </tr>
                                 ))}
                             </tbody>
                         </table>
