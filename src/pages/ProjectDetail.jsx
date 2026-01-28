@@ -299,7 +299,7 @@ export default function ProjectDetail() {
                 </TabsContent>
 
                 <TabsContent value="overtime">
-                    <OvertimeTab project={project} finalReport={finalReport} />
+                    <OvertimeTab project={project} />
                 </TabsContent>
 
                 <TabsContent value="analysis">
