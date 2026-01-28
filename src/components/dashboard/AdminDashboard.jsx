@@ -199,7 +199,7 @@ export default function AdminDashboard({ projects, employees }) {
                                     {draftProjects.slice(0, 4).map((project) => (
                                         <Link
                                             key={project.id}
-                                            to={createPageUrl(`ProjectDetail?projectId=${project.id}`)}
+                                            to={createPageUrl(`ProjectDetail?id=${project.id}`)}
                                             className="flex items-center justify-between p-3 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors"
                                         >
                                             <div>
@@ -212,7 +212,7 @@ export default function AdminDashboard({ projects, employees }) {
                                     {analyzedProjects.slice(0, 4).map((project) => (
                                         <Link
                                             key={project.id}
-                                            to={createPageUrl(`ProjectDetail?projectId=${project.id}`)}
+                                            to={createPageUrl(`ProjectDetail?id=${project.id}`)}
                                             className="flex items-center justify-between p-3 rounded-lg bg-green-50 hover:bg-green-100 transition-colors"
                                         >
                                             <div>
