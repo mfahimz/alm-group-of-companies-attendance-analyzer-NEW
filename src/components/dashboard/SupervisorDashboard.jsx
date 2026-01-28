@@ -243,11 +243,18 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                                     <span className="text-sm">Reports</span>
                                 </Button>
                             </Link>
-                            {hasPayrollCompany && (
+                            {hasPayrollCompany ? (
                                 <Link to={createPageUrl('Salaries')}>
                                     <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-green-50 hover:border-green-200">
                                         <DollarSign className="w-5 h-5 text-green-600" />
                                         <span className="text-sm">Salaries</span>
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <Link to={createPageUrl('Projects')}>
+                                    <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-slate-50 hover:border-slate-200">
+                                        <FolderKanban className="w-5 h-5 text-slate-600" />
+                                        <span className="text-sm">All Projects</span>
                                     </Button>
                                 </Link>
                             )}

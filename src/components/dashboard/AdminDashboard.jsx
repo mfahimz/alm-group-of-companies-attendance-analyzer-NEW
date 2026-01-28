@@ -258,15 +258,14 @@ export default function AdminDashboard({ projects, employees }) {
                                     <span className="text-sm">Users</span>
                                 </Button>
                             </Link>
-                            {hasPayrollCompany && (
+                            {hasPayrollCompany ? (
                                 <Link to={createPageUrl('Salaries')}>
                                     <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-green-50 hover:border-green-200">
                                         <DollarSign className="w-5 h-5 text-green-600" />
                                         <span className="text-sm">Salaries</span>
                                     </Button>
                                 </Link>
-                            )}
-                            {!hasPayrollCompany && (
+                            ) : (
                                 <Link to={createPageUrl('RulesSettings')}>
                                     <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-slate-50 hover:border-slate-200">
                                         <Settings className="w-5 h-5 text-slate-600" />
