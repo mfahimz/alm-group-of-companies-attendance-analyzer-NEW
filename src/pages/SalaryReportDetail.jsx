@@ -334,6 +334,7 @@ export default function SalaryReportDetail() {
                                 </CardTitle>
                                 <p className="text-sm text-slate-500 mt-1">
                                     {report.date_from} to {report.date_to} • {report.employee_count} employees • {report.company}
+                                    {report.salary_divisor && <span className="ml-2">• Divisor: {report.salary_divisor} days</span>}
                                 </p>
                             </div>
                             <div className="flex gap-2">
