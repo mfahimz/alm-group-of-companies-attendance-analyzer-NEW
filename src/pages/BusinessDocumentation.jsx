@@ -205,6 +205,7 @@ export default function BusinessDocumentation() {
                         Based on attendance results, the system calculates salary deductions:
                     </p>
                     <ul>
+                        <li><strong>Working Days:</strong> Total days excluding weekly off and public holidays, <strong>but including sick leave days</strong></li>
                         <li><strong>Leave Days:</strong> Days without punches (Annual Leave + LOP days, NOT sick leave)</li>
                         <li><strong>Leave Pay:</strong> (Total Salary ÷ 30) × Leave Days</li>
                         <li><strong>Salary Leave Amount:</strong> Paid leave (Annual Leave) calculated based on working hours:
@@ -352,13 +353,14 @@ export default function BusinessDocumentation() {
                     </p>
                     <ul>
                         <li>HR marks the dates as "Sick Leave" in the system</li>
-                        <li>Days are counted separately (not as absences)</li>
-                        <li>No salary deduction occurs</li>
-                        <li>Sick leave days are tracked for reporting purposes</li>
+                        <li><strong>Days are counted as WORKING DAYS</strong> (included in working days count)</li>
+                        <li>Days are tracked separately as sick leave for reporting purposes</li>
+                        <li>No salary deduction occurs (not treated as LOP)</li>
+                        <li>Employee is considered "present" for working day purposes but marked as on sick leave</li>
                     </ul>
                     <p className="text-sm bg-green-50 border border-green-200 rounded p-3">
                         <strong>Important:</strong> Sick leave still requires manager approval before being entered in the system. 
-                        The system doesn't grant leave automatically.
+                        The system doesn't grant leave automatically. Sick leave days count toward working days but do not result in any deductions.
                     </p>
 
                     <h3 className="text-xl font-semibold mt-6">Annual Leave</h3>
