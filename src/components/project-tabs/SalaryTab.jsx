@@ -310,9 +310,6 @@ export default function SalaryTab({ project, finalReport }) {
                                             <TableHead>Generated On</TableHead>
                                             <TableHead>Period</TableHead>
                                             <TableHead>Employees</TableHead>
-                                            <TableHead>Total Salary</TableHead>
-                                            <TableHead>Total OT</TableHead>
-                                            <TableHead>Total Deductions</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -333,15 +330,6 @@ export default function SalaryTab({ project, finalReport }) {
                                                 </TableCell>
                                                 <TableCell>{report.date_from} - {report.date_to}</TableCell>
                                                 <TableCell>{report.employee_count}</TableCell>
-                                                <TableCell className="font-semibold text-green-700">
-                                                    {report.total_salary_amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </TableCell>
-                                                <TableCell className="text-blue-600">
-                                                    {report.total_ot_salary?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </TableCell>
-                                                <TableCell className="text-red-600">
-                                                    {report.total_deductions?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-1">
                                                         <Link to={createPageUrl('SalaryReportDetail') + `?reportId=${report.id}`}>
