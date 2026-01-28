@@ -544,6 +544,7 @@ export default function SalaryTab({ project, finalReport }) {
                             <p><strong>Finalized Report Period:</strong> {finalReport?.date_from} to {finalReport?.date_to}</p>
                             <p><strong>Employees:</strong> {salarySnapshots.length}</p>
                             <p><strong>Company:</strong> {project?.company}</p>
+                            <p><strong>Salary Calculation Divisor:</strong> {project?.salary_calculation_days || 30} days</p>
                         </div>
                         {(newReportDateFrom !== finalReport?.date_from || newReportDateTo !== finalReport?.date_to) && (
                             <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
