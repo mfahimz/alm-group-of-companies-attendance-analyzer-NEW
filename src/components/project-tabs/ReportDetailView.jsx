@@ -1836,7 +1836,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </thead>
                             <tbody className="[&_tr:last-child]:border-0">
                                 {filteredResults.map((result) => (
-                                    <TableRow key={result.id}>
+                                    <tr key={result.id} className="border-b transition-colors hover:bg-muted/50">
                                         <TableCell>
                                             <Checkbox
                                                 checked={result.isVerified}
@@ -1994,7 +1994,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                </Button>
                                            )}
                                         </TableCell>
-                                    </TableRow>
+                                    </tr>
                                 ))}
                             </tbody>
                         </table>
