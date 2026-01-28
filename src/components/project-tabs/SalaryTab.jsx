@@ -148,6 +148,52 @@ export default function SalaryTab({ project, finalReport }) {
                 calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
             }
 
+            // Merge OT data from OvertimeData entity into calculated data
+            calculatedData = calculatedData.map(row => {
+                const otRecord = overtimeData.find(ot => 
+                    String(ot.attendance_id) === String(row.attendance_id)
+                );
+                
+                if (otRecord) {
+                    const salary = employeeSalaries.find(s => 
+                        String(s.attendance_id) === String(row.attendance_id) ||
+                        String(s.employee_id) === String(row.hrms_id)
+                    );
+                    const totalSalary = row.total_salary || salary?.total_salary || 0;
+                    const workingHours = row.working_hours || salary?.working_hours || 9;
+                    const hourlyRate = totalSalary / divisor / workingHours;
+
+                    const normalOtHours = otRecord.normalOtHours || 0;
+                    const specialOtHours = otRecord.specialOtHours || 0;
+                    const normalOtSalary = Math.round(hourlyRate * 1.25 * normalOtHours * 100) / 100;
+                    const specialOtSalary = Math.round(hourlyRate * 1.5 * specialOtHours * 100) / 100;
+                    const totalOtSalary = normalOtSalary + specialOtSalary;
+
+                    // Recalculate total with OT
+                    const netDeduction = row.netDeduction || 0;
+                    const deductibleHoursPay = row.deductibleHoursPay || 0;
+                    const bonus = row.bonus || 0;
+                    const incentive = row.incentive || 0;
+                    const otherDeduction = row.otherDeduction || 0;
+                    const advanceSalaryDeduction = row.advanceSalaryDeduction || 0;
+
+                    const finalTotal = totalSalary + totalOtSalary + bonus + incentive
+                        - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+
+                    return {
+                        ...row,
+                        normalOtHours,
+                        specialOtHours,
+                        normalOtSalary,
+                        specialOtSalary,
+                        totalOtSalary,
+                        total: Math.round(finalTotal * 100) / 100,
+                        wpsPay: Math.round(finalTotal * 100) / 100
+                    };
+                }
+                return row;
+            });
+
             // Calculate totals
             let totalSalaryAmount = 0;
             let totalDeductions = 0;
