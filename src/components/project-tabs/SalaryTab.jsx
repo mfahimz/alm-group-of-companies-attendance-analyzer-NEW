@@ -65,6 +65,22 @@ export default function SalaryTab({ project, finalReport }) {
         staleTime: 5 * 60 * 1000
     });
 
+    // Fetch overtime data from OvertimeData entity
+    const { data: overtimeData = [] } = useQuery({
+        queryKey: ['overtimeData', project?.id],
+        queryFn: () => base44.entities.OvertimeData.filter({ project_id: project.id }),
+        enabled: !!project?.id,
+        staleTime: 0
+    });
+
+    // Fetch employee salaries for OT calculation
+    const { data: employeeSalaries = [] } = useQuery({
+        queryKey: ['employeeSalaries', project?.company],
+        queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+        enabled: !!project?.company,
+        staleTime: 5 * 60 * 1000
+    });
+
     // ============================================
     // DERIVED VALUES
     // ============================================
