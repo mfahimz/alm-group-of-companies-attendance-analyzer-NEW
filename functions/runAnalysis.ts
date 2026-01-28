@@ -460,7 +460,9 @@ Deno.serve(async (req) => {
                     // Check if employee worked on this day despite annual leave
                     const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
                     if (dayPunchesForLeave.length === 0) {
-                        // Skip this day - annual leave already counted as calendar days
+                        // Skip this day for attendance counting - annual leave already counted as calendar days upfront
+                        // Decrement working days since this is a leave day (not a working day to count)
+                        workingDays--;
                         continue;
                     }
                     // If employee worked, continue normal analysis
