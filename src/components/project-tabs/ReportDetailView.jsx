@@ -1997,7 +1997,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     </TableRow>
                                 ))}
                             </TableBody>
-                        </Table>
+                        </table>
                     </div>
                 </CardContent>
             </Card>
