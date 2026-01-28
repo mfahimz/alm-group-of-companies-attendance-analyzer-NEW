@@ -129,16 +129,23 @@ export default function SalaryReportDetail() {
     };
 
     const calculateTotals = (row) => {
+        // DIVISOR_LEAVE_DEDUCTION: For leave/deduction calculations (stored in snapshot)
+        // [MERGE_NOTE: If merging, use single divisor for all]
         const divisor = row.salary_divisor || report?.salary_divisor || 30;
+        
+        // DIVISOR_OT: For OT salary calculations
+        // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
+        const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
+        
         const totalSalary = row.total_salary || 0;
         const workingHours = row.working_hours || 9;
         
-        // Recalculate OT salaries based on current edits
-        const hourlyRate = totalSalary / divisor / workingHours;
+        // Recalculate OT salaries based on current edits using DIVISOR_OT
+        const otHourlyRate = totalSalary / otDivisor / workingHours;
         const normalOtHours = getValue(row, 'normalOtHours') || 0;
         const specialOtHours = getValue(row, 'specialOtHours') || 0;
-        const normalOtSalary = Math.round(hourlyRate * 1.25 * normalOtHours * 100) / 100;
-        const specialOtSalary = Math.round(hourlyRate * 1.5 * specialOtHours * 100) / 100;
+        const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
+        const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
         const totalOtSalary = normalOtSalary + specialOtSalary;
         
         const bonus = getValue(row, 'bonus') || 0;
@@ -146,7 +153,7 @@ export default function SalaryReportDetail() {
         const otherDeduction = getValue(row, 'otherDeduction') || 0;
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
         
-        // Use stored values for leave calculations (already calculated with correct divisor)
+        // Use stored values for leave calculations (already calculated with DIVISOR_LEAVE_DEDUCTION)
         const netDeduction = row.netDeduction || 0;
         const deductibleHoursPay = row.deductibleHoursPay || 0;
 
@@ -174,18 +181,21 @@ export default function SalaryReportDetail() {
                 const updated = { ...row };
                 const totalSalary = row.total_salary || 0;
                 const workingHours = row.working_hours || 9;
-                // Use divisor from snapshot (captured at finalization) or report level
+                
+                // DIVISOR_OT: Use ot_divisor for OT calculations
+                // [MERGE_NOTE: If merging, use salary_divisor for both]
                 const divisor = row.salary_divisor || report?.salary_divisor || 30;
-                const hourlyRate = totalSalary / divisor / workingHours;
+                const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
+                const otHourlyRate = totalSalary / otDivisor / workingHours;
 
-                // Apply edits
+                // Apply edits using DIVISOR_OT for OT calculations
                 if ('normalOtHours' in edits) {
                     updated.normalOtHours = edits.normalOtHours;
-                    updated.normalOtSalary = Math.round(hourlyRate * 1.25 * edits.normalOtHours * 100) / 100;
+                    updated.normalOtSalary = Math.round(otHourlyRate * 1.25 * edits.normalOtHours * 100) / 100;
                 }
                 if ('specialOtHours' in edits) {
                     updated.specialOtHours = edits.specialOtHours;
-                    updated.specialOtSalary = Math.round(hourlyRate * 1.5 * edits.specialOtHours * 100) / 100;
+                    updated.specialOtSalary = Math.round(otHourlyRate * 1.5 * edits.specialOtHours * 100) / 100;
                 }
                 if ('otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
                 if ('bonus' in edits) updated.bonus = edits.bonus;
