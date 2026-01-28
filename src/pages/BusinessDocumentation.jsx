@@ -554,6 +554,33 @@ export default function BusinessDocumentation() {
                         <li>System tracks usage and shows remaining balance</li>
                     </ul>
 
+                    <h3 className="text-xl font-semibold mt-6">Grace Minutes Carry-Forward (Al Maraghi Auto Repairs)</h3>
+                    <p>
+                        When a project is closed for Al Maraghi Auto Repairs, unused grace minutes can be carried forward to employees' profiles for use in future projects:
+                    </p>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-2">
+                        <h4 className="font-semibold text-amber-900 mb-2">How It Works</h4>
+                        <ul className="text-sm text-amber-800">
+                            <li><strong>Triggered by:</strong> Admin explicitly checking "Carry forward unused grace minutes" checkbox when closing a project</li>
+                            <li><strong>Formula:</strong> <code className="bg-amber-100 px-1 rounded">Carried = Available - (Late + Early + Other - Approved)</code></li>
+                            <li><strong>Where:</strong>
+                                <ul className="ml-4 mt-1">
+                                    <li>Available = Base grace (from rules) + Previously carried grace</li>
+                                    <li>Late = Total late minutes from report</li>
+                                    <li>Early = Total early checkout minutes from report</li>
+                                    <li>Other = Other minutes from report</li>
+                                    <li>Approved = Department head approved minutes</li>
+                                </ul>
+                            </li>
+                            <li><strong>Result:</strong> The remaining minutes (minimum 0) are saved to the employee's profile</li>
+                        </ul>
+                        <p className="text-sm text-amber-700 mt-3">
+                            <strong>Important:</strong> This action is recorded in EmployeeGraceHistory for complete audit trail. 
+                            Each project can only execute carry-forward once (idempotent). The checkbox defaults to unchecked, 
+                            requiring explicit admin decision.
+                        </p>
+                    </div>
+
                     <h3 className="text-xl font-semibold mt-6">What Cannot Be Overridden</h3>
                     <p>
                         To maintain policy integrity, certain things cannot be approved or overridden:
