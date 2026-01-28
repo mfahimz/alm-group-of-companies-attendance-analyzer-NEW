@@ -217,6 +217,17 @@ export default function SalaryTab({ project, finalReport }) {
     // RENDER
     // ============================================
 
+    // Show loading state while fetching user
+    if (loadingUser) {
+        return (
+            <Card className="border-0 shadow-lg">
+                <CardContent className="p-12 text-center">
+                    <p className="text-slate-500">Loading...</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
     if (!isAdminOrCEO) {
         return (
             <Card className="border-0 shadow-lg">
