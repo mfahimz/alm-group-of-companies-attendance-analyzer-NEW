@@ -61,6 +61,7 @@ export const PAGES = {
     "UserProfile": UserProfile,
     "Users": Users,
     "SalaryReportGenerator": SalaryReportGenerator,
+    "SalaryReportDetail": SalaryReportDetail,
 }
 
 export const pagesConfig = {
