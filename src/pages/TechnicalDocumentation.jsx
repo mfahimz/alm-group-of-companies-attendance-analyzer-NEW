@@ -405,6 +405,82 @@ export default function TechnicalDocumentation() {
                             </p>
                         </div>
                     </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Grace Minutes Carry-Forward (Al Maraghi Auto Repairs)</h3>
+                    <div className="border border-amber-200 rounded-lg p-4 bg-amber-50">
+                        <h4 className="font-semibold text-amber-900 mb-2">EmployeeGraceHistory Entity</h4>
+                        <p className="text-sm text-amber-800 mb-3">
+                            <strong>Purpose:</strong> Audit trail for grace minutes carry-forward at project close. 
+                            This is the authoritative source of truth for historical grace calculations.
+                        </p>
+                        <table className="text-xs w-full border-collapse mb-3">
+                            <thead>
+                                <tr className="bg-amber-100">
+                                    <th className="border border-amber-300 p-2 text-left">Field</th>
+                                    <th className="border border-amber-300 p-2 text-left">Type</th>
+                                    <th className="border border-amber-300 p-2 text-left">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td className="border border-amber-300 p-2 font-mono">employee_id</td>
+                                    <td className="border border-amber-300 p-2">string</td>
+                                    <td className="border border-amber-300 p-2">Employee HRMS ID</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-amber-300 p-2 font-mono">source_project_id</td>
+                                    <td className="border border-amber-300 p-2">string</td>
+                                    <td className="border border-amber-300 p-2">Project that generated this carry-forward</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-amber-300 p-2 font-mono">grace_minutes_available</td>
+                                    <td className="border border-amber-300 p-2">number</td>
+                                    <td className="border border-amber-300 p-2">Base + carried grace at start</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-amber-300 p-2 font-mono">grace_minutes_used</td>
+                                    <td className="border border-amber-300 p-2">number</td>
+                                    <td className="border border-amber-300 p-2">late + early + other - approved</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-amber-300 p-2 font-mono">grace_minutes_carried</td>
+                                    <td className="border border-amber-300 p-2">number</td>
+                                    <td className="border border-amber-300 p-2">max(0, available - used)</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-amber-300 p-2 font-mono">carried_at</td>
+                                    <td className="border border-amber-300 p-2">datetime</td>
+                                    <td className="border border-amber-300 p-2">UAE timestamp of execution</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-amber-300 p-2 font-mono">carried_by</td>
+                                    <td className="border border-amber-300 p-2">string</td>
+                                    <td className="border border-amber-300 p-2">Admin email who executed</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p className="text-sm text-amber-800 mb-2"><strong>Trigger Conditions:</strong></p>
+                        <ul className="text-sm text-amber-700">
+                            <li>Only runs on project close (via closeProject backend function)</li>
+                            <li>Only if checkbox "Carry forward unused grace minutes" is checked (default: unchecked)</li>
+                            <li>Only for company "Al Maraghi Auto Repairs"</li>
+                            <li>Idempotent: Checks for existing records before creating new ones</li>
+                        </ul>
+                        <p className="text-sm text-amber-800 mt-3"><strong>Data Flow:</strong></p>
+                        <ol className="text-sm text-amber-700">
+                            <li>Admin checks carry-forward checkbox in CloseProjectDialog</li>
+                            <li>closeProject.js validates company and idempotency</li>
+                            <li>For each employee in AnalysisResult, calculates grace_minutes_carried</li>
+                            <li>Creates EmployeeGraceHistory record (audit)</li>
+                            <li>Updates Employee.carried_grace_minutes (derived current value)</li>
+                            <li>Logs GRACE_CARRY_FORWARD action in AuditLog</li>
+                        </ol>
+                        <p className="text-xs text-amber-600 mt-3">
+                            <strong>Design Note:</strong> Employee.carried_grace_minutes is a derived value for read convenience. 
+                            EmployeeGraceHistory is the authoritative audit trail. Future projects use carried_grace_minutes 
+                            when use_carried_grace_minutes is enabled.
+                        </p>
+                    </div>
                 </Section>
 
                 {/* Entity Reference */}
