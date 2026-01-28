@@ -1789,7 +1789,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <Table>
                             <TableHeader className="sticky top-0 z-10">
                                 <TableRow className="bg-slate-50 shadow-sm">
-                                    <TableHead className="w-12">Verified</TableHead>
+                                    <TableHead className="w-12 bg-slate-50">Verified</TableHead>
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                         ID
                                     </SortableTableHead>
@@ -1828,10 +1828,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}>
                                         Other Minutes
                                     </SortableTableHead>
-                                    <TableHead>Grace</TableHead>
-                                    <TableHead>Deductible</TableHead>
-                                    <TableHead>Notes</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="bg-slate-50">Grace</TableHead>
+                                    <TableHead className="bg-slate-50">Deductible</TableHead>
+                                    <TableHead className="bg-slate-50">Notes</TableHead>
+                                    <TableHead className="text-right bg-slate-50">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
