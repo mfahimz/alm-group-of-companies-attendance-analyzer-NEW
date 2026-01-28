@@ -397,8 +397,8 @@ export default function SalaryReportDetail() {
                             <table className="w-full caption-bottom text-sm">
                                 <thead className="sticky top-0 z-10 bg-slate-50">
                                     <tr className="border-b">
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Attendance ID</SortableTableHead>
-                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Name</SortableTableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-0 z-20">Attendance ID</SortableTableHead>
+                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[100px] z-20">Name</SortableTableHead>
                                         <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Department</SortableTableHead>
                                         <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Total Salary</SortableTableHead>
                                         <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Working Days</SortableTableHead>
@@ -437,8 +437,8 @@ export default function SalaryReportDetail() {
                                         const { total, wpsPay, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
                                         return (
                                             <tr key={row.hrms_id} className="border-b transition-colors hover:bg-muted/50">
-                                                <td className="p-2 align-middle font-medium">{row.attendance_id}</td>
-                                                <td className="p-2 align-middle font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
+                                                <td className="p-2 align-middle font-medium sticky left-0 bg-white z-10">{row.attendance_id}</td>
+                                                <td className="p-2 align-middle font-medium sticky left-[100px] bg-white z-10">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
                                                 <td className="p-2 align-middle text-sm text-slate-600">{row.department || '-'}</td>
                                                 <td className="p-2 align-middle font-semibold">{row.total_salary?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.working_days?.toFixed(2)}</td>

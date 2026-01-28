@@ -1789,11 +1789,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <table className="w-full caption-bottom text-sm">
                             <thead className="sticky top-0 z-10 bg-slate-50">
                                 <tr className="border-b">
-                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50">Verified</th>
-                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50 sticky left-0 z-20">Verified</th>
+                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[48px] z-20">
                                         ID
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[120px] z-20">
                                         Name
                                     </SortableTableHead>
                                     <SortableTableHead sortKey="working_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
@@ -1837,14 +1837,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <tbody className="[&_tr:last-child]:border-0">
                                 {filteredResults.map((result) => (
                                     <tr key={result.id} className="border-b transition-colors hover:bg-muted/50">
-                                        <td className="p-2 align-middle">
+                                        <td className="p-2 align-middle sticky left-0 bg-white z-10">
                                             <Checkbox
                                                 checked={result.isVerified}
                                                 onCheckedChange={() => toggleVerification(result.attendance_id)}
                                             />
                                         </td>
-                                        <td className="p-2 align-middle font-medium">{result.attendance_id}</td>
-                                        <td className="p-2 align-middle">{result.name}</td>
+                                        <td className="p-2 align-middle font-medium sticky left-[48px] bg-white z-10">{result.attendance_id}</td>
+                                        <td className="p-2 align-middle sticky left-[120px] bg-white z-10">{result.name}</td>
                                         <td className="p-2 align-middle">{result.working_days}</td>
                                         <td className="p-2 align-middle">
                                             <InlineEditableCell
