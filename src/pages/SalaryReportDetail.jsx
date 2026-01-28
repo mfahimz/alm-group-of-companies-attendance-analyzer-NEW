@@ -26,7 +26,7 @@ export default function SalaryReportDetail() {
     const [editableData, setEditableData] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortColumn, setSortColumn] = useState({ key: 'department', direction: 'asc' });
+    const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
 
     // ============================================
     // QUERIES
