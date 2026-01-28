@@ -1785,9 +1785,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     <CardTitle>Attendance Report</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto max-h-[600px] border rounded-lg">
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                                 <TableRow>
                                     <TableHead className="w-12">Verified</TableHead>
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
