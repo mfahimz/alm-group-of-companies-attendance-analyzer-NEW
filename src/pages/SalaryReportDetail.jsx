@@ -404,8 +404,8 @@ export default function SalaryReportDetail() {
                         </div>
 
                         {/* Salary Table */}
-                        <div className="border rounded-lg relative overflow-auto max-h-[600px]">
-                            <table className="w-full caption-bottom text-sm">
+                        <div className="border rounded-lg relative overflow-x-auto overflow-y-auto max-h-[600px]">
+                            <table className="w-full min-w-max caption-bottom text-sm">
                                 <thead className="sticky top-0 z-10 bg-slate-50">
                                     <tr className="border-b">
                                         <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-0 z-20">Attendance ID</SortableTableHead>

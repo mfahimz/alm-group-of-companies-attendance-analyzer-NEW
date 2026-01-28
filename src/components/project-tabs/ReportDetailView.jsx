@@ -1785,9 +1785,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 <CardHeader>
                     <CardTitle>Attendance Report</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="border rounded-lg relative overflow-auto max-h-[600px]">
-                        <table className="w-full caption-bottom text-sm">
+                <CardContent className="p-0 sm:p-6">
+                    <div className="border rounded-lg relative overflow-x-auto overflow-y-auto max-h-[600px]">
+                        <table className="w-full min-w-max caption-bottom text-sm">
                             <thead className="sticky top-0 z-10 bg-slate-50">
                                 <tr className="border-b">
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50 sticky left-0 z-20">Verified</th>
