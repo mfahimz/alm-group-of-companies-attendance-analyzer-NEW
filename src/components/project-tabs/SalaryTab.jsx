@@ -480,202 +480,51 @@ export default function SalaryTab({ project, finalReport }) {
                             
                             <div className="space-y-4 mb-4">
                         <div className="bg-white rounded-lg p-4">
-                            <p className="text-sm text-slate-600 mb-4">
-                                <strong>Note:</strong> Salary calculations based on selected finalized report. Attendance data and salary master are read-only.
-                            </p>
-                            {/* Search Box */}
-                            <div className="bg-white rounded-lg p-4 mb-4 border border-slate-200">
-                                <label className="text-sm font-medium text-slate-700 mb-2 block">Search Employees</label>
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search by name, ID, or department..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Advanced Filters */}
-                            <div className="bg-white rounded-lg p-4 mb-4 border border-slate-200">
-                                <h3 className="text-sm font-semibold text-slate-900 mb-3">Advanced Filters</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {/* Salary Range */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-700">Total Salary</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                placeholder="Min"
-                                                value={advancedFilters.salaryMin}
-                                                onChange={(e) => setAdvancedFilters({...advancedFilters, salaryMin: e.target.value})}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Max"
-                                                value={advancedFilters.salaryMax}
-                                                onChange={(e) => setAdvancedFilters({...advancedFilters, salaryMax: e.target.value})}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Leave Days Range */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-700">Leave Days</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                placeholder="Min"
-                                                value={advancedFilters.leaveDaysMin}
-                                                onChange={(e) => setAdvancedFilters({...advancedFilters, leaveDaysMin: e.target.value})}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Max"
-                                                value={advancedFilters.leaveDaysMax}
-                                                onChange={(e) => setAdvancedFilters({...advancedFilters, leaveDaysMax: e.target.value})}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Deduction Range */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-700">Total Deductions</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                placeholder="Min"
-                                                value={advancedFilters.deductionMin}
-                                                onChange={(e) => setAdvancedFilters({...advancedFilters, deductionMin: e.target.value})}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Max"
-                                                value={advancedFilters.deductionMax}
-                                                onChange={(e) => setAdvancedFilters({...advancedFilters, deductionMax: e.target.value})}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                        </div>
+                            {/* Search and Actions Row */}
+                            <div className="flex flex-col md:flex-row gap-4 items-end">
+                                {/* Search Box */}
+                                <div className="flex-1">
+                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Search Employees</label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search by name, ID, or department..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Department Filter & Action Buttons */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Department</label>
-                                    <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Departments</SelectItem>
-                                            {departments.map(dept => (
-                                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="flex items-end gap-2">
-                                        <Button 
-                                            onClick={handleRecalculateTotals} 
-                                            disabled={isCalculating || !finalReport || salarySnapshots.length === 0}
-                                            className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                                        >
-                                            <DollarSign className="w-4 h-4 mr-2" />
-                                            {isCalculating ? 'Recalculating...' : 'Recalculate Totals'}
-                                        </Button>
+                                {/* Action Buttons */}
+                                <div className="flex gap-2">
+                                    <Button 
+                                        onClick={handleRecalculateTotals} 
+                                        disabled={isCalculating || !finalReport || salarySnapshots.length === 0}
+                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        <DollarSign className="w-4 h-4 mr-2" />
+                                        {isCalculating ? 'Recalculating...' : 'Recalculate Totals'}
+                                    </Button>
                                     <Button 
                                         onClick={handleSave} 
                                         disabled={isSaving || Object.keys(editableData).length === 0}
-                                        className="flex-1 bg-green-600 hover:bg-green-700"
+                                        className="bg-green-600 hover:bg-green-700"
                                     >
                                         <Save className="w-4 h-4 mr-2" />
                                         {isSaving ? 'Saving...' : 'Save'}
                                     </Button>
                                 </div>
-
-                                {hasActiveFilters && (
-                                    <Button
-                                        onClick={handleClearFilters}
-                                        variant="outline"
-                                        className="md:col-span-3"
-                                    >
-                                        <X className="w-4 h-4 mr-2" />
-                                        Clear All Filters
-                                    </Button>
-                                )}
                             </div>
-                        </div>
-                        <div className="space-y-3">
-                            {/* Active Filters Display */}
-                            {hasActiveFilters && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <p className="text-xs font-semibold text-amber-900 mb-2">Active Filters:</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {searchQuery && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Search: "{searchQuery}"
-                                                    </span>
-                                                )}
-                                                {departmentFilter !== 'all' && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Dept: {departmentFilter}
-                                                    </span>
-                                                )}
-                                                {advancedFilters.salaryMin && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Salary ≥ {advancedFilters.salaryMin}
-                                                    </span>
-                                                )}
-                                                {advancedFilters.salaryMax && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Salary ≤ {advancedFilters.salaryMax}
-                                                    </span>
-                                                )}
-                                                {advancedFilters.leaveDaysMin && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Leave ≥ {advancedFilters.leaveDaysMin}
-                                                    </span>
-                                                )}
-                                                {advancedFilters.leaveDaysMax && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Leave ≤ {advancedFilters.leaveDaysMax}
-                                                    </span>
-                                                )}
-                                                {advancedFilters.deductionMin && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Deduct ≥ {advancedFilters.deductionMin}
-                                                    </span>
-                                                )}
-                                                {advancedFilters.deductionMax && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">
-                                                        Deduct ≤ {advancedFilters.deductionMax}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             {/* Results Count */}
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                <p className="text-xs text-blue-800">
-                                    <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
-                                    {isAdminOrCEO && hasActiveFilters && ` (${dataToDisplay.length - filteredSalaryData.length} hidden by filters)`}
-                                </p>
+                            <div className="mt-4 text-sm text-slate-600">
+                                <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
                             </div>
+                        </div>
 
+                        <div className="space-y-3">
                             {/* Formula Info */}
                              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 mb-3">
                                  <strong>🔒 IMMUTABLE SALARY SNAPSHOT:</strong> When a report is marked final, salary snapshots are created capturing exact values from that moment. These snapshots are frozen and never change automatically.
