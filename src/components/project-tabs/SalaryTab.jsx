@@ -386,6 +386,124 @@ export default function SalaryTab({ project, finalReport }) {
         }
     };
 
+    // Save salary report (store current data as a named report)
+    const handleSaveSalaryReport = async () => {
+        if (!reportName.trim()) {
+            toast.error('Please enter a report name');
+            return;
+        }
+
+        const dataToSave = calculatedData || dataToDisplay;
+        if (dataToSave.length === 0) {
+            toast.error('No salary data to save');
+            return;
+        }
+
+        setIsSavingReport(true);
+        try {
+            // Calculate totals
+            let totalSalaryAmount = 0;
+            let totalDeductions = 0;
+            let totalOtSalary = 0;
+
+            dataToSave.forEach(row => {
+                totalSalaryAmount += row.total || 0;
+                totalDeductions += (row.netDeduction || 0) + (row.deductibleHoursPay || 0) + (row.otherDeduction || 0) + (row.advanceSalaryDeduction || 0);
+                totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
+            });
+
+            await base44.entities.SalaryReport.create({
+                project_id: project.id,
+                report_run_id: finalReport.id,
+                report_name: reportName.trim(),
+                date_from: finalReport.date_from,
+                date_to: finalReport.date_to,
+                company: project.company,
+                employee_count: dataToSave.length,
+                total_salary_amount: Math.round(totalSalaryAmount * 100) / 100,
+                total_deductions: Math.round(totalDeductions * 100) / 100,
+                total_ot_salary: Math.round(totalOtSalary * 100) / 100,
+                snapshot_data: JSON.stringify(dataToSave),
+                generated_by: currentUser?.email,
+                notes: reportNotes.trim() || null
+            });
+
+            toast.success(`Salary report "${reportName}" saved successfully`);
+            setShowSaveReportDialog(false);
+            setReportName('');
+            setReportNotes('');
+            refetchSavedReports();
+        } catch (error) {
+            toast.error('Failed to save salary report: ' + error.message);
+        } finally {
+            setIsSavingReport(false);
+        }
+    };
+
+    // Export salary report to Excel
+    const handleExportToExcel = (data, filename) => {
+        const exportData = data.map(row => ({
+            'Attendance ID': row.attendance_id,
+            'Name': row.name,
+            'Department': row.department || '-',
+            'Working Hours/Day': row.working_hours,
+            'Basic Salary': row.basic_salary,
+            'Total Salary': row.total_salary,
+            'Working Days': row.working_days,
+            'Present Days': row.present_days,
+            'LOP Days': row.full_absence_count,
+            'Annual Leave Days': row.annual_leave_count,
+            'Sick Leave Days': row.sick_leave_count,
+            'Leave Days': row.leaveDays,
+            'Leave Pay': row.leavePay,
+            'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
+            'Salary Leave Amount': row.salaryLeaveAmount,
+            'Normal OT Hours': row.normalOtHours || 0,
+            'Normal OT Salary': row.normalOtSalary || 0,
+            'Special OT Hours': row.specialOtHours || 0,
+            'Special OT Salary': row.specialOtSalary || 0,
+            'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
+            'Deductible Hours': row.deductibleHours || 0,
+            'Deductible Hours Pay': row.deductibleHoursPay || 0,
+            'Other Deduction': row.otherDeduction || 0,
+            'Bonus': row.bonus || 0,
+            'Incentive': row.incentive || 0,
+            'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
+            'Total': row.total,
+            'WPS Pay': row.wpsPay,
+            'Balance': row.balance || 0
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
+        XLSX.writeFile(wb, `${filename}.xlsx`);
+        toast.success('Excel file downloaded');
+    };
+
+    // Delete saved salary report
+    const handleDeleteSalaryReport = async (reportId, reportName) => {
+        if (!confirm(`Are you sure you want to delete "${reportName}"?`)) return;
+        
+        try {
+            await base44.entities.SalaryReport.delete(reportId);
+            toast.success(`Report "${reportName}" deleted`);
+            refetchSavedReports();
+        } catch (error) {
+            toast.error('Failed to delete report: ' + error.message);
+        }
+    };
+
+    // View/Export saved report
+    const handleViewSavedReport = (report) => {
+        try {
+            const data = JSON.parse(report.snapshot_data);
+            handleExportToExcel(data, `${report.report_name}_${report.date_from}_to_${report.date_to}`);
+        } catch (error) {
+            toast.error('Failed to load report data');
+        }
+    };
+
     // Save all changes to backend
     const handleSave = async () => {
         if (Object.keys(editableData).length === 0) {
