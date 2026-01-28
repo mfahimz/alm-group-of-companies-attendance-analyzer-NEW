@@ -294,7 +294,7 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Check for annual leave
+                // Check for annual leave - skip counting here, we'll calculate calendar days separately
                 const annualLeaveException = employeeExceptions.find(ex => {
                     try {
                         const exFrom = new Date(ex.date_from);
@@ -306,7 +306,8 @@ Deno.serve(async (req) => {
                 const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
 
                 if (annualLeaveException && rawDayPunches.length === 0) {
-                    annualLeaveCount++;
+                    // Don't increment annualLeaveCount here - we calculate calendar days separately
+                    // But skip further processing for this day
                     continue;
                 }
 
