@@ -93,23 +93,47 @@ export default function ProjectDetail() {
     }
   });
 
+  // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Hourly Rate (deductions), Deductible Hours Pay
+  // [MERGE_NOTE: If merging divisors in future, keep only this mutation and remove OT mutation]
   const updateSalaryCalculationDaysMutation = useMutation({
     mutationFn: async (days) => {
       await base44.entities.Project.update(project.id, { salary_calculation_days: days });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['project', projectId]);
-      toast.success('Salary calculation days updated');
+      toast.success('Salary/Deduction divisor updated');
     },
     onError: () => {
-      toast.error('Failed to update salary calculation days');
+      toast.error('Failed to update salary/deduction divisor');
     }
   });
 
+  // DIVISOR_OT: Used for Normal OT Salary, Special OT Salary calculations
+  // [MERGE_NOTE: If merging divisors in future, remove this mutation entirely]
+  const updateOtCalculationDaysMutation = useMutation({
+    mutationFn: async (days) => {
+      await base44.entities.Project.update(project.id, { ot_calculation_days: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['project', projectId]);
+      toast.success('OT divisor updated');
+    },
+    onError: () => {
+      toast.error('Failed to update OT divisor');
+    }
+  });
+
+  // DIVISOR_LEAVE_DEDUCTION state
   const [salaryCalcDays, setSalaryCalcDays] = React.useState(project?.salary_calculation_days || 30);
   React.useEffect(() => {
     setSalaryCalcDays(project?.salary_calculation_days || 30);
   }, [project?.salary_calculation_days]);
+
+  // DIVISOR_OT state
+  const [otCalcDays, setOtCalcDays] = React.useState(project?.ot_calculation_days || 30);
+  React.useEffect(() => {
+    setOtCalcDays(project?.ot_calculation_days || 30);
+  }, [project?.ot_calculation_days]);
 
   if (isLoading) {
     return (
@@ -188,31 +212,63 @@ export default function ProjectDetail() {
                             }
                             </div>
 
+                            {/* DIVISOR SETTINGS - Al Maraghi Auto Repairs only */}
+                            {/* [MERGE_NOTE: If merging divisors in future, remove the OT divisor section and update label] */}
                             {project.company === 'Al Maraghi Auto Repairs' && isAdmin && (
-                            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <Label className="text-sm font-semibold text-blue-900 mb-2 block">
-                            Salary Calculation Days (Divisor)
-                            </Label>
-                            <div className="flex gap-2">
-                            <Input
-                             type="number"
-                             min="1"
-                             value={salaryCalcDays}
-                             onChange={(e) => setSalaryCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
-                             className="max-w-xs"
-                            />
-                            <Button
-                             onClick={() => updateSalaryCalculationDaysMutation.mutate(salaryCalcDays)}
-                             disabled={updateSalaryCalculationDaysMutation.isPending || salaryCalcDays === (project?.salary_calculation_days || 30)}
-                             size="sm"
-                             className="bg-blue-600 hover:bg-blue-700"
-                            >
-                             {updateSalaryCalculationDaysMutation.isPending ? 'Saving...' : 'Update'}
-                            </Button>
-                            </div>
-                            <p className="text-xs text-blue-700 mt-2">
-                            Used as divisor in salary calculations (Leave Pay, Salary Leave Amount, Hourly Rate)
-                            </p>
+                            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* DIVISOR_LEAVE_DEDUCTION */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <Label className="text-sm font-semibold text-blue-900 mb-2 block">
+                                        Salary/Deduction Divisor (Days)
+                                    </Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            min="1"
+                                            value={salaryCalcDays}
+                                            onChange={(e) => setSalaryCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
+                                            className="max-w-[100px]"
+                                        />
+                                        <Button
+                                            onClick={() => updateSalaryCalculationDaysMutation.mutate(salaryCalcDays)}
+                                            disabled={updateSalaryCalculationDaysMutation.isPending || salaryCalcDays === (project?.salary_calculation_days || 30)}
+                                            size="sm"
+                                            className="bg-blue-600 hover:bg-blue-700"
+                                        >
+                                            {updateSalaryCalculationDaysMutation.isPending ? 'Saving...' : 'Update'}
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-blue-700 mt-2">
+                                        Used for: Leave Pay, Salary Leave Amount, Deductible Hours Pay
+                                    </p>
+                                </div>
+
+                                {/* DIVISOR_OT */}
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                    <Label className="text-sm font-semibold text-orange-900 mb-2 block">
+                                        OT Divisor (Days)
+                                    </Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            min="1"
+                                            value={otCalcDays}
+                                            onChange={(e) => setOtCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
+                                            className="max-w-[100px]"
+                                        />
+                                        <Button
+                                            onClick={() => updateOtCalculationDaysMutation.mutate(otCalcDays)}
+                                            disabled={updateOtCalculationDaysMutation.isPending || otCalcDays === (project?.ot_calculation_days || 30)}
+                                            size="sm"
+                                            className="bg-orange-600 hover:bg-orange-700"
+                                        >
+                                            {updateOtCalculationDaysMutation.isPending ? 'Saving...' : 'Update'}
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-orange-700 mt-2">
+                                        Used for: Normal OT Salary, Special OT Salary
+                                    </p>
+                                </div>
                             </div>
                             )}
                 </div>
