@@ -252,6 +252,13 @@ export default function ProjectDetail() {
 
                             Exceptions {isReadOnly && '🔒'}
                         </TabsTrigger>
+                        {project.company === 'Al Maraghi Auto Repairs' &&
+            <TabsTrigger
+              value="overtime"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600 data-[state=active]:to-amber-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+                                Overtime
+                            </TabsTrigger>
+            }
                         <TabsTrigger
               value="analysis"
               disabled={isReadOnly}
@@ -265,13 +272,6 @@ export default function ProjectDetail() {
 
                             Report
                         </TabsTrigger>
-                        {project.company === 'Al Maraghi Auto Repairs' &&
-            <TabsTrigger
-              value="overtime"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600 data-[state=active]:to-amber-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
-                                Overtime
-                            </TabsTrigger>
-            }
                         {project.company === 'Al Maraghi Auto Repairs' &&
             <TabsTrigger
               value="salary"
@@ -298,16 +298,16 @@ export default function ProjectDetail() {
                     <ExceptionsTab project={project} />
                 </TabsContent>
 
+                <TabsContent value="overtime">
+                    <OvertimeTab project={project} finalReport={finalReport} />
+                </TabsContent>
+
                 <TabsContent value="analysis">
                     <RunAnalysisTab project={project} />
                 </TabsContent>
 
                 <TabsContent value="report">
                     <ReportTab project={project} />
-                </TabsContent>
-
-                <TabsContent value="overtime">
-                    <OvertimeTab project={project} finalReport={finalReport} />
                 </TabsContent>
 
                 <TabsContent value="salary">
