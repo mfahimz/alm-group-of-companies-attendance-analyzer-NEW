@@ -353,7 +353,12 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
 
     return (
         <div className="space-y-6">
-            <PINLock onUnlock={(unlocked) => setSalaryUnlocked(unlocked)} storageKey="salary_tab_pin" />
+            <PINLock onUnlock={(unlocked) => {
+                setSalaryUnlocked(unlocked);
+                if (unlocked) {
+                    sessionStorage.setItem('salary_tab_pin_unlocked', 'true');
+                }
+            }} storageKey="salary_tab_pin" />
             
             {!salaryUnlocked && (
                 <Card className="border-0 shadow-lg">
