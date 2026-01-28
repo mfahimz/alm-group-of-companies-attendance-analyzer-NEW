@@ -122,6 +122,8 @@ export default function SalaryTab({ project, finalReport }) {
 
         setIsGenerating(true);
         try {
+            // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
+            // [MERGE_NOTE: If merging divisors, this becomes the single divisor for all calculations]
             const divisor = project.salary_calculation_days || 30;
             const isCustomDateRange = newReportDateFrom !== finalReport.date_from || newReportDateTo !== finalReport.date_to;
 
