@@ -636,10 +636,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         // No LOP deduction, no late/early calculation for this day
                         sickLeaveCount++;
                     } else if (dateException.type === 'ANNUAL_LEAVE') {
-                        // Annual leave counts if no punches
+                        // Annual leave - already counted as calendar days upfront
+                        // Skip this day for attendance counting
                         if (dayPunches.length === 0) {
                             workingDays--;
-                            annualLeaveCount++;
+                            // Don't increment annualLeaveCount here - already counted upfront
                         } else {
                             presentDays++;
                         }
