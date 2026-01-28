@@ -149,6 +149,10 @@ export default function SalaryTab({ project, finalReport }) {
             }
 
             // Merge OT data from OvertimeData entity into calculated data
+            // DIVISOR_OT: Use ot_calculation_days for OT salary calculations
+            // [MERGE_NOTE: If merging divisors, change otDivisor to use divisor (salary_calculation_days) instead]
+            const otDivisor = project.ot_calculation_days || 30;
+            
             calculatedData = calculatedData.map(row => {
                 const otRecord = overtimeData.find(ot => 
                     String(ot.attendance_id) === String(row.attendance_id)
@@ -161,12 +165,15 @@ export default function SalaryTab({ project, finalReport }) {
                     );
                     const totalSalary = row.total_salary || salary?.total_salary || 0;
                     const workingHours = row.working_hours || salary?.working_hours || 9;
-                    const hourlyRate = totalSalary / divisor / workingHours;
+                    
+                    // DIVISOR_OT: OT hourly rate uses otDivisor
+                    // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
+                    const otHourlyRate = totalSalary / otDivisor / workingHours;
 
                     const normalOtHours = otRecord.normalOtHours || 0;
                     const specialOtHours = otRecord.specialOtHours || 0;
-                    const normalOtSalary = Math.round(hourlyRate * 1.25 * normalOtHours * 100) / 100;
-                    const specialOtSalary = Math.round(hourlyRate * 1.5 * specialOtHours * 100) / 100;
+                    const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
+                    const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
                     const totalOtSalary = normalOtSalary + specialOtSalary;
 
                     // Recalculate total with OT
@@ -187,6 +194,9 @@ export default function SalaryTab({ project, finalReport }) {
                         normalOtSalary,
                         specialOtSalary,
                         totalOtSalary,
+                        // Store divisors used for reference
+                        salary_divisor: divisor,
+                        ot_divisor: otDivisor,
                         total: Math.round(finalTotal * 100) / 100,
                         wpsPay: Math.round(finalTotal * 100) / 100
                     };
