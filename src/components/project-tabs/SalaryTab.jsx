@@ -880,6 +880,50 @@ export default function SalaryTab({ project, finalReport }) {
                     </CardContent>
                     </Card>
                     )}
+
+            {/* Save Report Dialog */}
+            <Dialog open={showSaveReportDialog} onOpenChange={setShowSaveReportDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Save Salary Report</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <label className="text-sm font-medium text-slate-700 mb-2 block">Report Name *</label>
+                            <Input
+                                placeholder="e.g., January 2026 Salary Report"
+                                value={reportName}
+                                onChange={(e) => setReportName(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-slate-700 mb-2 block">Notes (optional)</label>
+                            <Input
+                                placeholder="Any additional notes..."
+                                value={reportNotes}
+                                onChange={(e) => setReportNotes(e.target.value)}
+                            />
+                        </div>
+                        <div className="bg-slate-50 p-3 rounded text-sm text-slate-600">
+                            <p><strong>Period:</strong> {finalReport?.date_from} to {finalReport?.date_to}</p>
+                            <p><strong>Employees:</strong> {dataToDisplay.length}</p>
+                            <p><strong>Company:</strong> {project?.company}</p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowSaveReportDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={handleSaveSalaryReport}
+                            disabled={isSavingReport || !reportName.trim()}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            {isSavingReport ? 'Saving...' : 'Save Report'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
                     </div>
                     );
                     }
