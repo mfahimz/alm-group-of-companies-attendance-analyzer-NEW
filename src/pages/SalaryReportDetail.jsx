@@ -129,22 +129,31 @@ export default function SalaryReportDetail() {
     };
 
     const calculateTotals = (row) => {
-        const leavePay = row.leavePay || 0;
-        const salaryLeaveAmount = row.salaryLeaveAmount || 0;
-        const normalOtSalary = getValue(row, 'normalOtSalary') || 0;
-        const specialOtSalary = getValue(row, 'specialOtSalary') || 0;
+        const divisor = row.salary_divisor || report?.salary_divisor || 30;
+        const totalSalary = row.total_salary || 0;
+        const workingHours = row.working_hours || 9;
+        
+        // Recalculate OT salaries based on current edits
+        const hourlyRate = totalSalary / divisor / workingHours;
+        const normalOtHours = getValue(row, 'normalOtHours') || 0;
+        const specialOtHours = getValue(row, 'specialOtHours') || 0;
+        const normalOtSalary = Math.round(hourlyRate * 1.25 * normalOtHours * 100) / 100;
+        const specialOtSalary = Math.round(hourlyRate * 1.5 * specialOtHours * 100) / 100;
         const totalOtSalary = normalOtSalary + specialOtSalary;
+        
         const bonus = getValue(row, 'bonus') || 0;
         const incentive = getValue(row, 'incentive') || 0;
         const otherDeduction = getValue(row, 'otherDeduction') || 0;
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
+        
+        // Use stored values for leave calculations (already calculated with correct divisor)
+        const netDeduction = row.netDeduction || 0;
         const deductibleHoursPay = row.deductibleHoursPay || 0;
 
-        const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-        const total = row.total_salary + totalOtSalary + bonus + incentive
+        const total = totalSalary + totalOtSalary + bonus + incentive
                       - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
 
-        return { total, wpsPay: total, balance: 0 };
+        return { total, wpsPay: total, balance: 0, normalOtSalary, specialOtSalary, totalOtSalary };
     };
 
     const handleSave = async () => {
@@ -157,15 +166,16 @@ export default function SalaryReportDetail() {
         try {
             // Merge edits into snapshot data
             const originalData = JSON.parse(report.snapshot_data);
-            const divisor = project?.salary_calculation_days || 30;
 
             const updatedData = originalData.map(row => {
                 const edits = editableData[row.hrms_id];
                 if (!edits) return row;
 
                 const updated = { ...row };
-                const totalSalary = row.total_salary;
-                const workingHours = row.working_hours;
+                const totalSalary = row.total_salary || 0;
+                const workingHours = row.working_hours || 9;
+                // Use divisor from snapshot (captured at finalization) or report level
+                const divisor = row.salary_divisor || report?.salary_divisor || 30;
                 const hourlyRate = totalSalary / divisor / workingHours;
 
                 // Apply edits
@@ -424,8 +434,7 @@ export default function SalaryReportDetail() {
                                             </TableCell>
                                         </TableRow>
                                     ) : filteredData.map((row) => {
-                                        const { total, wpsPay } = calculateTotals(row);
-                                        const totalOtSalary = (getValue(row, 'normalOtSalary') || 0) + (getValue(row, 'specialOtSalary') || 0);
+                                        const { total, wpsPay, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
                                         return (
                                             <TableRow key={row.hrms_id}>
                                                 <TableCell className="sticky left-0 bg-white z-10 font-medium">{row.attendance_id}</TableCell>
@@ -452,7 +461,7 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
-                                                <TableCell className="bg-blue-100">{(getValue(row, 'normalOtSalary') || 0).toFixed(2)}</TableCell>
+                                                <TableCell className="bg-blue-100">{normalOtSalary.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-cyan-50 p-1">
                                                     <Input
                                                         type="number"
@@ -462,7 +471,7 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </TableCell>
-                                                <TableCell className="bg-cyan-100">{(getValue(row, 'specialOtSalary') || 0).toFixed(2)}</TableCell>
+                                                <TableCell className="bg-cyan-100">{specialOtSalary.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-cyan-200 font-semibold">{totalOtSalary.toFixed(2)}</TableCell>
                                                 <TableCell className="bg-red-50 p-1">
                                                     <Input
