@@ -153,49 +153,6 @@ export default function SalaryTab({ project, finalReport }) {
         setBlockingError(error);
     }, [finalReport, salarySnapshots, loadingSnapshots]);
 
-    // Validate custom date range against finalized report
-    const validateDateRange = async (fromDate, toDate) => {
-        if (!fromDate || !toDate || !finalReport) {
-            setDateRangeValidation({ valid: true, missingDates: [] });
-            return;
-        }
-
-        setIsValidatingDates(true);
-
-        // Check if custom range is within finalized report range
-        const reportFrom = new Date(finalReport.date_from);
-        const reportTo = new Date(finalReport.date_to);
-        const customFrom = new Date(fromDate);
-        const customTo = new Date(toDate);
-
-        if (customFrom < reportFrom || customTo > reportTo) {
-            const missingDates = [];
-            if (customFrom < reportFrom) {
-                missingDates.push(`${fromDate} to ${finalReport.date_from} (before report start)`);
-            }
-            if (customTo > reportTo) {
-                missingDates.push(`${finalReport.date_to} to ${toDate} (after report end)`);
-            }
-            setDateRangeValidation({ valid: false, missingDates });
-            setIsValidatingDates(false);
-            return;
-        }
-
-        // All dates are within the finalized report range
-        setDateRangeValidation({ valid: true, missingDates: [] });
-        setIsValidatingDates(false);
-    };
-
-    // Debounced date validation
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            validateDateRange(customDateFrom, customDateTo);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [customDateFrom, customDateTo, finalReport]);
-
-
-
     // Map salary snapshots to display format with editable overrides
     const salaryData = useMemo(() => {
         // Only return snapshots if all validations pass
