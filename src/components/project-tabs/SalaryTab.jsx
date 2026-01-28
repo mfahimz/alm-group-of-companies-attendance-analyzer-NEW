@@ -629,91 +629,12 @@ export default function SalaryTab({ project, finalReport }) {
                             )}
                             {calculatedData && (
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                    <strong>✓ Recalculated:</strong> Salary data has been recalculated{customRangeData ? ` for ${customDateFrom} to ${customDateTo}` : ''}. Edit OT hours, bonuses, or deductions as needed and click "Save Changes".
+                                    <strong>✓ Recalculated:</strong> Salary data has been recalculated. Edit OT hours, bonuses, or deductions as needed and click "Save".
                                 </div>
                             )}
                             
                             <div className="space-y-4 mb-4">
                         <div className="bg-white rounded-lg p-4">
-                            {/* Date Range Selection */}
-                            <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Calendar className="w-5 h-5 text-indigo-600" />
-                                    <h4 className="font-semibold text-slate-800">Salary Report Date Range</h4>
-                                </div>
-                                <p className="text-xs text-slate-500 mb-3">
-                                    Select a custom date range within the finalized report period ({finalReport?.date_from} to {finalReport?.date_to})
-                                </p>
-                                <div className="flex flex-wrap gap-4 items-end">
-                                    <div>
-                                        <Label className="text-sm text-slate-600">From Date</Label>
-                                        <Input
-                                            type="date"
-                                            value={customDateFrom}
-                                            onChange={(e) => setCustomDateFrom(e.target.value)}
-                                            min={finalReport?.date_from}
-                                            max={customDateTo || finalReport?.date_to}
-                                            className="w-40"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="text-sm text-slate-600">To Date</Label>
-                                        <Input
-                                            type="date"
-                                            value={customDateTo}
-                                            onChange={(e) => setCustomDateTo(e.target.value)}
-                                            min={customDateFrom || finalReport?.date_from}
-                                            max={finalReport?.date_to}
-                                            className="w-40"
-                                        />
-                                    </div>
-                                    <Button
-                                        onClick={recalculateForCustomDateRange}
-                                        disabled={isCalculating || !dateRangeValidation.valid || !customDateFrom || !customDateTo}
-                                        className="bg-indigo-600 hover:bg-indigo-700"
-                                    >
-                                        <DollarSign className="w-4 h-4 mr-2" />
-                                        {isCalculating ? 'Calculating...' : 'Calculate for Range'}
-                                    </Button>
-                                    {(customDateFrom !== finalReport?.date_from || customDateTo !== finalReport?.date_to) && (
-                                        <Button
-                                            variant="outline"
-                                            onClick={resetToFullPeriod}
-                                            className="text-slate-600"
-                                        >
-                                            <X className="w-4 h-4 mr-2" />
-                                            Reset to Full Period
-                                        </Button>
-                                    )}
-                                </div>
-
-                                {/* Date Range Validation Warning */}
-                                {!dateRangeValidation.valid && dateRangeValidation.missingDates.length > 0 && (
-                                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                        <div className="flex items-start gap-2">
-                                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-                                            <div>
-                                                <p className="text-sm font-semibold text-red-800">Invalid Date Range</p>
-                                                <p className="text-xs text-red-700 mt-1">
-                                                    The selected dates are outside the finalized report period. Missing dates:
-                                                </p>
-                                                <ul className="list-disc list-inside text-xs text-red-600 mt-1">
-                                                    {dateRangeValidation.missingDates.map((date, i) => (
-                                                        <li key={i}>{date}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {customRangeData && (
-                                    <div className="mt-3 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700">
-                                        <strong>Custom Range Active:</strong> Showing data for {customDateFrom} to {customDateTo}
-                                    </div>
-                                )}
-                            </div>
-
                             {/* Search and Actions Row */}
                             <div className="flex flex-col md:flex-row gap-4 items-end">
                                 {/* Search Box */}
