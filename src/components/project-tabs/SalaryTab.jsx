@@ -1,50 +1,31 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, FileSpreadsheet, Save, Filter, X, Search, Download, FileText, Trash2, Eye, Plus } from 'lucide-react';
+import { DollarSign, FileSpreadsheet, Download, Trash2, Eye, Plus, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
-import SortableTableHead from '../ui/SortableTableHead';
+import { Label } from '@/components/ui/label';
 
 export default function SalaryTab({ project, finalReport }) {
     const queryClient = useQueryClient();
     
     // ============================================
-    // STATE DECLARATIONS (MUST BE FIRST)
+    // STATE DECLARATIONS
     // ============================================
-    const [blockingError, setBlockingError] = useState(null);
-    const [editableData, setEditableData] = useState({});
-    const [isSaving, setIsSaving] = useState(false);
-    const [departmentFilter, setDepartmentFilter] = useState('all');
-    const [sortColumn, setSortColumn] = useState({ key: 'department', direction: 'asc' });
     const [salaryUnlocked, setSalaryUnlocked] = useState(false);
-    const [isCalculating, setIsCalculating] = useState(false);
-    const [calculatedData, setCalculatedData] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [advancedFilters, setAdvancedFilters] = useState({
-        salaryMin: '',
-        salaryMax: '',
-        leaveDaysMin: '',
-        leaveDaysMax: '',
-        deductionMin: '',
-        deductionMax: ''
-    });
-    const [showSaveReportDialog, setShowSaveReportDialog] = useState(false);
-    const [reportName, setReportName] = useState('');
-    const [reportNotes, setReportNotes] = useState('');
-    const [isSavingReport, setIsSavingReport] = useState(false);
-    const [showSavedReports, setShowSavedReports] = useState(false);
-    
-
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+    const [newReportName, setNewReportName] = useState('');
+    const [newReportDateFrom, setNewReportDateFrom] = useState('');
+    const [newReportDateTo, setNewReportDateTo] = useState('');
 
     // ============================================
     // QUERIES
@@ -54,435 +35,302 @@ export default function SalaryTab({ project, finalReport }) {
         queryFn: () => base44.auth.me()
     });
 
-    const { data: employees = [], isLoading: loadingEmployees } = useQuery({
-        queryKey: ['employees', project?.company],
-        queryFn: () => base44.entities.Employee.filter({ company: project.company, active: true }),
-        enabled: !!project?.company,
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
-
-    const { data: salaries = [], isLoading: loadingSalaries } = useQuery({
-        queryKey: ['salaries', project?.company],
-        queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
-        enabled: !!project?.company,
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
-
-    const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
-        queryKey: ['salarySnapshots', project?.id, finalReport?.id],
-        queryFn: async () => {
-            console.log('[SalaryTab] Fetching snapshots for project:', project?.id, 'report:', finalReport?.id);
-            const snapshots = await base44.entities.SalarySnapshot.filter({
-                project_id: project.id,
-                report_run_id: finalReport.id
-            });
-            console.log('[SalaryTab] Fetched', snapshots.length, 'snapshots');
-            return snapshots;
-        },
-        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
-        staleTime: 0,
-        gcTime: 10 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: true
-    });
-
     // Fetch saved salary reports
     const { data: savedSalaryReports = [], isLoading: loadingSavedReports, refetch: refetchSavedReports } = useQuery({
         queryKey: ['salaryReports', project?.id],
-        queryFn: () => base44.entities.SalaryReport.filter({ project_id: project.id }),
+        queryFn: () => base44.entities.SalaryReport.filter({ project_id: project.id }, '-created_date'),
         enabled: !!project?.id,
         staleTime: 5 * 60 * 1000
     });
 
+    // Fetch salary snapshots for generating reports
+    const { data: salarySnapshots = [] } = useQuery({
+        queryKey: ['salarySnapshots', project?.id, finalReport?.id],
+        queryFn: async () => {
+            const snapshots = await base44.entities.SalarySnapshot.filter({
+                project_id: project.id,
+                report_run_id: finalReport.id
+            });
+            return snapshots;
+        },
+        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
+        staleTime: 0
+    });
 
+    // Fetch exceptions for date range filtering
+    const { data: exceptions = [] } = useQuery({
+        queryKey: ['exceptions', project?.id],
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        enabled: !!project?.id,
+        staleTime: 5 * 60 * 1000
+    });
 
     // ============================================
     // DERIVED VALUES
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
+    const hasFinalReport = finalReport && finalReport.is_final === true;
 
     // ============================================
-    // EFFECTS
+    // HANDLERS
     // ============================================
-    
-    // Validate consistency of finalized report and snapshots
-    useEffect(() => {
-        let error = null;
 
-        if (!finalReport) {
-            error = 'No finalized report found. Please finalize a report in the Report Tab first.';
-        } else if (finalReport.is_final !== true) {
-            error = 'Selected report is not marked as final.';
-        } else if (loadingSnapshots) {
-            error = null; // Still loading, don't show error yet
-        } else if (salarySnapshots.length === 0) {
-            error = 'Salary snapshots not found. Report may need to be finalized again.';
-        } else {
-            const allSameReportId = salarySnapshots.every(s => s.report_run_id === finalReport.id);
-            if (!allSameReportId) {
-                error = 'Snapshots belong to different reports. Data integrity error.';
-            }
+    // Initialize date range when opening dialog
+    const handleOpenGenerateDialog = () => {
+        if (finalReport) {
+            setNewReportDateFrom(finalReport.date_from);
+            setNewReportDateTo(finalReport.date_to);
+            setNewReportName(`Salary Report ${finalReport.date_from} to ${finalReport.date_to}`);
         }
-
-        setBlockingError(error);
-    }, [finalReport, salarySnapshots, loadingSnapshots]);
-
-    // Map salary snapshots to display format with editable overrides
-    const salaryData = useMemo(() => {
-        // Only return snapshots if all validations pass
-        if (blockingError || !finalReport || salarySnapshots.length === 0) {
-            return [];
-        }
-
-        return salarySnapshots.map(snapshot => ({
-            ...snapshot,
-            // These are the only editable fields in salary tab
-            // All other values come from immutable snapshot
-            normalOtHours: editableData[snapshot.hrms_id]?.normalOtHours ?? 0,
-            specialOtHours: editableData[snapshot.hrms_id]?.specialOtHours ?? 0,
-            otherDeduction: editableData[snapshot.hrms_id]?.otherDeduction ?? 0,
-            bonus: editableData[snapshot.hrms_id]?.bonus ?? 0,
-            incentive: editableData[snapshot.hrms_id]?.incentive ?? 0,
-            advanceSalaryDeduction: editableData[snapshot.hrms_id]?.advanceSalaryDeduction ?? 0
-        }));
-    }, [salarySnapshots, editableData, blockingError, finalReport]);
-
-    // Get unique departments for filter
-    const departments = useMemo(() => {
-        const depts = [...new Set(salaryData.map(item => item.department).filter(Boolean))];
-        return depts.sort();
-    }, [salaryData]);
-
-    // Filter and sort salary data (use calculated data if available, otherwise use original)
-    const dataToDisplay = calculatedData || salaryData;
-    const filteredSalaryData = useMemo(() => {
-        let filtered = dataToDisplay;
-        
-        // Apply department filter
-        if (departmentFilter !== 'all') {
-            filtered = filtered.filter(item => item.department === departmentFilter);
-        }
-
-        // Apply search filter (name, attendance_id, department)
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(item =>
-                item.name.toLowerCase().includes(query) ||
-                item.attendance_id.toString().includes(query) ||
-                (item.department && item.department.toLowerCase().includes(query))
-            );
-        }
-
-        // Apply advanced filters
-        if (advancedFilters.salaryMin) {
-            const min = parseFloat(advancedFilters.salaryMin);
-            filtered = filtered.filter(item => item.total_salary >= min);
-        }
-        if (advancedFilters.salaryMax) {
-            const max = parseFloat(advancedFilters.salaryMax);
-            filtered = filtered.filter(item => item.total_salary <= max);
-        }
-        if (advancedFilters.leaveDaysMin) {
-            const min = parseFloat(advancedFilters.leaveDaysMin);
-            filtered = filtered.filter(item => item.leaveDays >= min);
-        }
-        if (advancedFilters.leaveDaysMax) {
-            const max = parseFloat(advancedFilters.leaveDaysMax);
-            filtered = filtered.filter(item => item.leaveDays <= max);
-        }
-        if (advancedFilters.deductionMin) {
-            const min = parseFloat(advancedFilters.deductionMin);
-            filtered = filtered.filter(item => (item.total_salary - item.total) >= min);
-        }
-        if (advancedFilters.deductionMax) {
-            const max = parseFloat(advancedFilters.deductionMax);
-            filtered = filtered.filter(item => (item.total_salary - item.total) <= max);
-        }
-
-        // Apply sorting
-        const sorted = [...filtered].sort((a, b) => {
-            let compareResult = 0;
-            
-            const key = sortColumn.key;
-            const aVal = a[key];
-            const bVal = b[key];
-            
-            if (typeof aVal === 'string') {
-                compareResult = (aVal || '').localeCompare(bVal || '');
-            } else if (typeof aVal === 'number') {
-                compareResult = aVal - bVal;
-            }
-            
-            return sortColumn.direction === 'asc' ? compareResult : -compareResult;
-        });
-        
-        return sorted;
-    }, [dataToDisplay, departmentFilter, searchQuery, advancedFilters, sortColumn]);
-
-    // Check if any filters are active
-    const hasActiveFilters = searchQuery.trim() || 
-                            departmentFilter !== 'all' || 
-                            Object.values(advancedFilters).some(v => v);
-
-    // Handle clear all filters
-    const handleClearFilters = () => {
-        setSearchQuery('');
-        setDepartmentFilter('all');
-        setAdvancedFilters({
-            salaryMin: '',
-            salaryMax: '',
-            leaveDaysMin: '',
-            leaveDaysMax: '',
-            deductionMin: '',
-            deductionMax: ''
-        });
+        setShowGenerateDialog(true);
     };
 
-    // Handle input change for editable fields - fix focus issue
-    const handleChange = (hrmsId, field, value) => {
-        setEditableData(prev => {
-            const numValue = value === '' ? 0 : parseFloat(value) || 0;
-            return {
-                ...prev,
-                [hrmsId]: {
-                    ...(prev[hrmsId] || {}),
-                    [field]: numValue
-                }
-            };
-        });
-    };
-
-    // Get value (either from editableData or original data)
-    const getValue = (row, field) => {
-        return editableData[row.hrms_id]?.[field] ?? row[field];
-    };
-
-    // Calculate totals dynamically
-    const calculateTotals = (row) => {
-        const leavePay = getValue(row, 'leavePay') || 0;
-        const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount') || 0;
-        const normalOtSalary = getValue(row, 'normalOtSalary') || 0;
-        const specialOtSalary = getValue(row, 'specialOtSalary') || 0;
-        const totalOtSalary = normalOtSalary + specialOtSalary;
-        const bonus = getValue(row, 'bonus') || 0;
-        const incentive = getValue(row, 'incentive') || 0;
-        const otherDeduction = getValue(row, 'otherDeduction') || 0;
-        const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
-        const deductibleHoursPay = getValue(row, 'deductibleHoursPay') || 0;
-
-        const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-        const total = row.total_salary + totalOtSalary + bonus + incentive
-                      - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
-        const wpsPay = total;
-        const balance = 0;
-
-        return { total, wpsPay, balance };
-    };
-
-    // Recalculate ALL dependent fields (leave pay, OT salary, etc.)
-    const recalculateDependentFields = (dataToRecalculate) => {
-        const recalculated = { ...dataToRecalculate };
-
-        Object.keys(recalculated).forEach(hrmsId => {
-            const row = dataToDisplay.find(r => r.hrms_id === hrmsId);
-            if (!row) return;
-
-            const employeeEdits = recalculated[hrmsId];
-            const totalSalary = row.total_salary;
-            const workingHours = row.working_hours;
-
-            // NOTE: leaveDays and salaryLeaveDays are READ-ONLY and fetched from report/exceptions
-            // They cannot be edited, so no recalculation needed here
-
-            const divisor = project.salary_calculation_days || 30;
-
-            // Recalculate Normal OT Salary if normalOtHours was edited
-            if ('normalOtHours' in employeeEdits) {
-                const normalOtHours = employeeEdits.normalOtHours;
-                const hourlyRate = totalSalary / divisor / workingHours;
-                const normalOtRate = hourlyRate * 1.25;
-                recalculated[hrmsId].normalOtSalary = normalOtRate * normalOtHours;
-            }
-
-            // Recalculate Special OT Salary if specialOtHours was edited
-            if ('specialOtHours' in employeeEdits) {
-                const specialOtHours = employeeEdits.specialOtHours;
-                const hourlyRate = totalSalary / divisor / workingHours;
-                const specialOtRate = hourlyRate * 1.5;
-                recalculated[hrmsId].specialOtSalary = specialOtRate * specialOtHours;
-            }
-        });
-
-        return recalculated;
-    };
-
-    // Recalculate totals based on edits (OT hours, bonuses, deductions only)
-    const handleRecalculateTotals = async () => {
-        if (!finalReport?.id) {
-            toast.error('No finalized report found');
+    // Generate new salary report
+    const handleGenerateReport = async () => {
+        if (!newReportName.trim()) {
+            toast.error('Please enter a report name');
             return;
         }
-
+        if (!newReportDateFrom || !newReportDateTo) {
+            toast.error('Please select date range');
+            return;
+        }
         if (salarySnapshots.length === 0) {
             toast.error('No salary snapshots available. Please finalize the report first.');
             return;
         }
 
-        setIsCalculating(true);
+        setIsGenerating(true);
         try {
             const divisor = project.salary_calculation_days || 30;
+            const dateFrom = new Date(newReportDateFrom);
+            const dateTo = new Date(newReportDateTo);
 
-            // Recalculate OT salaries based on editable hours
-            const calculatedWithEdits = salarySnapshots.map(snapshot => {
-                const edits = editableData[snapshot.hrms_id];
+            // Calculate salary data for the selected date range
+            const calculatedData = salarySnapshots.map(snapshot => {
                 const updated = { ...snapshot };
 
-                // Get edited OT hours or use existing values
-                const normalOtHours = edits?.normalOtHours ?? snapshot.normalOtHours ?? 0;
-                const specialOtHours = edits?.specialOtHours ?? snapshot.specialOtHours ?? 0;
+                // If custom date range (not full period), recalculate attendance metrics
+                if (newReportDateFrom !== finalReport.date_from || newReportDateTo !== finalReport.date_to) {
+                    // Get exceptions for this employee in the date range
+                    const empExceptions = exceptions.filter(e => 
+                        (String(e.attendance_id) === String(snapshot.attendance_id) || e.attendance_id === 'ALL') &&
+                        e.use_in_analysis !== false
+                    );
 
-                // Recalculate OT salaries
-                const totalSalary = snapshot.total_salary;
-                const workingHours = snapshot.working_hours;
-                const hourlyRate = totalSalary / divisor / workingHours;
+                    let presentDays = 0;
+                    let lopDays = 0;
+                    let annualLeaveDays = 0;
+                    let sickLeaveDays = 0;
+                    let workingDays = 0;
+                    let salaryLeaveDays = 0;
 
-                const normalOtRate = hourlyRate * 1.25;
-                const specialOtRate = hourlyRate * 1.5;
+                    // Iterate through each day in the range
+                    const currentDate = new Date(dateFrom);
+                    while (currentDate <= dateTo) {
+                        const dateStr = currentDate.toISOString().split('T')[0];
+                        const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
 
-                updated.normalOtHours = normalOtHours;
-                updated.normalOtSalary = Math.round(normalOtRate * normalOtHours * 100) / 100;
-                updated.specialOtHours = specialOtHours;
-                updated.specialOtSalary = Math.round(specialOtRate * specialOtHours * 100) / 100;
-                updated.totalOtSalary = Math.round((updated.normalOtSalary + updated.specialOtSalary) * 100) / 100;
+                        // Check if it's a weekly off
+                        const isWeeklyOff = dayOfWeek === snapshot.weekly_off;
 
-                // Apply other editable deductions and additions
-                updated.otherDeduction = edits?.otherDeduction ?? snapshot.otherDeduction ?? 0;
-                updated.bonus = edits?.bonus ?? snapshot.bonus ?? 0;
-                updated.incentive = edits?.incentive ?? snapshot.incentive ?? 0;
-                updated.advanceSalaryDeduction = edits?.advanceSalaryDeduction ?? snapshot.advanceSalaryDeduction ?? 0;
+                        // Check for public holiday
+                        const publicHoliday = empExceptions.find(e =>
+                            e.type === 'PUBLIC_HOLIDAY' &&
+                            e.attendance_id === 'ALL' &&
+                            dateStr >= e.date_from && dateStr <= e.date_to
+                        );
+
+                        if (!isWeeklyOff && !publicHoliday) {
+                            workingDays++;
+
+                            // Check for leave exceptions
+                            const annualLeave = empExceptions.find(e =>
+                                e.type === 'ANNUAL_LEAVE' &&
+                                dateStr >= e.date_from && dateStr <= e.date_to
+                            );
+                            const sickLeave = empExceptions.find(e =>
+                                e.type === 'SICK_LEAVE' &&
+                                dateStr >= e.date_from && dateStr <= e.date_to
+                            );
+                            const manualAbsent = empExceptions.find(e =>
+                                e.type === 'MANUAL_ABSENT' &&
+                                dateStr >= e.date_from && dateStr <= e.date_to
+                            );
+                            const manualPresent = empExceptions.find(e =>
+                                e.type === 'MANUAL_PRESENT' &&
+                                dateStr >= e.date_from && dateStr <= e.date_to
+                            );
+
+                            if (annualLeave) {
+                                annualLeaveDays++;
+                                if (annualLeave.salary_leave_days) {
+                                    salaryLeaveDays += annualLeave.salary_leave_days / 
+                                        (Math.ceil((new Date(annualLeave.date_to) - new Date(annualLeave.date_from)) / (1000 * 60 * 60 * 24)) + 1);
+                                }
+                            } else if (sickLeave) {
+                                sickLeaveDays++;
+                            } else if (manualAbsent) {
+                                lopDays++;
+                            } else if (manualPresent) {
+                                presentDays++;
+                            } else {
+                                // Check original snapshot for this day's status
+                                // For simplicity, proportionally distribute from original
+                                const originalWorkingDays = snapshot.working_days || 1;
+                                const dayRatio = 1 / originalWorkingDays;
+                                presentDays += (snapshot.present_days || 0) * dayRatio;
+                            }
+                        }
+
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+
+                    // Use proportional calculation for custom ranges
+                    const originalWorkingDays = snapshot.working_days || 1;
+                    const rangeRatio = workingDays / originalWorkingDays;
+
+                    updated.working_days = workingDays;
+                    updated.present_days = Math.round(presentDays * 100) / 100;
+                    updated.full_absence_count = lopDays || Math.round((snapshot.full_absence_count || 0) * rangeRatio * 100) / 100;
+                    updated.annual_leave_count = annualLeaveDays || Math.round((snapshot.annual_leave_count || 0) * rangeRatio * 100) / 100;
+                    updated.sick_leave_count = sickLeaveDays || Math.round((snapshot.sick_leave_count || 0) * rangeRatio * 100) / 100;
+                    updated.salary_leave_days = salaryLeaveDays;
+
+                    // Recalculate leave pay
+                    const totalSalary = snapshot.total_salary;
+                    const leaveDays = updated.annual_leave_count + updated.full_absence_count;
+                    updated.leaveDays = leaveDays;
+                    updated.leavePay = Math.round((totalSalary / divisor) * leaveDays * 100) / 100;
+
+                    // Recalculate salary leave amount
+                    const workingHours = snapshot.working_hours;
+                    if (updated.annual_leave_count > 0) {
+                        if (workingHours === 8) {
+                            updated.salaryLeaveAmount = Math.round((totalSalary / divisor) * updated.annual_leave_count * 100) / 100;
+                        } else if (workingHours === 9) {
+                            const adjustedSalary = totalSalary * 0.8767;
+                            updated.salaryLeaveAmount = Math.round((adjustedSalary / divisor) * updated.annual_leave_count * 100) / 100;
+                        }
+                    } else {
+                        updated.salaryLeaveAmount = 0;
+                    }
+
+                    updated.netDeduction = Math.max(0, updated.leavePay - updated.salaryLeaveAmount);
+
+                    // Proportionally scale deductible minutes
+                    updated.deductible_minutes = Math.round((snapshot.deductible_minutes || 0) * rangeRatio);
+                    updated.deductibleHours = updated.deductible_minutes / 60;
+                    const hourlyRate = totalSalary / divisor / workingHours;
+                    updated.deductibleHoursPay = Math.round(updated.deductibleHours * hourlyRate * 100) / 100;
+                }
 
                 // Recalculate total
-                const finalTotal = snapshot.total_salary + updated.totalOtSalary + updated.bonus + updated.incentive
-                                    - snapshot.netDeduction - snapshot.deductibleHoursPay - updated.otherDeduction - updated.advanceSalaryDeduction;
+                const totalSalary = updated.total_salary;
+                const normalOtSalary = updated.normalOtSalary || 0;
+                const specialOtSalary = updated.specialOtSalary || 0;
+                const totalOtSalary = normalOtSalary + specialOtSalary;
+                const bonus = updated.bonus || 0;
+                const incentive = updated.incentive || 0;
+                const otherDeduction = updated.otherDeduction || 0;
+                const advanceSalaryDeduction = updated.advanceSalaryDeduction || 0;
+                const netDeduction = updated.netDeduction || 0;
+                const deductibleHoursPay = updated.deductibleHoursPay || 0;
+
+                const finalTotal = totalSalary + totalOtSalary + bonus + incentive
+                                    - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
 
                 updated.total = Math.round(finalTotal * 100) / 100;
                 updated.wpsPay = Math.round(finalTotal * 100) / 100;
+                updated.balance = 0;
 
                 return updated;
             });
 
-            setCalculatedData(calculatedWithEdits);
-            toast.success('Salary data recalculated successfully');
-        } catch (error) {
-            toast.error('Failed to recalculate salaries: ' + error.message);
-        } finally {
-            setIsCalculating(false);
-        }
-    };
-
-    // Save salary report (store current data as a named report)
-    const handleSaveSalaryReport = async () => {
-        if (!reportName.trim()) {
-            toast.error('Please enter a report name');
-            return;
-        }
-
-        const dataToSave = calculatedData || dataToDisplay;
-        if (dataToSave.length === 0) {
-            toast.error('No salary data to save');
-            return;
-        }
-
-        setIsSavingReport(true);
-        try {
             // Calculate totals
             let totalSalaryAmount = 0;
             let totalDeductions = 0;
             let totalOtSalary = 0;
 
-            dataToSave.forEach(row => {
+            calculatedData.forEach(row => {
                 totalSalaryAmount += row.total || 0;
                 totalDeductions += (row.netDeduction || 0) + (row.deductibleHoursPay || 0) + (row.otherDeduction || 0) + (row.advanceSalaryDeduction || 0);
                 totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
             });
 
+            // Save the report
             await base44.entities.SalaryReport.create({
                 project_id: project.id,
                 report_run_id: finalReport.id,
-                report_name: reportName.trim(),
-                date_from: finalReport.date_from,
-                date_to: finalReport.date_to,
+                report_name: newReportName.trim(),
+                date_from: newReportDateFrom,
+                date_to: newReportDateTo,
                 company: project.company,
-                employee_count: dataToSave.length,
+                employee_count: calculatedData.length,
                 total_salary_amount: Math.round(totalSalaryAmount * 100) / 100,
                 total_deductions: Math.round(totalDeductions * 100) / 100,
                 total_ot_salary: Math.round(totalOtSalary * 100) / 100,
-                snapshot_data: JSON.stringify(dataToSave),
+                snapshot_data: JSON.stringify(calculatedData),
                 generated_by: currentUser?.email,
-                notes: reportNotes.trim() || null
+                notes: null
             });
 
-            toast.success(`Salary report "${reportName}" saved successfully`);
-            setShowSaveReportDialog(false);
-            setReportName('');
-            setReportNotes('');
+            toast.success(`Salary report "${newReportName}" generated successfully`);
+            setShowGenerateDialog(false);
+            setNewReportName('');
             refetchSavedReports();
         } catch (error) {
-            toast.error('Failed to save salary report: ' + error.message);
+            toast.error('Failed to generate report: ' + error.message);
         } finally {
-            setIsSavingReport(false);
+            setIsGenerating(false);
         }
     };
 
     // Export salary report to Excel
-    const handleExportToExcel = (data, filename) => {
-        const exportData = data.map(row => ({
-            'Attendance ID': row.attendance_id,
-            'Name': row.name,
-            'Department': row.department || '-',
-            'Working Hours/Day': row.working_hours,
-            'Basic Salary': row.basic_salary,
-            'Total Salary': row.total_salary,
-            'Working Days': row.working_days,
-            'Present Days': row.present_days,
-            'LOP Days': row.full_absence_count,
-            'Annual Leave Days': row.annual_leave_count,
-            'Sick Leave Days': row.sick_leave_count,
-            'Leave Days': row.leaveDays,
-            'Leave Pay': row.leavePay,
-            'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
-            'Salary Leave Amount': row.salaryLeaveAmount,
-            'Normal OT Hours': row.normalOtHours || 0,
-            'Normal OT Salary': row.normalOtSalary || 0,
-            'Special OT Hours': row.specialOtHours || 0,
-            'Special OT Salary': row.specialOtSalary || 0,
-            'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
-            'Deductible Hours': row.deductibleHours || 0,
-            'Deductible Hours Pay': row.deductibleHoursPay || 0,
-            'Other Deduction': row.otherDeduction || 0,
-            'Bonus': row.bonus || 0,
-            'Incentive': row.incentive || 0,
-            'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
-            'Total': row.total,
-            'WPS Pay': row.wpsPay,
-            'Balance': row.balance || 0
-        }));
+    const handleExportToExcel = (report) => {
+        try {
+            const data = JSON.parse(report.snapshot_data);
+            const exportData = data.map(row => ({
+                'Attendance ID': row.attendance_id,
+                'Name': row.name,
+                'Department': row.department || '-',
+                'Working Hours/Day': row.working_hours,
+                'Basic Salary': row.basic_salary,
+                'Total Salary': row.total_salary,
+                'Working Days': row.working_days,
+                'Present Days': row.present_days,
+                'LOP Days': row.full_absence_count,
+                'Annual Leave Days': row.annual_leave_count,
+                'Sick Leave Days': row.sick_leave_count,
+                'Leave Days': row.leaveDays,
+                'Leave Pay': row.leavePay,
+                'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
+                'Salary Leave Amount': row.salaryLeaveAmount,
+                'Normal OT Hours': row.normalOtHours || 0,
+                'Normal OT Salary': row.normalOtSalary || 0,
+                'Special OT Hours': row.specialOtHours || 0,
+                'Special OT Salary': row.specialOtSalary || 0,
+                'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
+                'Deductible Hours': row.deductibleHours || 0,
+                'Deductible Hours Pay': row.deductibleHoursPay || 0,
+                'Other Deduction': row.otherDeduction || 0,
+                'Bonus': row.bonus || 0,
+                'Incentive': row.incentive || 0,
+                'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
+                'Total': row.total,
+                'WPS Pay': row.wpsPay,
+                'Balance': row.balance || 0
+            }));
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
-        XLSX.writeFile(wb, `${filename}.xlsx`);
-        toast.success('Excel file downloaded');
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
+            XLSX.writeFile(wb, `${report.report_name}_${report.date_from}_to_${report.date_to}.xlsx`);
+            toast.success('Excel file downloaded');
+        } catch (error) {
+            toast.error('Failed to export report');
+        }
     };
 
     // Delete saved salary report
@@ -498,45 +346,9 @@ export default function SalaryTab({ project, finalReport }) {
         }
     };
 
-    // View/Export saved report
-    const handleViewSavedReport = (report) => {
-        try {
-            const data = JSON.parse(report.snapshot_data);
-            handleExportToExcel(data, `${report.report_name}_${report.date_from}_to_${report.date_to}`);
-        } catch (error) {
-            toast.error('Failed to load report data');
-        }
-    };
-
-    // Save all changes to backend
-    const handleSave = async () => {
-        if (Object.keys(editableData).length === 0) {
-            toast.info('No changes to save');
-            return;
-        }
-
-        setIsSaving(true);
-        try {
-            const response = await base44.functions.invoke('saveSalaryEdits', {
-                project_id: project.id,
-                report_run_id: finalReport.id,
-                edits: editableData
-            });
-
-            if (response.data.success) {
-                toast.success(`Saved editable values for ${response.data.updated_count} employees`);
-                setEditableData({}); // Clear editable data after save
-                // Refetch snapshots to get updated values
-                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id, finalReport?.id] });
-            } else {
-                toast.error('Failed to save: ' + (response.data.error || 'Unknown error'));
-            }
-        } catch (error) {
-            toast.error('Failed to save salary data: ' + error.message);
-        } finally {
-            setIsSaving(false);
-        }
-    };
+    // ============================================
+    // RENDER
+    // ============================================
 
     if (!isAdminOrCEO) {
         return (
@@ -549,415 +361,209 @@ export default function SalaryTab({ project, finalReport }) {
         );
     }
 
-    if (loadingEmployees || loadingSalaries || loadingSnapshots) {
-        return (
-            <Card className="border-0 shadow-lg">
-                <CardContent className="p-12 text-center">
-                    <p className="text-slate-600">Loading salary data...</p>
-                </CardContent>
-            </Card>
-        );
-    }
-
-
-
     return (
         <div className="space-y-6">
             <PINLock onUnlock={(unlocked) => setSalaryUnlocked(unlocked)} storageKey="salary_tab_pin" />
+            
             {!salaryUnlocked && (
                 <Card className="border-0 shadow-lg">
                     <CardContent className="p-12 text-center">
-                        <p className="text-slate-600">Please unlock the salary section to view the salary table.</p>
+                        <p className="text-slate-600">Please unlock the salary section to view salary reports.</p>
                     </CardContent>
                 </Card>
             )}
+
             {salaryUnlocked && (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-50 to-purple-50">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <DollarSign className="w-6 h-6 text-indigo-600" />
-                        Salary Calculation - {project.company}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {blockingError ? (
-                        <div className="text-center py-12">
-                            <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                            <p className="text-slate-700 text-lg font-semibold">{blockingError}</p>
-                            <p className="text-slate-600 text-sm mt-3">
-                                No finalized attendance report exists for this date range.
-                            </p>
-                            <Button className="mt-4 bg-indigo-600 hover:bg-indigo-700" onClick={() => window.location.hash = '#?tab=report'}>
-                                Go to Report Tab
-                            </Button>
-                        </div>
-                    ) : loadingSnapshots ? (
-                        <div className="text-center py-12">
-                            <p className="text-slate-600">Loading salary data...</p>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Finalized Report Info */}
-                            {finalReport && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                    <strong>✓ Finalized Report:</strong> {finalReport.report_name || 'Report'} ({finalReport.date_from} to {finalReport.date_to})
-                                    {finalReport.finalized_by && <span className="ml-2 text-xs">— Finalized by {finalReport.finalized_by}</span>}
-                                </div>
-                            )}
-                            {salarySnapshots.length > 0 && !calculatedData && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-                                    <strong>ℹ️ Snapshots Ready:</strong> Click "Recalculate Totals" to apply any OT hours, bonuses, or deductions you've entered.
-                                </div>
-                            )}
-                            {calculatedData && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                    <strong>✓ Recalculated:</strong> Salary data has been recalculated. Edit OT hours, bonuses, or deductions as needed and click "Save".
-                                </div>
-                            )}
-                            
-                            <div className="space-y-4 mb-4">
-                        <div className="bg-white rounded-lg p-4">
-                            {/* Search and Actions Row */}
-                            <div className="flex flex-col md:flex-row gap-4 items-end">
-                                {/* Search Box */}
-                                <div className="flex-1">
-                                    <label className="text-sm font-medium text-slate-700 mb-2 block">Search Employees</label>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search by name, ID, or department..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex gap-2 flex-wrap">
-                                    <Button 
-                                        onClick={handleRecalculateTotals} 
-                                        disabled={isCalculating || !finalReport || salarySnapshots.length === 0}
-                                        className="bg-indigo-600 hover:bg-indigo-700"
-                                    >
-                                        <DollarSign className="w-4 h-4 mr-2" />
-                                        {isCalculating ? 'Recalculating...' : 'Recalculate'}
-                                    </Button>
-                                    <Button 
-                                        onClick={handleSave} 
-                                        disabled={isSaving || Object.keys(editableData).length === 0}
-                                        className="bg-green-600 hover:bg-green-700"
-                                    >
-                                        <Save className="w-4 h-4 mr-2" />
-                                        {isSaving ? 'Saving...' : 'Save'}
-                                    </Button>
-                                    <Button 
-                                        onClick={() => setShowSaveReportDialog(true)}
-                                        disabled={dataToDisplay.length === 0}
-                                        variant="outline"
-                                        className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                                    >
-                                        <FileText className="w-4 h-4 mr-2" />
-                                        Save Report
-                                    </Button>
-                                    <Link to={createPageUrl('SalaryReportGenerator') + `?projectId=${project.id}&reportRunId=${finalReport?.id}`}>
-                                        <Button 
-                                            variant="outline"
-                                            className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                                        >
-                                            <Plus className="w-4 h-4 mr-2" />
-                                            Custom Date Report
-                                        </Button>
-                                    </Link>
-                                    <Button 
-                                        onClick={() => handleExportToExcel(calculatedData || dataToDisplay, `Salary_${project.company}_${finalReport?.date_from}_to_${finalReport?.date_to}`)}
-                                        disabled={dataToDisplay.length === 0}
-                                        variant="outline"
-                                        className="border-green-300 text-green-700 hover:bg-green-50"
-                                    >
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Export Excel
-                                    </Button>
-                                </div>
+                <Card className="border-0 shadow-lg">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                            <DollarSign className="w-6 h-6 text-indigo-600" />
+                            Salary Reports - {project.company}
+                        </CardTitle>
+                        <Button 
+                            onClick={handleOpenGenerateDialog}
+                            disabled={!hasFinalReport || salarySnapshots.length === 0}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Generate New Report
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        {/* Info Banner */}
+                        {!hasFinalReport ? (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                                <p className="text-amber-800">
+                                    <strong>No finalized report found.</strong> Please finalize a report in the Report Tab first to generate salary reports.
+                                </p>
+                                <Button 
+                                    className="mt-3 bg-amber-600 hover:bg-amber-700" 
+                                    onClick={() => window.location.hash = '#?tab=report'}
+                                >
+                                    Go to Report Tab
+                                </Button>
                             </div>
-
-                            {/* Results Count */}
-                            <div className="mt-4 text-sm text-slate-600">
-                                <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
+                        ) : (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 text-sm text-green-800">
+                                <strong>✓ Finalized Report:</strong> {finalReport.report_name || 'Report'} ({finalReport.date_from} to {finalReport.date_to})
+                                {finalReport.finalized_by && <span className="ml-2 text-xs">— Finalized by {finalReport.finalized_by}</span>}
                             </div>
+                        )}
 
-                        </div>
-
-                            {/* Saved Salary Reports Table */}
-                            {savedSalaryReports.length > 0 && (
-                                <div className="mt-6 bg-white rounded-lg border border-slate-200">
-                                    <div className="p-4 border-b border-slate-200">
-                                        <h3 className="text-lg font-semibold text-slate-900">Saved Salary Reports</h3>
-                                    </div>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Report Name</TableHead>
-                                                <TableHead>Generated On</TableHead>
-                                                <TableHead>Period</TableHead>
-                                                <TableHead>Employees</TableHead>
-                                                <TableHead>Total Salary</TableHead>
-                                                <TableHead>Total OT</TableHead>
-                                                <TableHead>Total Deductions</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {savedSalaryReports.map(report => (
-                                                <TableRow key={report.id}>
-                                                    <TableCell className="font-medium">{report.report_name}</TableCell>
-                                                    <TableCell className="text-slate-600">
-                                                        {new Date(report.created_date).toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: '2-digit',
-                                                            year: 'numeric'
-                                                        })}, {new Date(report.created_date).toLocaleTimeString('en-US', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                        })}
-                                                    </TableCell>
-                                                    <TableCell>{report.date_from} - {report.date_to}</TableCell>
-                                                    <TableCell>{report.employee_count}</TableCell>
-                                                    <TableCell className="font-semibold text-green-700">
-                                                        {report.total_salary_amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </TableCell>
-                                                    <TableCell className="text-blue-600">
-                                                        {report.total_ot_salary?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </TableCell>
-                                                    <TableCell className="text-red-600">
-                                                        {report.total_deductions?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <div className="flex justify-end gap-2">
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                onClick={() => handleViewSavedReport(report)}
-                                                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                                title="Export to Excel"
-                                                            >
-                                                                <Download className="w-4 h-4" />
-                                                            </Button>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                onClick={() => handleDeleteSalaryReport(report.id, report.report_name)}
-                                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                                title="Delete Report"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            )}
-
-
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-0 bg-white z-10">Attendance ID</SortableTableHead>
-                                    <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap sticky left-16 bg-white z-10">Name</SortableTableHead>
-                                    <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Department</SortableTableHead>
-                                    <SortableTableHead sortKey="working_hours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Working Hours/Day</SortableTableHead>
-                                    <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Basic Salary</SortableTableHead>
-                                    <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Total Salary</SortableTableHead>
-                                    <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Working Days</SortableTableHead>
-                                    <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Present Days</SortableTableHead>
-                                    <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">LOP Days</SortableTableHead>
-                                    <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Annual Leave Days</SortableTableHead>
-                                    <SortableTableHead sortKey="sick_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap">Sick Leave Days</SortableTableHead>
-                                    <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
-                                    <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
-                                    <SortableTableHead sortKey="salaryLeaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Salary Leave Days</SortableTableHead>
-                                    <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Salary Leave Amount</SortableTableHead>
-                                    <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hours</SortableTableHead>
-                                    <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
-                                    <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Hours</SortableTableHead>
-                                    <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Salary</SortableTableHead>
-                                    <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-100 font-bold">Total OT Salary</SortableTableHead>
-                                    <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
-                                    <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                    <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduction</SortableTableHead>
-                                    <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
-                                    <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
-                                    <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Salary Deduction</SortableTableHead>
-                                    <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
-                                    <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">WPS Pay</SortableTableHead>
-                                    <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100">Balance</SortableTableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredSalaryData.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={30} className="text-center py-12">
-                                            <p className="text-slate-600 text-lg font-medium">No employees match your search criteria</p>
-                                            <p className="text-slate-500 text-sm mt-2">Try adjusting your filters</p>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : filteredSalaryData.map((row) => {
-                                    const { total, wpsPay, balance } = calculateTotals(row);
-                                    return (
-                                        <TableRow key={row.hrms_id}>
-                                             <TableCell className="sticky left-0 bg-white z-10 font-medium">{row.attendance_id}</TableCell>
-                                             <TableCell className="sticky left-16 bg-white z-10 font-medium">{row.name.split(' ').slice(0, 2).join(' ')}</TableCell>
-                                             <TableCell className="text-sm text-slate-600">{row.department || '-'}</TableCell>
-                                             <TableCell>{row.working_hours.toFixed(2)}</TableCell>
-                                             <TableCell>{row.basic_salary.toFixed(2)}</TableCell>
-                                             <TableCell className="font-semibold">{row.total_salary.toFixed(2)}</TableCell>
-                                             <TableCell>{row.working_days.toFixed(2)}</TableCell>
-                                             <TableCell>{row.present_days.toFixed(2)}</TableCell>
-                                             <TableCell className="text-red-600 font-semibold">{row.full_absence_count.toFixed(2)}</TableCell>
-                                             <TableCell className="text-green-600 font-medium">{row.annual_leave_count.toFixed(2)}</TableCell>
-                                             <TableCell className="text-blue-600 font-medium">{row.sick_leave_count.toFixed(2)}</TableCell>
-                                             <TableCell className="bg-amber-50 p-2 text-sm font-medium text-slate-700 text-center">
-                                                {row.leaveDays.toFixed(2)}
-                                             </TableCell>
-                                             <TableCell className="bg-amber-100 p-2 text-sm font-medium text-slate-700">
-                                                 {(getValue(row, 'leavePay') || 0).toFixed(2)}
-                                              </TableCell>
-                                              <TableCell className="bg-green-50 p-2 text-sm font-medium text-slate-700 text-center">
-                                                 {(row.salaryLeaveDays || 0).toFixed(2)}
-                                              </TableCell>
-                                             <TableCell className="bg-green-100 p-2 text-sm font-medium text-slate-700">
-                                                 {(getValue(row, 'salaryLeaveAmount') || 0).toFixed(2)}
-                                             </TableCell>
-                                            <TableCell className="bg-blue-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getValue(row, 'normalOtHours')}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'normalOtHours', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
-                                            <TableCell className="bg-blue-100 p-2 text-sm font-medium text-slate-700">
-                                                {(getValue(row, 'normalOtSalary') || 0).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell className="bg-cyan-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getValue(row, 'specialOtHours')}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'specialOtHours', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
-                                            <TableCell className="bg-cyan-100 p-2 text-sm font-medium text-slate-700">
-                                                {(getValue(row, 'specialOtSalary') || 0).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell className="bg-blue-200 p-2 text-sm font-bold text-slate-900">
-                                                {((getValue(row, 'normalOtSalary') || 0) + (getValue(row, 'specialOtSalary') || 0)).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHours?.toFixed(2) || '0.00'}</TableCell>
-                                            <TableCell className="bg-purple-50 font-medium text-slate-700">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</TableCell>
-                                            <TableCell className="bg-red-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={(getValue(row, 'otherDeduction') || 0).toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
-                                            <TableCell className="bg-green-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={(getValue(row, 'bonus') || 0).toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
-                                            <TableCell className="bg-green-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={(getValue(row, 'incentive') || 0).toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
-                                            <TableCell className="bg-red-50 p-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={(getValue(row, 'advanceSalaryDeduction') || 0).toFixed(2)}
-                                                    onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </TableCell>
-                                            <TableCell className="bg-indigo-100 font-bold">{total.toFixed(2)}</TableCell>
-                                            <TableCell className="bg-indigo-100 font-bold">{wpsPay.toFixed(2)}</TableCell>
-                                            <TableCell className="bg-slate-100">{balance.toFixed(2)}</TableCell>
+                        {/* Reports Table */}
+                        {loadingSavedReports ? (
+                            <div className="text-center py-12 text-slate-500">
+                                Loading salary reports...
+                            </div>
+                        ) : savedSalaryReports.length === 0 ? (
+                            <div className="text-center py-12 text-slate-500">
+                                <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                                <p>No salary reports generated yet.</p>
+                                {hasFinalReport && (
+                                    <p className="mt-2 text-sm">Click "Generate New Report" to create your first salary report.</p>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Report Name</TableHead>
+                                            <TableHead>Generated On</TableHead>
+                                            <TableHead>Period</TableHead>
+                                            <TableHead>Employees</TableHead>
+                                            <TableHead>Total Salary</TableHead>
+                                            <TableHead>Total OT</TableHead>
+                                            <TableHead>Total Deductions</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </div>
-                    </>
-                    )}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {savedSalaryReports.map(report => (
+                                            <TableRow key={report.id} className="hover:bg-slate-50">
+                                                <TableCell className="font-medium">{report.report_name}</TableCell>
+                                                <TableCell className="text-slate-600">
+                                                    {new Date(report.created_date).toLocaleString('en-US', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: true,
+                                                        timeZone: 'Asia/Dubai'
+                                                    })}
+                                                </TableCell>
+                                                <TableCell>{report.date_from} - {report.date_to}</TableCell>
+                                                <TableCell>{report.employee_count}</TableCell>
+                                                <TableCell className="font-semibold text-green-700">
+                                                    {report.total_salary_amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </TableCell>
+                                                <TableCell className="text-blue-600">
+                                                    {report.total_ot_salary?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </TableCell>
+                                                <TableCell className="text-red-600">
+                                                    {report.total_deductions?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-1">
+                                                        <Link to={createPageUrl('SalaryReportDetail') + `?reportId=${report.id}`}>
+                                                            <Button size="sm" variant="ghost" title="View Report">
+                                                                <Eye className="w-4 h-4 text-indigo-600" />
+                                                            </Button>
+                                                        </Link>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => handleExportToExcel(report)}
+                                                            title="Export to Excel"
+                                                        >
+                                                            <Download className="w-4 h-4 text-green-600" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => handleDeleteSalaryReport(report.id, report.report_name)}
+                                                            title="Delete Report"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
                     </CardContent>
-                    </Card>
-                    )}
+                </Card>
+            )}
 
-            {/* Save Report Dialog */}
-            <Dialog open={showSaveReportDialog} onOpenChange={setShowSaveReportDialog}>
+            {/* Generate Report Dialog */}
+            <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Save Salary Report</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Calendar className="w-5 h-5 text-indigo-600" />
+                            Generate Salary Report
+                        </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div>
-                            <label className="text-sm font-medium text-slate-700 mb-2 block">Report Name *</label>
+                            <Label className="text-sm font-medium text-slate-700 mb-2 block">Report Name *</Label>
                             <Input
                                 placeholder="e.g., January 2026 Salary Report"
-                                value={reportName}
-                                onChange={(e) => setReportName(e.target.value)}
+                                value={newReportName}
+                                onChange={(e) => setNewReportName(e.target.value)}
                             />
                         </div>
-                        <div>
-                            <label className="text-sm font-medium text-slate-700 mb-2 block">Notes (optional)</label>
-                            <Input
-                                placeholder="Any additional notes..."
-                                value={reportNotes}
-                                onChange={(e) => setReportNotes(e.target.value)}
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-sm font-medium text-slate-700 mb-2 block">From Date</Label>
+                                <Input
+                                    type="date"
+                                    value={newReportDateFrom}
+                                    onChange={(e) => setNewReportDateFrom(e.target.value)}
+                                    min={finalReport?.date_from}
+                                    max={newReportDateTo || finalReport?.date_to}
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-slate-700 mb-2 block">To Date</Label>
+                                <Input
+                                    type="date"
+                                    value={newReportDateTo}
+                                    onChange={(e) => setNewReportDateTo(e.target.value)}
+                                    min={newReportDateFrom || finalReport?.date_from}
+                                    max={finalReport?.date_to}
+                                />
+                            </div>
                         </div>
                         <div className="bg-slate-50 p-3 rounded text-sm text-slate-600">
-                            <p><strong>Period:</strong> {finalReport?.date_from} to {finalReport?.date_to}</p>
-                            <p><strong>Employees:</strong> {dataToDisplay.length}</p>
+                            <p><strong>Finalized Report Period:</strong> {finalReport?.date_from} to {finalReport?.date_to}</p>
+                            <p><strong>Employees:</strong> {salarySnapshots.length}</p>
                             <p><strong>Company:</strong> {project?.company}</p>
                         </div>
+                        {(newReportDateFrom !== finalReport?.date_from || newReportDateTo !== finalReport?.date_to) && (
+                            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                                <strong>Custom Date Range:</strong> Attendance metrics will be recalculated for the selected period.
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowSaveReportDialog(false)}>
+                        <Button variant="outline" onClick={() => setShowGenerateDialog(false)}>
                             Cancel
                         </Button>
                         <Button 
-                            onClick={handleSaveSalaryReport}
-                            disabled={isSavingReport || !reportName.trim()}
+                            onClick={handleGenerateReport}
+                            disabled={isGenerating || !newReportName.trim() || !newReportDateFrom || !newReportDateTo}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
-                            {isSavingReport ? 'Saving...' : 'Save Report'}
+                            {isGenerating ? 'Generating...' : 'Generate Report'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-                    </div>
-                    );
-                    }
+        </div>
+    );
+}
