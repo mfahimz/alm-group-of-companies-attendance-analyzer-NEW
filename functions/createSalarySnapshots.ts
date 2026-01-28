@@ -445,9 +445,9 @@ Deno.serve(async (req) => {
             const graceMinutes = baseGrace + carriedGrace;
 
             // Calculate annual leave as CALENDAR DAYS (not working days)
-            // Find all unique ANNUAL_LEAVE exceptions and sum their calendar day ranges
+            // Use Set to deduplicate overlapping exception ranges (same as runAnalysis)
             const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
-            let totalAnnualLeaveCalendarDays = 0;
+            const annualLeaveDatesProcessed = new Set();
             
             for (const alEx of annualLeaveExceptions) {
                 try {
@@ -455,18 +455,21 @@ Deno.serve(async (req) => {
                     const exTo = new Date(alEx.date_to);
                     
                     // Clamp to report date range
-                    const rangeStart = exFrom < startDate ? startDate : exFrom;
-                    const rangeEnd = exTo > endDate ? endDate : exTo;
+                    const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
+                    const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
                     
                     if (rangeStart <= rangeEnd) {
-                        // Calendar days = end - start + 1 (inclusive)
-                        const calendarDays = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24)) + 1;
-                        totalAnnualLeaveCalendarDays += calendarDays;
+                        // Count each calendar day individually to handle overlaps
+                        for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+                            const dateStr = d.toISOString().split('T')[0];
+                            annualLeaveDatesProcessed.add(dateStr);
+                        }
                     }
                 } catch {
                     // Skip invalid date ranges
                 }
             }
+            const totalAnnualLeaveCalendarDays = annualLeaveDatesProcessed.size;
 
             return {
                 workingDays,
