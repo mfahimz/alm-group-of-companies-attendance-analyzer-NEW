@@ -164,7 +164,7 @@ export default function SalaryTab({ project, finalReport }) {
                             );
 
                             if (annualLeave) {
-                                annualLeaveDays++;
+                                // Don't count here - we'll calculate calendar days separately below
                                 if (annualLeave.salary_leave_days) {
                                     salaryLeaveDays += annualLeave.salary_leave_days / 
                                         (Math.ceil((new Date(annualLeave.date_to) - new Date(annualLeave.date_from)) / (1000 * 60 * 60 * 24)) + 1);
