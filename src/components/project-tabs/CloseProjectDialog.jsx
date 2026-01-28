@@ -11,8 +11,12 @@ import { toast } from 'sonner';
 
 export default function CloseProjectDialog({ open, onClose, project, lastSavedReport }) {
     const [deleteProgress, setDeleteProgress] = useState(null);
-    const [captureGraceMinutes, setCaptureGraceMinutes] = useState(true);
+    // Default to UNCHECKED - explicit admin decision required
+    const [carryForwardGraceMinutes, setCarryForwardGraceMinutes] = useState(false);
     const queryClient = useQueryClient();
+    
+    // Only show grace carry-forward option for Al Maraghi Auto Repairs
+    const showGraceOption = project?.company === 'Al Maraghi Auto Repairs';
 
     const closeProjectMutation = useMutation({
         mutationFn: async () => {
