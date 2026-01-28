@@ -324,7 +324,6 @@ Deno.serve(async (req) => {
             let fullAbsenceCount = 0;
             let halfAbsenceCount = 0;
             let sickLeaveCount = 0;
-            let annualLeaveCount = 0;
             let lateMinutes = 0;
             let earlyCheckoutMinutes = 0;
             let otherMinutes = 0;
@@ -335,6 +334,36 @@ Deno.serve(async (req) => {
 
             const startDate = new Date(date_from);
             const endDate = new Date(date_to);
+            
+            // Calculate annual leave as CALENDAR DAYS (not working days)
+            // This is done upfront, counting all days including weekends/holidays
+            let annualLeaveCount = 0;
+            const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
+            const annualLeaveDatesProcessed = new Set(); // Track dates already counted
+            
+            for (const alEx of annualLeaveExceptions) {
+                try {
+                    const exFrom = new Date(alEx.date_from);
+                    const exTo = new Date(alEx.date_to);
+                    
+                    // Clamp to report date range
+                    const rangeStart = exFrom < startDate ? startDate : exFrom;
+                    const rangeEnd = exTo > endDate ? endDate : exTo;
+                    
+                    if (rangeStart <= rangeEnd) {
+                        // Count each calendar day in the range
+                        for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+                            const dateStr = d.toISOString().split('T')[0];
+                            if (!annualLeaveDatesProcessed.has(dateStr)) {
+                                annualLeaveDatesProcessed.add(dateStr);
+                                annualLeaveCount++;
+                            }
+                        }
+                    }
+                } catch {
+                    // Skip invalid date ranges
+                }
+            }
             
             const dayNameToNumber = {
                 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
