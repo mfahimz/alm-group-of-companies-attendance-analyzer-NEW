@@ -89,7 +89,7 @@ export default function SalaryTab({ project, finalReport }) {
         setShowGenerateDialog(true);
     };
 
-    // Generate new salary report
+    // Generate new salary report with custom date range recalculation
     const handleGenerateReport = async () => {
         if (!newReportName.trim()) {
             toast.error('Please enter a report name');
@@ -107,15 +107,30 @@ export default function SalaryTab({ project, finalReport }) {
         setIsGenerating(true);
         try {
             const divisor = project.salary_calculation_days || 30;
-            const dateFrom = new Date(newReportDateFrom);
-            const dateTo = new Date(newReportDateTo);
+            const isCustomDateRange = newReportDateFrom !== finalReport.date_from || newReportDateTo !== finalReport.date_to;
 
-            // Use snapshot data directly - NO pro-rata recalculation for custom date ranges
-            // Custom date range only affects the report metadata (date_from, date_to)
-            // All salary calculations use the finalized snapshot data as-is
-            const calculatedData = salarySnapshots.map(snapshot => {
-                return { ...snapshot };
-            });
+            let calculatedData;
+
+            if (isCustomDateRange) {
+                // RECALCULATE for custom date range by calling backend function
+                toast.info('Recalculating attendance for custom date range...');
+                
+                const response = await base44.functions.invoke('createSalarySnapshotsForDateRange', {
+                    project_id: project.id,
+                    report_run_id: finalReport.id,
+                    date_from: newReportDateFrom,
+                    date_to: newReportDateTo
+                });
+
+                if (response.data?.error) {
+                    throw new Error(response.data.error);
+                }
+
+                calculatedData = response.data?.snapshots || [];
+            } else {
+                // Use existing snapshot data for full date range
+                calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
+            }
 
             // Calculate totals
             let totalSalaryAmount = 0;
@@ -143,7 +158,7 @@ export default function SalaryTab({ project, finalReport }) {
                 total_ot_salary: Math.round(totalOtSalary * 100) / 100,
                 snapshot_data: JSON.stringify(calculatedData),
                 generated_by: currentUser?.email,
-                notes: null
+                notes: isCustomDateRange ? `Custom date range: ${newReportDateFrom} to ${newReportDateTo}` : null
             });
 
             toast.success(`Salary report "${newReportName}" generated successfully`);
@@ -415,8 +430,8 @@ export default function SalaryTab({ project, finalReport }) {
                             <p><strong>Salary Calculation Divisor:</strong> {project?.salary_calculation_days || 30} days</p>
                         </div>
                         {(newReportDateFrom !== finalReport?.date_from || newReportDateTo !== finalReport?.date_to) && (
-                            <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
-                                <strong>Note:</strong> Custom date range only changes the report period label. All salary calculations use the finalized snapshot data without pro-rata adjustments.
+                            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                                <strong>Custom Date Range:</strong> Attendance data will be recalculated based on the selected date range. This may take a moment.
                             </div>
                         )}
                     </div>
