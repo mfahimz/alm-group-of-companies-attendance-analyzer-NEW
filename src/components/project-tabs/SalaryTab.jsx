@@ -187,6 +187,30 @@ export default function SalaryTab({ project, finalReport }) {
                         currentDate.setDate(currentDate.getDate() + 1);
                     }
 
+                    // Calculate annual leave as CALENDAR DAYS (not working days)
+                    // Find all unique ANNUAL_LEAVE exceptions and sum their calendar day ranges within report period
+                    const annualLeaveExceptions = empExceptions.filter(e => e.type === 'ANNUAL_LEAVE');
+                    let totalAnnualLeaveCalendarDays = 0;
+                    
+                    for (const alEx of annualLeaveExceptions) {
+                        try {
+                            const exFrom = new Date(alEx.date_from);
+                            const exTo = new Date(alEx.date_to);
+                            
+                            // Clamp to report date range
+                            const rangeStart = exFrom < dateFrom ? dateFrom : exFrom;
+                            const rangeEnd = exTo > dateTo ? dateTo : exTo;
+                            
+                            if (rangeStart <= rangeEnd) {
+                                // Calendar days = end - start + 1 (inclusive)
+                                const calendarDays = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24)) + 1;
+                                totalAnnualLeaveCalendarDays += calendarDays;
+                            }
+                        } catch {
+                            // Skip invalid date ranges
+                        }
+                    }
+
                     // Use proportional calculation for custom ranges
                     const originalWorkingDays = snapshot.working_days || 1;
                     const rangeRatio = workingDays / originalWorkingDays;
@@ -194,7 +218,7 @@ export default function SalaryTab({ project, finalReport }) {
                     updated.working_days = workingDays;
                     updated.present_days = Math.round(presentDays * 100) / 100;
                     updated.full_absence_count = lopDays || Math.round((snapshot.full_absence_count || 0) * rangeRatio * 100) / 100;
-                    updated.annual_leave_count = annualLeaveDays || Math.round((snapshot.annual_leave_count || 0) * rangeRatio * 100) / 100;
+                    updated.annual_leave_count = totalAnnualLeaveCalendarDays; // Calendar days, not working days
                     updated.sick_leave_count = sickLeaveDays || Math.round((snapshot.sick_leave_count || 0) * rangeRatio * 100) / 100;
                     updated.salary_leave_days = salaryLeaveDays;
 
