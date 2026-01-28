@@ -1789,51 +1789,51 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <table className="w-full caption-bottom text-sm">
                             <thead className="sticky top-0 z-10 bg-slate-50">
                                 <tr className="border-b">
-                                    <TableHead className="w-12 bg-slate-50">Verified</TableHead>
-                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50">Verified</th>
+                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         ID
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Name
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="working_days" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="working_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Working Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="present_days" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="present_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Present Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="annual_leave_count" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="annual_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Annual Leave
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="sick_leave_count" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="sick_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Sick Leave
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         LOP Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="half_absence_count" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="half_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Half Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Late Minutes
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Early Checkout
                                     </SortableTableHead>
                                     {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
-                                        <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort}>
+                                        <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                             Approved Minutes
                                         </SortableTableHead>
                                     )}
-                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort}>
+                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Other Minutes
                                     </SortableTableHead>
-                                    <TableHead className="bg-slate-50">Grace</TableHead>
-                                    <TableHead className="bg-slate-50">Deductible</TableHead>
-                                    <TableHead className="bg-slate-50">Notes</TableHead>
-                                    <TableHead className="text-right bg-slate-50">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
+                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>
+                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Deductible</th>
+                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Notes</th>
+                                    <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground bg-slate-50">Actions</th>
+                                </tr>
+                            </thead>
                             <TableBody>
                                 {filteredResults.map((result) => (
                                     <TableRow key={result.id}>
