@@ -217,11 +217,8 @@ export default function SalaryTab({ project, finalReport }) {
                 totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
             });
 
-            // DIVISOR_OT: Get OT divisor for storing in report
-            // [MERGE_NOTE: If merging, remove ot_divisor field]
-            const otDivisor = project.ot_calculation_days || 30;
-
             // Save the report with both divisors
+            // otDivisor already defined above at line 156
             await base44.entities.SalaryReport.create({
                 project_id: project.id,
                 report_run_id: finalReport.id,
