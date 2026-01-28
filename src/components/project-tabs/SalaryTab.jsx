@@ -267,6 +267,7 @@ export default function SalaryTab({ project, finalReport }) {
                 date_from: newReportDateFrom,
                 date_to: newReportDateTo,
                 company: project.company,
+                salary_divisor: divisor,
                 employee_count: calculatedData.length,
                 total_salary_amount: Math.round(totalSalaryAmount * 100) / 100,
                 total_deductions: Math.round(totalDeductions * 100) / 100,
