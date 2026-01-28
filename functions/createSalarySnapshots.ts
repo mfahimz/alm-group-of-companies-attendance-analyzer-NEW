@@ -288,7 +288,9 @@ Deno.serve(async (req) => {
                         halfAbsenceCount++;
                         continue;
                     } else if (dateException.type === 'SICK_LEAVE') {
-                        workingDays--;
+                        // Sick leave counts as WORKING DAY (no deduction from working_days)
+                        // Day is tracked separately as sick_leave_count
+                        // No LOP deduction, no late/early calculation for this day
                         sickLeaveCount++;
                         continue;
                     }

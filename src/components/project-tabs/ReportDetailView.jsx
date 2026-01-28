@@ -605,8 +605,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         presentDays++;
                         halfAbsenceCount++;
                     } else if (dateException.type === 'SICK_LEAVE') {
-                        // Sick leave counts regardless of punches
-                        workingDays--;
+                        // Sick leave counts as WORKING DAY (no deduction from working_days)
+                        // Day is tracked separately as sick_leave_count
+                        // No LOP deduction, no late/early calculation for this day
                         sickLeaveCount++;
                     } else if (dateException.type === 'ANNUAL_LEAVE') {
                         // Annual leave counts if no punches
