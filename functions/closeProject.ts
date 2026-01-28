@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Access denied: Admin role required' }, { status: 403 });
         }
 
-        const { project_id } = await req.json();
+        const { project_id, carry_forward_grace_minutes } = await req.json();
 
         if (!project_id) {
             return Response.json({ error: 'Missing project_id' }, { status: 400 });
