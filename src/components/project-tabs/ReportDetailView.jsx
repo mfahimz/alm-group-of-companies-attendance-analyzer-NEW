@@ -402,6 +402,32 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             'Thursday': 4, 'Friday': 5, 'Saturday': 6
         };
 
+        // Calculate annual leave as CALENDAR DAYS (not working days) - same as salary calculation
+        const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
+        const annualLeaveDatesProcessed = new Set();
+        
+        for (const alEx of annualLeaveExceptions) {
+            try {
+                const exFrom = new Date(alEx.date_from);
+                const exTo = new Date(alEx.date_to);
+                
+                // Clamp to report date range
+                const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
+                const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
+                
+                if (rangeStart <= rangeEnd) {
+                    // Count each calendar day individually
+                    for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+                        const dateStr = d.toISOString().split('T')[0];
+                        annualLeaveDatesProcessed.add(dateStr);
+                    }
+                }
+            } catch {
+                // Skip invalid date ranges
+            }
+        }
+        annualLeaveCount = annualLeaveDatesProcessed.size;
+
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
