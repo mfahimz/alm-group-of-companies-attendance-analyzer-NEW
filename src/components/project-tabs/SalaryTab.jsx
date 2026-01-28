@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import SortableTableHead from '../ui/SortableTableHead';
-import { Label } from '@/components/ui/label';
 
 export default function SalaryTab({ project, finalReport }) {
     const queryClient = useQueryClient();
