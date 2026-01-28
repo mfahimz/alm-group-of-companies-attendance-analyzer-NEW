@@ -669,22 +669,9 @@ export default function SalaryTab({ project, finalReport }) {
                                 </div>
                             </div>
 
-                            {/* Results Count and Saved Reports Toggle */}
-                            <div className="mt-4 flex justify-between items-center">
-                                <span className="text-sm text-slate-600">
-                                    <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
-                                </span>
-                                {savedSalaryReports.length > 0 && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setShowSavedReports(!showSavedReports)}
-                                        className="text-indigo-600"
-                                    >
-                                        <FileText className="w-4 h-4 mr-1" />
-                                        {showSavedReports ? 'Hide' : 'View'} Saved Reports ({savedSalaryReports.length})
-                                    </Button>
-                                )}
+                            {/* Results Count */}
+                            <div className="mt-4 text-sm text-slate-600">
+                                <strong>Showing {filteredSalaryData.length} of {dataToDisplay.length} employees</strong>
                             </div>
 
                         </div>
