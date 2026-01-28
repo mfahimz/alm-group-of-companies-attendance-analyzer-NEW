@@ -413,8 +413,8 @@ export default function SalaryTab({ project, finalReport }) {
                             <p><strong>Salary Calculation Divisor:</strong> {project?.salary_calculation_days || 30} days</p>
                         </div>
                         {(newReportDateFrom !== finalReport?.date_from || newReportDateTo !== finalReport?.date_to) && (
-                            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
-                                <strong>Custom Date Range:</strong> Attendance metrics will be recalculated for the selected period.
+                            <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
+                                <strong>Note:</strong> Custom date range only changes the report period label. All salary calculations use the finalized snapshot data without pro-rata adjustments.
                             </div>
                         )}
                     </div>
