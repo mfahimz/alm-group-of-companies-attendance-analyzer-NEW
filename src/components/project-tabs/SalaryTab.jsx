@@ -1259,9 +1259,14 @@ export default function SalaryTab({ project, finalReport }) {
                             />
                         </div>
                         <div className="bg-slate-50 p-3 rounded text-sm text-slate-600">
-                            <p><strong>Period:</strong> {finalReport?.date_from} to {finalReport?.date_to}</p>
-                            <p><strong>Employees:</strong> {dataToDisplay.length}</p>
+                            <p><strong>Period:</strong> {customDateFrom || finalReport?.date_from} to {customDateTo || finalReport?.date_to}</p>
+                            <p><strong>Employees:</strong> {(customRangeData || dataToDisplay).length}</p>
                             <p><strong>Company:</strong> {project?.company}</p>
+                            {customRangeData && (
+                                <p className="text-indigo-600 font-medium mt-1">
+                                    <strong>Note:</strong> Custom date range calculated from finalized report data
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
