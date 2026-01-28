@@ -143,10 +143,10 @@ export default function OvertimeTab({ project }) {
 
                 const data = {
                     project_id: project.id,
-                    attendance_id: attendanceId,
-                    hrms_id: employee.hrms_id,
+                    attendance_id: String(attendanceId),
+                    hrms_id: String(employee.hrms_id || ''),
                     name: employee.name,
-                    department: employee.department,
+                    department: employee.department || '',
                     normalOtHours: edits.normalOtHours ?? 0,
                     specialOtHours: edits.specialOtHours ?? 0
                 };
