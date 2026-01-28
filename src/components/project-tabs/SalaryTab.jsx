@@ -43,12 +43,7 @@ export default function SalaryTab({ project, finalReport }) {
     const [isSavingReport, setIsSavingReport] = useState(false);
     const [showSavedReports, setShowSavedReports] = useState(false);
     
-    // Custom date range for salary report
-    const [customDateFrom, setCustomDateFrom] = useState('');
-    const [customDateTo, setCustomDateTo] = useState('');
-    const [dateRangeValidation, setDateRangeValidation] = useState({ valid: true, missingDates: [] });
-    const [isValidatingDates, setIsValidatingDates] = useState(false);
-    const [customRangeData, setCustomRangeData] = useState(null);
+
 
     // ============================================
     // QUERIES
