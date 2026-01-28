@@ -30,7 +30,7 @@ export default function SalaryTab({ project, finalReport }) {
     // ============================================
     // QUERIES
     // ============================================
-    const { data: currentUser } = useQuery({
+    const { data: currentUser, isLoading: loadingUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
