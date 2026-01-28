@@ -20,29 +20,13 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
 
     const closeProjectMutation = useMutation({
         mutationFn: async () => {
-            // Step 1: Update employee grace minutes from last report (if enabled)
-            if (captureGraceMinutes) {
-                setDeleteProgress({ phase: 'Updating employee grace minutes...', percent: 50 });
-                const results = await base44.entities.AnalysisResult.filter({ report_run_id: lastSavedReport.id });
-                const employees = await base44.entities.Employee.filter({ company: project.company });
-                
-                for (const result of results) {
-                    const employee = employees.find(e => e.attendance_id === result.attendance_id);
-                    if (employee) {
-                        const usedMinutes = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
-                        const remainingGrace = Math.max(0, (result.grace_minutes || 0) - usedMinutes);
-                        
-                        await base44.entities.Employee.update(employee.id, {
-                            carried_grace_minutes: remainingGrace
-                        });
-                    }
-                }
-            }
-
-            // Step 2: Close project via backend (handles quarterly minutes deductions)
-            setDeleteProgress({ phase: 'Finalizing project...', percent: 90 });
+            // All logic now handled in backend for safety and auditability
+            setDeleteProgress({ phase: 'Closing project...', percent: 50 });
+            
+            // Pass carry_forward_grace_minutes to backend
             const closeResult = await base44.functions.invoke('closeProject', {
-                project_id: project.id
+                project_id: project.id,
+                carry_forward_grace_minutes: showGraceOption ? carryForwardGraceMinutes : false
             });
 
             if (!closeResult.data.success) {
@@ -55,9 +39,14 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['punches', project.id]);
             queryClient.invalidateQueries(['employees']);
-            const message = captureGraceMinutes 
-                ? `Project closed. Grace minutes updated for all employees. ${result.updated_records} quarterly minutes records updated.`
-                : `Project closed. ${result.updated_records} quarterly minutes records updated.`;
+            
+            let message = `Project closed. ${result.updated_records} quarterly minutes records updated.`;
+            if (result.grace_carry_forward?.processed > 0) {
+                message += ` ${result.grace_carry_forward.processed} grace carry-forward records created.`;
+            } else if (result.grace_carry_forward?.already_exists) {
+                message += ' Grace carry-forward already existed (skipped).';
+            }
+            
             toast.success(message);
             setDeleteProgress(null);
             onClose();
