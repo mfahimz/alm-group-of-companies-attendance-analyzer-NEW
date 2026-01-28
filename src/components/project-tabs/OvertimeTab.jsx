@@ -1,16 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Clock, Search, Save, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { Clock, Search, Save, Upload, Download, FileSpreadsheet, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import SortableTableHead from '../ui/SortableTableHead';
 
-export default function OvertimeTab({ project, finalReport }) {
+export default function OvertimeTab({ project }) {
     const queryClient = useQueryClient();
 
     // ============================================
@@ -29,18 +29,12 @@ export default function OvertimeTab({ project, finalReport }) {
         queryFn: () => base44.auth.me()
     });
 
-    // Fetch salary snapshots for this project's finalized report
-    const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
-        queryKey: ['salarySnapshots', project?.id, finalReport?.id],
-        queryFn: async () => {
-            const snapshots = await base44.entities.SalarySnapshot.filter({
-                project_id: project.id,
-                report_run_id: finalReport.id
-            });
-            return snapshots;
-        },
-        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
-        staleTime: 0
+    // Fetch employees for this company
+    const { data: employees = [], isLoading: loadingEmployees } = useQuery({
+        queryKey: ['employees', project?.company],
+        queryFn: () => base44.entities.Employee.filter({ company: project.company, active: true }),
+        enabled: !!project?.company,
+        staleTime: 5 * 60 * 1000
     });
 
     // Fetch employee salaries for hourly rate calculation
@@ -51,31 +45,58 @@ export default function OvertimeTab({ project, finalReport }) {
         staleTime: 5 * 60 * 1000
     });
 
+    // Fetch existing overtime data for this project
+    const { data: overtimeRecords = [], isLoading: loadingOT, refetch: refetchOT } = useQuery({
+        queryKey: ['overtimeData', project?.id],
+        queryFn: () => base44.entities.OvertimeData.filter({ project_id: project.id }),
+        enabled: !!project?.id,
+        staleTime: 0
+    });
+
     // ============================================
     // DERIVED VALUES
     // ============================================
     const divisor = project?.salary_calculation_days || 30;
-    const hasFinalReport = finalReport && finalReport.is_final === true;
 
-    // Merge snapshots with editable data
+    // Build employee list with OT data
     const overtimeData = useMemo(() => {
-        return salarySnapshots.map(snapshot => {
-            const salary = employeeSalaries.find(s => 
-                String(s.attendance_id) === String(snapshot.attendance_id) ||
-                String(s.employee_id) === String(snapshot.hrms_id)
+        // Filter employees to only those with custom_employee_ids if specified
+        let filteredEmployees = employees;
+        
+        if (project?.custom_employee_ids) {
+            const customIds = project.custom_employee_ids.split(',').map(id => id.trim());
+            filteredEmployees = employees.filter(emp => 
+                customIds.includes(emp.hrms_id) || customIds.includes(emp.attendance_id)
             );
-            const totalSalary = snapshot.total_salary || salary?.total_salary || 0;
-            const workingHours = snapshot.working_hours || salary?.working_hours || 9;
+        }
+
+        return filteredEmployees.map(emp => {
+            const salary = employeeSalaries.find(s => 
+                String(s.attendance_id) === String(emp.attendance_id) ||
+                String(s.employee_id) === String(emp.hrms_id)
+            );
+            const otRecord = overtimeRecords.find(ot => 
+                String(ot.attendance_id) === String(emp.attendance_id)
+            );
+
+            const totalSalary = salary?.total_salary || 0;
+            const workingHours = salary?.working_hours || 9;
             const hourlyRate = totalSalary / divisor / workingHours;
 
             return {
-                ...snapshot,
+                hrms_id: emp.hrms_id,
+                attendance_id: emp.attendance_id,
+                name: emp.name,
+                department: emp.department,
+                total_salary: totalSalary,
+                working_hours: workingHours,
                 hourlyRate: Math.round(hourlyRate * 100) / 100,
-                normalOtHours: editableData[snapshot.hrms_id]?.normalOtHours ?? snapshot.normalOtHours ?? 0,
-                specialOtHours: editableData[snapshot.hrms_id]?.specialOtHours ?? snapshot.specialOtHours ?? 0
+                normalOtHours: editableData[emp.attendance_id]?.normalOtHours ?? otRecord?.normalOtHours ?? 0,
+                specialOtHours: editableData[emp.attendance_id]?.specialOtHours ?? otRecord?.specialOtHours ?? 0,
+                otRecordId: otRecord?.id
             };
         });
-    }, [salarySnapshots, employeeSalaries, editableData, divisor]);
+    }, [employees, employeeSalaries, overtimeRecords, editableData, divisor, project?.custom_employee_ids]);
 
     // Filter and sort
     const filteredData = useMemo(() => {
@@ -109,18 +130,18 @@ export default function OvertimeTab({ project, finalReport }) {
     // ============================================
     // HANDLERS
     // ============================================
-    const handleChange = (hrmsId, field, value) => {
+    const handleChange = (attendanceId, field, value) => {
         setEditableData(prev => ({
             ...prev,
-            [hrmsId]: {
-                ...(prev[hrmsId] || {}),
+            [attendanceId]: {
+                ...(prev[attendanceId] || {}),
                 [field]: value === '' ? 0 : parseFloat(value) || 0
             }
         }));
     };
 
     const getValue = (row, field) => {
-        return editableData[row.hrms_id]?.[field] ?? row[field] ?? 0;
+        return editableData[row.attendance_id]?.[field] ?? row[field] ?? 0;
     };
 
     const calculateOtSalary = (row) => {
@@ -143,48 +164,43 @@ export default function OvertimeTab({ project, finalReport }) {
 
         setIsSaving(true);
         try {
-            // Update each modified snapshot
-            const updates = Object.entries(editableData).map(async ([hrmsId, edits]) => {
-                const snapshot = salarySnapshots.find(s => s.hrms_id === hrmsId);
-                if (!snapshot) return;
+            const updates = [];
+            const creates = [];
 
-                const totalSalary = snapshot.total_salary || 0;
-                const workingHours = snapshot.working_hours || 9;
-                const hourlyRate = totalSalary / divisor / workingHours;
+            Object.entries(editableData).forEach(([attendanceId, edits]) => {
+                const employee = overtimeData.find(e => String(e.attendance_id) === String(attendanceId));
+                if (!employee) return;
 
-                const normalOtHours = edits.normalOtHours ?? snapshot.normalOtHours ?? 0;
-                const specialOtHours = edits.specialOtHours ?? snapshot.specialOtHours ?? 0;
-                const normalOtSalary = Math.round(hourlyRate * 1.25 * normalOtHours * 100) / 100;
-                const specialOtSalary = Math.round(hourlyRate * 1.5 * specialOtHours * 100) / 100;
-                const totalOtSalary = normalOtSalary + specialOtSalary;
+                const data = {
+                    project_id: project.id,
+                    attendance_id: attendanceId,
+                    hrms_id: employee.hrms_id,
+                    name: employee.name,
+                    department: employee.department,
+                    normalOtHours: edits.normalOtHours ?? 0,
+                    specialOtHours: edits.specialOtHours ?? 0
+                };
 
-                // Recalculate total
-                const netDeduction = snapshot.netDeduction || 0;
-                const deductibleHoursPay = snapshot.deductibleHoursPay || 0;
-                const bonus = snapshot.bonus || 0;
-                const incentive = snapshot.incentive || 0;
-                const otherDeduction = snapshot.otherDeduction || 0;
-                const advanceSalaryDeduction = snapshot.advanceSalaryDeduction || 0;
-
-                const finalTotal = totalSalary + totalOtSalary + bonus + incentive
-                    - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
-
-                await base44.entities.SalarySnapshot.update(snapshot.id, {
-                    normalOtHours,
-                    specialOtHours,
-                    normalOtSalary,
-                    specialOtSalary,
-                    totalOtSalary,
-                    total: Math.round(finalTotal * 100) / 100,
-                    wpsPay: Math.round(finalTotal * 100) / 100
-                });
+                if (employee.otRecordId) {
+                    updates.push({ id: employee.otRecordId, data });
+                } else {
+                    creates.push(data);
+                }
             });
 
-            await Promise.all(updates);
+            // Execute updates
+            for (const { id, data } of updates) {
+                await base44.entities.OvertimeData.update(id, data);
+            }
+
+            // Execute creates
+            if (creates.length > 0) {
+                await base44.entities.OvertimeData.bulkCreate(creates);
+            }
 
             toast.success(`Overtime data saved for ${Object.keys(editableData).length} employee(s)`);
             setEditableData({});
-            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project?.id, finalReport?.id] });
+            refetchOT();
         } catch (error) {
             toast.error('Failed to save: ' + error.message);
         } finally {
@@ -226,17 +242,14 @@ export default function OvertimeTab({ project, finalReport }) {
 
             rows.forEach(row => {
                 const attendanceId = String(row['Attendance ID'] || row['attendance_id'] || '');
-                const hrmsId = String(row['HRMS ID'] || row['hrms_id'] || '');
                 const normalOtHours = parseFloat(row['Normal OT Hours'] || row['normalOtHours'] || 0) || 0;
                 const specialOtHours = parseFloat(row['Special OT Hours'] || row['specialOtHours'] || 0) || 0;
 
-                // Find matching snapshot
-                const snapshot = salarySnapshots.find(s => 
-                    String(s.attendance_id) === attendanceId || String(s.hrms_id) === hrmsId
-                );
+                // Find matching employee
+                const employee = overtimeData.find(e => String(e.attendance_id) === attendanceId);
 
-                if (snapshot) {
-                    newEdits[snapshot.hrms_id] = { normalOtHours, specialOtHours };
+                if (employee) {
+                    newEdits[attendanceId] = { normalOtHours, specialOtHours };
                     matched++;
                 }
             });
@@ -258,21 +271,7 @@ export default function OvertimeTab({ project, finalReport }) {
     // ============================================
     // RENDER
     // ============================================
-    if (!hasFinalReport) {
-        return (
-            <Card className="border-0 shadow-lg">
-                <CardContent className="p-12 text-center">
-                    <Clock className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600 font-medium">No finalized report found</p>
-                    <p className="text-slate-500 text-sm mt-2">
-                        Please finalize a report in the Report Tab first to manage overtime hours.
-                    </p>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (loadingSnapshots) {
+    if (loadingEmployees || loadingOT) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
@@ -288,11 +287,11 @@ export default function OvertimeTab({ project, finalReport }) {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                         <CardTitle className="flex items-center gap-2">
-                            <Clock className="w-6 h-6 text-indigo-600" />
+                            <Clock className="w-6 h-6 text-orange-600" />
                             Overtime Management
                         </CardTitle>
                         <p className="text-sm text-slate-500 mt-1">
-                            Manage overtime hours for employees • Divisor: {divisor} days
+                            Enter overtime hours for employees • Divisor: {divisor} days
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -335,10 +334,12 @@ export default function OvertimeTab({ project, finalReport }) {
             </CardHeader>
             <CardContent>
                 {/* Info Banner */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4 text-sm text-orange-800">
                     <strong>OT Calculation:</strong> Normal OT = Hourly Rate × 1.25 × Hours | Special OT = Hourly Rate × 1.5 × Hours
                     <br />
                     <strong>Hourly Rate:</strong> Total Salary / {divisor} / Working Hours
+                    <br />
+                    <strong>Note:</strong> OT data entered here will be included in generated salary reports.
                 </div>
 
                 {/* Search */}
@@ -350,10 +351,11 @@ export default function OvertimeTab({ project, finalReport }) {
                             placeholder="Search by name, ID, or department..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                         />
                     </div>
                     <p className="text-sm text-slate-500 mt-2">
+                        <Users className="w-4 h-4 inline mr-1" />
                         Showing {filteredData.length} of {overtimeData.length} employees
                         {Object.keys(editableData).length > 0 && (
                             <span className="ml-2 text-amber-600 font-medium">
@@ -390,21 +392,21 @@ export default function OvertimeTab({ project, finalReport }) {
                                 </TableRow>
                             ) : filteredData.map(row => {
                                 const { normalOtSalary, specialOtSalary, totalOtSalary } = calculateOtSalary(row);
-                                const hasEdits = editableData[row.hrms_id];
+                                const hasEdits = editableData[row.attendance_id];
                                 return (
-                                    <TableRow key={row.hrms_id} className={hasEdits ? 'bg-amber-50' : ''}>
+                                    <TableRow key={row.attendance_id} className={hasEdits ? 'bg-amber-50' : ''}>
                                         <TableCell className="font-medium">{row.attendance_id}</TableCell>
                                         <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
                                         <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
                                         <TableCell>{row.total_salary?.toFixed(2)}</TableCell>
-                                        <TableCell className="font-semibold text-indigo-600">{row.hourlyRate?.toFixed(2)}</TableCell>
+                                        <TableCell className="font-semibold text-orange-600">{row.hourlyRate?.toFixed(2)}</TableCell>
                                         <TableCell className="bg-blue-50 p-1">
                                             <Input
                                                 type="number"
                                                 step="0.5"
                                                 min="0"
                                                 value={getValue(row, 'normalOtHours')}
-                                                onChange={(e) => handleChange(row.hrms_id, 'normalOtHours', e.target.value)}
+                                                onChange={(e) => handleChange(row.attendance_id, 'normalOtHours', e.target.value)}
                                                 className="h-8 text-sm w-20"
                                             />
                                         </TableCell>
@@ -415,7 +417,7 @@ export default function OvertimeTab({ project, finalReport }) {
                                                 step="0.5"
                                                 min="0"
                                                 value={getValue(row, 'specialOtHours')}
-                                                onChange={(e) => handleChange(row.hrms_id, 'specialOtHours', e.target.value)}
+                                                onChange={(e) => handleChange(row.attendance_id, 'specialOtHours', e.target.value)}
                                                 className="h-8 text-sm w-20"
                                             />
                                         </TableCell>
