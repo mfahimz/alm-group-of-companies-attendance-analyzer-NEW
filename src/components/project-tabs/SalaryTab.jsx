@@ -653,7 +653,15 @@ export default function SalaryTab({ project, finalReport }) {
                                 </div>
 
                                 {/* Action Buttons */}
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap">
+                                    <Button 
+                                        onClick={handleRecalculateTotals} 
+                                        disabled={isCalculating || !finalReport || salarySnapshots.length === 0}
+                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        <DollarSign className="w-4 h-4 mr-2" />
+                                        {isCalculating ? 'Recalculating...' : 'Recalculate'}
+                                    </Button>
                                     <Button 
                                         onClick={handleSave} 
                                         disabled={isSaving || Object.keys(editableData).length === 0}
@@ -664,15 +672,24 @@ export default function SalaryTab({ project, finalReport }) {
                                     </Button>
                                     <Button 
                                         onClick={() => setShowSaveReportDialog(true)}
-                                        disabled={dataToDisplay.length === 0 || !dateRangeValidation.valid}
+                                        disabled={dataToDisplay.length === 0}
                                         variant="outline"
                                         className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
                                     >
                                         <FileText className="w-4 h-4 mr-2" />
                                         Save Report
                                     </Button>
+                                    <Link to={createPageUrl('SalaryReportGenerator') + `?projectId=${project.id}&reportRunId=${finalReport?.id}`}>
+                                        <Button 
+                                            variant="outline"
+                                            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                                        >
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Custom Date Report
+                                        </Button>
+                                    </Link>
                                     <Button 
-                                        onClick={() => handleExportToExcel(customRangeData || calculatedData || dataToDisplay, `Salary_${project.company}_${customDateFrom || finalReport?.date_from}_to_${customDateTo || finalReport?.date_to}`)}
+                                        onClick={() => handleExportToExcel(calculatedData || dataToDisplay, `Salary_${project.company}_${finalReport?.date_from}_to_${finalReport?.date_to}`)}
                                         disabled={dataToDisplay.length === 0}
                                         variant="outline"
                                         className="border-green-300 text-green-700 hover:bg-green-50"
