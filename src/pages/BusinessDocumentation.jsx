@@ -800,6 +800,20 @@ export default function BusinessDocumentation() {
                             </p>
                         </div>
 
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                            <h4 className="font-semibold text-indigo-900">Custom Date Range Salary Report</h4>
+                            <p className="text-sm text-indigo-800">
+                                Generate salary calculations for a specific date range within a finalized report period. 
+                                Useful when payroll periods don't align with attendance report periods, or for mid-month settlements.
+                            </p>
+                            <p className="text-xs text-indigo-700 mt-2">
+                                <strong>Access:</strong> From Salary Tab → "Custom Date Report" button → Select dates → Calculate → Save/Export
+                            </p>
+                            <p className="text-xs text-indigo-700 mt-1">
+                                <strong>Note:</strong> Only available for Al Maraghi Auto Repairs. Dates must be within the finalized report period.
+                            </p>
+                        </div>
+
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <h4 className="font-semibold text-amber-900">Exception Report</h4>
                             <p className="text-sm text-amber-800">
