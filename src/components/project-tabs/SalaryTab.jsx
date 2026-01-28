@@ -413,12 +413,7 @@ export default function SalaryTab({ project, finalReport }) {
             return;
         }
 
-        if (!dateRangeValidation.valid) {
-            toast.error('Cannot save report with invalid date range');
-            return;
-        }
-
-        const dataToSave = customRangeData || calculatedData || dataToDisplay;
+        const dataToSave = calculatedData || dataToDisplay;
         if (dataToSave.length === 0) {
             toast.error('No salary data to save');
             return;
