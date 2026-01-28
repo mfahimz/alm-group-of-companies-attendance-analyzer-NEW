@@ -522,7 +522,7 @@ Deno.serve(async (req) => {
                 allowances: allowancesAmount,
                 total_salary: totalSalaryAmount,
                 working_hours: workingHours,
-                working_days: divisor, // This is the salary divisor, not actual working days
+                working_days: calculated.workingDays, // Actual working days in period
                 present_days: calculated.presentDays,
                 full_absence_count: calculated.fullAbsenceCount,
                 annual_leave_count: calculated.annualLeaveCount,
