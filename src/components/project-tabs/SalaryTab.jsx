@@ -131,14 +131,6 @@ export default function SalaryTab({ project, finalReport }) {
     // EFFECTS
     // ============================================
     
-    // Initialize custom date range from finalized report
-    useEffect(() => {
-        if (finalReport?.date_from && finalReport?.date_to) {
-            setCustomDateFrom(finalReport.date_from);
-            setCustomDateTo(finalReport.date_to);
-        }
-    }, [finalReport?.date_from, finalReport?.date_to]);
-
     // Validate consistency of finalized report and snapshots
     useEffect(() => {
         let error = null;
