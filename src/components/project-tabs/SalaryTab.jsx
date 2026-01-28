@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, FileSpreadsheet, Save, Filter, X, Search, Download, FileText, Trash2, Eye } from 'lucide-react';
+import { DollarSign, FileSpreadsheet, Save, Filter, X, Search, Download, FileText, Trash2, Eye, Calendar, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import SortableTableHead from '../ui/SortableTableHead';
+import { Label } from '@/components/ui/label';
 
 export default function SalaryTab({ project, finalReport }) {
     const queryClient = useQueryClient();
