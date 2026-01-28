@@ -27,6 +27,7 @@ import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import SalaryReportGenerator from './pages/SalaryReportGenerator';
+import SalaryReportDetail from './pages/SalaryReportDetail';
 import __Layout from './Layout.jsx';
 
 
@@ -60,6 +61,7 @@ export const PAGES = {
     "UserProfile": UserProfile,
     "Users": Users,
     "SalaryReportGenerator": SalaryReportGenerator,
+    "SalaryReportDetail": SalaryReportDetail,
 }
 
 export const pagesConfig = {
