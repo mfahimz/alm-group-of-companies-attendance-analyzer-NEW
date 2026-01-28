@@ -442,13 +442,37 @@ Deno.serve(async (req) => {
             const carriedGrace = project.use_carried_grace_minutes ? (emp.carried_grace_minutes || 0) : 0;
             const graceMinutes = baseGrace + carriedGrace;
 
+            // Calculate annual leave as CALENDAR DAYS (not working days)
+            // Find all unique ANNUAL_LEAVE exceptions and sum their calendar day ranges
+            const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
+            let totalAnnualLeaveCalendarDays = 0;
+            
+            for (const alEx of annualLeaveExceptions) {
+                try {
+                    const exFrom = new Date(alEx.date_from);
+                    const exTo = new Date(alEx.date_to);
+                    
+                    // Clamp to report date range
+                    const rangeStart = exFrom < startDate ? startDate : exFrom;
+                    const rangeEnd = exTo > endDate ? endDate : exTo;
+                    
+                    if (rangeStart <= rangeEnd) {
+                        // Calendar days = end - start + 1 (inclusive)
+                        const calendarDays = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24)) + 1;
+                        totalAnnualLeaveCalendarDays += calendarDays;
+                    }
+                } catch {
+                    // Skip invalid date ranges
+                }
+            }
+
             return {
                 workingDays,
                 presentDays,
                 fullAbsenceCount,
                 halfAbsenceCount,
                 sickLeaveCount,
-                annualLeaveCount,
+                annualLeaveCount: totalAnnualLeaveCalendarDays, // Calendar days, not working days
                 lateMinutes,
                 earlyCheckoutMinutes,
                 otherMinutes,
