@@ -309,7 +309,8 @@ Deno.serve(async (req) => {
 
                 if (annualLeaveException && rawDayPunches.length === 0) {
                     // Don't increment annualLeaveCount here - we calculate calendar days separately
-                    // But skip further processing for this day
+                    // Decrement working days since this is a leave day (not counted as working day)
+                    workingDays--;
                     continue;
                 }
 
