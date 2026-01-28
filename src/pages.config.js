@@ -59,6 +59,7 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
+    "SalaryReportGenerator": SalaryReportGenerator,
     "SalaryReportDetail": SalaryReportDetail,
 }
 
