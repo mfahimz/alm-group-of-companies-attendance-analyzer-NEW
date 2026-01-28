@@ -36,6 +36,11 @@ export default function SalaryTab({ project, finalReport }) {
         deductionMin: '',
         deductionMax: ''
     });
+    const [showSaveReportDialog, setShowSaveReportDialog] = useState(false);
+    const [reportName, setReportName] = useState('');
+    const [reportNotes, setReportNotes] = useState('');
+    const [isSavingReport, setIsSavingReport] = useState(false);
+    const [showSavedReports, setShowSavedReports] = useState(false);
 
     // ============================================
     // QUERIES
