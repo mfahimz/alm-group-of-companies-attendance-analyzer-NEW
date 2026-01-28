@@ -687,46 +687,80 @@ export default function SalaryTab({ project, finalReport }) {
                                 )}
                             </div>
 
-                            {/* Saved Reports List */}
-                            {showSavedReports && savedSalaryReports.length > 0 && (
-                                <div className="mt-4 bg-slate-50 rounded-lg p-4 border border-slate-200">
-                                    <h4 className="text-sm font-semibold text-slate-700 mb-3">Saved Salary Reports</h4>
-                                    <div className="space-y-2">
-                                        {savedSalaryReports.map(report => (
-                                            <div key={report.id} className="flex items-center justify-between bg-white p-3 rounded border border-slate-200">
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-slate-800">{report.report_name}</p>
-                                                    <p className="text-xs text-slate-500">
-                                                        {report.date_from} to {report.date_to} • {report.employee_count} employees • 
-                                                        Total: AED {report.total_salary_amount?.toLocaleString()}
-                                                    </p>
-                                                    {report.notes && <p className="text-xs text-slate-400 mt-1">{report.notes}</p>}
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleViewSavedReport(report)}
-                                                        className="text-green-600 border-green-200"
-                                                    >
-                                                        <Download className="w-3 h-3 mr-1" />
-                                                        Export
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleDeleteSalaryReport(report.id, report.report_name)}
-                                                        className="text-red-600 border-red-200"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
+                        </div>
+
+                            {/* Saved Salary Reports Table */}
+                            {savedSalaryReports.length > 0 && (
+                                <div className="mt-6 bg-white rounded-lg border border-slate-200">
+                                    <div className="p-4 border-b border-slate-200">
+                                        <h3 className="text-lg font-semibold text-slate-900">Saved Salary Reports</h3>
                                     </div>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Report Name</TableHead>
+                                                <TableHead>Generated On</TableHead>
+                                                <TableHead>Period</TableHead>
+                                                <TableHead>Employees</TableHead>
+                                                <TableHead>Total Salary</TableHead>
+                                                <TableHead>Total OT</TableHead>
+                                                <TableHead>Total Deductions</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {savedSalaryReports.map(report => (
+                                                <TableRow key={report.id}>
+                                                    <TableCell className="font-medium">{report.report_name}</TableCell>
+                                                    <TableCell className="text-slate-600">
+                                                        {new Date(report.created_date).toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: '2-digit',
+                                                            year: 'numeric'
+                                                        })}, {new Date(report.created_date).toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </TableCell>
+                                                    <TableCell>{report.date_from} - {report.date_to}</TableCell>
+                                                    <TableCell>{report.employee_count}</TableCell>
+                                                    <TableCell className="font-semibold text-green-700">
+                                                        {report.total_salary_amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </TableCell>
+                                                    <TableCell className="text-blue-600">
+                                                        {report.total_ot_salary?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </TableCell>
+                                                    <TableCell className="text-red-600">
+                                                        {report.total_deductions?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                onClick={() => handleViewSavedReport(report)}
+                                                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                                title="Export to Excel"
+                                                            >
+                                                                <Download className="w-4 h-4" />
+                                                            </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                onClick={() => handleDeleteSalaryReport(report.id, report.report_name)}
+                                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                title="Delete Report"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
                                 </div>
                             )}
-                        </div>
 
 
                     </div>
