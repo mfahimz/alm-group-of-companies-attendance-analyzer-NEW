@@ -326,6 +326,16 @@ export default function SalaryReportDetail() {
         );
     }
 
+    // Check if salary tab PIN was already unlocked in this session
+    const isSalaryUnlockedFromTab = sessionStorage.getItem('salary_tab_pin_unlocked') === 'true';
+    
+    // Auto-unlock if already unlocked from SalaryTab
+    React.useEffect(() => {
+        if (isSalaryUnlockedFromTab && !salaryUnlocked) {
+            setSalaryUnlocked(true);
+        }
+    }, [isSalaryUnlockedFromTab]);
+
     return (
         <div className="max-w-full mx-auto space-y-6">
             <Breadcrumb items={[
@@ -334,9 +344,11 @@ export default function SalaryReportDetail() {
                 { label: report?.report_name || 'Salary Report' }
             ]} />
 
-            <PINLock onUnlock={(unlocked) => setSalaryUnlocked(unlocked)} storageKey="salary_report_detail_pin" />
+            {!salaryUnlocked && !isSalaryUnlockedFromTab && (
+                <PINLock onUnlock={(unlocked) => setSalaryUnlocked(unlocked)} storageKey="salary_tab_pin" />
+            )}
 
-            {!salaryUnlocked && (
+            {!salaryUnlocked && !isSalaryUnlockedFromTab && (
                 <Card className="border-0 shadow-lg">
                     <CardContent className="p-12 text-center">
                         <p className="text-slate-600">Please unlock to view the salary report.</p>
@@ -344,7 +356,7 @@ export default function SalaryReportDetail() {
                 </Card>
             )}
 
-            {salaryUnlocked && (
+            {(salaryUnlocked || isSalaryUnlockedFromTab) && (
                 <Card className="border-0 shadow-lg">
                     <CardHeader>
                         <div className="flex items-center justify-between">
