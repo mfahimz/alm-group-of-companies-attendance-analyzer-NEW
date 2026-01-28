@@ -409,8 +409,9 @@ export default function RunAnalysisTab({ project }) {
                     present_days++;
                     half_absence_count++;
                 } else if (dateException.type === 'SICK_LEAVE') {
-                    // Sick leave is separate from LOP - don't count as working day
-                    working_days--;
+                    // Sick leave counts as WORKING DAY (no deduction from working_days)
+                    // Day is tracked separately as sick_leave_count
+                    // No LOP deduction, no late/early calculation for this day
                     sick_leave_count++;
                     continue;
                 }
