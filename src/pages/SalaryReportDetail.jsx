@@ -59,6 +59,9 @@ export default function SalaryReportDetail() {
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
+    // Allow access for Al Maraghi Auto Repairs projects for all users with project access
+    const isAlMaraghi = project?.company === 'Al Maraghi Auto Repairs';
+    const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
 
     // Parse snapshot data
     const salaryData = useMemo(() => {
@@ -266,7 +269,7 @@ export default function SalaryReportDetail() {
     // ============================================
     // RENDER
     // ============================================
-    if (!isAdminOrCEO) {
+    if (!canAccessSalaryReport && !loadingReport) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
