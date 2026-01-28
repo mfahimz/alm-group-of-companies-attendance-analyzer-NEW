@@ -1834,7 +1834,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground bg-slate-50">Actions</th>
                                 </tr>
                             </thead>
-                            <TableBody>
+                            <tbody className="[&_tr:last-child]:border-0">
                                 {filteredResults.map((result) => (
                                     <TableRow key={result.id}>
                                         <TableCell>
@@ -1996,7 +1996,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                            </TableBody>
+                            </tbody>
                         </table>
                     </div>
                 </CardContent>
