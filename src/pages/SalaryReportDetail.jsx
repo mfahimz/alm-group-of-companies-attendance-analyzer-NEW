@@ -364,28 +364,6 @@ export default function SalaryReportDetail() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {/* Summary Cards */}
-                        <div className="grid grid-cols-3 gap-4 mb-6">
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <p className="text-sm text-green-700">Total Salary</p>
-                                <p className="text-2xl font-bold text-green-800">
-                                    {report.total_salary_amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </p>
-                            </div>
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <p className="text-sm text-blue-700">Total OT</p>
-                                <p className="text-2xl font-bold text-blue-800">
-                                    {report.total_ot_salary?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </p>
-                            </div>
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                                <p className="text-sm text-red-700">Total Deductions</p>
-                                <p className="text-2xl font-bold text-red-800">
-                                    {report.total_deductions?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </p>
-                            </div>
-                        </div>
-
                         {/* Search */}
                         <div className="mb-4">
                             <div className="relative max-w-md">
