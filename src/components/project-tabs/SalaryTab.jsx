@@ -524,19 +524,7 @@ export default function SalaryTab({ project, finalReport }) {
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            {/* Formula Info */}
-                             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 mb-3">
-                                 <strong>🔒 IMMUTABLE SALARY SNAPSHOT:</strong> When a report is marked final, salary snapshots are created capturing exact values from that moment. These snapshots are frozen and never change automatically.
-                                 <br /><span className="text-xs mt-1 block"><strong>What's Locked:</strong> Present Days, Leave Days, LOP Days, Deductible Minutes, and all related pay calculations.</span>
-                                 <br /><span className="text-xs mt-1 block"><strong>What's Editable:</strong> Normal OT Hours, Special OT Hours, Bonus, Incentive, Other Deductions only.</span>
-                                 <br /><span className="text-xs mt-1 block"><strong>If Report Changes:</strong> Delete old final report and mark a new one final to create new snapshots. Salary data for deleted reports is also deleted.</span>
-                             </div>
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
-                                <strong>Salary Total Formula:</strong> Total = Basic Salary + Allowances + OT Salary + Bonus + Incentive - Leave Deduction - Deductible Hours Pay - Other Deductions - Advance Salary.
-                                <br /><span className="text-xs mt-1 block">Report values (leave, deductible minutes) are immutable. Only OT hours, bonuses, and deductions can be edited.</span>
-                            </div>
-                        </div>
+
                     </div>
 
                     <div className="overflow-x-auto">
