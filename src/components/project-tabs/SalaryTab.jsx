@@ -169,6 +169,7 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
             }
 
             // Merge OT data from OvertimeData entity into calculated data
+            // ALSO merge adjustment fields from SalarySnapshot
             // DIVISOR_OT: Use ot_calculation_days for OT salary calculations
             // [MERGE_NOTE: If merging divisors, change otDivisor to use divisor (salary_calculation_days) instead]
             const otDivisor = project.ot_calculation_days || 30;
@@ -178,50 +179,57 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
                     String(ot.attendance_id) === String(row.attendance_id)
                 );
                 
-                if (otRecord) {
-                    const salary = employeeSalaries.find(s => 
-                        String(s.attendance_id) === String(row.attendance_id) ||
-                        String(s.employee_id) === String(row.hrms_id)
-                    );
-                    const totalSalary = row.total_salary || salary?.total_salary || 0;
-                    const workingHours = row.working_hours || salary?.working_hours || 9;
-                    
-                    // DIVISOR_OT: OT hourly rate uses otDivisor
-                    // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
-                    const otHourlyRate = totalSalary / otDivisor / workingHours;
+                // Get the latest SalarySnapshot for adjustment values
+                const snapshotRecord = salarySnapshots.find(s => 
+                    String(s.attendance_id) === String(row.attendance_id)
+                );
+                
+                const salary = employeeSalaries.find(s => 
+                    String(s.attendance_id) === String(row.attendance_id) ||
+                    String(s.employee_id) === String(row.hrms_id)
+                );
+                const totalSalary = row.total_salary || salary?.total_salary || 0;
+                const workingHours = row.working_hours || salary?.working_hours || 9;
+                
+                // DIVISOR_OT: OT hourly rate uses otDivisor
+                // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
+                const otHourlyRate = totalSalary / otDivisor / workingHours;
 
-                    const normalOtHours = otRecord.normalOtHours || 0;
-                    const specialOtHours = otRecord.specialOtHours || 0;
-                    const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
-                    const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
-                    const totalOtSalary = normalOtSalary + specialOtSalary;
+                // OT hours from OvertimeData (pre-finalization entry)
+                const normalOtHours = otRecord?.normalOtHours || 0;
+                const specialOtHours = otRecord?.specialOtHours || 0;
+                const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
+                const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
+                const totalOtSalary = normalOtSalary + specialOtSalary;
 
-                    // Recalculate total with OT
-                    const netDeduction = row.netDeduction || 0;
-                    const deductibleHoursPay = row.deductibleHoursPay || 0;
-                    const bonus = row.bonus || 0;
-                    const incentive = row.incentive || 0;
-                    const otherDeduction = row.otherDeduction || 0;
-                    const advanceSalaryDeduction = row.advanceSalaryDeduction || 0;
+                // Get adjustment values from SalarySnapshot (post-finalization edits)
+                const netDeduction = row.netDeduction || 0;
+                const deductibleHoursPay = row.deductibleHoursPay || 0;
+                const bonus = snapshotRecord?.bonus ?? row.bonus ?? 0;
+                const incentive = snapshotRecord?.incentive ?? row.incentive ?? 0;
+                const otherDeduction = snapshotRecord?.otherDeduction ?? row.otherDeduction ?? 0;
+                const advanceSalaryDeduction = snapshotRecord?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0;
 
-                    const finalTotal = totalSalary + totalOtSalary + bonus + incentive
-                        - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+                const finalTotal = totalSalary + totalOtSalary + bonus + incentive
+                    - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
 
-                    return {
-                        ...row,
-                        normalOtHours,
-                        specialOtHours,
-                        normalOtSalary,
-                        specialOtSalary,
-                        totalOtSalary,
-                        // Store divisors used for reference
-                        salary_divisor: divisor,
-                        ot_divisor: otDivisor,
-                        total: Math.round(finalTotal * 100) / 100,
-                        wpsPay: Math.round(finalTotal * 100) / 100
-                    };
-                }
-                return row;
+                return {
+                    ...row,
+                    normalOtHours,
+                    specialOtHours,
+                    normalOtSalary,
+                    specialOtSalary,
+                    totalOtSalary,
+                    bonus,
+                    incentive,
+                    otherDeduction,
+                    advanceSalaryDeduction,
+                    // Store divisors used for reference
+                    salary_divisor: divisor,
+                    ot_divisor: otDivisor,
+                    total: Math.round(finalTotal * 100) / 100,
+                    wpsPay: Math.round(finalTotal * 100) / 100
+                };
             });
 
             // Calculate totals
