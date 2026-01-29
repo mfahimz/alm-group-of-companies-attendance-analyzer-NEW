@@ -10,15 +10,20 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-[#0F1E36] text-white shadow-sm hover:bg-[#142A4D]",
+          "bg-[#0F1E36] text-white shadow-sm hover:bg-[#162F55]",
         destructive:
-          "bg-[#A61B1B] text-white shadow-sm hover:bg-[#8F1515]",
+          "bg-[#991B1B] text-white shadow-sm hover:bg-[#7F1D1D]",
         outline:
           "border border-[#CBD5E1] bg-white shadow-sm hover:bg-[#F1F5F9] text-[#1F2937]",
         secondary:
-          "bg-[#F1F4F8] text-[#1F2937] shadow-sm hover:bg-[#E2E6EC]",
-        ghost: "hover:bg-[#F1F4F8] text-[#4B5563] hover:text-[#1F2937]",
+          "bg-[#EEF2F7] text-[#1F2937] shadow-sm hover:bg-[#E2E6EC]",
+        ghost: "hover:bg-[#F1F5F9] text-[#4B5563] hover:text-[#1F2937]",
         link: "text-[#0F1E36] underline-offset-4 hover:underline",
+        /* New action variants */
+        positive:
+          "bg-[#166534] text-white shadow-sm hover:bg-[#14532D]",
+        warning:
+          "bg-[#B45309] text-white shadow-sm hover:bg-[#92400E]",
       },
       size: {
         default: "h-9 px-4 py-2",
