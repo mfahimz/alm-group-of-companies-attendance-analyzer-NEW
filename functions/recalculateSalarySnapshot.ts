@@ -274,12 +274,13 @@ Deno.serve(async (req) => {
 
         // ============================================================
         // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+        // Balance must always be a multiple of 100 (round down)
         // ============================================================
         let wpsPay = finalTotal;
         let balance = 0;
         let wpsCapApplied = false;
         const wpsCapEnabled = salaryRecord?.wps_cap_enabled || false;
-        const wpsCapAmount = salaryRecord?.wps_cap_amount ?? 4800;
+        const wpsCapAmount = salaryRecord?.wps_cap_amount ?? 4900;
 
         if (wpsCapEnabled) {
             if (finalTotal <= 0) {
@@ -287,10 +288,14 @@ Deno.serve(async (req) => {
                 balance = 0;
                 wpsCapApplied = false;
             } else {
-                const cap = wpsCapAmount != null ? wpsCapAmount : 4800;
-                wpsPay = Math.min(finalTotal, cap);
-                balance = Math.max(0, finalTotal - wpsPay);
-                wpsCapApplied = finalTotal > cap;
+                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
+                // Calculate raw excess over cap
+                const rawExcess = Math.max(0, finalTotal - cap);
+                // Round balance DOWN to nearest 100
+                balance = Math.floor(rawExcess / 100) * 100;
+                // WPS gets the rest (total - balance)
+                wpsPay = finalTotal - balance;
+                wpsCapApplied = rawExcess > 0;
             }
         } else if (finalTotal <= 0) {
             wpsPay = 0;
