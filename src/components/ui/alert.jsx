@@ -1,16 +1,23 @@
+
 import * as React from "react"
 import { cva } from "class-variance-authority";
 
 import { cn } from "@/lib/utils"
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7",
+  "relative w-full rounded-lg border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg~*]:pl-7",
   {
     variants: {
       variant: {
-        default: "bg-background text-foreground",
+        default: "bg-white border-[#E2E6EC] text-[#1F2937] [&>svg]:text-[#4B5563]",
         destructive:
-          "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+          "border-[#F5B5B5] bg-[#FDECEC] text-[#A61B1B] [&>svg]:text-[#A61B1B]",
+        warning:
+          "border-[#F5D38A] bg-[#FFF7E6] text-[#9A6700] [&>svg]:text-[#9A6700]",
+        success:
+          "border-[#BFE3C9] bg-[#EAF4EC] text-[#1F7A3A] [&>svg]:text-[#1F7A3A]",
+        info:
+          "border-transparent bg-[#EEF4FF] text-[#1E40AF] [&>svg]:text-[#1E40AF]",
       },
     },
     defaultVariants: {
