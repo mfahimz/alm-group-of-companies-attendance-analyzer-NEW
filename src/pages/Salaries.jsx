@@ -826,6 +826,41 @@ export default function Salaries() {
                             />
                         </div>
 
+                        {/* WPS Cap Settings - Only for Al Maraghi Auto Repairs */}
+                        {formData.company === 'Al Maraghi Auto Repairs' && (
+                            <div className="col-span-2 border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
+                                <div className="flex items-center gap-2 text-amber-800 font-medium">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    WPS Cap Settings
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Checkbox
+                                        id="wps_cap_enabled"
+                                        checked={formData.wps_cap_enabled}
+                                        onCheckedChange={(checked) => setFormData({...formData, wps_cap_enabled: checked})}
+                                    />
+                                    <Label htmlFor="wps_cap_enabled" className="text-sm">
+                                        Enable WPS Cap (limit WPS pay, excess goes to Balance)
+                                    </Label>
+                                </div>
+                                {formData.wps_cap_enabled && (
+                                    <div className="ml-6">
+                                        <Label className="text-sm">WPS Cap Amount (AED)</Label>
+                                        <Input
+                                            type="number"
+                                            value={formData.wps_cap_amount}
+                                            onChange={(e) => setFormData({...formData, wps_cap_amount: parseFloat(e.target.value) || 4800})}
+                                            className="w-32 mt-1"
+                                            min={0}
+                                        />
+                                        <p className="text-xs text-amber-700 mt-1">
+                                            Default: 4800. WPS Pay will be capped at this amount.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="col-span-2 bg-slate-50 rounded-lg p-4">
                             <div className="text-sm text-slate-600">Total Salary</div>
                             <div className="text-2xl font-bold text-green-600">
