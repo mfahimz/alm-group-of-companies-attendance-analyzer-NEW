@@ -637,13 +637,13 @@ export default function SalaryReportDetail() {
                 </Card>
             )}
 
-            {/* Recalculate Confirmation Dialog */}
-            <Dialog open={!!confirmRecalc} onOpenChange={() => setConfirmRecalc(null)}>
+            {/* Recalculate All Confirmation Dialog */}
+            <Dialog open={confirmRecalcAll} onOpenChange={setConfirmRecalcAll}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Recalculate Salary</DialogTitle>
+                        <DialogTitle>Recalculate All Salaries</DialogTitle>
                         <DialogDescription>
-                            This will recalculate salary totals for <strong>{confirmRecalc?.name}</strong> using current salary formula.
+                            This will recalculate salary totals for all <strong>{salaryData.length}</strong> employees in this report.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
@@ -652,21 +652,21 @@ export default function SalaryReportDetail() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmRecalc(null)}>
+                        <Button variant="outline" onClick={() => setConfirmRecalcAll(false)}>
                             Cancel
                         </Button>
                         <Button 
-                            onClick={() => handleRecalculateSalary(confirmRecalc.attendanceId, confirmRecalc.name)}
-                            disabled={recalculating}
+                            onClick={handleRecalculateAll}
+                            disabled={recalculatingAll}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
-                            {recalculating ? (
+                            {recalculatingAll ? (
                                 <>
                                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                                     Recalculating...
                                 </>
                             ) : (
-                                'Recalculate'
+                                'Recalculate All'
                             )}
                         </Button>
                     </DialogFooter>
