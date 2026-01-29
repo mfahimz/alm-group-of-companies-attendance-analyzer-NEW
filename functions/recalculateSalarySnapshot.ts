@@ -203,7 +203,10 @@ Deno.serve(async (req) => {
             totalOtSalary: snapshot.totalOtSalary,
             total: snapshot.total,
             wpsPay: snapshot.wpsPay,
-            balance: snapshot.balance
+            balance: snapshot.balance,
+            wps_cap_enabled: snapshot.wps_cap_enabled,
+            wps_cap_amount: snapshot.wps_cap_amount,
+            wps_cap_applied: snapshot.wps_cap_applied
         };
 
         // ============================================================
