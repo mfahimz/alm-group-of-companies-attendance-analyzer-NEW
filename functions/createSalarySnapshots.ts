@@ -48,7 +48,10 @@ Deno.serve(async (req) => {
         }
 
         const project = projects[0];
+        // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
         const divisor = project.salary_calculation_days || 30;
+        // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
+        const otDivisor = project.ot_calculation_days || divisor;
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
 
         // ============================================================
@@ -563,9 +566,12 @@ Deno.serve(async (req) => {
 
         // ============================================================
         // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
+        // Uses otDivisor for previous month calculations
         // ============================================================
-        const calculateExtraPrevMonthMinutes = (emp, graceMinutesPerDay) => {
-            if (!isAlMaraghi || !hasExtraPrevMonthRange) return 0;
+        const calculateExtraPrevMonthData = (emp, graceMinutesPerDay, totalSalaryAmount, workingHours) => {
+            if (!isAlMaraghi || !hasExtraPrevMonthRange) {
+                return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0 };
+            }
 
             const attendanceIdStr = String(emp.attendance_id);
             const includeSeconds = false; // Al Maraghi doesn't use seconds
@@ -588,6 +594,7 @@ Deno.serve(async (req) => {
             };
 
             let totalExtraDeductibleMinutes = 0;
+            let extraLopDays = 0;  // LOP days from previous month range
 
             const startDate = new Date(extraPrevMonthFrom);
             const endDate = new Date(extraPrevMonthTo);
@@ -627,15 +634,22 @@ Deno.serve(async (req) => {
                     ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
                     : null;
 
+                // Handle MANUAL_ABSENT as LOP for previous month
+                if (dateException && dateException.type === 'MANUAL_ABSENT') {
+                    extraLopDays++;
+                    continue;
+                }
+
                 if (dateException && [
-                    'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'SICK_LEAVE', 'ANNUAL_LEAVE'
+                    'MANUAL_PRESENT', 'MANUAL_HALF', 'SICK_LEAVE', 'ANNUAL_LEAVE'
                 ].includes(dateException.type)) {
                     continue;
                 }
 
-                // Get punches for this day - NO PUNCHES = 0 minutes (strict rule)
+                // Get punches for this day - NO PUNCHES = LOP day (strict rule for previous month)
                 const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
                 if (rawDayPunches.length === 0) {
+                    extraLopDays++;
                     continue;
                 }
 
@@ -753,7 +767,21 @@ Deno.serve(async (req) => {
                 totalExtraDeductibleMinutes += dayDeductible;
             }
 
-            return totalExtraDeductibleMinutes;
+            // Calculate previous month monetary values using OT Divisor
+            // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
+            const extraLopPay = extraLopDays > 0 ? (totalSalaryAmount / otDivisor) * extraLopDays : 0;
+            
+            // Previous month Deductible Hours Pay = (Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60)
+            const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
+            const otHourlyRate = totalSalaryAmount / otDivisor / workingHours;
+            const extraDeductibleHoursPay = otHourlyRate * extraDeductibleHours;
+
+            return {
+                extraDeductibleMinutes: totalExtraDeductibleMinutes,
+                extraLopDays: extraLopDays,
+                extraLopPay: Math.round(extraLopPay * 100) / 100,
+                extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay * 100) / 100
+            };
         };
 
         // ============================================================
@@ -842,17 +870,30 @@ Deno.serve(async (req) => {
             const deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
             
+            // Current month hourly rate uses salary divisor
             const hourlyRate = totalSalaryAmount / divisor / workingHours;
             
-            // AL MARAGHI: Calculate extra prev month deductible minutes
-            const extraPrevMonthDeductibleMinutes = calculateExtraPrevMonthMinutes(emp, calculated.graceMinutes);
+            // Current month deductible hours pay (uses salary divisor)
+            const currentMonthDeductibleHoursPay = hourlyRate * deductibleHours;
             
-            // Total deductible includes regular + extra prev month
+            // AL MARAGHI: Calculate extra prev month data (uses OT divisor)
+            const extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, totalSalaryAmount, workingHours);
+            const extraPrevMonthDeductibleMinutes = extraPrevMonthData.extraDeductibleMinutes;
+            const extraPrevMonthLopDays = extraPrevMonthData.extraLopDays;
+            const extraPrevMonthLopPay = extraPrevMonthData.extraLopPay;
+            const extraPrevMonthDeductibleHoursPay = extraPrevMonthData.extraDeductibleHoursPay;
+            
+            // Total deductible hours pay = current month (salary divisor) + prev month (OT divisor)
+            const totalDeductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
+            
+            // Total deductible minutes (for display purposes)
             const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
             const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
-            const deductibleHoursPay = hourlyRate * totalDeductibleHours;
 
-            const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
+            // Final total calculation
+            // Current month: netDeduction (leave) + currentMonthDeductibleHoursPay (time)
+            // Previous month: extraPrevMonthLopPay (leave) + extraPrevMonthDeductibleHoursPay (time)
+            const finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay;
 
             // ============================================================
             // WPS SPLIT LOGIC (Al Maraghi Motors only)
@@ -900,6 +941,7 @@ Deno.serve(async (req) => {
                 working_hours: workingHours,
                 working_days: calculated.workingDays,
                 salary_divisor: divisor,
+                ot_divisor: otDivisor,
                 present_days: calculated.presentDays,
                 full_absence_count: calculated.fullAbsenceCount,
                 annual_leave_count: calculated.annualLeaveCount,
@@ -911,6 +953,9 @@ Deno.serve(async (req) => {
                 grace_minutes: calculated.graceMinutes,
                 deductible_minutes: deductibleMinutes,
                 extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
+                extra_prev_month_lop_days: extraPrevMonthLopDays,
+                extra_prev_month_lop_pay: extraPrevMonthLopPay,
+                extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
                 salary_month_start: salaryMonthStartStr,
                 salary_month_end: salaryMonthEndStr,
                 salary_leave_days: salaryLeaveDays,
@@ -918,7 +963,7 @@ Deno.serve(async (req) => {
                 leavePay: Math.round(leavePay * 100) / 100,
                 salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
                 deductibleHours: totalDeductibleHours,
-                deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
+                deductibleHoursPay: Math.round(totalDeductibleHoursPay * 100) / 100,
                 netDeduction: Math.round(netDeduction * 100) / 100,
                 normalOtHours: 0,
                 normalOtSalary: 0,
