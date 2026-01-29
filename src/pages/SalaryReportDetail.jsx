@@ -72,6 +72,14 @@ export default function SalaryReportDetail() {
         enabled: !!report?.project_id
     });
 
+    // Fetch live SalarySnapshot data for the most recent adjustment values
+    const { data: liveSalarySnapshots = [] } = useQuery({
+        queryKey: ['liveSalarySnapshots', report?.report_run_id],
+        queryFn: () => base44.entities.SalarySnapshot.filter({ report_run_id: report.report_run_id }),
+        enabled: !!report?.report_run_id,
+        staleTime: 0
+    });
+
     // ============================================
     // DERIVED VALUES
     // ============================================
@@ -83,19 +91,10 @@ export default function SalaryReportDetail() {
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
     
     // Can recalculate: Al Maraghi only, report finalized, project not closed, user has permission
-    const reportRun = report?.report_run_id ? liveSalarySnapshots[0] : null; // Check if finalized via snapshots
     const canRecalculate = isAlMaraghi && 
                            isAdminOrSupervisorOrHR && 
                            project?.status !== 'closed' &&
                            liveSalarySnapshots.length > 0; // Snapshots exist = report is finalized
-
-    // Fetch live SalarySnapshot data for the most recent adjustment values
-    const { data: liveSalarySnapshots = [] } = useQuery({
-        queryKey: ['liveSalarySnapshots', report?.report_run_id],
-        queryFn: () => base44.entities.SalarySnapshot.filter({ report_run_id: report.report_run_id }),
-        enabled: !!report?.report_run_id,
-        staleTime: 0
-    });
 
     // Parse snapshot data and merge with live adjustment values
     const salaryData = useMemo(() => {
