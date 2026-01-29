@@ -295,11 +295,16 @@ export default function SalaryReportDetail() {
         let errorCount = 0;
         const errors = [];
         
+        // Helper to add delay between calls to avoid rate limiting
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
         try {
             // Get all attendance_ids from the current report data
             const attendanceIds = salaryData.map(row => row.attendance_id);
             
-            for (const attendanceId of attendanceIds) {
+            for (let i = 0; i < attendanceIds.length; i++) {
+                const attendanceId = attendanceIds[i];
+                
                 try {
                     const response = await base44.functions.invoke('recalculateSalarySnapshot', {
                         salary_report_id: reportId,
@@ -318,6 +323,11 @@ export default function SalaryReportDetail() {
                 } catch (error) {
                     errorCount++;
                     errors.push(`${attendanceId}: ${error.response?.data?.error || error.message}`);
+                }
+                
+                // Add 500ms delay between calls to avoid rate limiting
+                if (i < attendanceIds.length - 1) {
+                    await delay(500);
                 }
             }
             
