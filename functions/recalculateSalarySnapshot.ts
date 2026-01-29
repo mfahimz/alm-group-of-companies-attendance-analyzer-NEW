@@ -368,7 +368,12 @@ Deno.serve(async (req) => {
             // Final totals
             total: afterValues.total,
             wpsPay: afterValues.wpsPay,
-            balance: afterValues.balance
+            balance: afterValues.balance,
+            
+            // WPS Cap fields
+            wps_cap_enabled: afterValues.wps_cap_enabled,
+            wps_cap_amount: afterValues.wps_cap_amount,
+            wps_cap_applied: afterValues.wps_cap_applied
         };
 
         await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, updatePayload);
