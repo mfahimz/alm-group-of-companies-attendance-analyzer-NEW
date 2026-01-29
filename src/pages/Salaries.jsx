@@ -43,7 +43,7 @@ export default function Salaries() {
         allowances: 0,
         allowances_with_bonus: 0,
         wps_cap_enabled: false,
-        wps_cap_amount: 4800
+        wps_cap_amount: 4900
     });
 
     const queryClient = useQueryClient();
@@ -173,7 +173,7 @@ export default function Salaries() {
             allowances: 0,
             allowances_with_bonus: 0,
             wps_cap_enabled: false,
-            wps_cap_amount: 4800
+            wps_cap_amount: 4900
         });
         setEditingSalary(null);
         setSelectedCompany('');
@@ -205,7 +205,7 @@ export default function Salaries() {
             allowances: Number(salary.allowances) || 0,
             allowances_with_bonus: salary.allowances_with_bonus || 0,
             wps_cap_enabled: salary.wps_cap_enabled || false,
-            wps_cap_amount: salary.wps_cap_amount ?? 4800
+            wps_cap_amount: salary.wps_cap_amount ?? 4900
         });
         setEditingSalary(salary);
         setShowDialog(true);
@@ -864,7 +864,7 @@ export default function Salaries() {
                                             min={0}
                                         />
                                         <p className="text-xs text-amber-700 mt-1">
-                                            Default: 4800. WPS Pay will be capped at this amount.
+                                            Default: 4900. Balance will be rounded to nearest 100 (excess stays in WPS Pay).
                                         </p>
                                     </div>
                                 )}
