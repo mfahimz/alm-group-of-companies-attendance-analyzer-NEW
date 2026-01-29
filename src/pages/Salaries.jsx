@@ -42,7 +42,7 @@ export default function Salaries() {
         basic_salary: 0,
         allowances: 0,
         allowances_with_bonus: 0,
-        wps_cap_enabled: false,
+        wps_cap_enabled: true,
         wps_cap_amount: 4900
     });
 
@@ -172,7 +172,7 @@ export default function Salaries() {
             basic_salary: 0,
             allowances: 0,
             allowances_with_bonus: 0,
-            wps_cap_enabled: false,
+            wps_cap_enabled: true,
             wps_cap_amount: 4900
         });
         setEditingSalary(null);
