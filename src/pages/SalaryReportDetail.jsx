@@ -71,24 +71,40 @@ export default function SalaryReportDetail() {
     const isAlMaraghi = project?.company === 'Al Maraghi Auto Repairs';
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
 
-    // Parse snapshot data
+    // Fetch live SalarySnapshot data for the most recent adjustment values
+    const { data: liveSalarySnapshots = [] } = useQuery({
+        queryKey: ['liveSalarySnapshots', report?.report_run_id],
+        queryFn: () => base44.entities.SalarySnapshot.filter({ report_run_id: report.report_run_id }),
+        enabled: !!report?.report_run_id,
+        staleTime: 0
+    });
+
+    // Parse snapshot data and merge with live adjustment values
     const salaryData = useMemo(() => {
         if (!report?.snapshot_data) return [];
         try {
             const data = JSON.parse(report.snapshot_data);
-            return data.map(row => ({
-                ...row,
-                normalOtHours: editableData[row.hrms_id]?.normalOtHours ?? row.normalOtHours ?? 0,
-                specialOtHours: editableData[row.hrms_id]?.specialOtHours ?? row.specialOtHours ?? 0,
-                otherDeduction: editableData[row.hrms_id]?.otherDeduction ?? row.otherDeduction ?? 0,
-                bonus: editableData[row.hrms_id]?.bonus ?? row.bonus ?? 0,
-                incentive: editableData[row.hrms_id]?.incentive ?? row.incentive ?? 0,
-                advanceSalaryDeduction: editableData[row.hrms_id]?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0
-            }));
+            return data.map(row => {
+                // Get live snapshot for this employee for the latest adjustments
+                const liveSnapshot = liveSalarySnapshots.find(s => 
+                    String(s.attendance_id) === String(row.attendance_id)
+                );
+                
+                return {
+                    ...row,
+                    normalOtHours: editableData[row.hrms_id]?.normalOtHours ?? row.normalOtHours ?? 0,
+                    specialOtHours: editableData[row.hrms_id]?.specialOtHours ?? row.specialOtHours ?? 0,
+                    // Use live snapshot values for adjustments (can be edited in Overtime & Adjustments tab)
+                    otherDeduction: editableData[row.hrms_id]?.otherDeduction ?? liveSnapshot?.otherDeduction ?? row.otherDeduction ?? 0,
+                    bonus: editableData[row.hrms_id]?.bonus ?? liveSnapshot?.bonus ?? row.bonus ?? 0,
+                    incentive: editableData[row.hrms_id]?.incentive ?? liveSnapshot?.incentive ?? row.incentive ?? 0,
+                    advanceSalaryDeduction: editableData[row.hrms_id]?.advanceSalaryDeduction ?? liveSnapshot?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0
+                };
+            });
         } catch {
             return [];
         }
-    }, [report?.snapshot_data, editableData]);
+    }, [report?.snapshot_data, editableData, liveSalarySnapshots]);
 
     // Filter and sort data
     const filteredData = useMemo(() => {
