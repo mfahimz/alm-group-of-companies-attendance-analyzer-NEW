@@ -52,10 +52,10 @@ Deno.serve(async (req) => {
         }
         const project = projects[0];
 
-        // COMPANY SCOPE CHECK: Al Maraghi Auto Repairs ONLY
-        if (project.company !== 'Al Maraghi Auto Repairs') {
+        // COMPANY SCOPE CHECK: Al Maraghi Motors ONLY
+        if (project.company !== 'Al Maraghi Motors') {
             return Response.json({ 
-                error: 'This feature is only available for Al Maraghi Auto Repairs' 
+                error: 'This feature is only available for Al Maraghi Motors' 
             }, { status: 403 });
         }
 

@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
         const project = projects[0];
-        const isAlMaraghiAutoRepairs = project.company === 'Al Maraghi Auto Repairs';
+        const isAlMaraghiAutoRepairs = project.company === 'Al Maraghi Motors';
 
         // Fetch all required data
         const [allEmployees, allReportRuns, punches, shifts, allExceptions, rulesData, salaries] = await Promise.all([
@@ -503,7 +503,7 @@ Deno.serve(async (req) => {
             mode,
             project_id,
             project_company: project.company,
-            is_al_maraghi_auto_repairs: isAlMaraghiAutoRepairs,
+            is_al_maraghi_motors: isAlMaraghiAutoRepairs,
             report_runs_processed: 0,
             analysis_results_to_create: [],
             salary_snapshots_to_create: [],
@@ -777,7 +777,7 @@ Deno.serve(async (req) => {
             mode,
             project_id,
             project_company: project.company,
-            is_al_maraghi_auto_repairs: isAlMaraghiAutoRepairs,
+            is_al_maraghi_motors: isAlMaraghiAutoRepairs,
             report_runs_processed: results.report_runs_processed,
             analysis_results_created: results.analysis_results_to_create.length,
             salary_snapshots_created: results.salary_snapshots_to_create.length,
