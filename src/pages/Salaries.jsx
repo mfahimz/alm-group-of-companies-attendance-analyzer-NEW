@@ -132,8 +132,8 @@ export default function Salaries() {
                 deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
             };
             
-            // Add WPS cap fields only for Al Maraghi Auto Repairs
-            if (data.company === 'Al Maraghi Auto Repairs') {
+            // Add WPS cap fields only for Al Maraghi Motors
+            if (data.company === 'Al Maraghi Motors') {
                 updatePayload.wps_cap_enabled = data.wps_cap_enabled || false;
                 updatePayload.wps_cap_amount = data.wps_cap_amount ?? 4800;
             }
@@ -694,7 +694,7 @@ export default function Salaries() {
                                                 AED {Number(salary.total_salary || 0).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
-                                                {salary.company === 'Al Maraghi Auto Repairs' && salary.wps_cap_enabled ? (
+                                                {salary.company === 'Al Maraghi Motors' && salary.wps_cap_enabled ? (
                                                     <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-medium">
                                                         {salary.wps_cap_amount?.toLocaleString() || 4800}
                                                     </span>
@@ -836,8 +836,8 @@ export default function Salaries() {
                             />
                         </div>
 
-                        {/* WPS Cap Settings - Only for Al Maraghi Auto Repairs */}
-                        {formData.company === 'Al Maraghi Auto Repairs' && (
+                        {/* WPS Cap Settings - Only for Al Maraghi Motors */}
+                        {formData.company === 'Al Maraghi Motors' && (
                             <div className="col-span-2 border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
                                 <div className="flex items-center gap-2 text-amber-800 font-medium">
                                     <AlertTriangle className="w-4 h-4" />
