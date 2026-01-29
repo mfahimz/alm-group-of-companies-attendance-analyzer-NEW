@@ -329,6 +329,7 @@ export default function SalaryTab({ project }) {
                 'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
                 'Deductible Hours': row.deductibleHours || 0,
                 'Deductible Hours Pay': row.deductibleHoursPay || 0,
+                'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
                 'Other Deduction': row.otherDeduction || 0,
                 'Bonus': row.bonus || 0,
                 'Incentive': row.incentive || 0,
