@@ -370,8 +370,8 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
     // RENDER
     // ============================================
 
-    // Show loading state while fetching user
-    if (loadingUser) {
+    // Show loading state while fetching user or reports
+    if (loadingUser || loadingReports) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
