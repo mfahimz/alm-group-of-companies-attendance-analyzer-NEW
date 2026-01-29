@@ -595,33 +595,23 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{(row.balance || 0).toFixed(2)}</td>
                                                 {canRecalculate && (
                                                     <td className="p-2 align-middle text-center">
-                                                        {(() => {
-                                                            // Find the live snapshot for this employee
-                                                            const liveSnapshot = liveSalarySnapshots.find(s => 
-                                                                String(s.attendance_id) === String(row.attendance_id)
-                                                            );
-                                                            if (!liveSnapshot) return null;
-                                                            
-                                                            return (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => setConfirmRecalc({ 
-                                                                        snapshotId: liveSnapshot.id, 
-                                                                        name: row.name 
-                                                                    })}
-                                                                    disabled={recalculating === liveSnapshot.id}
-                                                                    className="h-7 px-2 text-xs"
-                                                                    title="Recalculate salary totals using stored attendance values"
-                                                                >
-                                                                    {recalculating === liveSnapshot.id ? (
-                                                                        <RefreshCw className="w-3 h-3 animate-spin" />
-                                                                    ) : (
-                                                                        <RefreshCw className="w-3 h-3" />
-                                                                    )}
-                                                                </Button>
-                                                            );
-                                                        })()}
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => setConfirmRecalc({ 
+                                                                attendanceId: row.attendance_id, 
+                                                                name: row.name 
+                                                            })}
+                                                            disabled={recalculating === row.attendance_id}
+                                                            className="h-7 px-2 text-xs"
+                                                            title="Recalculate salary totals using current formula (attendance values unchanged)"
+                                                        >
+                                                            {recalculating === row.attendance_id ? (
+                                                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                                            ) : (
+                                                                <RefreshCw className="w-3 h-3" />
+                                                            )}
+                                                        </Button>
                                                     </td>
                                                 )}
                                             </tr>
