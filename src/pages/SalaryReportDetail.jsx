@@ -287,15 +287,20 @@ export default function SalaryReportDetail() {
         }
     };
 
-    const handleRecalculateSalary = async (snapshotId, employeeName) => {
-        setRecalculating(snapshotId);
+    const handleRecalculateSalary = async (attendanceId, employeeName) => {
+        setRecalculating(attendanceId);
         try {
-            const response = await base44.functions.invoke('recalculateIndividualSalary', {
-                salary_snapshot_id: snapshotId
+            const response = await base44.functions.invoke('recalculateSalarySnapshot', {
+                salary_report_id: reportId,
+                report_run_id: report?.report_run_id,
+                project_id: report?.project_id,
+                attendance_id: attendanceId,
+                mode: 'APPLY'
             });
             
             if (response.data?.success) {
-                toast.success(`Salary recalculated for ${employeeName}`);
+                const changedCount = response.data?.changed_fields?.length || 0;
+                toast.success(`Salary recalculated for ${employeeName}. ${changedCount} field(s) updated.`);
                 // Refresh data
                 queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
                 queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
@@ -303,7 +308,7 @@ export default function SalaryReportDetail() {
                 toast.error(response.data?.error || 'Failed to recalculate salary');
             }
         } catch (error) {
-            toast.error('Error: ' + (error.message || 'Failed to recalculate'));
+            toast.error('Error: ' + (error.response?.data?.error || error.message || 'Failed to recalculate'));
         } finally {
             setRecalculating(null);
             setConfirmRecalc(null);
