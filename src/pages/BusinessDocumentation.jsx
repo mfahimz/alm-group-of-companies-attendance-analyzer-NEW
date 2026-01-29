@@ -892,8 +892,161 @@ export default function BusinessDocumentation() {
                     </p>
                 </Section>
 
+                {/* Backfill Missing Employees */}
+                <Section id="backfill" title="10. Backfill Missing Employees (Admin Tool)" icon={Settings}>
+                    <h3 className="text-xl font-semibold mt-0">What Problem It Solves</h3>
+                    <p>
+                        Some employees may be missing from attendance or salary reports even though they are active. This typically happens when:
+                    </p>
+                    <ul>
+                        <li><strong>No Punches:</strong> Employee had no punch data during the period (e.g., they were on extended leave)</li>
+                        <li><strong>Older Reports:</strong> Reports generated before system improvements may have excluded employees without punches</li>
+                        <li><strong>Exceptions Only:</strong> Employee had annual leave or sick leave but no punches, so they weren't originally included</li>
+                    </ul>
+                    <p className="text-sm bg-amber-50 border border-amber-200 rounded p-3 mt-2">
+                        <strong>Result:</strong> The employee doesn't appear in the Attendance Report or Salary Tab, even though they should.
+                    </p>
+
+                    <h3 className="text-xl font-semibold mt-6">When to Use the Backfill Tool</h3>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-green-900 mb-2">✅ Use When:</h4>
+                        <ul className="text-sm text-green-800">
+                            <li>Active employees are missing from a finalized report</li>
+                            <li>Employees with annual leave exceptions don't appear in salary calculations</li>
+                            <li>You notice missing employees after a report is already finalized</li>
+                            <li>System was upgraded and old reports need to include all employees</li>
+                        </ul>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-3">
+                        <h4 className="font-semibold text-red-900 mb-2">❌ Do NOT Use When:</h4>
+                        <ul className="text-sm text-red-800">
+                            <li>Report is still in draft status (just re-run analysis instead)</li>
+                            <li>Project is not finalized yet (add exceptions and re-analyze)</li>
+                            <li>Employee is not active in the system</li>
+                            <li>Employee doesn't have a salary record (add salary first)</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Company Scope Rules</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <ul className="text-sm text-blue-800">
+                            <li><strong>Attendance Report Backfill:</strong> Works for ALL companies</li>
+                            <li><strong>Salary Snapshot Backfill:</strong> ONLY for "Al Maraghi Auto Repairs" (salary module exists only there)</li>
+                            <li>Running backfill on other companies will only add missing AnalysisResult records, not salary data</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Parameters</h3>
+                    <table className="w-full text-sm border-collapse mt-3">
+                        <thead>
+                            <tr className="bg-slate-100">
+                                <th className="border border-slate-300 p-2 text-left">Parameter</th>
+                                <th className="border border-slate-300 p-2 text-left">Required</th>
+                                <th className="border border-slate-300 p-2 text-left">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">project_id</td>
+                                <td className="border border-slate-300 p-2">Yes</td>
+                                <td className="border border-slate-300 p-2">The project to backfill</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">report_run_id</td>
+                                <td className="border border-slate-300 p-2">No</td>
+                                <td className="border border-slate-300 p-2">Specific report to backfill. If not provided, processes all reports for the project.</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">mode</td>
+                                <td className="border border-slate-300 p-2">No</td>
+                                <td className="border border-slate-300 p-2"><strong>DRY_RUN</strong> (default): Preview only, no changes. <strong>APPLY</strong>: Actually creates records.</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">include_salary_snapshots</td>
+                                <td className="border border-slate-300 p-2">No</td>
+                                <td className="border border-slate-300 p-2">true (default) or false. Whether to create missing salary snapshots (Al Maraghi only).</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3 className="text-xl font-semibold mt-6">Safety Guarantees</h3>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <ul className="text-sm text-green-800">
+                            <li>✅ <strong>Idempotent:</strong> Running multiple times will NOT create duplicate records</li>
+                            <li>✅ <strong>Adds Only:</strong> Only adds missing rows, NEVER deletes or overwrites existing data</li>
+                            <li>✅ <strong>No Duplicates:</strong> Checks for existing (report_run_id + attendance_id) before creating</li>
+                            <li>✅ <strong>Company Scoped:</strong> Salary snapshots ONLY created for Al Maraghi Auto Repairs</li>
+                            <li>✅ <strong>Finalized Reports Only:</strong> Salary backfill only runs on reports where is_final = true</li>
+                            <li>✅ <strong>Full Calculation:</strong> Uses same attendance engine as normal reports (shifts + exceptions + punches)</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Step-by-Step Operator Instructions</h3>
+                    <div className="bg-slate-100 border border-slate-300 rounded-lg p-4">
+                        <ol className="text-sm">
+                            <li className="mb-3">
+                                <strong>Step 1: Identify the Problem</strong>
+                                <p className="text-slate-600 mt-1">Go to the Attendance Report. Note which employees are missing. Verify they are active and have salary records.</p>
+                            </li>
+                            <li className="mb-3">
+                                <strong>Step 2: Get IDs</strong>
+                                <p className="text-slate-600 mt-1">From the project detail page URL, copy the project_id. From the report list, copy the report_run_id.</p>
+                            </li>
+                            <li className="mb-3">
+                                <strong>Step 3: Run DRY_RUN First (ALWAYS)</strong>
+                                <p className="text-slate-600 mt-1">Call the backfill function with mode="DRY_RUN". Review the output to see what WOULD be created.</p>
+                                <pre className="bg-slate-900 text-green-300 text-xs p-2 rounded mt-2 overflow-x-auto">{`{
+  "project_id": "YOUR_PROJECT_ID",
+  "report_run_id": "YOUR_REPORT_ID",
+  "mode": "DRY_RUN",
+  "include_salary_snapshots": true
+}`}</pre>
+                            </li>
+                            <li className="mb-3">
+                                <strong>Step 4: Verify the Preview</strong>
+                                <p className="text-slate-600 mt-1">Check the response shows the expected employees. Verify annual_leave_count values look correct. Confirm salary totals are reasonable.</p>
+                            </li>
+                            <li className="mb-3">
+                                <strong>Step 5: Run APPLY</strong>
+                                <p className="text-slate-600 mt-1">If DRY_RUN looks correct, change mode to "APPLY" and run again.</p>
+                                <pre className="bg-slate-900 text-green-300 text-xs p-2 rounded mt-2 overflow-x-auto">{`{
+  "project_id": "YOUR_PROJECT_ID",
+  "report_run_id": "YOUR_REPORT_ID",
+  "mode": "APPLY",
+  "include_salary_snapshots": true
+}`}</pre>
+                            </li>
+                            <li className="mb-3">
+                                <strong>Step 6: Refresh UI</strong>
+                                <p className="text-slate-600 mt-1">Go back to the Attendance Report page and refresh. The missing employees should now appear. Check the Salary Tab as well.</p>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Understanding the Output</h3>
+                    <div className="bg-slate-50 border border-slate-300 rounded-lg p-4">
+                        <pre className="text-xs overflow-x-auto">{`{
+  "success": true,
+  "mode": "APPLY",
+  "project_company": "Al Maraghi Auto Repairs",
+  "is_al_maraghi_auto_repairs": true,
+  "analysis_results_created": 2,        // ← Attendance rows added
+  "salary_snapshots_created": 2,        // ← Salary rows added (Al Maraghi only)
+  "details": {
+    "analysis_results": [...],          // ← Employee details
+    "salary_snapshots": [...]           // ← Salary details
+  }
+}`}</pre>
+                        <ul className="text-sm mt-3">
+                            <li><strong>analysis_results_created:</strong> Number of employees added to attendance report</li>
+                            <li><strong>salary_snapshots_created:</strong> Number of employees added to salary (Al Maraghi only)</li>
+                            <li><strong>details:</strong> Full breakdown of what was created with employee names and values</li>
+                        </ul>
+                    </div>
+                </Section>
+
                 {/* Change Management */}
-                <Section id="changes" title="10. Change Management" icon={AlertCircle}>
+                <Section id="changes" title="11. Change Management" icon={AlertCircle}>
                     <h3 className="text-xl font-semibold mt-0">What Happens When Rules Change</h3>
                     <p>
                         When your company changes attendance policies (e.g., new grace period, different shift times):
