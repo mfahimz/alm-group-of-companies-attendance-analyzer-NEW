@@ -1,0 +1,395 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+
+/**
+ * RECALCULATE SALARY SNAPSHOT
+ * 
+ * Recalculates salary totals for a single employee using STORED attendance values.
+ * 
+ * CRITICAL RULES:
+ * - ONLY reads from SalarySnapshot, Project, EmployeeSalary
+ * - NEVER queries Punch, ShiftTiming, Exception, AnalysisResult
+ * - NEVER modifies attendance data (deductible_minutes, annual_leave_count, etc.)
+ * - ONLY recalculates DERIVED salary fields
+ * - Scoped to Al Maraghi Auto Repairs ONLY
+ * - Supports PREVIEW mode (no DB changes) and APPLY mode (updates DB)
+ */
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        
+        const user = await base44.auth.me();
+        if (!user) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // PERMISSION CHECK: Only Admin, Supervisor, HR Manager
+        const userRole = user?.extended_role || user?.role || 'user';
+        const allowedRoles = ['admin', 'supervisor', 'hr_manager'];
+        if (!allowedRoles.includes(userRole)) {
+            return Response.json({ 
+                error: 'Access denied: Only Admin, Supervisor, or HR Manager can recalculate salaries' 
+            }, { status: 403 });
+        }
+
+        const { 
+            salary_report_id,  // Optional: SalaryReport.id if from SalaryReportDetail
+            report_run_id,     // Required: ReportRun.id
+            project_id,        // Required: Project.id
+            attendance_id,     // Required: employee attendance_id (string or number)
+            mode = 'APPLY'     // Optional: 'PREVIEW' or 'APPLY'
+        } = await req.json();
+
+        // Validate required fields
+        if (!report_run_id) {
+            return Response.json({ error: 'report_run_id is required' }, { status: 400 });
+        }
+        if (!project_id) {
+            return Response.json({ error: 'project_id is required' }, { status: 400 });
+        }
+        if (!attendance_id) {
+            return Response.json({ error: 'attendance_id is required' }, { status: 400 });
+        }
+
+        // Validate mode
+        const validModes = ['PREVIEW', 'APPLY'];
+        if (!validModes.includes(mode)) {
+            return Response.json({ error: `Invalid mode. Must be one of: ${validModes.join(', ')}` }, { status: 400 });
+        }
+
+        // ============================================================
+        // FETCH PROJECT
+        // ============================================================
+        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id });
+        if (projects.length === 0) {
+            return Response.json({ error: 'Project not found' }, { status: 404 });
+        }
+        const project = projects[0];
+
+        // COMPANY SCOPE CHECK: Al Maraghi Auto Repairs ONLY
+        if (project.company !== 'Al Maraghi Auto Repairs') {
+            return Response.json({ 
+                error: 'Salary recalculation is only enabled for Al Maraghi Auto Repairs.' 
+            }, { status: 403 });
+        }
+
+        // PROJECT STATUS CHECK: Cannot recalculate on closed projects
+        if (project.status === 'closed') {
+            return Response.json({ 
+                error: 'Project closed. Salary is read-only.' 
+            }, { status: 403 });
+        }
+
+        // ============================================================
+        // FETCH SALARY SNAPSHOT
+        // ============================================================
+        const snapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({ 
+            project_id: project_id,
+            report_run_id: report_run_id,
+            attendance_id: String(attendance_id)
+        });
+        
+        if (snapshots.length === 0) {
+            return Response.json({ 
+                error: 'SalarySnapshot not found for this employee in this report.' 
+            }, { status: 404 });
+        }
+        const snapshot = snapshots[0];
+
+        // ============================================================
+        // FETCH EMPLOYEE SALARY MASTER DATA
+        // ============================================================
+        let salaryRecord = null;
+        
+        // Try by HRMS ID first if available
+        if (snapshot.hrms_id) {
+            const salariesByHrms = await base44.asServiceRole.entities.EmployeeSalary.filter({
+                employee_id: snapshot.hrms_id,
+                company: project.company,
+                active: true
+            });
+            if (salariesByHrms.length > 0) {
+                salaryRecord = salariesByHrms[0];
+            }
+        }
+        
+        // Fallback to attendance_id
+        if (!salaryRecord) {
+            const salariesByAttendance = await base44.asServiceRole.entities.EmployeeSalary.filter({
+                attendance_id: String(attendance_id),
+                company: project.company,
+                active: true
+            });
+            if (salariesByAttendance.length > 0) {
+                salaryRecord = salariesByAttendance[0];
+            }
+        }
+
+        if (!salaryRecord) {
+            return Response.json({ 
+                error: `EmployeeSalary record not found for employee ${snapshot.name} (attendance_id: ${attendance_id}). Cannot recalculate salary.` 
+            }, { status: 400 });
+        }
+
+        // ============================================================
+        // VALIDATE WORKING HOURS
+        // ============================================================
+        const workingHours = snapshot.working_hours || salaryRecord.working_hours || 9;
+        if (!workingHours || workingHours <= 0) {
+            return Response.json({ 
+                error: `Working hours not set for employee ${snapshot.name}. Please set working hours in the salary master.` 
+            }, { status: 400 });
+        }
+
+        // ============================================================
+        // GET DIVISORS
+        // ============================================================
+        const divisor = snapshot.salary_divisor || project.salary_calculation_days || 30;
+        const otDivisor = project.ot_calculation_days || divisor;
+
+        if (divisor <= 0) {
+            return Response.json({ error: 'Invalid salary_divisor: must be greater than 0' }, { status: 400 });
+        }
+
+        // ============================================================
+        // READ-ONLY ATTENDANCE VALUES (NEVER MODIFY THESE)
+        // ============================================================
+        const attendanceValues = {
+            deductible_minutes: snapshot.deductible_minutes || 0,
+            annual_leave_count: snapshot.annual_leave_count || 0,
+            sick_leave_count: snapshot.sick_leave_count || 0,
+            full_absence_count: snapshot.full_absence_count || 0,
+            salary_leave_days: snapshot.salary_leave_days || 0,
+            late_minutes: snapshot.late_minutes || 0,
+            early_checkout_minutes: snapshot.early_checkout_minutes || 0,
+            other_minutes: snapshot.other_minutes || 0,
+            approved_minutes: snapshot.approved_minutes || 0,
+            grace_minutes: snapshot.grace_minutes || 15,
+            working_days: snapshot.working_days || 0,
+            present_days: snapshot.present_days || 0
+        };
+
+        // ============================================================
+        // EDITABLE ADJUSTMENT VALUES (preserve these, do NOT override)
+        // ============================================================
+        const adjustmentValues = {
+            normalOtHours: snapshot.normalOtHours || 0,
+            specialOtHours: snapshot.specialOtHours || 0,
+            bonus: snapshot.bonus || 0,
+            incentive: snapshot.incentive || 0,
+            otherDeduction: snapshot.otherDeduction || 0,
+            advanceSalaryDeduction: snapshot.advanceSalaryDeduction || 0
+        };
+
+        // ============================================================
+        // BASE SALARY VALUES
+        // ============================================================
+        const basicSalary = snapshot.basic_salary || salaryRecord.basic_salary || 0;
+        const allowances = snapshot.allowances || Number(salaryRecord.allowances) || 0;
+        const totalSalary = snapshot.total_salary || salaryRecord.total_salary || 0;
+
+        // ============================================================
+        // BEFORE VALUES (for comparison)
+        // ============================================================
+        const beforeValues = {
+            leaveDays: snapshot.leaveDays,
+            leavePay: snapshot.leavePay,
+            salaryLeaveAmount: snapshot.salaryLeaveAmount,
+            netDeduction: snapshot.netDeduction,
+            deductibleHours: snapshot.deductibleHours,
+            deductibleHoursPay: snapshot.deductibleHoursPay,
+            normalOtSalary: snapshot.normalOtSalary,
+            specialOtSalary: snapshot.specialOtSalary,
+            totalOtSalary: snapshot.totalOtSalary,
+            total: snapshot.total,
+            wpsPay: snapshot.wpsPay,
+            balance: snapshot.balance
+        };
+
+        // ============================================================
+        // RECALCULATE DERIVED FIELDS
+        // ============================================================
+
+        // Leave Days = Annual Leave + LOP (excludes sick leave per Al Maraghi rule)
+        const leaveDays = attendanceValues.annual_leave_count + attendanceValues.full_absence_count;
+        
+        // Leave Pay = (Total Salary / Divisor) * Leave Days
+        const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
+        
+        // Salary Leave Amount calculation with working hours adjustment
+        let salaryLeaveAmount = 0;
+        const salaryLeaveDays = attendanceValues.salary_leave_days || attendanceValues.annual_leave_count;
+        
+        if (salaryLeaveDays > 0) {
+            if (workingHours === 8) {
+                // For 8-hour employees: (Total Salary / Divisor) * Annual Leave Count
+                salaryLeaveAmount = (totalSalary / divisor) * salaryLeaveDays;
+            } else if (workingHours === 9) {
+                // For 9-hour employees: (Total Salary * 0.8767 / Divisor) * Annual Leave Count
+                const adjustedSalary = totalSalary * 0.8767;
+                salaryLeaveAmount = (adjustedSalary / divisor) * salaryLeaveDays;
+            } else {
+                // Default to standard calculation
+                const salaryForLeave = basicSalary + allowances;
+                salaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
+            }
+        }
+        
+        // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
+        const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+
+        // Deductible Hours = Deductible Minutes / 60 (from stored attendance value)
+        const deductibleHours = Math.round((attendanceValues.deductible_minutes / 60) * 100) / 100;
+        
+        // Hourly Rate (for deductions) = Total Salary / Divisor / Working Hours
+        const hourlyRateDeduction = totalSalary / divisor / workingHours;
+        
+        // Deductible Hours Pay = Hourly Rate * Deductible Hours
+        const deductibleHoursPay = hourlyRateDeduction * deductibleHours;
+
+        // OT Hourly Rate (uses OT Divisor)
+        const otHourlyRate = totalSalary / otDivisor / workingHours;
+        
+        // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours
+        const normalOtSalary = Math.round(otHourlyRate * 1.25 * adjustmentValues.normalOtHours * 100) / 100;
+        
+        // Special OT Salary = OT Hourly Rate * 1.5 * Special OT Hours
+        const specialOtSalary = Math.round(otHourlyRate * 1.5 * adjustmentValues.specialOtHours * 100) / 100;
+        
+        // Total OT Salary
+        const totalOtSalary = normalOtSalary + specialOtSalary;
+
+        // Final Total = Total Salary + OT + Bonus + Incentive - Net Deduction - Deductible Hours Pay - Other Deduction - Advance
+        const finalTotal = totalSalary 
+            + totalOtSalary 
+            + adjustmentValues.bonus 
+            + adjustmentValues.incentive
+            - netDeduction 
+            - deductibleHoursPay 
+            - adjustmentValues.otherDeduction 
+            - adjustmentValues.advanceSalaryDeduction;
+
+        // WPS Pay = Final Total
+        const wpsPay = finalTotal;
+        
+        // Balance = 0 (Total - WPS Pay)
+        const balance = 0;
+
+        // ============================================================
+        // AFTER VALUES (computed)
+        // ============================================================
+        const afterValues = {
+            leaveDays: Math.round(leaveDays * 100) / 100,
+            leavePay: Math.round(leavePay * 100) / 100,
+            salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
+            netDeduction: Math.round(netDeduction * 100) / 100,
+            deductibleHours: deductibleHours,
+            deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
+            normalOtSalary: normalOtSalary,
+            specialOtSalary: specialOtSalary,
+            totalOtSalary: totalOtSalary,
+            total: Math.round(finalTotal * 100) / 100,
+            wpsPay: Math.round(wpsPay * 100) / 100,
+            balance: Math.round(balance * 100) / 100
+        };
+
+        // ============================================================
+        // COMPUTE DIFF
+        // ============================================================
+        const diff = {};
+        for (const key of Object.keys(afterValues)) {
+            const before = beforeValues[key] || 0;
+            const after = afterValues[key] || 0;
+            if (Math.abs(before - after) > 0.001) {
+                diff[key] = { before, after, change: Math.round((after - before) * 100) / 100 };
+            }
+        }
+
+        // ============================================================
+        // PREVIEW MODE: Return computed values without saving
+        // ============================================================
+        if (mode === 'PREVIEW') {
+            return Response.json({
+                success: true,
+                mode: 'PREVIEW',
+                employee_name: snapshot.name,
+                attendance_id: snapshot.attendance_id,
+                before: beforeValues,
+                after: afterValues,
+                diff: diff,
+                message: 'Preview only - no changes applied'
+            });
+        }
+
+        // ============================================================
+        // APPLY MODE: Update snapshot with derived fields only
+        // ============================================================
+        const updatePayload = {
+            // Derived leave calculations
+            leaveDays: afterValues.leaveDays,
+            leavePay: afterValues.leavePay,
+            salaryLeaveAmount: afterValues.salaryLeaveAmount,
+            netDeduction: afterValues.netDeduction,
+            
+            // Derived deduction calculations
+            deductibleHours: afterValues.deductibleHours,
+            deductibleHoursPay: afterValues.deductibleHoursPay,
+            
+            // OT calculations (recalculated based on existing OT hours)
+            normalOtSalary: afterValues.normalOtSalary,
+            specialOtSalary: afterValues.specialOtSalary,
+            totalOtSalary: afterValues.totalOtSalary,
+            
+            // Final totals
+            total: afterValues.total,
+            wpsPay: afterValues.wpsPay,
+            balance: afterValues.balance
+        };
+
+        await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, updatePayload);
+
+        // ============================================================
+        // AUDIT LOG
+        // ============================================================
+        const changedFields = Object.keys(diff);
+        try {
+            await base44.asServiceRole.entities.AuditLog.create({
+                action: 'RECALCULATE_SALARY_SNAPSHOT',
+                entity_type: 'SalarySnapshot',
+                entity_id: snapshot.id,
+                user_email: user.email,
+                company: project.company,
+                details: JSON.stringify({
+                    project_id: project_id,
+                    report_run_id: report_run_id,
+                    attendance_id: String(attendance_id),
+                    employee_name: snapshot.name,
+                    changed_fields: changedFields,
+                    previous_total: beforeValues.total,
+                    new_total: afterValues.total
+                })
+            });
+        } catch (auditError) {
+            console.warn('[recalculateSalarySnapshot] Audit log failed:', auditError.message);
+            // Don't fail the operation if audit log fails
+        }
+
+        return Response.json({
+            success: true,
+            mode: 'APPLY',
+            employee_name: snapshot.name,
+            attendance_id: snapshot.attendance_id,
+            before: beforeValues,
+            after: afterValues,
+            diff: diff,
+            changed_fields: changedFields,
+            message: `Salary recalculated successfully for ${snapshot.name}. ${changedFields.length} field(s) updated.`
+        });
+
+    } catch (error) {
+        console.error('Recalculate salary snapshot error:', error);
+        return Response.json({ 
+            error: error.message 
+        }, { status: 500 });
+    }
+});
