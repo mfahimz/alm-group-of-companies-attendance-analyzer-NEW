@@ -481,7 +481,7 @@ export default function OverviewTab({ project }) {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                                    <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
                                     <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
                                     <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
                                     <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
