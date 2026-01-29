@@ -205,8 +205,11 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     };
 
     // Use a query hook to fetch results for a specific report when displaying verification count
+    // Memoize report run IDs to prevent infinite re-renders
+    const reportRunIds = React.useMemo(() => reportRuns.map(r => r.id).join(','), [reportRuns]);
+
     const { data: reportResults = {} } = useQuery({
-        queryKey: ['reportResults', project.id, reportRuns.map(r => r.id)],
+        queryKey: ['reportResults', project.id, reportRunIds],
         queryFn: async () => {
             // Fetch results only for displayed reports
             const resultsByReport = {};
