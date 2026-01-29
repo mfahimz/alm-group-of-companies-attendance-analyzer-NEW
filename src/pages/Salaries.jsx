@@ -693,6 +693,15 @@ export default function Salaries() {
                                             <TableCell className="font-bold text-green-700">
                                                 AED {Number(salary.total_salary || 0).toFixed(2)}
                                             </TableCell>
+                                            <TableCell>
+                                                {salary.company === 'Al Maraghi Auto Repairs' && salary.wps_cap_enabled ? (
+                                                    <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-medium">
+                                                        {salary.wps_cap_amount?.toLocaleString() || 4800}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">—</span>
+                                                )}
+                                            </TableCell>
                                             {(isAdmin || isSupervisor) && (
                                                 <TableCell className="text-right">
                                                     <div className="flex gap-1 justify-end">
