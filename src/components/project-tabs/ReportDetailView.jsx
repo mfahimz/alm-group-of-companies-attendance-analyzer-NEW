@@ -764,9 +764,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     annual_leave_count: result.annual_leave_count || 0,
                     late_minutes: result.late_minutes || 0,
                     early_checkout_minutes: result.early_checkout_minutes || 0,
-                    other_minutes: result.other_minutes || 0
+                    other_minutes: result.other_minutes || 0,
+                    has_no_punches: false // Can't determine for closed projects
                 };
             }
+            
+            // Check if employee has any punches at all
+            const attendanceIdStr = String(result.attendance_id);
+            const employeePunches = punches.filter(p => 
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= reportRun.date_from && 
+                p.punch_date <= reportRun.date_to
+            );
+            const hasNoPunches = employeePunches.length === 0;
             
             // For open projects, recalculate from punch data
             const { 
@@ -792,7 +802,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annual_leave_count: annualLeaveCount,
                 late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout),
-                other_minutes: Math.max(0, totalOtherMinutes)
+                other_minutes: Math.max(0, totalOtherMinutes),
+                has_no_punches: hasNoPunches
             };
         });
     }, [results, employees, punches, shifts, exceptions, reportRun, project.status]);
