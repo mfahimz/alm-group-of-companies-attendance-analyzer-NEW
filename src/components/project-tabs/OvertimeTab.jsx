@@ -73,9 +73,9 @@ export default function OvertimeTab({ project, finalReport }) {
         let filteredEmployees = employees;
         
         if (project?.custom_employee_ids) {
-            const customIds = project.custom_employee_ids.split(',').map(id => id.trim());
+            const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
             filteredEmployees = employees.filter(emp => 
-                customIds.includes(emp.hrms_id) || customIds.includes(emp.attendance_id)
+                customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id))
             );
         }
 
@@ -99,6 +99,7 @@ export default function OvertimeTab({ project, finalReport }) {
                 otRecordId: otRecord?.id,
                 // Adjustment fields from SalarySnapshot
                 snapshotId: snapshot?.id,
+                attendanceSource: snapshot?.attendance_source || null,
                 bonus: editableAdjustments[emp.attendance_id]?.bonus ?? snapshot?.bonus ?? 0,
                 incentive: editableAdjustments[emp.attendance_id]?.incentive ?? snapshot?.incentive ?? 0,
                 otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? snapshot?.otherDeduction ?? 0,
