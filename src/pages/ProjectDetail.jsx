@@ -73,10 +73,8 @@ export default function ProjectDetail() {
     refetchOnMount: true
   });
 
-  // Fetch the actual finalized report using project.last_saved_report_id
-  const finalReport = project?.last_saved_report_id 
-    ? reportRuns.find(r => r.id === project.last_saved_report_id && r.is_final === true)
-    : null;
+  // NOTE: finalReport is no longer needed at this level - SalaryTab and OvertimeTab
+  // now fetch their own finalized report by scanning all reportRuns for is_final=true
 
 
 
@@ -349,7 +347,7 @@ export default function ProjectDetail() {
                 </TabsContent>
 
                 <TabsContent value="overtime">
-                    <OvertimeTab project={project} finalReport={finalReport} />
+                    <OvertimeTab project={project} />
                 </TabsContent>
 
                 <TabsContent value="analysis">
@@ -361,7 +359,7 @@ export default function ProjectDetail() {
                 </TabsContent>
 
                 <TabsContent value="salary">
-                    <SalaryTab project={project} finalReport={finalReport} />
+                    <SalaryTab project={project} />
                 </TabsContent>
             </Tabs>
             )}
