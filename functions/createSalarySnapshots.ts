@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
 
                 workingDays++;
 
-                // Get latest exception for this date
+                // Get ALL matching exceptions for this date
                 const matchingExceptions = employeeExceptions.filter(ex => {
                     try {
                         const exFrom = new Date(ex.date_from);
@@ -293,16 +293,27 @@ Deno.serve(async (req) => {
                         return currentDate >= exFrom && currentDate <= exTo;
                     } catch { return false; }
                 });
+
+                // CRITICAL: PUBLIC_HOLIDAY takes priority over ALL other exceptions
+                // If a PUBLIC_HOLIDAY exists for this date, day is NOT a working day
+                // regardless of any other exceptions (including MANUAL_ABSENT)
+                const hasPublicHoliday = matchingExceptions.some(ex => 
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
+                
+                if (hasPublicHoliday) {
+                    workingDays--;
+                    continue;
+                }
+
+                // Get the most recent exception (excluding PUBLIC_HOLIDAY which was already handled)
                 const dateException = matchingExceptions.length > 0
                     ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
                     : null;
 
-                // Handle special exception types first
+                // Handle special exception types
                 if (dateException) {
-                    if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
-                        workingDays--;
-                        continue;
-                    } else if (dateException.type === 'MANUAL_PRESENT') {
+                    if (dateException.type === 'MANUAL_PRESENT') {
                         presentDays++;
                         continue;
                     } else if (dateException.type === 'MANUAL_ABSENT') {
