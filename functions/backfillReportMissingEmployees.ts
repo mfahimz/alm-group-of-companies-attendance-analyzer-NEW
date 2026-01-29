@@ -8,7 +8,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * 
  * RULES:
  * - AnalysisResult backfill: ALL companies
- * - SalarySnapshot backfill: ONLY Al Maraghi Auto Repairs
+ * - SalarySnapshot backfill: ONLY Al Maraghi Motors
  * 
  * This is idempotent - running multiple times will not create duplicates.
  */
@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
         const project = projects[0];
-        const isAlMaraghiAutoRepairs = project.company === 'Al Maraghi Motors';
+        const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
 
         // Fetch all required data
         const [allEmployees, allReportRuns, punches, shifts, allExceptions, rulesData, salaries] = await Promise.all([
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id }),
             base44.asServiceRole.entities.Exception.filter({ project_id }),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
-            isAlMaraghiAutoRepairs 
+            isAlMaraghiMotors 
                 ? base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true })
                 : Promise.resolve([])
         ]);
@@ -578,8 +578,8 @@ Deno.serve(async (req) => {
                 }
             }
 
-            // Handle SalarySnapshot backfill (ONLY for Al Maraghi Auto Repairs AND finalized reports)
-            if (include_salary_snapshots && isAlMaraghiAutoRepairs && reportRun.is_final) {
+            // Handle SalarySnapshot backfill (ONLY for Al Maraghi Motors AND finalized reports)
+            if (include_salary_snapshots && isAlMaraghiMotors && reportRun.is_final) {
                 console.log(`[backfillReportMissingEmployees] Processing salary snapshots for finalized report ${reportRun.id}`);
                 
                 // Fetch existing salary snapshots
@@ -646,7 +646,7 @@ Deno.serve(async (req) => {
 
                     const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
 
-                    // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+                    // WPS SPLIT LOGIC (Al Maraghi Motors only)
                     // Balance must always be a multiple of 100 (round down)
                     let wpsAmount = finalTotal;
                     let balanceAmount = 0;
@@ -654,7 +654,7 @@ Deno.serve(async (req) => {
                     const wpsCapEnabled = salary?.wps_cap_enabled || false;
                     const wpsCapAmount = salary?.wps_cap_amount ?? 4900;
 
-                    if (isAlMaraghiAutoRepairs && wpsCapEnabled) {
+                    if (isAlMaraghiMotors && wpsCapEnabled) {
                         if (finalTotal <= 0) {
                             wpsAmount = 0;
                             balanceAmount = 0;

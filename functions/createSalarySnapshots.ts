@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
 
         // ============================================================
-        // AL MARAGHI AUTO REPAIRS: Calculate salary month ranges
+        // AL MARAGHI MOTORS: Calculate salary month ranges
         // ============================================================
         let salaryMonthStartStr = null;
         let salaryMonthEndStr = null;
@@ -562,7 +562,7 @@ Deno.serve(async (req) => {
         };
 
         // ============================================================
-        // AL MARAGHI: Calculate extra prev month deductible minutes
+        // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
         // ============================================================
         const calculateExtraPrevMonthMinutes = (emp, graceMinutesPerDay) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) return 0;
@@ -855,7 +855,7 @@ Deno.serve(async (req) => {
             const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
 
             // ============================================================
-            // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+            // WPS SPLIT LOGIC (Al Maraghi Motors only)
             // ============================================================
             // WPS split is applied AFTER final total is computed
             // Uses wps_cap_enabled and wps_cap_amount from EmployeeSalary

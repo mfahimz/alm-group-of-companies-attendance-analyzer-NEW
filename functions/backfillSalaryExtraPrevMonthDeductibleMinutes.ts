@@ -3,7 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 /**
  * BACKFILL SALARY EXTRA PREVIOUS MONTH DEDUCTIBLE MINUTES
  * 
- * For Al Maraghi Auto Repairs only.
+ * For Al Maraghi Motors only.
  * Computes and stores extra_prev_month_deductible_minutes for existing finalized reports.
  * 
  * Inputs:

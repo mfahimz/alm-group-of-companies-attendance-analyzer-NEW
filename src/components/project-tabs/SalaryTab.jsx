@@ -208,7 +208,7 @@ export default function SalaryTab({ project }) {
                 const finalTotal = totalSalary + totalOtSalary + bonus + incentive
                     - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
 
-                // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+                // WPS SPLIT LOGIC (Al Maraghi Motors only)
                 // Balance must always be a multiple of 100 (round down)
                 let wpsAmount = finalTotal;
                 let balanceAmount = 0;

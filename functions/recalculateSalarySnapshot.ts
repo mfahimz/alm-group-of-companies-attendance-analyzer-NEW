@@ -10,7 +10,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * - NEVER queries Punch, ShiftTiming, Exception, AnalysisResult
  * - NEVER modifies attendance data (deductible_minutes, annual_leave_count, etc.)
  * - ONLY recalculates DERIVED salary fields
- * - Scoped to Al Maraghi Auto Repairs ONLY
+ * - Scoped to Al Maraghi Motors ONLY
  * - Supports PREVIEW mode (no DB changes) and APPLY mode (updates DB)
  */
 
@@ -273,7 +273,7 @@ Deno.serve(async (req) => {
             - adjustmentValues.advanceSalaryDeduction;
 
         // ============================================================
-        // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+        // WPS SPLIT LOGIC (Al Maraghi Motors only)
         // Balance must always be a multiple of 100 (round down)
         // ============================================================
         let wpsPay = finalTotal;

@@ -594,7 +594,7 @@ Deno.serve(async (req) => {
             const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
 
             // ============================================================
-            // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+            // WPS SPLIT LOGIC (Al Maraghi Motors only)
             // Balance must always be a multiple of 100 (round down)
             // ============================================================
             let wpsAmount = finalTotal;

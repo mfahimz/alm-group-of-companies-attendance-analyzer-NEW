@@ -10,7 +10,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * - NEVER queries Punch, ShiftTiming, Exception, AnalysisResult
  * - NEVER modifies attendance data (deductible_minutes, annual_leave_count, etc.)
  * - ONLY recalculates DERIVED salary fields
- * - Scoped to Al Maraghi Auto Repairs ONLY
+ * - Scoped to Al Maraghi Motors ONLY
  * - Requires Admin, Supervisor, or HR Manager role
  */
 
