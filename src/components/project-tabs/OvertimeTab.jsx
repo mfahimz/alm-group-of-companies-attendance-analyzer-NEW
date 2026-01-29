@@ -234,6 +234,7 @@ export default function OvertimeTab({ project, finalReport }) {
             'HRMS ID': row.hrms_id,
             'Name': row.name,
             'Department': row.department || '',
+            'Attendance Source': row.attendanceSource || 'ANALYZED',
             'Normal OT Hours': row.normalOtHours || 0,
             'Special OT Hours': row.specialOtHours || 0
         }));
