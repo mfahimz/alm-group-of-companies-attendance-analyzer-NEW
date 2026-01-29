@@ -88,7 +88,7 @@ export default function SalaryReportDetail() {
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
     const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
-    const isAlMaraghi = project?.company === 'Al Maraghi Auto Repairs';
+    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
     
     // Can recalculate: Al Maraghi only, report finalized, project not closed, user has permission

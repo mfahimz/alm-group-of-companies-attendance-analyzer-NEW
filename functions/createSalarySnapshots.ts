@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
 
         const project = projects[0];
         const divisor = project.salary_calculation_days || 30;
-        const isAlMaraghi = project.company === 'Al Maraghi Auto Repairs';
+        const isAlMaraghi = project.company === 'Al Maraghi Motors';
 
         // ============================================================
         // AL MARAGHI AUTO REPAIRS: Calculate salary month ranges
@@ -867,7 +867,7 @@ Deno.serve(async (req) => {
             const wpsCapEnabled = salary?.wps_cap_enabled || false;
             const wpsCapAmount = salary?.wps_cap_amount ?? 4900;
 
-            if (project.company === 'Al Maraghi Auto Repairs' && wpsCapEnabled) {
+            if (project.company === 'Al Maraghi Motors' && wpsCapEnabled) {
                 if (finalTotal <= 0) {
                     wpsAmount = 0;
                     balanceAmount = 0;
