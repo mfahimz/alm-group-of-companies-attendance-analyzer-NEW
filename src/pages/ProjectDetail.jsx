@@ -308,7 +308,7 @@ export default function ProjectDetail() {
             <TabsTrigger
               value="overtime"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600 data-[state=active]:to-orange-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
-                                Overtime
+                                Overtime & Adjustments
                             </TabsTrigger>
             }
                         <TabsTrigger
@@ -349,7 +349,7 @@ export default function ProjectDetail() {
                 </TabsContent>
 
                 <TabsContent value="overtime">
-                    <OvertimeTab project={project} />
+                    <OvertimeTab project={project} finalReport={finalReport} />
                 </TabsContent>
 
                 <TabsContent value="analysis">
