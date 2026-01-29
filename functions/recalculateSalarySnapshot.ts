@@ -171,7 +171,10 @@ Deno.serve(async (req) => {
             approved_minutes: snapshot.approved_minutes || 0,
             grace_minutes: snapshot.grace_minutes || 15,
             working_days: snapshot.working_days || 0,
-            present_days: snapshot.present_days || 0
+            present_days: snapshot.present_days || 0,
+            // Previous month data (Al Maraghi Motors only)
+            extra_prev_month_deductible_minutes: snapshot.extra_prev_month_deductible_minutes || 0,
+            extra_prev_month_lop_days: snapshot.extra_prev_month_lop_days || 0
         };
 
         // ============================================================
@@ -203,6 +206,8 @@ Deno.serve(async (req) => {
             netDeduction: snapshot.netDeduction,
             deductibleHours: snapshot.deductibleHours,
             deductibleHoursPay: snapshot.deductibleHoursPay,
+            extra_prev_month_lop_pay: snapshot.extra_prev_month_lop_pay,
+            extra_prev_month_deductible_hours_pay: snapshot.extra_prev_month_deductible_hours_pay,
             normalOtSalary: snapshot.normalOtSalary,
             specialOtSalary: snapshot.specialOtSalary,
             totalOtSalary: snapshot.totalOtSalary,
@@ -246,17 +251,34 @@ Deno.serve(async (req) => {
         // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
         const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-        // Deductible Hours = Deductible Minutes / 60 (from stored attendance value)
+        // Deductible Hours = Deductible Minutes / 60 (from stored attendance value - current month only)
         const deductibleHours = Math.round((attendanceValues.deductible_minutes / 60) * 100) / 100;
         
-        // Hourly Rate (for deductions) = Total Salary / Divisor / Working Hours
+        // Current month hourly rate (uses salary divisor)
         const hourlyRateDeduction = totalSalary / divisor / workingHours;
         
-        // Deductible Hours Pay = Hourly Rate * Deductible Hours
-        const deductibleHoursPay = hourlyRateDeduction * deductibleHours;
+        // Current month Deductible Hours Pay = Hourly Rate * Deductible Hours
+        const currentMonthDeductibleHoursPay = hourlyRateDeduction * deductibleHours;
 
         // OT Hourly Rate (uses OT Divisor)
         const otHourlyRate = totalSalary / otDivisor / workingHours;
+        
+        // Previous month calculations (uses OT Divisor) - Al Maraghi Motors only
+        // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
+        const extraPrevMonthLopPay = attendanceValues.extra_prev_month_lop_days > 0 
+            ? (totalSalary / otDivisor) * attendanceValues.extra_prev_month_lop_days 
+            : 0;
+        
+        // Previous month Deductible Hours Pay = OT Hourly Rate * (Extra Deductible Minutes / 60)
+        const extraPrevMonthDeductibleHours = attendanceValues.extra_prev_month_deductible_minutes / 60;
+        const extraPrevMonthDeductibleHoursPay = otHourlyRate * extraPrevMonthDeductibleHours;
+        
+        // Total deductible hours (for display)
+        const totalDeductibleMinutes = attendanceValues.deductible_minutes + attendanceValues.extra_prev_month_deductible_minutes;
+        const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
+        
+        // Total deductible hours pay = current month + prev month
+        const deductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
         
         // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours
         const normalOtSalary = Math.round(otHourlyRate * 1.25 * adjustmentValues.normalOtHours * 100) / 100;
@@ -267,13 +289,20 @@ Deno.serve(async (req) => {
         // Total OT Salary
         const totalOtSalary = normalOtSalary + specialOtSalary;
 
-        // Final Total = Total Salary + OT + Bonus + Incentive - Net Deduction - Deductible Hours Pay - Other Deduction - Advance
+        // Final Total = Total Salary + OT + Bonus + Incentive 
+        //             - Net Deduction (current month leave)
+        //             - Current Month Deductible Hours Pay
+        //             - Previous Month LOP Pay
+        //             - Previous Month Deductible Hours Pay
+        //             - Other Deduction - Advance
         const finalTotal = totalSalary 
             + totalOtSalary 
             + adjustmentValues.bonus 
             + adjustmentValues.incentive
             - netDeduction 
-            - deductibleHoursPay 
+            - currentMonthDeductibleHoursPay
+            - extraPrevMonthLopPay
+            - extraPrevMonthDeductibleHoursPay
             - adjustmentValues.otherDeduction 
             - adjustmentValues.advanceSalaryDeduction;
 
@@ -315,8 +344,10 @@ Deno.serve(async (req) => {
             leavePay: Math.round(leavePay * 100) / 100,
             salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
             netDeduction: Math.round(netDeduction * 100) / 100,
-            deductibleHours: deductibleHours,
+            deductibleHours: totalDeductibleHours,
             deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
+            extra_prev_month_lop_pay: Math.round(extraPrevMonthLopPay * 100) / 100,
+            extra_prev_month_deductible_hours_pay: Math.round(extraPrevMonthDeductibleHoursPay * 100) / 100,
             normalOtSalary: normalOtSalary,
             specialOtSalary: specialOtSalary,
             totalOtSalary: totalOtSalary,
@@ -370,7 +401,11 @@ Deno.serve(async (req) => {
             deductibleHours: afterValues.deductibleHours,
             deductibleHoursPay: afterValues.deductibleHoursPay,
             
-            // OT calculations (recalculated based on existing OT hours)
+            // Previous month calculations (using OT divisor)
+            extra_prev_month_lop_pay: afterValues.extra_prev_month_lop_pay,
+            extra_prev_month_deductible_hours_pay: afterValues.extra_prev_month_deductible_hours_pay,
+            
+            // OT calculations (recalculated based on existing OT hours, using OT divisor)
             normalOtSalary: afterValues.normalOtSalary,
             specialOtSalary: afterValues.specialOtSalary,
             totalOtSalary: afterValues.totalOtSalary,
