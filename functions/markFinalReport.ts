@@ -109,68 +109,80 @@ Deno.serve(async (req) => {
 
         console.log(`[markFinalReport] Validation: ${snapshotCount} snapshots created, ${eligibleCount} eligible employees`);
 
-        // HARD VALIDATION: Snapshot count MUST equal eligible employee count (AL MARAGHI AUTO REPAIRS ONLY)
+        // ============================================================================
+        // VALIDATION: Ensure complete data before finalization
+        // ============================================================================
         const isAlMaraghiAutoRepairs = project.company === 'Al Maraghi Auto Repairs';
         
-        if (isAlMaraghiAutoRepairs && snapshotCount !== eligibleCount) {
-            console.log(`[markFinalReport] VALIDATION MISMATCH: ${snapshotCount} snapshots vs ${eligibleCount} eligible. Attempting auto-backfill...`);
+        // STEP 1: Validate AnalysisResult count (ALL COMPANIES)
+        const analysisResults = await base44.asServiceRole.entities.AnalysisResult.filter({
+            project_id: project_id,
+            report_run_id: report_run_id
+        });
+        const analysisCount = analysisResults.length;
+        const analysisAttendanceIds = new Set(analysisResults.map(r => String(r.attendance_id)));
+        
+        // Get ALL active employees for the project
+        const allActiveEmployeeIds = eligibleEmployees.map(e => String(e.attendance_id));
+        
+        // Find missing AnalysisResult records
+        const missingAnalysisIds = allActiveEmployeeIds.filter(id => !analysisAttendanceIds.has(id));
+        
+        if (missingAnalysisIds.length > 0) {
+            console.log(`[markFinalReport] ANALYSIS VALIDATION FAILED: ${missingAnalysisIds.length} employees missing AnalysisResult`);
             
-            // Attempt auto-backfill for missing employees
-            try {
-                const backfillResult = await base44.asServiceRole.functions.invoke('backfillReportMissingEmployees', {
-                    project_id: project_id,
-                    report_run_id: report_run_id,
-                    mode: 'APPLY',
-                    include_salary_snapshots: true
-                });
-                console.log('[markFinalReport] Auto-backfill result:', backfillResult);
-                
-                // Re-check snapshot count after backfill
-                const updatedSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
-                    project_id: project_id,
-                    report_run_id: report_run_id
-                });
-                const updatedSnapshotCount = updatedSnapshots.length;
-                
-                console.log(`[markFinalReport] After backfill: ${updatedSnapshotCount} snapshots, ${eligibleCount} eligible`);
-                
-                if (updatedSnapshotCount !== eligibleCount) {
-                    // Still mismatched after backfill - rollback
-                    await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-                        is_final: false,
-                        finalized_by: null,
-                        finalized_date: null
-                    });
+            // Rollback: Unmark as final
+            await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
+                is_final: false,
+                finalized_by: null,
+                finalized_date: null
+            });
 
-                    return Response.json({ 
-                        success: false,
-                        error: `VALIDATION FAILED: After auto-backfill, have ${updatedSnapshotCount} salary snapshots but expected ${eligibleCount} (eligible employees with salary records). Please check employee and salary data.`,
-                        snapshots_created: updatedSnapshotCount,
-                        eligible_employees: eligibleCount,
-                        backfill_attempted: true
-                    }, { status: 400 });
-                }
-                
-                // Backfill succeeded - update snapshotCount for audit log
-                console.log('[markFinalReport] Auto-backfill succeeded, validation passed');
-            } catch (backfillError) {
-                console.error('[markFinalReport] Auto-backfill failed:', backfillError);
-                
-                // Rollback: Unmark as final
-                await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-                    is_final: false,
-                    finalized_by: null,
-                    finalized_date: null
-                });
+            // Get employee names for better error message
+            const missingEmployees = eligibleEmployees
+                .filter(e => missingAnalysisIds.includes(String(e.attendance_id)))
+                .map(e => ({ attendance_id: e.attendance_id, name: e.name }));
 
-                return Response.json({ 
-                    success: false,
-                    error: `VALIDATION FAILED: Created ${snapshotCount} salary snapshots but expected ${eligibleCount}. Auto-backfill also failed: ${backfillError.message}`,
-                    snapshots_created: snapshotCount,
-                    eligible_employees: eligibleCount,
-                    backfill_error: backfillError.message
-                }, { status: 400 });
-            }
+            return Response.json({ 
+                success: false,
+                error: `VALIDATION FAILED: ${missingAnalysisIds.length} employees missing from AnalysisResult. Run backfillReportMissingEmployees first.`,
+                analysis_count: analysisCount,
+                expected_count: allActiveEmployeeIds.length,
+                missing_attendance_ids: missingAnalysisIds,
+                missing_employees: missingEmployees.slice(0, 10), // Show first 10
+                action_required: `Run backfillReportMissingEmployees with project_id="${project_id}" and report_run_id="${report_run_id}"`
+            }, { status: 400 });
+        }
+        
+        // STEP 2: Validate SalarySnapshot count (AL MARAGHI AUTO REPAIRS ONLY)
+        if (isAlMaraghiAutoRepairs && snapshotCount !== eligibleCount) {
+            console.log(`[markFinalReport] SALARY VALIDATION FAILED: ${snapshotCount} snapshots vs ${eligibleCount} eligible`);
+            
+            // Find missing SalarySnapshot records
+            const snapshotAttendanceIds = new Set(createdSnapshots.map(s => String(s.attendance_id)));
+            const missingSalaryIds = eligibleEmployees
+                .filter(emp => salaries.some(s => 
+                    String(s.employee_id) === String(emp.hrms_id) || 
+                    String(s.attendance_id) === String(emp.attendance_id)
+                ))
+                .filter(emp => !snapshotAttendanceIds.has(String(emp.attendance_id)))
+                .map(e => ({ attendance_id: e.attendance_id, name: e.name }));
+            
+            // Rollback: Unmark as final
+            await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
+                is_final: false,
+                finalized_by: null,
+                finalized_date: null
+            });
+
+            return Response.json({ 
+                success: false,
+                error: `VALIDATION FAILED: ${snapshotCount} salary snapshots but expected ${eligibleCount}. Run backfillReportMissingEmployees first.`,
+                snapshots_created: snapshotCount,
+                eligible_employees: eligibleCount,
+                missing_employees: missingSalaryIds.slice(0, 10), // Show first 10
+                action_required: `Run backfillReportMissingEmployees with project_id="${project_id}", report_run_id="${report_run_id}", include_salary_snapshots=true`
+            }, { status: 400 });
         }
 
         // Log audit
