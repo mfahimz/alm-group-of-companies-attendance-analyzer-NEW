@@ -49,14 +49,27 @@ export default function OvertimeTab({ project, finalReport }) {
         staleTime: 0
     });
 
+    // Fetch all report runs for this project to find the finalized one
+    const { data: reportRuns = [], isLoading: loadingReports } = useQuery({
+        queryKey: ['reportRuns', project?.id],
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
+        enabled: !!project?.id,
+        staleTime: 0
+    });
+
+    // Find the finalized report from the list (there should only be one with is_final=true)
+    const finalizedReport = useMemo(() => {
+        return reportRuns.find(r => r.is_final === true) || null;
+    }, [reportRuns]);
+
     // Fetch salary snapshots for adjustments (only after finalization)
     const { data: salarySnapshots = [], isLoading: loadingSnapshots, refetch: refetchSnapshots } = useQuery({
-        queryKey: ['salarySnapshots', project?.id, finalReport?.id],
+        queryKey: ['salarySnapshots', project?.id, finalizedReport?.id],
         queryFn: () => base44.entities.SalarySnapshot.filter({
             project_id: project.id,
-            report_run_id: finalReport.id
+            report_run_id: finalizedReport.id
         }),
-        enabled: !!project?.id && !!finalReport?.id,
+        enabled: !!project?.id && !!finalizedReport?.id,
         staleTime: 0
     });
 
