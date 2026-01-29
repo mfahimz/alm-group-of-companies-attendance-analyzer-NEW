@@ -199,7 +199,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                                 <SelectValue placeholder="Select company" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Al Maraghi Auto Repairs">Al Maraghi Auto Repairs</SelectItem>
+                                <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
                                 <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
                                 <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
                                 <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
@@ -348,7 +348,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                         </div>
                     )}
 
-                    {formData.company === 'Al Maraghi Auto Repairs' && currentUser && currentUser.role === 'admin' && (
+                    {formData.company === 'Al Maraghi Motors' && currentUser && currentUser.role === 'admin' && (
                         <div>
                             <Label htmlFor="salary_calculation_days">Salary Calculation Days</Label>
                             <Input
