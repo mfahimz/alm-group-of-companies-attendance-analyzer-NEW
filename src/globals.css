@@ -4,124 +4,289 @@
 
 @layer base {
   :root {
-    /* Brand Colors */
-    --primary: 220 90% 56%;        /* Indigo-600 */
-    --primary-hover: 220 90% 50%;  /* Indigo-700 */
-    --primary-light: 220 95% 95%;  /* Indigo-50 */
+    /* ============================================
+       ENTERPRISE HR SYSTEM - FORMAL COLOR PALETTE
+       ============================================ */
     
-    --secondary: 270 95% 75%;      /* Purple-400 */
-    --accent: 45 93% 47%;          /* Amber-500 */
+    /* Primary Brand - Deep Navy Blue */
+    --primary: 213 57% 14%;           /* #0F1E36 */
+    --primary-hover: 213 50% 19%;     /* #142A4D */
+    --primary-light: 220 33% 96%;     /* #EEF2FF */
+    --primary-foreground: 0 0% 100%;  /* White text on primary */
     
-    /* Semantic Colors */
-    --success: 142 76% 36%;        /* Green-600 */
-    --success-light: 142 76% 96%;  /* Green-50 */
-    --warning: 38 92% 50%;         /* Amber-500 */
-    --warning-light: 48 96% 95%;   /* Amber-50 */
-    --error: 0 84% 60%;            /* Red-500 */
-    --error-light: 0 86% 97%;      /* Red-50 */
-    --info: 217 91% 60%;           /* Blue-500 */
-    --info-light: 214 95% 93%;     /* Blue-50 */
+    /* Secondary Accent - Muted Gold */
+    --secondary-gold: 42 50% 54%;     /* #C9A24D */
+    --secondary-gold-light: 42 60% 94%; /* Light gold background */
     
-    /* Neutral Colors */
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;     /* Slate-900 */
+    /* Neutral Background Palette */
+    --background: 220 20% 97%;        /* #F4F6F9 - App background */
+    --foreground: 220 20% 14%;        /* #1F2937 - Primary text */
     
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 0 0% 100%;                /* #FFFFFF - Card surfaces */
+    --card-foreground: 220 20% 14%;   /* #1F2937 */
     
-    --muted: 210 40% 96%;          /* Slate-50 */
-    --muted-foreground: 215 16% 47%; /* Slate-600 */
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 14%;
     
-    --border: 214 32% 91%;         /* Slate-200 */
-    --input: 214 32% 91%;
-    --ring: 220 90% 56%;
+    /* Elevated Panels */
+    --elevated: 220 20% 99%;          /* #FAFBFC */
+    
+    /* Muted / Secondary backgrounds */
+    --muted: 220 14% 96%;             /* #F1F4F8 - Table headers, subtle bg */
+    --muted-foreground: 220 9% 46%;   /* #6B7280 - Muted text */
+    
+    /* Text Colors */
+    --text-primary: 220 20% 14%;      /* #1F2937 */
+    --text-secondary: 220 13% 34%;    /* #4B5563 */
+    --text-muted: 220 9% 46%;         /* #6B7280 */
+    --text-disabled: 220 9% 64%;      /* #9CA3AF */
+    
+    /* Borders & Dividers */
+    --border: 220 13% 90%;            /* #E2E6EC */
+    --border-light: 220 14% 93%;      /* #E7EBF1 - Table grid lines */
+    --input: 215 20% 80%;             /* #CBD5E1 - Input borders */
+    --ring: 213 57% 14%;              /* Focus ring - Deep Navy */
+    
+    /* Status Colors - Success */
+    --success: 142 50% 30%;           /* #1F7A3A */
+    --success-light: 140 30% 94%;     /* #EAF4EC */
+    --success-border: 140 35% 80%;    /* #BFE3C9 */
+    
+    /* Status Colors - Warning */
+    --warning: 40 70% 31%;            /* #9A6700 */
+    --warning-light: 42 100% 95%;     /* #FFF7E6 */
+    --warning-border: 42 75% 75%;     /* #F5D38A */
+    
+    /* Status Colors - Error / Destructive */
+    --destructive: 0 70% 38%;         /* #A61B1B */
+    --destructive-light: 0 60% 96%;   /* #FDECEC */
+    --destructive-border: 0 60% 83%;  /* #F5B5B5 */
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Status Colors - Info */
+    --info: 224 76% 37%;              /* #1E40AF */
+    --info-light: 224 100% 97%;       /* #EEF4FF */
+    
+    /* Accent (for backwards compatibility) */
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 20% 14%;
+    
+    /* Chart Colors */
+    --chart-1: 213 57% 14%;           /* Navy */
+    --chart-2: 42 50% 54%;            /* Gold */
+    --chart-3: 142 50% 30%;           /* Green */
+    --chart-4: 220 13% 34%;           /* Slate */
+    --chart-5: 0 70% 38%;             /* Red */
     
     /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    
-    /* Spacing Scale */
-    --spacing-xs: 0.25rem;   /* 4px */
-    --spacing-sm: 0.5rem;    /* 8px */
-    --spacing-md: 1rem;      /* 16px */
-    --spacing-lg: 1.5rem;    /* 24px */
-    --spacing-xl: 2rem;      /* 32px */
-    --spacing-2xl: 3rem;     /* 48px */
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-elevated: 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-modal: 0 8px 24px rgba(0,0,0,0.12);
     
     /* Border Radius */
-    --radius-sm: 0.375rem;   /* 6px */
-    --radius-md: 0.5rem;     /* 8px */
-    --radius-lg: 0.75rem;    /* 12px */
-    --radius-xl: 1rem;       /* 16px */
-    --radius-full: 9999px;
-    
-    /* Typography */
-    --font-size-xs: 0.75rem;     /* 12px */
-    --font-size-sm: 0.875rem;    /* 14px */
-    --font-size-base: 1rem;      /* 16px */
-    --font-size-lg: 1.125rem;    /* 18px */
-    --font-size-xl: 1.25rem;     /* 20px */
-    --font-size-2xl: 1.5rem;     /* 24px */
-    --font-size-3xl: 1.875rem;   /* 30px */
-    --font-size-4xl: 2.25rem;    /* 36px */
+    --radius: 0.5rem;
+    --radius-sm: 0.375rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 @layer components {
-  /* Custom component styles */
+  /* ============================================
+     CARD STYLES
+     ============================================ */
   .stat-card {
-    @apply border-0 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden group;
+    @apply bg-card border border-border rounded-lg;
+    box-shadow: var(--shadow-card);
   }
   
-  .btn-primary {
-    @apply bg-[hsl(var(--primary))] text-white hover:bg-[hsl(var(--primary-hover))] 
-           transition-colors rounded-lg px-4 py-2 font-medium;
-  }
-  
-  .btn-secondary {
-    @apply bg-slate-100 text-slate-700 hover:bg-slate-200 
-           transition-colors rounded-lg px-4 py-2 font-medium;
+  .stat-card:hover {
+    box-shadow: var(--shadow-elevated);
   }
   
   .card-elevated {
-    @apply bg-white rounded-xl shadow-lg border-0 backdrop-blur-sm;
+    @apply bg-card rounded-lg border border-border;
+    box-shadow: var(--shadow-card);
   }
   
-  .text-gradient {
-    @apply bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent;
+  /* ============================================
+     BUTTON STYLES
+     ============================================ */
+  .btn-primary {
+    @apply text-white font-medium rounded-md px-4 py-2 transition-colors;
+    background-color: hsl(var(--primary));
   }
   
+  .btn-primary:hover:not(:disabled) {
+    background-color: hsl(var(--primary-hover));
+  }
+  
+  .btn-primary:disabled {
+    background-color: hsl(var(--text-disabled));
+  }
+  
+  .btn-secondary {
+    @apply bg-white border font-medium rounded-md px-4 py-2 transition-colors;
+    border-color: hsl(var(--input));
+    color: hsl(var(--text-primary));
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background-color: hsl(220 14% 96%);
+  }
+  
+  .btn-danger {
+    @apply text-white font-medium rounded-md px-4 py-2 transition-colors;
+    background-color: hsl(var(--destructive));
+  }
+  
+  .btn-danger:hover:not(:disabled) {
+    background-color: hsl(0 70% 33%);
+  }
+  
+  /* ============================================
+     TABLE STYLES
+     ============================================ */
+  .table-header {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--text-primary));
+    font-weight: 600;
+  }
+  
+  .table-row-hover:hover {
+    background-color: hsl(220 20% 98%); /* #F7F9FC */
+  }
+  
+  .table-row-selected {
+    background-color: hsl(220 30% 95%); /* #EDF2F9 */
+  }
+  
+  .table-totals-row {
+    background-color: hsl(220 20% 98%);
+    font-weight: 600;
+  }
+  
+  /* ============================================
+     BADGE STYLES
+     ============================================ */
   .badge-success {
-    @apply bg-[hsl(var(--success-light))] text-[hsl(var(--success))] 
-           px-2.5 py-1 rounded-md text-xs font-medium;
+    background-color: hsl(var(--success-light));
+    color: hsl(var(--success));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
   }
   
   .badge-warning {
-    @apply bg-[hsl(var(--warning-light))] text-[hsl(var(--warning))] 
-           px-2.5 py-1 rounded-md text-xs font-medium;
+    background-color: hsl(var(--warning-light));
+    color: hsl(var(--warning));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
   }
   
   .badge-error {
-    @apply bg-[hsl(var(--error-light))] text-[hsl(var(--error))] 
-           px-2.5 py-1 rounded-md text-xs font-medium;
+    background-color: hsl(var(--destructive-light));
+    color: hsl(var(--destructive));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
   }
   
   .badge-info {
-    @apply bg-[hsl(var(--info-light))] text-[hsl(var(--info))] 
-           px-2.5 py-1 rounded-md text-xs font-medium;
+    background-color: hsl(var(--info-light));
+    color: hsl(var(--info));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  
+  .badge-neutral {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--text-secondary));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  
+  .badge-gold {
+    background-color: hsl(var(--secondary-gold-light));
+    color: hsl(var(--secondary-gold));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  
+  /* ============================================
+     INPUT STYLES
+     ============================================ */
+  .input-formal {
+    @apply bg-white rounded-md px-3 py-2 text-sm transition-colors;
+    border: 1px solid hsl(var(--input));
+    color: hsl(var(--text-primary));
+  }
+  
+  .input-formal:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 1px hsl(var(--primary));
+  }
+  
+  .input-formal:disabled {
+    background-color: hsl(220 14% 96%);
+    color: hsl(var(--text-disabled));
+  }
+  
+  .input-formal.error {
+    border-color: hsl(var(--destructive));
+  }
+  
+  /* ============================================
+     TEXT UTILITIES
+     ============================================ */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, hsl(var(--primary)), hsl(213 50% 25%));
+  }
+  
+  .text-primary-navy {
+    color: hsl(var(--primary));
+  }
+  
+  .text-gold {
+    color: hsl(var(--secondary-gold));
+  }
+  
+  /* ============================================
+     SHADOW UTILITIES
+     ============================================ */
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  
+  .shadow-modal {
+    box-shadow: var(--shadow-modal);
   }
 }
 
 @layer utilities {
+  /* Subtle shimmer animation for loading states */
   .animate-shimmer {
     animation: shimmer 2s linear infinite;
+    background: linear-gradient(
+      to right,
+      hsl(var(--muted)) 0%,
+      hsl(220 20% 98%) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
   }
   
   @keyframes shimmer {
     from {
-      background-position: 0 0;
+      background-position: 200% 0;
     }
     to {
       background-position: -200% 0;
