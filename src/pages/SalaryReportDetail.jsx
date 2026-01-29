@@ -198,11 +198,44 @@ export default function SalaryReportDetail() {
         // Use stored values for leave calculations (already calculated with DIVISOR_LEAVE_DEDUCTION)
         const netDeduction = row.netDeduction || 0;
         const deductibleHoursPay = row.deductibleHoursPay || 0;
+        
+        // Previous month deductions (Al Maraghi Motors - calculated using OT divisor)
+        const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
+        const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
 
         const total = totalSalary + totalOtSalary + bonus + incentive
-                      - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+                      - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
+                      - otherDeduction - advanceSalaryDeduction;
 
-        return { total, wpsPay: total, balance: 0, normalOtSalary, specialOtSalary, totalOtSalary };
+        // WPS SPLIT LOGIC (Al Maraghi Motors only)
+        // Balance must always be a multiple of 100 (round down)
+        let wpsPay = total;
+        let balance = 0;
+        let wpsCapApplied = false;
+        const wpsCapEnabled = row.wps_cap_enabled || false;
+        const wpsCapAmount = row.wps_cap_amount ?? 4900;
+
+        if (isAlMaraghi && wpsCapEnabled) {
+            if (total <= 0) {
+                wpsPay = 0;
+                balance = 0;
+                wpsCapApplied = false;
+            } else {
+                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
+                // Calculate raw excess over cap
+                const rawExcess = Math.max(0, total - cap);
+                // Round balance DOWN to nearest 100
+                balance = Math.floor(rawExcess / 100) * 100;
+                // WPS gets the rest (total - balance)
+                wpsPay = total - balance;
+                wpsCapApplied = rawExcess > 0;
+            }
+        } else if (total <= 0) {
+            wpsPay = 0;
+            balance = 0;
+        }
+
+        return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary };
     };
 
     const handleSave = async () => {
@@ -217,45 +250,64 @@ export default function SalaryReportDetail() {
             const originalData = JSON.parse(report.snapshot_data);
 
             const updatedData = originalData.map(row => {
-                const edits = editableData[row.hrms_id];
-                if (!edits) return row;
+            const edits = editableData[row.hrms_id];
+            if (!edits) return row;
 
-                const updated = { ...row };
-                const totalSalary = row.total_salary || 0;
-                const workingHours = row.working_hours || 9;
-                
-                // DIVISOR_OT: Use ot_divisor for OT calculations
-                // [MERGE_NOTE: If merging, use salary_divisor for both]
-                const divisor = row.salary_divisor || report?.salary_divisor || 30;
-                const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
-                const otHourlyRate = totalSalary / otDivisor / workingHours;
+            const updated = { ...row };
+            const totalSalary = row.total_salary || 0;
+            const workingHours = row.working_hours || 9;
 
-                // Apply edits using DIVISOR_OT for OT calculations
-                if ('normalOtHours' in edits) {
-                    updated.normalOtHours = edits.normalOtHours;
-                    updated.normalOtSalary = Math.round(otHourlyRate * 1.25 * edits.normalOtHours * 100) / 100;
-                }
-                if ('specialOtHours' in edits) {
-                    updated.specialOtHours = edits.specialOtHours;
-                    updated.specialOtSalary = Math.round(otHourlyRate * 1.5 * edits.specialOtHours * 100) / 100;
-                }
-                if ('otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
-                if ('bonus' in edits) updated.bonus = edits.bonus;
-                if ('incentive' in edits) updated.incentive = edits.incentive;
-                if ('advanceSalaryDeduction' in edits) updated.advanceSalaryDeduction = edits.advanceSalaryDeduction;
+            // DIVISOR_OT: Use ot_divisor for OT calculations
+            // [MERGE_NOTE: If merging, use salary_divisor for both]
+            const divisor = row.salary_divisor || report?.salary_divisor || 30;
+            const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
+            const otHourlyRate = totalSalary / otDivisor / workingHours;
 
-                // Recalculate total
-                const totalOtSalary = (updated.normalOtSalary || 0) + (updated.specialOtSalary || 0);
-                const netDeduction = updated.netDeduction || 0;
-                const deductibleHoursPay = updated.deductibleHoursPay || 0;
+            // Apply edits using DIVISOR_OT for OT calculations
+            if ('normalOtHours' in edits) {
+                updated.normalOtHours = edits.normalOtHours;
+                updated.normalOtSalary = Math.round(otHourlyRate * 1.25 * edits.normalOtHours * 100) / 100;
+            }
+            if ('specialOtHours' in edits) {
+                updated.specialOtHours = edits.specialOtHours;
+                updated.specialOtSalary = Math.round(otHourlyRate * 1.5 * edits.specialOtHours * 100) / 100;
+            }
+            if ('otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
+            if ('bonus' in edits) updated.bonus = edits.bonus;
+            if ('incentive' in edits) updated.incentive = edits.incentive;
+            if ('advanceSalaryDeduction' in edits) updated.advanceSalaryDeduction = edits.advanceSalaryDeduction;
 
-                const finalTotal = totalSalary + totalOtSalary + (updated.bonus || 0) + (updated.incentive || 0)
-                                    - netDeduction - deductibleHoursPay - (updated.otherDeduction || 0) - (updated.advanceSalaryDeduction || 0);
+            // Recalculate total (include previous month deductions)
+            const totalOtSalary = (updated.normalOtSalary || 0) + (updated.specialOtSalary || 0);
+            const netDeduction = updated.netDeduction || 0;
+            const deductibleHoursPay = updated.deductibleHoursPay || 0;
+            const extraPrevMonthLopPay = updated.extra_prev_month_lop_pay || 0;
+            const extraPrevMonthDeductibleHoursPay = updated.extra_prev_month_deductible_hours_pay || 0;
 
-                updated.total = Math.round(finalTotal * 100) / 100;
-                updated.wpsPay = Math.round(finalTotal * 100) / 100;
+            const finalTotal = totalSalary + totalOtSalary + (updated.bonus || 0) + (updated.incentive || 0)
+                                - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
+                                - (updated.otherDeduction || 0) - (updated.advanceSalaryDeduction || 0);
 
-                return updated;
+            updated.total = Math.round(finalTotal * 100) / 100;
+
+            // WPS SPLIT LOGIC (Al Maraghi Motors only)
+            const wpsCapEnabled = updated.wps_cap_enabled || false;
+            const wpsCapAmount = updated.wps_cap_amount ?? 4900;
+
+            if (isAlMaraghi && wpsCapEnabled && finalTotal > 0) {
+                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
+                const rawExcess = Math.max(0, finalTotal - cap);
+                const balance = Math.floor(rawExcess / 100) * 100;
+                updated.wpsPay = Math.round((finalTotal - balance) * 100) / 100;
+                updated.balance = balance;
+                updated.wps_cap_applied = rawExcess > 0;
+            } else {
+                updated.wpsPay = Math.round(Math.max(0, finalTotal) * 100) / 100;
+                updated.balance = 0;
+                updated.wps_cap_applied = false;
+            }
+
+            return updated;
             });
 
             // Calculate new totals
@@ -350,38 +402,45 @@ export default function SalaryReportDetail() {
     };
 
     const handleExportToExcel = () => {
-        const exportData = filteredData.map(row => ({
-            'Attendance ID': row.attendance_id,
-            'Name': row.name,
-            'Attendance Source': row.attendance_source || 'ANALYZED',
-            'Total Salary': row.total_salary || 0,
-            'Working Days': row.working_days || 0,
-            'Present Days': row.present_days || 0,
-            'LOP Days': row.full_absence_count || 0,
-            'Annual Leave Days': row.annual_leave_count || 0,
-            'Leave Days': row.leaveDays || 0,
-            'Leave Pay': row.leavePay || 0,
-            'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
-            'Salary Leave Amount': row.salaryLeaveAmount || 0,
-            'Net Deduction': row.netDeduction || 0,
-            'Deductible Hours': row.deductibleHours || 0,
-            'Deductible Hours Pay': row.deductibleHoursPay || 0,
-            'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
-            'Normal OT Hours': row.normalOtHours || 0,
-            'Normal OT Salary': row.normalOtSalary || 0,
-            'Special OT Hours': row.specialOtHours || 0,
-            'Special OT Salary': row.specialOtSalary || 0,
-            'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
-            'Other Deduction': row.otherDeduction || 0,
-            'Bonus': row.bonus || 0,
-            'Incentive': row.incentive || 0,
-            'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
-            'Total': row.total || 0,
-            'WPS Pay': row.wpsPay || 0,
-            'Balance': row.balance || 0,
-            'WPS Cap Applied': row.wps_cap_applied ? 'Yes' : 'No',
-            'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4800) : ''
-        }));
+        const exportData = filteredData.map(row => {
+            // Calculate totals for export to get correct WPS values
+            const { total, wpsPay, balance, wpsCapApplied } = calculateTotals(row);
+            return {
+                'Attendance ID': row.attendance_id,
+                'Name': row.name,
+                'Attendance Source': row.attendance_source || 'ANALYZED',
+                'Total Salary': row.total_salary || 0,
+                'Working Days': row.working_days || 0,
+                'Present Days': row.present_days || 0,
+                'LOP Days': row.full_absence_count || 0,
+                'Annual Leave Days': row.annual_leave_count || 0,
+                'Leave Days': row.leaveDays || 0,
+                'Leave Pay': row.leavePay || 0,
+                'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
+                'Salary Leave Amount': row.salaryLeaveAmount || 0,
+                'Net Deduction': row.netDeduction || 0,
+                'Deductible Hours': row.deductibleHours || 0,
+                'Deductible Hours Pay': row.deductibleHoursPay || 0,
+                'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
+                'Extra LOP Days (Prev Month)': row.extra_prev_month_lop_days || 0,
+                'Extra LOP Pay (Prev Month)': row.extra_prev_month_lop_pay || 0,
+                'Extra Deductible Pay (Prev Month)': row.extra_prev_month_deductible_hours_pay || 0,
+                'Normal OT Hours': row.normalOtHours || 0,
+                'Normal OT Salary': row.normalOtSalary || 0,
+                'Special OT Hours': row.specialOtHours || 0,
+                'Special OT Salary': row.specialOtSalary || 0,
+                'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
+                'Other Deduction': row.otherDeduction || 0,
+                'Bonus': row.bonus || 0,
+                'Incentive': row.incentive || 0,
+                'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
+                'Total': total,
+                'WPS Pay': wpsPay,
+                'Balance': balance,
+                'WPS Cap Applied': wpsCapApplied ? 'Yes' : 'No',
+                'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
+            };
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
@@ -541,7 +600,10 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deductible Min (Prev Month)</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Min (PM)</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_lop_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra LOP Days (PM)</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_lop_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra LOP Pay (PM)</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_deductible_hours_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra Deduct Pay (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hours</SortableTableHead>
                                         <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
                                         <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Hours</SortableTableHead>
@@ -559,8 +621,8 @@ export default function SalaryReportDetail() {
                                 </thead>
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
-                                        <tr className="border-b">
-                                            <td colSpan={canRecalculate ? 28 : 27} className="text-center py-12">
+                                    <tr className="border-b">
+                                    <td colSpan={31} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
@@ -583,6 +645,9 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle bg-purple-50">{row.deductibleHours?.toFixed(2) || '0.00'}</td>
                                                 <td className="p-2 align-middle bg-purple-100">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</td>
                                                 <td className="p-2 align-middle bg-orange-50">{row.extra_prev_month_deductible_minutes || 0}</td>
+                                                <td className="p-2 align-middle bg-orange-50">{(row.extra_prev_month_lop_days || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_lop_pay || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_deductible_hours_pay || 0).toFixed(2)}</td>
                                                 <td className="p-1 align-middle bg-blue-50">
                                                     <Input
                                                         type="number"
@@ -641,10 +706,10 @@ export default function SalaryReportDetail() {
                                                     />
                                                 </td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-green-100 font-bold">{(row.wpsPay || wpsPay).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100 font-bold">{(row.balance || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-green-100 font-bold">{wpsPay.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100 font-bold">{balance.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-slate-50 text-center">
-                                                    {row.wps_cap_applied ? (
+                                                    {wpsCapApplied ? (
                                                         <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded text-xs font-medium">
                                                             Yes
                                                         </span>
