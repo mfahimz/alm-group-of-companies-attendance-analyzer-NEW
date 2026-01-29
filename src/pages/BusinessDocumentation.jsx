@@ -1045,8 +1045,150 @@ export default function BusinessDocumentation() {
                     </div>
                 </Section>
 
+                {/* Recalculate Individual Salary */}
+                <Section id="recalculate-salary" title="11. Recalculate Individual Salary (Admin Tool)" icon={DollarSign}>
+                    <h3 className="text-xl font-semibold mt-0">What Problem It Solves</h3>
+                    <p>
+                        Sometimes salary totals need to be recalculated for a single employee after the report is finalized. This can happen when:
+                    </p>
+                    <ul>
+                        <li><strong>Divisor Changed:</strong> Project's salary calculation divisor was updated after finalization</li>
+                        <li><strong>OT Hours Edited:</strong> Overtime hours were corrected but totals weren't updated</li>
+                        <li><strong>Adjustments Made:</strong> Bonus, incentive, or deductions were edited</li>
+                        <li><strong>Formula Fix:</strong> A calculation formula was corrected in the system</li>
+                    </ul>
+                    <p className="text-sm bg-amber-50 border border-amber-200 rounded p-3 mt-2">
+                        <strong>Important:</strong> This feature recalculates derived salary fields ONLY. It does NOT change attendance data (late minutes, absences, leave days, etc.).
+                    </p>
+
+                    <h3 className="text-xl font-semibold mt-6">Company Scope</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-800">
+                            <strong>This feature is available ONLY for Al Maraghi Auto Repairs.</strong> Other companies do not have salary calculation features.
+                        </p>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Who Can Use It</h3>
+                    <div className="grid md:grid-cols-3 gap-3">
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                            <p className="text-sm text-green-800 font-semibold">✅ Admin</p>
+                        </div>
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                            <p className="text-sm text-green-800 font-semibold">✅ Supervisor</p>
+                        </div>
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                            <p className="text-sm text-green-800 font-semibold">✅ HR Manager</p>
+                        </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-3 mt-2">
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                            <p className="text-sm text-red-800 font-semibold">❌ Department Head</p>
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                            <p className="text-sm text-red-800 font-semibold">❌ Regular User</p>
+                        </div>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">When NOT to Use</h3>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <ul className="text-sm text-red-800">
+                            <li><strong>❌ Project is closed:</strong> Cannot recalculate on closed projects</li>
+                            <li><strong>❌ Report not finalized:</strong> Only works on finalized reports with salary snapshots</li>
+                            <li><strong>❌ Attendance needs fixing:</strong> Use the attendance report editing tools instead</li>
+                            <li><strong>❌ Multiple employees:</strong> This is for one employee at a time</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">What Gets Recalculated</h3>
+                    <table className="w-full text-sm border-collapse mt-3">
+                        <thead>
+                            <tr className="bg-slate-100">
+                                <th className="border border-slate-300 p-2 text-left">Field</th>
+                                <th className="border border-slate-300 p-2 text-left">Formula</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="border border-slate-300 p-2">Leave Pay</td>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">(Total Salary / Divisor) × Leave Days</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2">Salary Leave Amount</td>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">(Basic + Allowances) / Divisor × Salary Leave Days</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2">Net Deduction</td>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">max(0, Leave Pay - Salary Leave Amount)</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2">Deductible Hours Pay</td>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">Hourly Rate × Deductible Hours</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2">Normal OT Salary</td>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">OT Hourly Rate × 1.25 × Normal OT Hours</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2">Special OT Salary</td>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">OT Hourly Rate × 1.5 × Special OT Hours</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-slate-300 p-2">Total</td>
+                                <td className="border border-slate-300 p-2 font-mono text-xs">Total Salary + OT - Deductions + Adjustments</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3 className="text-xl font-semibold mt-6">What Does NOT Change</h3>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <p className="text-sm text-amber-800 mb-2">These attendance values remain unchanged:</p>
+                        <ul className="text-sm text-amber-800 columns-2">
+                            <li>Late minutes</li>
+                            <li>Early checkout minutes</li>
+                            <li>Deductible minutes</li>
+                            <li>Annual leave count</li>
+                            <li>Sick leave count</li>
+                            <li>LOP days (full absence)</li>
+                            <li>Working days</li>
+                            <li>Present days</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">How to Use</h3>
+                    <div className="bg-slate-100 border border-slate-300 rounded-lg p-4">
+                        <ol className="text-sm">
+                            <li className="mb-2">
+                                <strong>Step 1:</strong> Go to the Salary Report Detail page (from Salary Tab → View icon on a saved report)
+                            </li>
+                            <li className="mb-2">
+                                <strong>Step 2:</strong> Find the employee row you need to recalculate
+                            </li>
+                            <li className="mb-2">
+                                <strong>Step 3:</strong> Click the refresh icon (↻) in the Actions column
+                            </li>
+                            <li className="mb-2">
+                                <strong>Step 4:</strong> Read the confirmation message and click "Recalculate"
+                            </li>
+                            <li className="mb-2">
+                                <strong>Step 5:</strong> The page will refresh with updated totals
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Safety Features</h3>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <ul className="text-sm text-green-800">
+                            <li>✅ <strong>Idempotent:</strong> Running multiple times produces the same result</li>
+                            <li>✅ <strong>Audit Logged:</strong> Every recalculation is recorded with user and timestamp</li>
+                            <li>✅ <strong>Confirmation Required:</strong> Cannot accidentally trigger - requires confirmation</li>
+                            <li>✅ <strong>Single Employee:</strong> Only affects the selected employee</li>
+                            <li>✅ <strong>Read-Only Attendance:</strong> Cannot modify attendance data through this feature</li>
+                        </ul>
+                    </div>
+                </Section>
+
                 {/* Change Management */}
-                <Section id="changes" title="11. Change Management" icon={AlertCircle}>
+                <Section id="changes" title="12. Change Management" icon={AlertCircle}>
                     <h3 className="text-xl font-semibold mt-0">What Happens When Rules Change</h3>
                     <p>
                         When your company changes attendance policies (e.g., new grace period, different shift times):
