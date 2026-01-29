@@ -529,11 +529,28 @@ export default function OvertimeTab({ project, finalReport }) {
                         )}
                     </div>
 
-                    {Object.keys(editableAdjustments).length > 0 && !isProjectClosed && (
-                        <p className="text-sm text-amber-600 font-medium mb-4">
-                            • {Object.keys(editableAdjustments).length} unsaved adjustment change(s)
+                    {/* Search for Adjustments */}
+                    <div className="mb-4">
+                        <div className="relative max-w-md">
+                            <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search by name, ID, or department..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                        </div>
+                        <p className="text-sm text-slate-500 mt-2">
+                            <Users className="w-4 h-4 inline mr-1" />
+                            Showing {filteredData.filter(r => r.snapshotId).length} employees with salary snapshots
+                            {Object.keys(editableAdjustments).length > 0 && !isProjectClosed && (
+                                <span className="ml-2 text-amber-600 font-medium">
+                                    • {Object.keys(editableAdjustments).length} unsaved adjustment change(s)
+                                </span>
+                            )}
                         </p>
-                    )}
+                    </div>
 
                     {/* Adjustments Table */}
                     <div className="border rounded-lg overflow-auto max-h-[500px]">
