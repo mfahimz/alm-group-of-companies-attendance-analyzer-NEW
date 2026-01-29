@@ -658,8 +658,11 @@ Deno.serve(async (req) => {
                 incentive: 0,
                 advanceSalaryDeduction: 0,
                 total: Math.round(finalTotal * 100) / 100,
-                wpsPay: Math.round(finalTotal * 100) / 100,
-                balance: 0,
+                wpsPay: Math.round(wpsAmount * 100) / 100,
+                balance: Math.round(balanceAmount * 100) / 100,
+                wps_cap_enabled: wpsCapEnabled,
+                wps_cap_amount: wpsCapAmount,
+                wps_cap_applied: wpsCapApplied,
                 snapshot_created_at: new Date().toISOString(),
                 attendance_source: attendanceSource
             });
