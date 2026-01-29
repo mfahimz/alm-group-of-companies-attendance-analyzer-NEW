@@ -589,7 +589,10 @@ Deno.serve(async (req) => {
                 });
                 const existingSnapshotAttendanceIds = new Set(existingSnapshots.map(s => String(s.attendance_id)));
 
+                // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
                 const divisor = project.salary_calculation_days || 30;
+                // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
+                const otDivisor = project.ot_calculation_days || divisor;
 
                 // Find employees missing salary snapshots
                 for (const emp of eligibleEmployees) {
@@ -644,6 +647,12 @@ Deno.serve(async (req) => {
                     const hourlyRate = totalSalaryAmount / divisor / workingHours;
                     const deductibleHoursPay = hourlyRate * deductibleHours;
 
+                    // Previous month values (backfill creates with 0 as we don't have prev month data)
+                    const extraPrevMonthDeductibleMinutes = 0;
+                    const extraPrevMonthLopDays = 0;
+                    const extraPrevMonthLopPay = 0;
+                    const extraPrevMonthDeductibleHoursPay = 0;
+
                     const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
 
                     // WPS SPLIT LOGIC (Al Maraghi Motors only)
@@ -687,6 +696,7 @@ Deno.serve(async (req) => {
                         working_hours: workingHours,
                         working_days: calculated.workingDays,
                         salary_divisor: divisor,
+                        ot_divisor: otDivisor,
                         present_days: calculated.presentDays,
                         full_absence_count: calculated.fullAbsenceCount,
                         annual_leave_count: calculated.annualLeaveCount,
@@ -697,6 +707,10 @@ Deno.serve(async (req) => {
                         approved_minutes: calculated.approvedMinutes,
                         grace_minutes: calculated.graceMinutes,
                         deductible_minutes: calculated.deductibleMinutes,
+                        extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
+                        extra_prev_month_lop_days: extraPrevMonthLopDays,
+                        extra_prev_month_lop_pay: extraPrevMonthLopPay,
+                        extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
                         salary_leave_days: salaryLeaveDays,
                         leaveDays: leaveDays,
                         leavePay: Math.round(leavePay * 100) / 100,
