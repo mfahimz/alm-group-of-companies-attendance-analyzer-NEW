@@ -79,14 +79,14 @@ Deno.serve(async (req) => {
         // Get attendance IDs of filtered employees - keep as strings
         const activeEmployeeAttendanceIds = filteredEmployees.map(e => String(e.attendance_id));
         
-        // Extract attendance IDs from punches and ensure uniqueness with Set - strings
-        const punchAttendanceIds = punches.map(p => String(p.attendance_id));
-        const uniqueEmployeeIds = [...new Set(punchAttendanceIds)]
-            .filter(id => activeEmployeeAttendanceIds.includes(id));
+        // CRITICAL: Include ALL active employees, not just those with punches
+        // Employees may have exceptions (annual leave, sick leave, LOP) even without any punches
+        // This ensures they appear in attendance reports for proper tracking
+        const uniqueEmployeeIds = [...activeEmployeeAttendanceIds];
         
         console.log('[runAnalysis] Total punches:', punches.length);
         console.log('[runAnalysis] Filtered employees:', filteredEmployees.length);
-        console.log('[runAnalysis] Unique attendance IDs from punches:', uniqueEmployeeIds.length);
+        console.log('[runAnalysis] Employees to analyze (all active):', uniqueEmployeeIds.length);
         
         // Use filtered employees for analysis
         const employees = filteredEmployees;
