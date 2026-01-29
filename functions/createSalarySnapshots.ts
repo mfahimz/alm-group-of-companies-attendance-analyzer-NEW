@@ -293,16 +293,22 @@ Deno.serve(async (req) => {
                     } catch { return false; }
                 });
 
-                // CRITICAL: PUBLIC_HOLIDAY takes priority over ALL other exceptions
-                // If a PUBLIC_HOLIDAY exists for this date, day is NOT a working day
-                // regardless of any other exceptions (including MANUAL_ABSENT)
-                // Check this BEFORE incrementing workingDays
+                // Check for PUBLIC_HOLIDAY - day is NOT a working day
                 const hasPublicHoliday = matchingExceptions.some(ex => 
                     ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                 );
                 
+                // Check for MANUAL_ABSENT on the same date (even if it's a public holiday)
+                const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
+                
                 if (hasPublicHoliday) {
-                    // Skip this day entirely - not a working day, no LOP, nothing
+                    // PUBLIC_HOLIDAY: Day is NOT a working day
+                    // BUT if there's also a MANUAL_ABSENT, count LOP without adding to working days
+                    // This handles the case where employee was marked absent on a holiday
+                    if (hasManualAbsent) {
+                        fullAbsenceCount++;
+                    }
+                    // Skip rest of day processing - not a working day
                     continue;
                 }
 
