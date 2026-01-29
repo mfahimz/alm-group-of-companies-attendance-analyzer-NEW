@@ -627,27 +627,7 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{wpsPay.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{(row.balance || 0).toFixed(2)}</td>
-                                                {canRecalculate && (
-                                                    <td className="p-2 align-middle text-center">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => setConfirmRecalc({ 
-                                                                attendanceId: row.attendance_id, 
-                                                                name: row.name 
-                                                            })}
-                                                            disabled={recalculating === row.attendance_id}
-                                                            className="h-7 px-2 text-xs"
-                                                            title="Recalculate salary totals using current formula (attendance values unchanged)"
-                                                        >
-                                                            {recalculating === row.attendance_id ? (
-                                                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                                            ) : (
-                                                                <RefreshCw className="w-3 h-3" />
-                                                            )}
-                                                        </Button>
-                                                    </td>
-                                                )}
+
                                             </tr>
                                         );
                                     })}
