@@ -366,6 +366,7 @@ export default function SalaryReportDetail() {
             'Net Deduction': row.netDeduction || 0,
             'Deductible Hours': row.deductibleHours || 0,
             'Deductible Hours Pay': row.deductibleHoursPay || 0,
+            'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
             'Normal OT Hours': row.normalOtHours || 0,
             'Normal OT Salary': row.normalOtSalary || 0,
             'Special OT Hours': row.specialOtHours || 0,
