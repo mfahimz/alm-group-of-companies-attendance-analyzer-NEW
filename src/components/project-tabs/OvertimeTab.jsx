@@ -492,7 +492,7 @@ export default function OvertimeTab({ project, finalReport }) {
         </Card>
 
         {/* ADJUSTMENTS SECTION - Only visible after finalization */}
-        {hasFinalReport && (
+        {hasFinalReport && salarySnapshots.length > 0 && (
             <Card className="border-0 shadow-lg">
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
