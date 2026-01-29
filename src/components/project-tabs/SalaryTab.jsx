@@ -322,14 +322,18 @@ export default function SalaryTab({ project }) {
                 'Leave Pay': row.leavePay,
                 'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
                 'Salary Leave Amount': row.salaryLeaveAmount,
+                'Net Deduction': row.netDeduction || 0,
+                'Deductible Hours': row.deductibleHours || 0,
+                'Deductible Hours Pay': row.deductibleHoursPay || 0,
+                'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
+                'Extra LOP Days (Prev Month)': row.extra_prev_month_lop_days || 0,
+                'Extra LOP Pay (Prev Month)': row.extra_prev_month_lop_pay || 0,
+                'Extra Deductible Pay (Prev Month)': row.extra_prev_month_deductible_hours_pay || 0,
                 'Normal OT Hours': row.normalOtHours || 0,
                 'Normal OT Salary': row.normalOtSalary || 0,
                 'Special OT Hours': row.specialOtHours || 0,
                 'Special OT Salary': row.specialOtSalary || 0,
                 'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
-                'Deductible Hours': row.deductibleHours || 0,
-                'Deductible Hours Pay': row.deductibleHoursPay || 0,
-                'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
                 'Other Deduction': row.otherDeduction || 0,
                 'Bonus': row.bonus || 0,
                 'Incentive': row.incentive || 0,
@@ -338,7 +342,7 @@ export default function SalaryTab({ project }) {
                 'WPS Pay': row.wpsPay,
                 'Balance': row.balance || 0,
                 'WPS Cap Applied': row.wps_cap_applied ? 'Yes' : 'No',
-                'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4800) : ''
+                'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
             }));
 
             const ws = XLSX.utils.json_to_sheet(exportData);
