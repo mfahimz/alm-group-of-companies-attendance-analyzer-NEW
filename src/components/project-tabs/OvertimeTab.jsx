@@ -63,7 +63,7 @@ export default function OvertimeTab({ project, finalReport }) {
     // ============================================
     // DERIVED VALUES
     // ============================================
-    const hasFinalReport = finalReport && finalReport.is_final === true;
+    const hasFinalReport = !!finalReport;
     const isProjectClosed = project?.status === 'closed';
     const canEditAdjustments = hasFinalReport && !isProjectClosed;
 
