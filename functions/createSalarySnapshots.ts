@@ -537,29 +537,19 @@ Deno.serve(async (req) => {
             let calculated;
             let attendanceSource;
             
+            // ALWAYS recalculate attendance from shifts + exceptions + punches
+            // This ensures employees with no punches but with exceptions (annual leave, etc.) are computed correctly
+            calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to);
+
             if (hasAnalysisResult) {
-                // ANALYZED: Use recalculated attendance data
-                calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to);
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
             } else {
-                // NO_ATTENDANCE_DATA: Zero-attendance snapshot (no penalties, no assumptions)
-                calculated = {
-                    workingDays: 0,
-                    presentDays: 0,
-                    fullAbsenceCount: 0,
-                    halfAbsenceCount: 0,
-                    sickLeaveCount: 0,
-                    annualLeaveCount: 0,
-                    lateMinutes: 0,
-                    earlyCheckoutMinutes: 0,
-                    otherMinutes: 0,
-                    approvedMinutes: 0,
-                    graceMinutes: 15
-                };
+                // Employee had no AnalysisResult (was missing from original report run)
+                // But we still computed their attendance from exceptions/shifts
                 attendanceSource = 'NO_ATTENDANCE_DATA';
                 noAttendanceCount++;
-                console.log(`[createSalarySnapshots] Creating NO_ATTENDANCE_DATA snapshot for ${emp.name} (${emp.attendance_id})`);
+                console.log(`[createSalarySnapshots] Computing attendance for missing employee ${emp.name} (${emp.attendance_id}) - will use exceptions/shifts`);
             }
 
             const totalSalaryAmount = salary?.total_salary || 0;
