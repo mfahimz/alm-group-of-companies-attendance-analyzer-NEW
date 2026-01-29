@@ -539,7 +539,6 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">WPS Pay</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Balance</SortableTableHead>
-                                        {canRecalculate && <TableHead className="whitespace-nowrap bg-slate-50 text-center">Actions</TableHead>}
                                     </tr>
                                 </thead>
                                 <tbody className="[&_tr:last-child]:border-0">
