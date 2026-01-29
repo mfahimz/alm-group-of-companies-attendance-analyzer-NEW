@@ -49,6 +49,44 @@ Deno.serve(async (req) => {
 
         const project = projects[0];
         const divisor = project.salary_calculation_days || 30;
+        const isAlMaraghi = project.company === 'Al Maraghi Auto Repairs';
+
+        // ============================================================
+        // AL MARAGHI AUTO REPAIRS: Calculate salary month ranges
+        // ============================================================
+        let salaryMonthStartStr = null;
+        let salaryMonthEndStr = null;
+        let extraPrevMonthFrom = null;
+        let extraPrevMonthTo = null;
+        let hasExtraPrevMonthRange = false;
+
+        if (isAlMaraghi) {
+            const projectDateTo = new Date(project.date_to);
+            const salaryMonthStart = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth(), 1);
+            const salaryMonthEnd = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth() + 1, 0);
+            
+            salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
+            salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
+
+            // Extra previous month range
+            const projectDateFrom = new Date(project.date_from);
+            const dayBeforeSalaryMonth = new Date(salaryMonthStart);
+            dayBeforeSalaryMonth.setDate(dayBeforeSalaryMonth.getDate() - 1);
+
+            if (projectDateFrom < salaryMonthStart) {
+                extraPrevMonthFrom = project.date_from;
+                extraPrevMonthTo = dayBeforeSalaryMonth.toISOString().split('T')[0];
+                hasExtraPrevMonthRange = true;
+            }
+
+            console.log('[createSalarySnapshots] Al Maraghi salary month ranges:', {
+                salary_month_start: salaryMonthStartStr,
+                salary_month_end: salaryMonthEndStr,
+                extra_prev_month_from: extraPrevMonthFrom,
+                extra_prev_month_to: extraPrevMonthTo,
+                has_extra_range: hasExtraPrevMonthRange
+            });
+        }
 
         // Verify report exists
         const reports = await base44.asServiceRole.entities.ReportRun.filter({ id: report_run_id, project_id: project_id });
