@@ -335,11 +335,11 @@ export default function OvertimeTab({ project, finalReport }) {
             await base44.entities.AuditLog.create({
                 action: 'UPDATE_SALARY_ADJUSTMENTS',
                 entity_type: 'SalarySnapshot',
-                entity_id: finalReport.id,
+                entity_id: finalizedReport.id,
                 user_email: currentUser?.email,
                 details: JSON.stringify({
                     project_id: project.id,
-                    report_run_id: finalReport.id,
+                    report_run_id: finalizedReport.id,
                     employees_updated: Object.keys(editableAdjustments).length,
                     adjustments: editableAdjustments
                 })
