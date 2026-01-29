@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Clock, Search, Save, Upload, Download, FileSpreadsheet, Users } from 'lucide-react';
+import { Clock, Search, Save, Upload, Download, FileSpreadsheet, Users, DollarSign, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import SortableTableHead from '../ui/SortableTableHead';
 
-export default function OvertimeTab({ project }) {
+export default function OvertimeTab({ project, finalReport }) {
     const queryClient = useQueryClient();
 
     // ============================================
@@ -18,7 +18,9 @@ export default function OvertimeTab({ project }) {
     // ============================================
     const [searchQuery, setSearchQuery] = useState('');
     const [editableData, setEditableData] = useState({});
+    const [editableAdjustments, setEditableAdjustments] = useState({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isSavingAdjustments, setIsSavingAdjustments] = useState(false);
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
 
     // ============================================
@@ -47,9 +49,23 @@ export default function OvertimeTab({ project }) {
         staleTime: 0
     });
 
+    // Fetch salary snapshots for adjustments (only after finalization)
+    const { data: salarySnapshots = [], isLoading: loadingSnapshots, refetch: refetchSnapshots } = useQuery({
+        queryKey: ['salarySnapshots', project?.id, finalReport?.id],
+        queryFn: () => base44.entities.SalarySnapshot.filter({
+            project_id: project.id,
+            report_run_id: finalReport.id
+        }),
+        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
+        staleTime: 0
+    });
+
     // ============================================
     // DERIVED VALUES
     // ============================================
+    const hasFinalReport = finalReport && finalReport.is_final === true;
+    const isProjectClosed = project?.status === 'closed';
+    const canEditAdjustments = hasFinalReport && !isProjectClosed;
 
     // Build employee list with OT data
     const overtimeData = useMemo(() => {
@@ -68,6 +84,11 @@ export default function OvertimeTab({ project }) {
                 String(ot.attendance_id) === String(emp.attendance_id)
             );
 
+            // Get salary snapshot for this employee (for adjustments)
+            const snapshot = salarySnapshots.find(s => 
+                String(s.attendance_id) === String(emp.attendance_id)
+            );
+
             return {
                 hrms_id: emp.hrms_id,
                 attendance_id: emp.attendance_id,
@@ -75,10 +96,16 @@ export default function OvertimeTab({ project }) {
                 department: emp.department,
                 normalOtHours: editableData[emp.attendance_id]?.normalOtHours ?? otRecord?.normalOtHours ?? 0,
                 specialOtHours: editableData[emp.attendance_id]?.specialOtHours ?? otRecord?.specialOtHours ?? 0,
-                otRecordId: otRecord?.id
+                otRecordId: otRecord?.id,
+                // Adjustment fields from SalarySnapshot
+                snapshotId: snapshot?.id,
+                bonus: editableAdjustments[emp.attendance_id]?.bonus ?? snapshot?.bonus ?? 0,
+                incentive: editableAdjustments[emp.attendance_id]?.incentive ?? snapshot?.incentive ?? 0,
+                otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? snapshot?.otherDeduction ?? 0,
+                advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? snapshot?.advanceSalaryDeduction ?? 0
             };
         });
-    }, [employees, overtimeRecords, editableData, project?.custom_employee_ids]);
+    }, [employees, overtimeRecords, editableData, editableAdjustments, salarySnapshots, project?.custom_employee_ids]);
 
     // Filter and sort
     const filteredData = useMemo(() => {
@@ -124,6 +151,28 @@ export default function OvertimeTab({ project }) {
 
     const getValue = (row, field) => {
         return editableData[row.attendance_id]?.[field] ?? row[field] ?? 0;
+    };
+
+    const handleAdjustmentChange = (attendanceId, field, value) => {
+        const numValue = value === '' ? 0 : parseFloat(value) || 0;
+        
+        // Validation: bonus and incentive must be >= 0
+        if ((field === 'bonus' || field === 'incentive') && numValue < 0) {
+            toast.error(`${field === 'bonus' ? 'Bonus' : 'Incentive'} cannot be negative`);
+            return;
+        }
+
+        setEditableAdjustments(prev => ({
+            ...prev,
+            [attendanceId]: {
+                ...(prev[attendanceId] || {}),
+                [field]: numValue
+            }
+        }));
+    };
+
+    const getAdjustmentValue = (row, field) => {
+        return editableAdjustments[row.attendance_id]?.[field] ?? row[field] ?? 0;
     };
 
     const handleSave = async () => {
@@ -236,20 +285,77 @@ export default function OvertimeTab({ project }) {
         e.target.value = '';
     };
 
+    // Save adjustments to SalarySnapshot
+    const handleSaveAdjustments = async () => {
+        if (Object.keys(editableAdjustments).length === 0) {
+            toast.info('No adjustment changes to save');
+            return;
+        }
+
+        setIsSavingAdjustments(true);
+        try {
+            const updates = [];
+
+            Object.entries(editableAdjustments).forEach(([attendanceId, edits]) => {
+                const employee = overtimeData.find(e => String(e.attendance_id) === String(attendanceId));
+                if (!employee || !employee.snapshotId) return;
+
+                updates.push({
+                    id: employee.snapshotId,
+                    data: {
+                        bonus: edits.bonus ?? employee.bonus ?? 0,
+                        incentive: edits.incentive ?? employee.incentive ?? 0,
+                        otherDeduction: edits.otherDeduction ?? employee.otherDeduction ?? 0,
+                        advanceSalaryDeduction: edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction ?? 0
+                    }
+                });
+            });
+
+            // Execute updates
+            for (const { id, data } of updates) {
+                await base44.entities.SalarySnapshot.update(id, data);
+            }
+
+            // Audit log
+            await base44.entities.AuditLog.create({
+                action: 'UPDATE_SALARY_ADJUSTMENTS',
+                entity_type: 'SalarySnapshot',
+                entity_id: finalReport.id,
+                user_email: currentUser?.email,
+                details: JSON.stringify({
+                    project_id: project.id,
+                    report_run_id: finalReport.id,
+                    employees_updated: Object.keys(editableAdjustments).length,
+                    adjustments: editableAdjustments
+                })
+            });
+
+            toast.success(`Adjustments saved for ${updates.length} employee(s)`);
+            setEditableAdjustments({});
+            refetchSnapshots();
+            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project?.id] });
+        } catch (error) {
+            toast.error('Failed to save adjustments: ' + error.message);
+        } finally {
+            setIsSavingAdjustments(false);
+        }
+    };
+
     // ============================================
     // RENDER
     // ============================================
-    if (loadingEmployees || loadingOT) {
+    if (loadingEmployees || loadingOT || loadingSnapshots) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
-                    <p className="text-slate-500">Loading overtime data...</p>
+                    <p className="text-slate-500">Loading data...</p>
                 </CardContent>
             </Card>
         );
     }
 
     return (
+        <>
         <Card className="border-0 shadow-lg">
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -384,5 +490,153 @@ export default function OvertimeTab({ project }) {
                 </div>
             </CardContent>
         </Card>
+
+        {/* ADJUSTMENTS SECTION - Only visible after finalization */}
+        {hasFinalReport && (
+            <Card className="border-0 shadow-lg">
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <DollarSign className="w-6 h-6 text-green-600" />
+                                Salary Adjustments
+                                {isProjectClosed && <Lock className="w-4 h-4 text-slate-400" />}
+                            </CardTitle>
+                            <p className="text-sm text-slate-500 mt-1">
+                                Enter bonus, incentives, and deductions for finalized report
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                onClick={handleSaveAdjustments}
+                                disabled={isSavingAdjustments || Object.keys(editableAdjustments).length === 0 || isProjectClosed}
+                                className="bg-green-600 hover:bg-green-700"
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                {isSavingAdjustments ? 'Saving...' : 'Save Adjustments'}
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {/* Info Banner */}
+                    <div className={`border rounded-lg p-3 mb-4 text-sm ${isProjectClosed ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-green-50 border-green-200 text-green-800'}`}>
+                        {isProjectClosed ? (
+                            <><strong>Project Closed:</strong> Adjustments are read-only. Reopen the project to make changes.</>
+                        ) : (
+                            <><strong>Note:</strong> These adjustments will be reflected in the Salary Tab. Bonus and Incentive add to salary; Other Deduction and Advance Salary Deduction subtract from salary.</>
+                        )}
+                    </div>
+
+                    {Object.keys(editableAdjustments).length > 0 && !isProjectClosed && (
+                        <p className="text-sm text-amber-600 font-medium mb-4">
+                            • {Object.keys(editableAdjustments).length} unsaved adjustment change(s)
+                        </p>
+                    )}
+
+                    {/* Adjustments Table */}
+                    <div className="border rounded-lg overflow-auto max-h-[500px]">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-slate-50 z-10">
+                                <TableRow>
+                                    <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
+                                    <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
+                                    <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
+                                    <TableHead className="bg-green-50 text-green-700">Bonus (+)</TableHead>
+                                    <TableHead className="bg-green-50 text-green-700">Incentive (+)</TableHead>
+                                    <TableHead className="bg-red-50 text-red-700">Other Deduction (-)</TableHead>
+                                    <TableHead className="bg-red-50 text-red-700">Advance Salary Deduction (-)</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredData.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-12">
+                                            <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                                            <p className="text-slate-500">No employees found</p>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredData.map(row => {
+                                    const hasAdjustmentEdits = editableAdjustments[row.attendance_id];
+                                    const hasSnapshot = !!row.snapshotId;
+                                    return (
+                                        <TableRow key={`adj-${row.attendance_id}`} className={hasAdjustmentEdits ? 'bg-amber-50' : ''}>
+                                            <TableCell className="font-medium">{row.attendance_id}</TableCell>
+                                            <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
+                                            <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
+                                            <TableCell className="bg-green-50 p-1">
+                                                {hasSnapshot ? (
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={getAdjustmentValue(row, 'bonus')}
+                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'bonus', e.target.value)}
+                                                        className="h-8 text-sm w-20"
+                                                        disabled={isProjectClosed}
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">N/A</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="bg-green-50 p-1">
+                                                {hasSnapshot ? (
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={getAdjustmentValue(row, 'incentive')}
+                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'incentive', e.target.value)}
+                                                        className="h-8 text-sm w-20"
+                                                        disabled={isProjectClosed}
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">N/A</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="bg-red-50 p-1">
+                                                {hasSnapshot ? (
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={getAdjustmentValue(row, 'otherDeduction')}
+                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', e.target.value)}
+                                                        className="h-8 text-sm w-20"
+                                                        disabled={isProjectClosed}
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">N/A</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="bg-red-50 p-1">
+                                                {hasSnapshot ? (
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
+                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', e.target.value)}
+                                                        className="h-8 text-sm w-20"
+                                                        disabled={isProjectClosed}
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">N/A</span>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {!hasFinalReport && (
+                        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                            <strong>No finalized report.</strong> Adjustments are only available after a report has been finalized in the Report Tab.
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        )}
+        </>
     );
 }
