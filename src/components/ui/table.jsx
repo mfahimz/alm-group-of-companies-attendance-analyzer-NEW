@@ -13,7 +13,7 @@ const Table = React.forwardRef(({ className, ...props }, ref) => (
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b [&_tr]:border-[#E7EBF1] bg-[#F1F4F8]", className)} {...props} />
+  <thead ref={ref} className={cn("[&_tr]:border-b [&_tr]:border-[#E7EBF1] bg-[#EEF2F7]", className)} {...props} />
 ))
 TableHeader.displayName = "TableHeader"
 
@@ -28,7 +28,7 @@ TableBody.displayName = "TableBody"
 const TableFooter = React.forwardRef(({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
-    className={cn("border-t border-[#E7EBF1] bg-[#F9FAFB] font-semibold text-[#1F2937] [&>tr]:last:border-b-0", className)}
+    className={cn("border-t border-[#E7EBF1] bg-[#F0FDF4] font-semibold text-[#14532D] [&>tr]:last:border-b-0", className)}
     {...props} />
 ))
 TableFooter.displayName = "TableFooter"
@@ -37,7 +37,7 @@ const TableRow = React.forwardRef(({ className, ...props }, ref) => (
   <tr
     ref={ref}
     className={cn(
-      "border-b border-[#E7EBF1] transition-colors hover:bg-[#F7F9FC] data-[state=selected]:bg-[#EDF2F9]",
+      "border-b border-[#E7EBF1] transition-colors hover:bg-[#F1F5F9] data-[state=selected]:bg-[#E0E7FF]",
       className
     )}
     {...props} />
