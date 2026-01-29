@@ -538,6 +538,15 @@ Deno.serve(async (req) => {
 
                 if (mode === 'APPLY') {
                     try {
+                        // IDEMPOTENCY: Double-check right before create to handle concurrency
+                        const existCheck = await base44.asServiceRole.entities.AnalysisResult.filter({
+                            report_run_id: reportRun.id,
+                            attendance_id: String(emp.attendance_id)
+                        });
+                        if (existCheck.length > 0) {
+                            console.log(`[backfillReportMissingEmployees] SKIP: AnalysisResult already exists for ${emp.name} (${emp.attendance_id}) - concurrent creation detected`);
+                            continue;
+                        }
                         await base44.asServiceRole.entities.AnalysisResult.create(analysisResult);
                         console.log(`[backfillReportMissingEmployees] Created AnalysisResult for ${emp.name} (${emp.attendance_id})`);
                     } catch (err) {
@@ -671,6 +680,16 @@ Deno.serve(async (req) => {
 
                     if (mode === 'APPLY') {
                         try {
+                            // IDEMPOTENCY: Double-check right before create to handle concurrency
+                            const existCheck = await base44.asServiceRole.entities.SalarySnapshot.filter({
+                                project_id: String(project_id),
+                                report_run_id: String(reportRun.id),
+                                attendance_id: String(emp.attendance_id)
+                            });
+                            if (existCheck.length > 0) {
+                                console.log(`[backfillReportMissingEmployees] SKIP: SalarySnapshot already exists for ${emp.name} (${emp.attendance_id}) - concurrent creation detected`);
+                                continue;
+                            }
                             await base44.asServiceRole.entities.SalarySnapshot.create(snapshot);
                             console.log(`[backfillReportMissingEmployees] Created SalarySnapshot for ${emp.name} (${emp.attendance_id})`);
                         } catch (err) {

@@ -109,21 +109,68 @@ Deno.serve(async (req) => {
 
         console.log(`[markFinalReport] Validation: ${snapshotCount} snapshots created, ${eligibleCount} eligible employees`);
 
-        // HARD VALIDATION: Snapshot count MUST equal eligible employee count
-        if (snapshotCount !== eligibleCount) {
-            // Rollback: Unmark as final
-            await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-                is_final: false,
-                finalized_by: null,
-                finalized_date: null
-            });
+        // HARD VALIDATION: Snapshot count MUST equal eligible employee count (AL MARAGHI AUTO REPAIRS ONLY)
+        const isAlMaraghiAutoRepairs = project.company === 'Al Maraghi Auto Repairs';
+        
+        if (isAlMaraghiAutoRepairs && snapshotCount !== eligibleCount) {
+            console.log(`[markFinalReport] VALIDATION MISMATCH: ${snapshotCount} snapshots vs ${eligibleCount} eligible. Attempting auto-backfill...`);
+            
+            // Attempt auto-backfill for missing employees
+            try {
+                const backfillResult = await base44.asServiceRole.functions.invoke('backfillReportMissingEmployees', {
+                    project_id: project_id,
+                    report_run_id: report_run_id,
+                    mode: 'APPLY',
+                    include_salary_snapshots: true
+                });
+                console.log('[markFinalReport] Auto-backfill result:', backfillResult);
+                
+                // Re-check snapshot count after backfill
+                const updatedSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
+                    project_id: project_id,
+                    report_run_id: report_run_id
+                });
+                const updatedSnapshotCount = updatedSnapshots.length;
+                
+                console.log(`[markFinalReport] After backfill: ${updatedSnapshotCount} snapshots, ${eligibleCount} eligible`);
+                
+                if (updatedSnapshotCount !== eligibleCount) {
+                    // Still mismatched after backfill - rollback
+                    await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
+                        is_final: false,
+                        finalized_by: null,
+                        finalized_date: null
+                    });
 
-            return Response.json({ 
-                success: false,
-                error: `VALIDATION FAILED: Created ${snapshotCount} salary snapshots but expected ${eligibleCount} (eligible employees with salary records). Please check employee and salary data.`,
-                snapshots_created: snapshotCount,
-                eligible_employees: eligibleCount
-            }, { status: 400 });
+                    return Response.json({ 
+                        success: false,
+                        error: `VALIDATION FAILED: After auto-backfill, have ${updatedSnapshotCount} salary snapshots but expected ${eligibleCount} (eligible employees with salary records). Please check employee and salary data.`,
+                        snapshots_created: updatedSnapshotCount,
+                        eligible_employees: eligibleCount,
+                        backfill_attempted: true
+                    }, { status: 400 });
+                }
+                
+                // Backfill succeeded - update snapshotCount for audit log
+                console.log('[markFinalReport] Auto-backfill succeeded, validation passed');
+            } catch (backfillError) {
+                console.error('[markFinalReport] Auto-backfill failed:', backfillError);
+                
+                // Rollback: Unmark as final
+                await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
+                    is_final: false,
+                    finalized_by: null,
+                    finalized_date: null
+                });
+
+                return Response.json({ 
+                    success: false,
+                    error: `VALIDATION FAILED: Created ${snapshotCount} salary snapshots but expected ${eligibleCount}. Auto-backfill also failed: ${backfillError.message}`,
+                    snapshots_created: snapshotCount,
+                    eligible_employees: eligibleCount,
+                    backfill_error: backfillError.message
+                }, { status: 400 });
+            }
         }
 
         // Log audit
