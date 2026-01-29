@@ -312,7 +312,10 @@ Deno.serve(async (req) => {
             totalOtSalary: totalOtSalary,
             total: Math.round(finalTotal * 100) / 100,
             wpsPay: Math.round(wpsPay * 100) / 100,
-            balance: Math.round(balance * 100) / 100
+            balance: Math.round(balance * 100) / 100,
+            wps_cap_enabled: wpsCapEnabled,
+            wps_cap_amount: wpsCapAmount,
+            wps_cap_applied: wpsCapApplied
         };
 
         // ============================================================
