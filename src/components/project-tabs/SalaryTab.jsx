@@ -99,8 +99,8 @@ export default function SalaryTab({ project }) {
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
-    // Allow access to Salary tab for Al Maraghi Auto Repairs projects for all users with project access
-    const isAlMaraghi = project?.company === 'Al Maraghi Auto Repairs';
+    // Allow access to Salary tab for Al Maraghi Motors projects for all users with project access
+    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryTab = isAdminOrCEO || isAlMaraghi;
     const hasFinalReport = finalReport && finalReport.is_final === true;
 

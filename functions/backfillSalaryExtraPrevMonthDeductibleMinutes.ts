@@ -40,10 +40,10 @@ Deno.serve(async (req) => {
         }
         const project = projects[0];
 
-        // Guard: Only Al Maraghi Auto Repairs
-        if (project.company !== 'Al Maraghi Auto Repairs') {
+        // Guard: Only Al Maraghi Motors
+        if (project.company !== 'Al Maraghi Motors') {
             return Response.json({ 
-                error: 'This function only applies to Al Maraghi Auto Repairs projects',
+                error: 'This function only applies to Al Maraghi Motors projects',
                 company: project.company
             }, { status: 400 });
         }
@@ -302,7 +302,7 @@ Deno.serve(async (req) => {
         // Calculate extra prev month deductible minutes for an employee
         const calculateExtraPrevMonthMinutes = (attendanceId, empData) => {
             const attendanceIdStr = String(attendanceId);
-            const includeSeconds = false; // Al Maraghi Auto Repairs doesn't use seconds
+            const includeSeconds = false; // Al Maraghi Motors doesn't use seconds
             
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr &&
