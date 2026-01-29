@@ -28,6 +28,16 @@ export default function SalaryReportDetail() {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
 
+    // Check if salary tab PIN was already unlocked in this session
+    const isSalaryUnlockedFromTab = sessionStorage.getItem('salary_tab_pin_unlocked') === 'true';
+    
+    // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
+    React.useEffect(() => {
+        if (isSalaryUnlockedFromTab && !salaryUnlocked) {
+            setSalaryUnlocked(true);
+        }
+    }, [isSalaryUnlockedFromTab, salaryUnlocked]);
+
     // ============================================
     // QUERIES
     // ============================================
