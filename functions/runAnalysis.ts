@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
         // Use filtered employees for analysis
         const employees = filteredEmployees;
 
-        // Create report run
+        // Create report run - count ALL active employees being analyzed
         const reportRun = await base44.asServiceRole.entities.ReportRun.create({
             project_id,
             report_name: report_name || `Report - ${new Date().toLocaleDateString()}`,
@@ -99,6 +99,8 @@ Deno.serve(async (req) => {
             date_to,
             employee_count: uniqueEmployeeIds.length
         });
+        
+        console.log('[runAnalysis] Created report run with', uniqueEmployeeIds.length, 'employees');
 
         // Helper functions (moved from frontend)
         const parseTime = (timeStr, includeSeconds = false) => {
