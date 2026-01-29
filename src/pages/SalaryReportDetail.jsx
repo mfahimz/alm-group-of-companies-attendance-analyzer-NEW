@@ -274,7 +274,7 @@ export default function SalaryReportDetail() {
         const exportData = filteredData.map(row => ({
             'Attendance ID': row.attendance_id,
             'Name': row.name,
-
+            'Attendance Source': row.attendance_source || 'ANALYZED',
             'Total Salary': row.total_salary || 0,
             'Working Days': row.working_days || 0,
             'Present Days': row.present_days || 0,
