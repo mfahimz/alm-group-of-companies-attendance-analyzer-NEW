@@ -122,14 +122,22 @@ export default function Salaries() {
             const allowancesWithBonus = Number(data.allowances_with_bonus) || 0;
             const total = Number((data.basic_salary + allowancesAmount + allowancesWithBonus).toFixed(2));
             
-            return base44.entities.EmployeeSalary.update(id, {
+            const updatePayload = {
                 working_hours: data.working_hours || 9,
                 basic_salary: data.basic_salary,
                 allowances: allowancesAmount,
                 allowances_with_bonus: allowancesWithBonus,
                 total_salary: total,
                 deduction_per_minute: total / (30 * (data.working_hours || 9) * 60)
-            });
+            };
+            
+            // Add WPS cap fields only for Al Maraghi Auto Repairs
+            if (data.company === 'Al Maraghi Auto Repairs') {
+                updatePayload.wps_cap_enabled = data.wps_cap_enabled || false;
+                updatePayload.wps_cap_amount = data.wps_cap_amount ?? 4800;
+            }
+            
+            return base44.entities.EmployeeSalary.update(id, updatePayload);
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['salaries']);
