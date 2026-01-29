@@ -336,16 +336,6 @@ export default function SalaryReportDetail() {
         );
     }
 
-    // Check if salary tab PIN was already unlocked in this session
-    const isSalaryUnlockedFromTab = sessionStorage.getItem('salary_tab_pin_unlocked') === 'true';
-    
-    // Auto-unlock if already unlocked from SalaryTab
-    React.useEffect(() => {
-        if (isSalaryUnlockedFromTab && !salaryUnlocked) {
-            setSalaryUnlocked(true);
-        }
-    }, [isSalaryUnlockedFromTab]);
-
     return (
         <div className="max-w-full mx-auto space-y-6">
             <Breadcrumb items={[
