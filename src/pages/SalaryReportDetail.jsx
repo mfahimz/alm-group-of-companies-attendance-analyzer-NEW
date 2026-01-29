@@ -476,7 +476,13 @@ export default function SalaryReportDetail() {
                                             <tr key={row.hrms_id} className="border-b transition-colors hover:bg-muted/50">
                                                 <td className="p-2 align-middle font-medium sticky left-0 bg-white z-10">{row.attendance_id}</td>
                                                 <td className="p-2 align-middle font-medium sticky left-[100px] bg-white z-10">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
-
+                                                <td className="p-2 align-middle">
+                                                    {row.attendance_source === 'NO_ATTENDANCE_DATA' ? (
+                                                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded whitespace-nowrap">No attendance</span>
+                                                    ) : (
+                                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">Analyzed</span>
+                                                    )}
+                                                </td>
                                                 <td className="p-2 align-middle font-semibold">{row.total_salary?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.working_days?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.present_days?.toFixed(2)}</td>
