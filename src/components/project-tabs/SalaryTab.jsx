@@ -213,6 +213,29 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
                 const finalTotal = totalSalary + totalOtSalary + bonus + incentive
                     - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
 
+                // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+                let wpsAmount = finalTotal;
+                let balanceAmount = 0;
+                let wpsCapApplied = false;
+                const wpsCapEnabled = salary?.wps_cap_enabled || false;
+                const wpsCapAmount = salary?.wps_cap_amount ?? 4800;
+
+                if (isAlMaraghi && wpsCapEnabled) {
+                    if (finalTotal <= 0) {
+                        wpsAmount = 0;
+                        balanceAmount = 0;
+                        wpsCapApplied = false;
+                    } else {
+                        const cap = wpsCapAmount != null ? wpsCapAmount : 4800;
+                        wpsAmount = Math.min(finalTotal, cap);
+                        balanceAmount = Math.max(0, finalTotal - wpsAmount);
+                        wpsCapApplied = finalTotal > cap;
+                    }
+                } else if (finalTotal <= 0) {
+                    wpsAmount = 0;
+                    balanceAmount = 0;
+                }
+
                 return {
                     ...row,
                     normalOtHours,
@@ -228,7 +251,11 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
                     salary_divisor: divisor,
                     ot_divisor: otDivisor,
                     total: Math.round(finalTotal * 100) / 100,
-                    wpsPay: Math.round(finalTotal * 100) / 100
+                    wpsPay: Math.round(wpsAmount * 100) / 100,
+                    balance: Math.round(balanceAmount * 100) / 100,
+                    wps_cap_enabled: wpsCapEnabled,
+                    wps_cap_amount: wpsCapAmount,
+                    wps_cap_applied: wpsCapApplied
                 };
             });
 
