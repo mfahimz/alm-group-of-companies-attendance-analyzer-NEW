@@ -630,12 +630,12 @@ export default function SalaryReportDetail() {
                     <DialogHeader>
                         <DialogTitle>Recalculate Salary</DialogTitle>
                         <DialogDescription>
-                            This will recalculate salary totals for <strong>{confirmRecalc?.name}</strong> using existing attendance values.
+                            This will recalculate salary totals for <strong>{confirmRecalc?.name}</strong> using current salary formula.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                            <strong>Note:</strong> Attendance data will NOT change. Only derived salary values (leave pay, deductions, OT salary, totals) will be recalculated.
+                            <strong>Note:</strong> Attendance values will NOT change. Only derived salary values (leave pay, net deduction, deductible hours pay, OT salary, final total) will be recalculated using the current formula.
                         </div>
                     </div>
                     <DialogFooter>
@@ -643,7 +643,7 @@ export default function SalaryReportDetail() {
                             Cancel
                         </Button>
                         <Button 
-                            onClick={() => handleRecalculateSalary(confirmRecalc.snapshotId, confirmRecalc.name)}
+                            onClick={() => handleRecalculateSalary(confirmRecalc.attendanceId, confirmRecalc.name)}
                             disabled={recalculating}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
