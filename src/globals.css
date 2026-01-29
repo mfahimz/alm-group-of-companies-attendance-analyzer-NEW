@@ -5,18 +5,15 @@
 @layer base {
   :root {
     /* ============================================
-       ENTERPRISE HR SYSTEM - FORMAL COLOR PALETTE
+       ENTERPRISE HR SYSTEM - ENHANCED COLOR PALETTE
+       "Neutral base + meaningful color accents"
        ============================================ */
     
     /* Primary Brand - Deep Navy Blue */
     --primary: 213 57% 14%;           /* #0F1E36 */
-    --primary-hover: 213 50% 19%;     /* #142A4D */
+    --primary-hover: 213 50% 22%;     /* #162F55 */
     --primary-light: 220 33% 96%;     /* #EEF2FF */
     --primary-foreground: 0 0% 100%;  /* White text on primary */
-    
-    /* Secondary Accent - Muted Gold */
-    --secondary-gold: 42 50% 54%;     /* #C9A24D */
-    --secondary-gold-light: 42 60% 94%; /* Light gold background */
     
     /* Neutral Background Palette */
     --background: 220 20% 97%;        /* #F4F6F9 - App background */
@@ -32,7 +29,7 @@
     --elevated: 220 20% 99%;          /* #FAFBFC */
     
     /* Muted / Secondary backgrounds */
-    --muted: 220 14% 96%;             /* #F1F4F8 - Table headers, subtle bg */
+    --muted: 220 14% 95%;             /* #EEF2F7 - Table headers */
     --muted-foreground: 220 9% 46%;   /* #6B7280 - Muted text */
     
     /* Text Colors */
@@ -47,41 +44,98 @@
     --input: 215 20% 80%;             /* #CBD5E1 - Input borders */
     --ring: 213 57% 14%;              /* Focus ring - Deep Navy */
     
-    /* Status Colors - Success */
-    --success: 142 50% 30%;           /* #1F7A3A */
-    --success-light: 140 30% 94%;     /* #EAF4EC */
-    --success-border: 140 35% 80%;    /* #BFE3C9 */
+    /* ============================================
+       SECTION COLOR CODING (Soft Accents)
+       ============================================ */
     
-    /* Status Colors - Warning */
-    --warning: 40 70% 31%;            /* #9A6700 */
-    --warning-light: 42 100% 95%;     /* #FFF7E6 */
-    --warning-border: 42 75% 75%;     /* #F5D38A */
+    /* Attendance / Analysis - Soft Blue */
+    --section-attendance: 217 100% 96%;      /* #E8F0FF */
+    --section-attendance-border: 217 91% 60%; /* #2563EB */
+    --section-attendance-text: 217 91% 50%;   /* #1D4ED8 */
     
-    /* Status Colors - Error / Destructive */
-    --destructive: 0 70% 38%;         /* #A61B1B */
-    --destructive-light: 0 60% 96%;   /* #FDECEC */
-    --destructive-border: 0 60% 83%;  /* #F5B5B5 */
+    /* Salary & Payroll - Soft Green */
+    --section-salary: 145 60% 94%;           /* #EAF7EF */
+    --section-salary-border: 142 64% 24%;    /* #15803D */
+    --section-salary-text: 142 64% 24%;      /* #15803D */
+    
+    /* Overtime & Adjustments - Soft Amber */
+    --section-overtime: 38 100% 95%;         /* #FFF4E5 */
+    --section-overtime-border: 32 95% 38%;   /* #B45309 */
+    --section-overtime-text: 32 95% 38%;     /* #B45309 */
+    
+    /* Reports & Finalized - Soft Violet */
+    --section-reports: 270 100% 97%;         /* #F3E8FF */
+    --section-reports-border: 263 70% 50%;   /* #7C3AED */
+    --section-reports-text: 263 70% 50%;     /* #7C3AED */
+    
+    /* Admin / Settings - Soft Slate */
+    --section-admin: 220 20% 95%;            /* #EEF2F7 */
+    --section-admin-border: 215 25% 27%;     /* #334155 */
+    --section-admin-text: 215 25% 27%;       /* #334155 */
+    
+    /* ============================================
+       STATUS COLORS (More Expressive)
+       ============================================ */
+    
+    /* Success / Final / Approved */
+    --success: 142 76% 22%;           /* #166534 */
+    --success-light: 142 76% 93%;     /* #DCFCE7 */
+    --success-border: 142 69% 58%;    /* #4ADE80 */
+    
+    /* Warning / Pending */
+    --warning: 32 95% 31%;            /* #92400E */
+    --warning-light: 48 96% 89%;      /* #FEF3C7 */
+    --warning-border: 38 92% 50%;     /* #F59E0B */
+    
+    /* Error / Blocking / Destructive */
+    --destructive: 0 72% 35%;         /* #991B1B */
+    --destructive-light: 0 86% 94%;   /* #FEE2E2 */
+    --destructive-border: 0 84% 60%;  /* #F87171 */
     --destructive-foreground: 0 0% 100%;
     
-    /* Status Colors - Info */
-    --info: 224 76% 37%;              /* #1E40AF */
-    --info-light: 224 100% 97%;       /* #EEF4FF */
+    /* Info */
+    --info: 224 76% 35%;              /* #1E3A8A */
+    --info-light: 226 100% 94%;       /* #E0E7FF */
+    --info-border: 224 76% 48%;       /* #3B82F6 */
     
     /* Accent (for backwards compatibility) */
     --accent: 220 14% 96%;
     --accent-foreground: 220 20% 14%;
     
-    /* Chart Colors */
-    --chart-1: 213 57% 14%;           /* Navy */
-    --chart-2: 42 50% 54%;            /* Gold */
-    --chart-3: 142 50% 30%;           /* Green */
-    --chart-4: 220 13% 34%;           /* Slate */
-    --chart-5: 0 70% 38%;             /* Red */
+    /* ============================================
+       TABLE COLORS
+       ============================================ */
+    --table-header: 220 20% 95%;      /* #EEF2F7 */
+    --table-row-hover: 216 20% 97%;   /* #F1F5F9 */
+    --table-row-zebra: 220 20% 99%;   /* #FAFBFD */
+    --table-totals-bg: 142 76% 97%;   /* #F0FDF4 */
+    --table-totals-text: 143 64% 18%; /* #14532D */
     
-    /* Shadows */
-    --shadow-card: 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-elevated: 0 2px 4px rgba(0,0,0,0.06);
-    --shadow-modal: 0 8px 24px rgba(0,0,0,0.12);
+    /* ============================================
+       BUTTON COLORS
+       ============================================ */
+    --btn-positive: 142 76% 22%;      /* #166534 */
+    --btn-positive-hover: 143 64% 18%; /* #14532D */
+    --btn-warning: 32 95% 38%;        /* #B45309 */
+    --btn-warning-hover: 32 95% 31%;  /* #92400E */
+    --btn-danger: 0 72% 35%;          /* #991B1B */
+    --btn-danger-hover: 0 72% 28%;    /* #7F1D1D */
+    
+    /* ============================================
+       CHART COLORS
+       ============================================ */
+    --chart-1: 213 57% 14%;           /* Navy */
+    --chart-2: 142 64% 24%;           /* Green */
+    --chart-3: 32 95% 38%;            /* Amber */
+    --chart-4: 263 70% 50%;           /* Violet */
+    --chart-5: 0 72% 35%;             /* Red */
+    
+    /* ============================================
+       SHADOWS
+       ============================================ */
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.05);
+    --shadow-elevated: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-modal: 0 12px 32px rgba(0,0,0,0.14);
     
     /* Border Radius */
     --radius: 0.5rem;
@@ -120,6 +174,39 @@
   }
   
   /* ============================================
+     SECTION-CODED CARDS
+     ============================================ */
+  .card-attendance {
+    @apply bg-card rounded-lg border-l-4;
+    border-left-color: hsl(var(--section-attendance-border));
+    box-shadow: var(--shadow-card);
+  }
+  
+  .card-salary {
+    @apply bg-card rounded-lg border-l-4;
+    border-left-color: hsl(var(--section-salary-border));
+    box-shadow: var(--shadow-card);
+  }
+  
+  .card-overtime {
+    @apply bg-card rounded-lg border-l-4;
+    border-left-color: hsl(var(--section-overtime-border));
+    box-shadow: var(--shadow-card);
+  }
+  
+  .card-reports {
+    @apply bg-card rounded-lg border-l-4;
+    border-left-color: hsl(var(--section-reports-border));
+    box-shadow: var(--shadow-card);
+  }
+  
+  .card-admin {
+    @apply bg-card rounded-lg border-l-4;
+    border-left-color: hsl(var(--section-admin-border));
+    box-shadow: var(--shadow-card);
+  }
+  
+  /* ============================================
      BUTTON STYLES
      ============================================ */
   .btn-primary {
@@ -142,42 +229,70 @@
   }
   
   .btn-secondary:hover:not(:disabled) {
-    background-color: hsl(220 14% 96%);
+    background-color: hsl(var(--table-row-hover));
+  }
+  
+  .btn-positive {
+    @apply text-white font-medium rounded-md px-4 py-2 transition-colors;
+    background-color: hsl(var(--btn-positive));
+  }
+  
+  .btn-positive:hover:not(:disabled) {
+    background-color: hsl(var(--btn-positive-hover));
+  }
+  
+  .btn-warning {
+    @apply text-white font-medium rounded-md px-4 py-2 transition-colors;
+    background-color: hsl(var(--btn-warning));
+  }
+  
+  .btn-warning:hover:not(:disabled) {
+    background-color: hsl(var(--btn-warning-hover));
   }
   
   .btn-danger {
     @apply text-white font-medium rounded-md px-4 py-2 transition-colors;
-    background-color: hsl(var(--destructive));
+    background-color: hsl(var(--btn-danger));
   }
   
   .btn-danger:hover:not(:disabled) {
-    background-color: hsl(0 70% 33%);
+    background-color: hsl(var(--btn-danger-hover));
   }
   
   /* ============================================
      TABLE STYLES
      ============================================ */
   .table-header {
-    background-color: hsl(var(--muted));
+    background-color: hsl(var(--table-header));
     color: hsl(var(--text-primary));
     font-weight: 600;
   }
   
   .table-row-hover:hover {
-    background-color: hsl(220 20% 98%); /* #F7F9FC */
+    background-color: hsl(var(--table-row-hover));
+  }
+  
+  .table-row-zebra:nth-child(even) {
+    background-color: hsl(var(--table-row-zebra));
   }
   
   .table-row-selected {
-    background-color: hsl(220 30% 95%); /* #EDF2F9 */
+    background-color: hsl(var(--info-light));
   }
   
   .table-totals-row {
-    background-color: hsl(220 20% 98%);
+    background-color: hsl(var(--table-totals-bg));
+    color: hsl(var(--table-totals-text));
     font-weight: 600;
   }
   
+  .table-cell-numeric {
+    @apply font-medium tabular-nums;
+    color: hsl(var(--text-primary));
+  }
+  
   /* ============================================
-     BADGE STYLES
+     BADGE STYLES (Enhanced)
      ============================================ */
   .badge-success {
     background-color: hsl(var(--success-light));
@@ -209,9 +324,34 @@
     @apply px-2.5 py-1 rounded-md text-xs font-medium;
   }
   
-  .badge-gold {
-    background-color: hsl(var(--secondary-gold-light));
-    color: hsl(var(--secondary-gold));
+  /* Section-coded badges */
+  .badge-attendance {
+    background-color: hsl(var(--section-attendance));
+    color: hsl(var(--section-attendance-text));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  
+  .badge-salary {
+    background-color: hsl(var(--section-salary));
+    color: hsl(var(--section-salary-text));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  
+  .badge-overtime {
+    background-color: hsl(var(--section-overtime));
+    color: hsl(var(--section-overtime-text));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  
+  .badge-reports {
+    background-color: hsl(var(--section-reports));
+    color: hsl(var(--section-reports-text));
+    @apply px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  
+  .badge-admin {
+    background-color: hsl(var(--section-admin));
+    color: hsl(var(--section-admin-text));
     @apply px-2.5 py-1 rounded-md text-xs font-medium;
   }
   
@@ -219,7 +359,7 @@
      INPUT STYLES
      ============================================ */
   .input-formal {
-    @apply bg-white rounded-md px-3 py-2 text-sm transition-colors;
+    @apply bg-white rounded-md px-3 py-2 text-sm transition-all;
     border: 1px solid hsl(var(--input));
     color: hsl(var(--text-primary));
   }
@@ -227,16 +367,21 @@
   .input-formal:focus {
     outline: none;
     border-color: hsl(var(--primary));
-    box-shadow: 0 0 0 1px hsl(var(--primary));
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.1);
   }
   
   .input-formal:disabled {
-    background-color: hsl(220 14% 96%);
+    background-color: #F3F4F6;
     color: hsl(var(--text-disabled));
   }
   
-  .input-formal.error {
-    border-color: hsl(var(--destructive));
+  .input-formal.input-valid {
+    border-color: #86EFAC;
+  }
+  
+  .input-formal.input-error {
+    border-color: #F87171;
+    background-color: #FEF2F2;
   }
   
   /* ============================================
@@ -251,8 +396,20 @@
     color: hsl(var(--primary));
   }
   
-  .text-gold {
-    color: hsl(var(--secondary-gold));
+  .text-section-attendance {
+    color: hsl(var(--section-attendance-text));
+  }
+  
+  .text-section-salary {
+    color: hsl(var(--section-salary-text));
+  }
+  
+  .text-section-overtime {
+    color: hsl(var(--section-overtime-text));
+  }
+  
+  .text-section-reports {
+    color: hsl(var(--section-reports-text));
   }
   
   /* ============================================
