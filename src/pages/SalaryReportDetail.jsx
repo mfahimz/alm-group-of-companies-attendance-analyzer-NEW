@@ -466,7 +466,7 @@ export default function SalaryReportDetail() {
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                         <tr className="border-b">
-                                            <td colSpan={27} className="text-center py-12">
+                                            <td colSpan={28} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
