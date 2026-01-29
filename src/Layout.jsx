@@ -102,9 +102,9 @@ export default function Layout({ children, currentPageName }) {
 
     if (isLoading || !currentUser) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-500">Loading...</div>
-            </div>
+            <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
+                    <div className="text-[#6B7280]">Loading...</div>
+                </div>
         );
     }
 
@@ -116,11 +116,11 @@ export default function Layout({ children, currentPageName }) {
     // Validation checks
     if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'hr_manager')) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-slate-600 text-center">
-                    No company is assigned. Wait for the administrator to assign a company.
-                </div>
-            </div>
+            <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
+                      <div className="text-[#4B5563] text-center">
+                          No company is assigned. Wait for the administrator to assign a company.
+                      </div>
+                  </div>
         );
     }
 
@@ -137,21 +137,21 @@ export default function Layout({ children, currentPageName }) {
 
         if (!currentUser.department) {
             return (
-                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                    <div className="text-slate-600 text-center">
-                        No department is assigned. Wait for the administrator to assign a department.
-                    </div>
-                </div>
+                <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
+                              <div className="text-[#4B5563] text-center">
+                                  No department is assigned. Wait for the administrator to assign a department.
+                              </div>
+                          </div>
             );
         }
 
         if (!currentUser.hrms_id) {
             return (
-                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                    <div className="text-slate-600 text-center">
-                        Not linked to employee record. Wait for the administrator to link you to an employee.
-                    </div>
-                </div>
+                <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
+                              <div className="text-[#4B5563] text-center">
+                                  Not linked to employee record. Wait for the administrator to link you to an employee.
+                              </div>
+                          </div>
             );
         }
     }
@@ -161,9 +161,9 @@ export default function Layout({ children, currentPageName }) {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-slate-50 to-purple-50/40">
+        <div className="min-h-screen bg-[#F4F6F9]">
             {/* Top Navigation Bar */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+            <header className="bg-white border-b border-[#E2E6EC] sticky top-0 z-30" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
                 <div className="flex items-center justify-between px-6 py-3">
                     {/* Desktop Navigation */}
                     <DesktopNav 
@@ -190,22 +190,22 @@ export default function Layout({ children, currentPageName }) {
                         {/* Desktop User Menu */}
                         <div className="hidden lg:flex items-center gap-3">
                             {currentUser?.company && (
-                                <div className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-md">
-                                    {currentUser.company}
-                                </div>
-                            )}
+                                      <div className="px-3 py-1 bg-[#EEF2FF] text-[#0F1E36] text-xs font-medium rounded-md border border-[#E2E6EC]">
+                                          {currentUser.company}
+                                      </div>
+                                  )}
                             <div className="flex items-center gap-3">
                                 <div className="text-right">
-                                    <p className="text-sm font-medium text-slate-900">
-                                        {currentUser?.display_name || currentUser?.full_name}
-                                    </p>
-                                    <p className="text-xs text-slate-500">{currentUser?.email}</p>
-                                </div>
+                                      <p className="text-sm font-medium text-[#1F2937]">
+                                          {currentUser?.display_name || currentUser?.full_name}
+                                      </p>
+                                      <p className="text-xs text-[#6B7280]">{currentUser?.email}</p>
+                                  </div>
                                 <button
-                                    onClick={handleLogout}
-                                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                    title="Logout"
-                                >
+                                      onClick={handleLogout}
+                                      className="p-2 text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F1F4F8] rounded-lg transition-colors"
+                                      title="Logout"
+                                  >
                                     <LogOut className="w-5 h-5" />
                                 </button>
                             </div>
