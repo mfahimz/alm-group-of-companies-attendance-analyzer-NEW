@@ -1196,6 +1196,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const baseRow = [
                 r.attendance_id,
                 r.name,
+                r.has_no_punches ? 'No' : 'Yes',
                 r.working_days,
                 r.manual_present_days ?? r.present_days,
                 r.manual_annual_leave_count ?? r.annual_leave_count ?? 0,
