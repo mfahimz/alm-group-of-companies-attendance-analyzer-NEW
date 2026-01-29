@@ -344,11 +344,11 @@ export default function SalaryReportDetail() {
                 { label: report?.report_name || 'Salary Report' }
             ]} />
 
-            {!salaryUnlocked && !isSalaryUnlockedFromTab && (
+            {!salaryUnlocked && (
                 <PINLock onUnlock={(unlocked) => setSalaryUnlocked(unlocked)} storageKey="salary_tab_pin" />
             )}
 
-            {!salaryUnlocked && !isSalaryUnlockedFromTab && (
+            {!salaryUnlocked && (
                 <Card className="border-0 shadow-lg">
                     <CardContent className="p-12 text-center">
                         <p className="text-slate-600">Please unlock to view the salary report.</p>
@@ -356,7 +356,7 @@ export default function SalaryReportDetail() {
                 </Card>
             )}
 
-            {(salaryUnlocked || isSalaryUnlockedFromTab) && (
+            {salaryUnlocked && (
                 <Card className="border-0 shadow-lg">
                     <CardHeader>
                         <div className="flex items-center justify-between">
