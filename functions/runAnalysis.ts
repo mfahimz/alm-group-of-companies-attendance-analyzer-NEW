@@ -393,9 +393,10 @@ Deno.serve(async (req) => {
 
                 workingDays++;
 
-                let dateException = null;
+                // Get ALL matching exceptions for this date
+                let matchingExceptions = [];
                 try {
-                    const matchingExceptions = employeeExceptions.filter(ex => {
+                    matchingExceptions = employeeExceptions.filter(ex => {
                         try {
                             const exFrom = new Date(ex.date_from);
                             const exTo = new Date(ex.date_to);
@@ -404,19 +405,29 @@ Deno.serve(async (req) => {
                             return false;
                         }
                     });
-
-                    dateException = matchingExceptions.length > 0
-                        ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
-                        : null;
                 } catch {
-                    dateException = null;
+                    matchingExceptions = [];
                 }
 
+                // CRITICAL: PUBLIC_HOLIDAY takes priority over ALL other exceptions
+                // If a PUBLIC_HOLIDAY exists for this date, day is NOT a working day
+                // regardless of any other exceptions (including MANUAL_ABSENT)
+                const hasPublicHoliday = matchingExceptions.some(ex => 
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
+                
+                if (hasPublicHoliday) {
+                    workingDays--;
+                    continue;
+                }
+
+                // Get the most recent exception (excluding PUBLIC_HOLIDAY which was already handled)
+                const dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                    : null;
+
                 if (dateException) {
-                    if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
-                        workingDays--;
-                        continue;
-                    } else if (dateException.type === 'MANUAL_PRESENT') {
+                    if (dateException.type === 'MANUAL_PRESENT') {
                         presentDays++;
                     } else if (dateException.type === 'MANUAL_ABSENT') {
                         fullAbsenceCount++;
