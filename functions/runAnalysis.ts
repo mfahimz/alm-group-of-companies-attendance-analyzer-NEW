@@ -602,7 +602,7 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Check for approved minutes (foundation for all companies, currently enabled for Al Maraghi Auto Repairs only)
+                // Check for approved minutes (foundation for all companies, currently enabled for Al Maraghi Motors only)
                 let approvedMinutesForDay = 0;
                 try {
                     if (rules.approved_minutes_enabled && 
@@ -752,7 +752,7 @@ Deno.serve(async (req) => {
             // deductible_minutes = (late + early + other) - grace - approved
             // This value is FINAL and stored in AnalysisResult for salary calculation
             // Salary calculations fetch this directly, NO recalculation
-            // For Al Maraghi Auto Repairs, once report is finalized, this is locked
+            // For Al Maraghi Motors, once report is finalized, this is locked
             // DO NOT modify this formula without updating all downstream salary logic
             // ============================================================================
             const graceMinutes = baseGrace + carriedGrace;
