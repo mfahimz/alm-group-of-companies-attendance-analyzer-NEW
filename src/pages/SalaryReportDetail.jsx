@@ -377,7 +377,9 @@ export default function SalaryReportDetail() {
             'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
             'Total': row.total || 0,
             'WPS Pay': row.wpsPay || 0,
-            'Balance': row.balance || 0
+            'Balance': row.balance || 0,
+            'WPS Cap Applied': row.wps_cap_applied ? 'Yes' : 'No',
+            'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4800) : ''
         }));
 
         const ws = XLSX.utils.json_to_sheet(exportData);
