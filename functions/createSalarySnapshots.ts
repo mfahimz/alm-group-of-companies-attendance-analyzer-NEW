@@ -562,6 +562,201 @@ Deno.serve(async (req) => {
         };
 
         // ============================================================
+        // AL MARAGHI: Calculate extra prev month deductible minutes
+        // ============================================================
+        const calculateExtraPrevMonthMinutes = (emp, graceMinutesPerDay) => {
+            if (!isAlMaraghi || !hasExtraPrevMonthRange) return 0;
+
+            const attendanceIdStr = String(emp.attendance_id);
+            const includeSeconds = false; // Al Maraghi doesn't use seconds
+            
+            const employeePunches = punches.filter(p => 
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= extraPrevMonthFrom && 
+                p.punch_date <= extraPrevMonthTo
+            );
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
+            const employeeExceptions = allExceptions.filter(e => 
+                (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+                e.use_in_analysis !== false &&
+                e.is_custom_type !== true
+            );
+
+            const dayNameToNumber = {
+                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                'Thursday': 4, 'Friday': 5, 'Saturday': 6
+            };
+
+            let totalExtraDeductibleMinutes = 0;
+
+            const startDate = new Date(extraPrevMonthFrom);
+            const endDate = new Date(extraPrevMonthTo);
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDate = new Date(d);
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const dayOfWeek = currentDate.getUTCDay();
+
+                // Check weekly off
+                let weeklyOffDay = null;
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                } else if (emp.weekly_off) {
+                    weeklyOffDay = dayNameToNumber[emp.weekly_off];
+                }
+                
+                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    continue;
+                }
+
+                // Check exceptions
+                const matchingExceptions = employeeExceptions.filter(ex => {
+                    try {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        return currentDate >= exFrom && currentDate <= exTo;
+                    } catch { return false; }
+                });
+
+                const hasPublicHoliday = matchingExceptions.some(ex => 
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
+                if (hasPublicHoliday) continue;
+
+                const dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                    : null;
+
+                if (dateException && [
+                    'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'SICK_LEAVE', 'ANNUAL_LEAVE'
+                ].includes(dateException.type)) {
+                    continue;
+                }
+
+                // Get punches for this day - NO PUNCHES = 0 minutes (strict rule)
+                const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+                if (rawDayPunches.length === 0) {
+                    continue;
+                }
+
+                // Get shift for this day
+                const isShiftEffective = (s) => {
+                    if (!s.effective_from || !s.effective_to) return true;
+                    const from = new Date(s.effective_from);
+                    const to = new Date(s.effective_to);
+                    return currentDate >= from && currentDate <= to;
+                };
+
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const currentDayName = dayNames[dayOfWeek];
+
+                let shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
+                if (!shift) {
+                    const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
+                    for (const s of applicableShifts) {
+                        if (s.applicable_days) {
+                            try {
+                                const applicableDaysArray = JSON.parse(s.applicable_days);
+                                if (Array.isArray(applicableDaysArray) && applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
+                                    shift = s;
+                                    break;
+                                }
+                            } catch {}
+                        }
+                    }
+                    if (!shift) {
+                        if (dayOfWeek === 5) {
+                            shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s)) ||
+                                    employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        } else {
+                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        }
+                    }
+                }
+
+                if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                    const isFriday = dayOfWeek === 5;
+                    if (dateException.include_friday || !isFriday) {
+                        shift = {
+                            am_start: dateException.new_am_start,
+                            am_end: dateException.new_am_end,
+                            pm_start: dateException.new_pm_start,
+                            pm_end: dateException.new_pm_end
+                        };
+                    }
+                }
+
+                if (!shift) continue;
+
+                const dayPunches = filterMultiplePunches(rawDayPunches, includeSeconds);
+
+                // Track allowed minutes
+                let allowedMinutesForDay = 0;
+                let approvedMinutesForDay = 0;
+                if (dateException && dateException.type === 'ALLOWED_MINUTES' && 
+                    dateException.approval_status === 'approved_dept_head') {
+                    allowedMinutesForDay = dateException.allowed_minutes || 0;
+                    approvedMinutesForDay = allowedMinutesForDay;
+                }
+
+                const hasManualTimeException = dateException && (
+                    dateException.type === 'MANUAL_LATE' || 
+                    dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                    (dateException.late_minutes > 0) ||
+                    (dateException.early_checkout_minutes > 0) ||
+                    (dateException.other_minutes > 0)
+                );
+
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+                let dayOtherMinutes = 0;
+
+                if (hasManualTimeException) {
+                    if (dateException.late_minutes > 0) dayLateMinutes = dateException.late_minutes;
+                    if (dateException.early_checkout_minutes > 0) dayEarlyMinutes = dateException.early_checkout_minutes;
+                    if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
+                } else if (dayPunches.length > 0) {
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
+                    
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+                        
+                        if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
+                            dayLateMinutes += Math.round((punchTime - shiftTime) / (1000 * 60));
+                        }
+                        if ((match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') && punchTime < shiftTime) {
+                            dayEarlyMinutes += Math.round((shiftTime - punchTime) / (1000 * 60));
+                        }
+                    }
+                    
+                    if (allowedMinutesForDay > 0) {
+                        const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                        const excessMinutes = Math.max(0, totalDayMinutes - allowedMinutesForDay);
+                        if (totalDayMinutes > 0 && excessMinutes > 0) {
+                            const lateRatio = dayLateMinutes / totalDayMinutes;
+                            const earlyRatio = dayEarlyMinutes / totalDayMinutes;
+                            dayLateMinutes = Math.round(excessMinutes * lateRatio);
+                            dayEarlyMinutes = Math.round(excessMinutes * earlyRatio);
+                        } else {
+                            dayLateMinutes = 0;
+                            dayEarlyMinutes = 0;
+                        }
+                    }
+                }
+
+                // dayDeductible = max(0, late + early + other - grace - approved)
+                const dayDeductible = Math.max(0, 
+                    dayLateMinutes + dayEarlyMinutes + dayOtherMinutes - graceMinutesPerDay - approvedMinutesForDay
+                );
+                totalExtraDeductibleMinutes += dayDeductible;
+            }
+
+            return totalExtraDeductibleMinutes;
+        };
+
+        // ============================================================
         // NEW LOGIC: Create salary snapshots for ALL active employees
         // ============================================================
         const snapshots = [];
