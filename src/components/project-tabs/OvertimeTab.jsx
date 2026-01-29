@@ -578,68 +578,60 @@ export default function OvertimeTab({ project, finalReport }) {
                                 ) : filteredData.map(row => {
                                     const hasAdjustmentEdits = editableAdjustments[row.attendance_id];
                                     const hasSnapshot = !!row.snapshotId;
+                                    const isNoAttendanceData = row.attendanceSource === 'NO_ATTENDANCE_DATA';
                                     return (
                                         <TableRow key={`adj-${row.attendance_id}`} className={hasAdjustmentEdits ? 'bg-amber-50' : ''}>
                                             <TableCell className="font-medium">{row.attendance_id}</TableCell>
-                                            <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {row.name?.split(' ').slice(0, 2).join(' ')}
+                                                {isNoAttendanceData && (
+                                                    <span className="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">
+                                                        No attendance data
+                                                    </span>
+                                                )}
+                                            </TableCell>
                                             <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
                                             <TableCell className="bg-green-50 p-1">
-                                                {hasSnapshot ? (
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={getAdjustmentValue(row, 'bonus')}
-                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'bonus', e.target.value)}
-                                                        className="h-8 text-sm w-20"
-                                                        disabled={isProjectClosed}
-                                                    />
-                                                ) : (
-                                                    <span className="text-slate-400 text-xs">N/A</span>
-                                                )}
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={getAdjustmentValue(row, 'bonus')}
+                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'bonus', e.target.value)}
+                                                    className="h-8 text-sm w-20"
+                                                    disabled={isProjectClosed || !hasSnapshot}
+                                                />
                                             </TableCell>
                                             <TableCell className="bg-green-50 p-1">
-                                                {hasSnapshot ? (
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={getAdjustmentValue(row, 'incentive')}
-                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'incentive', e.target.value)}
-                                                        className="h-8 text-sm w-20"
-                                                        disabled={isProjectClosed}
-                                                    />
-                                                ) : (
-                                                    <span className="text-slate-400 text-xs">N/A</span>
-                                                )}
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={getAdjustmentValue(row, 'incentive')}
+                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'incentive', e.target.value)}
+                                                    className="h-8 text-sm w-20"
+                                                    disabled={isProjectClosed || !hasSnapshot}
+                                                />
                                             </TableCell>
                                             <TableCell className="bg-red-50 p-1">
-                                                {hasSnapshot ? (
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={getAdjustmentValue(row, 'otherDeduction')}
-                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', e.target.value)}
-                                                        className="h-8 text-sm w-20"
-                                                        disabled={isProjectClosed}
-                                                    />
-                                                ) : (
-                                                    <span className="text-slate-400 text-xs">N/A</span>
-                                                )}
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getAdjustmentValue(row, 'otherDeduction')}
+                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', e.target.value)}
+                                                    className="h-8 text-sm w-20"
+                                                    disabled={isProjectClosed || !hasSnapshot}
+                                                />
                                             </TableCell>
                                             <TableCell className="bg-red-50 p-1">
-                                                {hasSnapshot ? (
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
-                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', e.target.value)}
-                                                        className="h-8 text-sm w-20"
-                                                        disabled={isProjectClosed}
-                                                    />
-                                                ) : (
-                                                    <span className="text-slate-400 text-xs">N/A</span>
-                                                )}
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
+                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', e.target.value)}
+                                                    className="h-8 text-sm w-20"
+                                                    disabled={isProjectClosed || !hasSnapshot}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     );
