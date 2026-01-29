@@ -667,6 +667,7 @@ export default function Salaries() {
                                     <TableHead>Allowances</TableHead>
                                     <TableHead>Allowances + Bonus</TableHead>
                                     <TableHead>Total</TableHead>
+                                    <TableHead>WPS Cap</TableHead>
                                     {(isAdmin || isSupervisor) && <TableHead className="text-right">Actions</TableHead>}
                                 </TableRow>
                             </TableHeader>
