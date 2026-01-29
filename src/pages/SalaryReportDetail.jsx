@@ -462,6 +462,17 @@ export default function SalaryReportDetail() {
                                     <Save className="w-4 h-4 mr-2" />
                                     {isSaving ? 'Saving...' : 'Save Changes'}
                                 </Button>
+                                {canRecalculate && (
+                                    <Button
+                                        onClick={() => setConfirmRecalcAll(true)}
+                                        disabled={recalculatingAll || salaryData.length === 0}
+                                        variant="outline"
+                                        className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 mr-2 ${recalculatingAll ? 'animate-spin' : ''}`} />
+                                        {recalculatingAll ? 'Recalculating...' : 'Recalculate All'}
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={handleExportToExcel}
                                     variant="outline"
