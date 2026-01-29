@@ -581,6 +581,7 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle bg-red-50 font-semibold">{row.netDeduction?.toFixed(2) || '0.00'}</td>
                                                 <td className="p-2 align-middle bg-purple-50">{row.deductibleHours?.toFixed(2) || '0.00'}</td>
                                                 <td className="p-2 align-middle bg-purple-100">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</td>
+                                                <td className="p-2 align-middle bg-orange-50">{row.extra_prev_month_deductible_minutes || 0}</td>
                                                 <td className="p-1 align-middle bg-blue-50">
                                                     <Input
                                                         type="number"
