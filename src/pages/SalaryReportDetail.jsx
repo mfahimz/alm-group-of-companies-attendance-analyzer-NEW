@@ -627,7 +627,7 @@ export default function SalaryReportDetail() {
                                             </td>
                                         </tr>
                                     ) : filteredData.map((row) => {
-                                        const { total, wpsPay, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
+                                        const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
                                         return (
                                             <tr key={row.hrms_id} className="border-b transition-colors hover:bg-muted/50">
                                                 <td className="p-2 align-middle font-medium sticky left-0 bg-white z-10">{row.attendance_id}</td>
