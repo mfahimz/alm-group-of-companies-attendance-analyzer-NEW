@@ -1,5 +1,15 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+/**
+ * CREATE SALARY SNAPSHOTS FOR DATE RANGE
+ * 
+ * CORE RULE: Every active employee MUST have a SalarySnapshot.
+ * Attendance quality does NOT decide salary inclusion.
+ * 
+ * This function creates snapshots for a CUSTOM date range (different from report dates).
+ * Used when generating salary reports with specific date ranges.
+ */
+
 Deno.serve(async (req) => {
     try {
         console.log('[createSalarySnapshotsForDateRange] Function invoked');
@@ -51,6 +61,8 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
         ]);
+
+        console.log(`[createSalarySnapshotsForDateRange] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results`);
 
         // Parse rules
         let rules = null;
@@ -175,7 +187,6 @@ Deno.serve(async (req) => {
             const attendanceIdStr = String(emp.attendance_id);
             const includeSeconds = project.company === 'Al Maraghi Automotive';
             
-            // CRITICAL: Filter punches by the CUSTOM date range, not the original report range
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr &&
                 p.punch_date >= dateFrom && 
@@ -226,7 +237,7 @@ Deno.serve(async (req) => {
 
                 workingDays++;
 
-                // Get latest exception for this date (within custom date range)
+                // Get latest exception for this date
                 const matchingExceptions = employeeExceptions.filter(ex => {
                     try {
                         const exFrom = new Date(ex.date_from);
@@ -254,9 +265,6 @@ Deno.serve(async (req) => {
                         halfAbsenceCount++;
                         continue;
                     } else if (dateException.type === 'SICK_LEAVE') {
-                        // Sick leave counts as WORKING DAY (no deduction from working_days)
-                        // Day is tracked separately as sick_leave_count
-                        // No LOP deduction, no late/early calculation for this day
                         sickLeaveCount++;
                         continue;
                     }
@@ -416,7 +424,6 @@ Deno.serve(async (req) => {
                     const exFrom = new Date(alEx.date_from);
                     const exTo = new Date(alEx.date_to);
                     
-                    // Clamp to CUSTOM date range
                     const rangeStart = exFrom < startDate ? startDate : exFrom;
                     const rangeEnd = exTo > endDate ? endDate : exTo;
                     
@@ -444,21 +451,67 @@ Deno.serve(async (req) => {
             };
         };
 
-        // Create salary snapshots for custom date range
+        // ============================================================
+        // NEW LOGIC: Create salary snapshots for ALL active employees
+        // ============================================================
         const snapshots = [];
+        let analyzedCount = 0;
+        let noAttendanceCount = 0;
         
-        for (const emp of employees) {
+        // Filter employees to project's custom_employee_ids if specified
+        let eligibleEmployees = employees;
+        if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
+            const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
+            eligibleEmployees = employees.filter(emp => 
+                customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id))
+            );
+            console.log(`[createSalarySnapshotsForDateRange] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids`);
+        }
+        
+        for (const emp of eligibleEmployees) {
+            // Find matching salary record (REQUIRED for salary snapshot)
             const salary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
                 String(s.attendance_id) === String(emp.attendance_id)
             );
             
-            // Check if employee has analysis result (was included in the report)
-            const hasResult = analysisResults.some(r => String(r.attendance_id) === String(emp.attendance_id));
-            if (!hasResult) continue;
+            // Skip if no salary record
+            if (!salary) {
+                console.log(`[createSalarySnapshotsForDateRange] Skipping ${emp.name} (${emp.attendance_id}) - no salary record`);
+                continue;
+            }
 
-            // RECALCULATE for CUSTOM date range
-            const calculated = recalculateEmployeeAttendance(emp, date_from, date_to);
+            // Check if employee has analysis result
+            const analysisResult = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
+            const hasAnalysisResult = !!analysisResult;
+            
+            let calculated;
+            let attendanceSource;
+            
+            if (hasAnalysisResult) {
+                // ANALYZED: Recalculate for CUSTOM date range
+                calculated = recalculateEmployeeAttendance(emp, date_from, date_to);
+                attendanceSource = 'ANALYZED';
+                analyzedCount++;
+            } else {
+                // NO_ATTENDANCE_DATA: Zero-attendance snapshot
+                calculated = {
+                    workingDays: 0,
+                    presentDays: 0,
+                    fullAbsenceCount: 0,
+                    halfAbsenceCount: 0,
+                    sickLeaveCount: 0,
+                    annualLeaveCount: 0,
+                    lateMinutes: 0,
+                    earlyCheckoutMinutes: 0,
+                    otherMinutes: 0,
+                    approvedMinutes: 0,
+                    graceMinutes: 15
+                };
+                attendanceSource = 'NO_ATTENDANCE_DATA';
+                noAttendanceCount++;
+                console.log(`[createSalarySnapshotsForDateRange] Creating NO_ATTENDANCE_DATA snapshot for ${emp.name} (${emp.attendance_id})`);
+            }
 
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || 9;
@@ -472,7 +525,6 @@ Deno.serve(async (req) => {
                 exc.type === 'ANNUAL_LEAVE'
             );
             
-            // Calculate salary_leave_days for custom date range
             if (empAnnualLeaveExceptions.length > 0) {
                 const customStartDate = new Date(date_from);
                 const customEndDate = new Date(date_to);
@@ -480,7 +532,6 @@ Deno.serve(async (req) => {
                 
                 for (const exc of empAnnualLeaveExceptions) {
                     if (exc.salary_leave_days && exc.salary_leave_days > 0) {
-                        // Calculate the proportion of salary_leave_days within custom range
                         const exFrom = new Date(exc.date_from);
                         const exTo = new Date(exc.date_to);
                         const fullRange = Math.ceil((exTo - exFrom) / (1000 * 60 * 60 * 24)) + 1;
@@ -561,16 +612,19 @@ Deno.serve(async (req) => {
                 total: Math.round(finalTotal * 100) / 100,
                 wpsPay: Math.round(finalTotal * 100) / 100,
                 balance: 0,
-                snapshot_created_at: new Date().toISOString()
+                snapshot_created_at: new Date().toISOString(),
+                attendance_source: attendanceSource
             });
         }
 
-        console.log(`[createSalarySnapshotsForDateRange] Generated ${snapshots.length} snapshots for date range ${date_from} to ${date_to}`);
+        console.log(`[createSalarySnapshotsForDateRange] Generated ${snapshots.length} snapshots for date range ${date_from} to ${date_to} (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
 
         return Response.json({
             success: true,
             snapshots: snapshots,
             count: snapshots.length,
+            analyzed_count: analyzedCount,
+            no_attendance_count: noAttendanceCount,
             date_range: { from: date_from, to: date_to }
         });
 

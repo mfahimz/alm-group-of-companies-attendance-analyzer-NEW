@@ -1,5 +1,24 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+/**
+ * CREATE SALARY SNAPSHOTS
+ * 
+ * CORE RULE: Every active employee MUST have a SalarySnapshot when a report is finalized.
+ * Attendance quality does NOT decide salary inclusion.
+ * 
+ * Active Employee Definition:
+ * - employee.company === project.company
+ * - employee.active === true
+ * - A valid EmployeeSalary record exists
+ * 
+ * Algorithm:
+ * 1. Fetch ALL active employees for the project company with valid salary records
+ * 2. For EACH employee:
+ *    - Try to find AnalysisResult for the finalized report_run_id
+ *    - If found → use attendance values, set attendance_source = "ANALYZED"
+ *    - If NOT found → create ZERO-ATTENDANCE snapshot, set attendance_source = "NO_ATTENDANCE_DATA"
+ */
+
 Deno.serve(async (req) => {
     try {
         console.log('[createSalarySnapshots] Function invoked');
@@ -52,6 +71,8 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
         ]);
 
+        console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results`);
+
         // Parse rules
         let rules = null;
         if (rulesData.length > 0) {
@@ -69,6 +90,7 @@ Deno.serve(async (req) => {
         });
 
         if (existingSnapshots.length > 0) {
+            console.log(`[createSalarySnapshots] Deleting ${existingSnapshots.length} existing snapshots`);
             await Promise.all(existingSnapshots.map(s => base44.asServiceRole.entities.SalarySnapshot.delete(s.id)));
         }
 
@@ -288,15 +310,12 @@ Deno.serve(async (req) => {
                         halfAbsenceCount++;
                         continue;
                     } else if (dateException.type === 'SICK_LEAVE') {
-                        // Sick leave counts as WORKING DAY (no deduction from working_days)
-                        // Day is tracked separately as sick_leave_count
-                        // No LOP deduction, no late/early calculation for this day
                         sickLeaveCount++;
                         continue;
                     }
                 }
 
-                // Check for annual leave - skip counting here, we'll calculate calendar days separately
+                // Check for annual leave
                 const annualLeaveException = employeeExceptions.find(ex => {
                     try {
                         const exFrom = new Date(ex.date_from);
@@ -308,8 +327,6 @@ Deno.serve(async (req) => {
                 const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
 
                 if (annualLeaveException && rawDayPunches.length === 0) {
-                    // Don't increment annualLeaveCount here - we calculate calendar days separately
-                    // Decrement working days since this is a leave day (not counted as working day)
                     workingDays--;
                     continue;
                 }
@@ -391,7 +408,6 @@ Deno.serve(async (req) => {
                 } else if (!dateException || !['MANUAL_LATE', 'MANUAL_EARLY_CHECKOUT'].includes(dateException.type)) {
                     fullAbsenceCount++;
                 } else {
-                    // Manual late/early without punches = still present
                     presentDays++;
                 }
 
@@ -446,7 +462,6 @@ Deno.serve(async (req) => {
             const graceMinutes = baseGrace + carriedGrace;
 
             // Calculate annual leave as CALENDAR DAYS (not working days)
-            // Use Set to deduplicate overlapping exception ranges (same as runAnalysis)
             const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
             const annualLeaveDatesProcessed = new Set();
             
@@ -455,12 +470,10 @@ Deno.serve(async (req) => {
                     const exFrom = new Date(alEx.date_from);
                     const exTo = new Date(alEx.date_to);
                     
-                    // Clamp to report date range
                     const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
                     const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
                     
                     if (rangeStart <= rangeEnd) {
-                        // Count each calendar day individually to handle overlaps
                         for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
                             const dateStr = d.toISOString().split('T')[0];
                             annualLeaveDatesProcessed.add(dateStr);
@@ -478,7 +491,7 @@ Deno.serve(async (req) => {
                 fullAbsenceCount,
                 halfAbsenceCount,
                 sickLeaveCount,
-                annualLeaveCount: totalAnnualLeaveCalendarDays, // Calendar days, not working days
+                annualLeaveCount: totalAnnualLeaveCalendarDays,
                 lateMinutes,
                 earlyCheckoutMinutes,
                 otherMinutes,
@@ -487,21 +500,67 @@ Deno.serve(async (req) => {
             };
         };
 
-        // Create salary snapshots for each employee with RECALCULATED values
+        // ============================================================
+        // NEW LOGIC: Create salary snapshots for ALL active employees
+        // ============================================================
         const snapshots = [];
+        let analyzedCount = 0;
+        let noAttendanceCount = 0;
         
-        for (const emp of employees) {
+        // Filter employees to project's custom_employee_ids if specified
+        let eligibleEmployees = employees;
+        if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
+            const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
+            eligibleEmployees = employees.filter(emp => 
+                customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id))
+            );
+            console.log(`[createSalarySnapshots] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids`);
+        }
+        
+        for (const emp of eligibleEmployees) {
+            // Find matching salary record (REQUIRED for salary snapshot)
             const salary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
                 String(s.attendance_id) === String(emp.attendance_id)
             );
             
-            // Check if employee has analysis result (was included in the report)
-            const hasResult = analysisResults.some(r => String(r.attendance_id) === String(emp.attendance_id));
-            if (!hasResult) continue;
+            // Skip if no salary record - employee is not eligible for salary
+            if (!salary) {
+                console.log(`[createSalarySnapshots] Skipping ${emp.name} (${emp.attendance_id}) - no salary record`);
+                continue;
+            }
 
-            // RECALCULATE from punches + exceptions (same as UI)
-            const calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to);
+            // Check if employee has analysis result
+            const analysisResult = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
+            const hasAnalysisResult = !!analysisResult;
+            
+            let calculated;
+            let attendanceSource;
+            
+            if (hasAnalysisResult) {
+                // ANALYZED: Use recalculated attendance data
+                calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to);
+                attendanceSource = 'ANALYZED';
+                analyzedCount++;
+            } else {
+                // NO_ATTENDANCE_DATA: Zero-attendance snapshot (no penalties, no assumptions)
+                calculated = {
+                    workingDays: 0,
+                    presentDays: 0,
+                    fullAbsenceCount: 0,
+                    halfAbsenceCount: 0,
+                    sickLeaveCount: 0,
+                    annualLeaveCount: 0,
+                    lateMinutes: 0,
+                    earlyCheckoutMinutes: 0,
+                    otherMinutes: 0,
+                    approvedMinutes: 0,
+                    graceMinutes: 15
+                };
+                attendanceSource = 'NO_ATTENDANCE_DATA';
+                noAttendanceCount++;
+                console.log(`[createSalarySnapshots] Creating NO_ATTENDANCE_DATA snapshot for ${emp.name} (${emp.attendance_id})`);
+            }
 
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || 9;
@@ -553,8 +612,8 @@ Deno.serve(async (req) => {
                 allowances: allowancesAmount,
                 total_salary: totalSalaryAmount,
                 working_hours: workingHours,
-                working_days: calculated.workingDays, // Actual working days in period
-                salary_divisor: divisor, // Divisor from project settings for calculations
+                working_days: calculated.workingDays,
+                salary_divisor: divisor,
                 present_days: calculated.presentDays,
                 full_absence_count: calculated.fullAbsenceCount,
                 annual_leave_count: calculated.annualLeaveCount,
@@ -584,24 +643,27 @@ Deno.serve(async (req) => {
                 total: Math.round(finalTotal * 100) / 100,
                 wpsPay: Math.round(finalTotal * 100) / 100,
                 balance: 0,
-                snapshot_created_at: new Date().toISOString()
+                snapshot_created_at: new Date().toISOString(),
+                attendance_source: attendanceSource
             });
         }
 
         // Bulk create snapshots
         if (snapshots.length > 0) {
-            console.log(`[createSalarySnapshots] Creating ${snapshots.length} salary snapshots`);
+            console.log(`[createSalarySnapshots] Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
             await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
             console.log(`[createSalarySnapshots] Successfully created ${snapshots.length} snapshots`);
         } else {
-            console.warn(`[createSalarySnapshots] No snapshots created`);
+            console.warn(`[createSalarySnapshots] No snapshots created - no eligible employees found`);
         }
 
         return Response.json({
             success: true,
             snapshots_created: snapshots.length,
-            employees_count: employees.length,
-            message: `Created ${snapshots.length} salary snapshots with recalculated attendance data`
+            analyzed_count: analyzedCount,
+            no_attendance_count: noAttendanceCount,
+            employees_count: eligibleEmployees.length,
+            message: `Created ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`
         });
 
     } catch (error) {
