@@ -571,7 +571,12 @@ Deno.serve(async (req) => {
                         }
                     }
                 } else {
-                    fullAbsenceCount++;
+                    // No punches for this day
+                    // Check if there's an exception that handles this day (already processed above)
+                    // Only count as LOP if no exception covers it
+                    if (!dateException || (dateException.type !== 'MANUAL_PRESENT' && dateException.type !== 'MANUAL_HALF')) {
+                        fullAbsenceCount++;
+                    }
                 }
 
                 // Check for approved minutes (foundation for all companies, currently enabled for Al Maraghi Auto Repairs only)
