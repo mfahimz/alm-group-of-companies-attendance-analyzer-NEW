@@ -1170,6 +1170,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const headers = [
             'Attendance ID',
             'Name',
+            'Has Punches',
             'Working Days',
             'Present Days',
             'Annual Leave',
