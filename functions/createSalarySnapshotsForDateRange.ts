@@ -593,6 +593,31 @@ Deno.serve(async (req) => {
 
             const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
 
+            // ============================================================
+            // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+            // ============================================================
+            let wpsAmount = finalTotal;
+            let balanceAmount = 0;
+            let wpsCapApplied = false;
+            const wpsCapEnabled = salary?.wps_cap_enabled || false;
+            const wpsCapAmount = salary?.wps_cap_amount ?? 4800;
+
+            if (project.company === 'Al Maraghi Auto Repairs' && wpsCapEnabled) {
+                if (finalTotal <= 0) {
+                    wpsAmount = 0;
+                    balanceAmount = 0;
+                    wpsCapApplied = false;
+                } else {
+                    const cap = wpsCapAmount != null ? wpsCapAmount : 4800;
+                    wpsAmount = Math.min(finalTotal, cap);
+                    balanceAmount = Math.max(0, finalTotal - wpsAmount);
+                    wpsCapApplied = finalTotal > cap;
+                }
+            } else if (finalTotal <= 0) {
+                wpsAmount = 0;
+                balanceAmount = 0;
+            }
+
             snapshots.push({
                 project_id: String(project_id),
                 report_run_id: String(report_run_id),
