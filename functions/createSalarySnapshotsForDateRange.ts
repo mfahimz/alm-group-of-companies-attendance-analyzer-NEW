@@ -221,7 +221,10 @@ Deno.serve(async (req) => {
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const currentDate = new Date(d);
                 const dateStr = currentDate.toISOString().split('T')[0];
-                const dayOfWeek = currentDate.getDay();
+                // CRITICAL: Use UTC day of week to avoid timezone issues
+                // new Date(dateStr) creates a date at UTC midnight, so we must use getUTCDay()
+                // Otherwise, server timezone can shift the day and cause incorrect weekly off detection
+                const dayOfWeek = currentDate.getUTCDay();
 
                 // Check weekly off
                 let weeklyOffDay = null;
