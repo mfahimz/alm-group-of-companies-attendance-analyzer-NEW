@@ -1883,7 +1883,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             />
                                         </td>
                                         <td className="p-2 align-middle font-medium sticky left-[48px] bg-white z-10">{result.attendance_id}</td>
-                                        <td className="p-2 align-middle sticky left-[120px] bg-white z-10">{result.name}</td>
+                                        <td className="p-2 align-middle sticky left-[120px] bg-white z-10">
+                                            <div className="flex items-center gap-2">
+                                                <span>{result.name}</span>
+                                                {result.has_no_punches && (
+                                                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded whitespace-nowrap" title="No punch data for this period">
+                                                        No punches
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="p-2 align-middle">{result.working_days}</td>
                                         <td className="p-2 align-middle">
                                             <InlineEditableCell
