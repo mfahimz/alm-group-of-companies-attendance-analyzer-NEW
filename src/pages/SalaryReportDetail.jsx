@@ -635,10 +635,18 @@ export default function SalaryReportDetail() {
                                                     />
                                                 </td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{wpsPay.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{(row.balance || 0).toFixed(2)}</td>
-
-                                            </tr>
+                                                <td className="p-2 align-middle bg-green-100 font-bold">{(row.wpsPay || wpsPay).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100 font-bold">{(row.balance || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-slate-50 text-center">
+                                                    {row.wps_cap_applied ? (
+                                                        <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded text-xs font-medium">
+                                                            Yes
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-xs">—</span>
+                                                    )}
+                                                </td>
+                                                </tr>
                                         );
                                     })}
                                 </tbody>
