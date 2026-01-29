@@ -23,7 +23,7 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
             {/* Hamburger Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 text-[#4B5563] hover:bg-[#F1F4F8] rounded-lg transition-colors"
             >
                 <Menu className="w-6 h-6" />
             </button>
@@ -44,14 +44,14 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                 )}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                <div className="flex items-center justify-between p-4 border-b border-[#E2E6EC]">
                     <Link to={createPageUrl('Dashboard')} onClick={closeDrawer} className="flex items-center gap-3">
-                        <BarChart3 className="w-6 h-6 text-indigo-600" />
-                        <span className="font-bold text-lg text-slate-900">ALM Attendance</span>
+                        <BarChart3 className="w-6 h-6 text-[#0F1E36]" />
+                        <span className="font-bold text-lg text-[#0F1E36]">ALM Attendance</span>
                     </Link>
                     <button
                         onClick={closeDrawer}
-                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                        className="p-1.5 text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F1F4F8] rounded-lg"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -85,8 +85,8 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                                 onClick={closeDrawer}
                                 className={cn(
                                     'flex items-center gap-3 px-4 py-2.5 mb-1 rounded-lg text-sm font-medium transition-colors',
-                                    isActive && 'bg-indigo-50 text-indigo-600',
-                                    !isActive && 'text-slate-700 hover:bg-slate-50'
+                                    isActive && 'bg-[#EEF2FF] text-[#0F1E36]',
+                                    !isActive && 'text-[#4B5563] hover:bg-[#F7F9FC]'
                                 )}
                             >
                                 <item.icon className="w-5 h-5" />
@@ -103,7 +103,7 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                         return (
                             <div key={key} className="mt-6">
                                 {/* Category Header */}
-                                <div className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-500 uppercase">
+                                <div className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#6B7280] uppercase">
                                     <dropdown.icon className="w-4 h-4" />
                                     {dropdown.label}
                                 </div>
@@ -119,8 +119,8 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                                             onClick={closeDrawer}
                                             className={cn(
                                                 'flex items-center gap-3 px-4 py-2.5 mb-1 rounded-lg text-sm transition-colors',
-                                                isActive && 'bg-indigo-50 text-indigo-600 font-medium',
-                                                !isActive && 'text-slate-600 hover:bg-slate-50'
+                                                isActive && 'bg-[#EEF2FF] text-[#0F1E36] font-medium',
+                                                !isActive && 'text-[#4B5563] hover:bg-[#F7F9FC]'
                                             )}
                                         >
                                             <item.icon className="w-4 h-4" />
@@ -134,24 +134,24 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                 </div>
 
                 {/* User Section */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200 bg-white">
+                <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#E2E6EC] bg-white">
                     {user?.company && (
-                        <div className="mb-2 px-2 py-1 bg-indigo-50 text-indigo-600 text-xs font-medium rounded">
+                        <div className="mb-2 px-2 py-1 bg-[#EEF2FF] text-[#0F1E36] text-xs font-medium rounded border border-[#E2E6EC]">
                             {user.company}
                         </div>
                     )}
                     <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">
+                            <p className="text-sm font-medium text-[#1F2937] truncate">
                                 {user?.display_name || user?.full_name}
                             </p>
-                            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                            <p className="text-xs text-[#6B7280] truncate">{user?.email}</p>
                         </div>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={onLogout}
-                            className="text-slate-500 hover:text-slate-700"
+                            className="text-[#6B7280] hover:text-[#1F2937]"
                         >
                             Logout
                         </Button>

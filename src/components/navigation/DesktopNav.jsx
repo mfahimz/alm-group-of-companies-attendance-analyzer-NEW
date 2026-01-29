@@ -17,8 +17,8 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
         <nav className="hidden lg:flex items-center gap-1 flex-1">
             {/* Logo */}
             <Link to={createPageUrl('Dashboard')} className="flex items-center gap-3 mr-6">
-                <BarChart3 className="w-8 h-8 text-indigo-600 flex-shrink-0" />
-                <span className="font-bold text-lg text-slate-900">ALM Attendance</span>
+                <BarChart3 className="w-8 h-8 text-[#0F1E36] flex-shrink-0" />
+                <span className="font-bold text-lg text-[#0F1E36]">ALM Attendance</span>
             </Link>
 
             {/* Direct Links (Main category) */}
@@ -47,9 +47,9 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
                         to={createPageUrl(targetPage)}
                         className={cn(
                             'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                            isActive && 'bg-slate-800 text-white',
-                            !isActive && isHome && 'font-semibold text-slate-900 hover:bg-slate-100',
-                            !isActive && !isHome && 'text-slate-600 hover:bg-slate-100'
+                            isActive && 'bg-[#0F1E36] text-white',
+                            !isActive && isHome && 'font-semibold text-[#1F2937] hover:bg-[#F1F4F8]',
+                            !isActive && !isHome && 'text-[#4B5563] hover:bg-[#F1F4F8]'
                         )}
                     >
                         <item.icon className="w-4 h-4" />
@@ -70,8 +70,8 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
                         <button
                             className={cn(
                                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                hasActivePage && 'bg-slate-800 text-white',
-                                !hasActivePage && 'text-slate-600 hover:bg-slate-100'
+                                hasActivePage && 'bg-[#0F1E36] text-white',
+                                !hasActivePage && 'text-[#4B5563] hover:bg-[#F1F4F8]'
                             )}
                         >
                             <dropdown.icon className="w-4 h-4" />
@@ -80,7 +80,7 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
                         </button>
 
                         {/* Dropdown Content */}
-                        <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg border border-[#E2E6EC] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50" style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
                             <div className="py-2">
                                 {accessibleItems.map((item) => {
                                     const isActive = currentPageName === item.name;
@@ -91,8 +91,8 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
                                             to={createPageUrl(item.name)}
                                             className={cn(
                                                 'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
-                                                isActive && 'bg-indigo-50 text-indigo-600 font-medium',
-                                                !isActive && 'text-slate-700 hover:bg-slate-50'
+                                                isActive && 'bg-[#EEF2FF] text-[#0F1E36] font-medium',
+                                                !isActive && 'text-[#4B5563] hover:bg-[#F7F9FC]'
                                             )}
                                         >
                                             <item.icon className="w-4 h-4" />
