@@ -50,7 +50,7 @@ const SheetContent = React.forwardRef(({ side = "right", className, children, ..
     <SheetPrimitive.Content 
       ref={ref} 
       className={cn(sheetVariants({ side }), "overflow-y-auto", className)} 
-      style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+      style={{ boxShadow: '0 12px 32px rgba(0,0,0,0.14)' }}
       {...props}>
       <SheetPrimitive.Close
         className="absolute right-4 top-4 rounded-sm text-[#6B7280] transition-colors hover:text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#0F1E36] focus:ring-offset-2 disabled:pointer-events-none z-10">
