@@ -238,9 +238,8 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
-                workingDays++;
-
-                // Get ALL matching exceptions for this date
+                // Get ALL matching exceptions for this date BEFORE incrementing workingDays
+                // This allows PUBLIC_HOLIDAY to completely skip the day
                 const matchingExceptions = employeeExceptions.filter(ex => {
                     try {
                         const exFrom = new Date(ex.date_from);
@@ -252,16 +251,20 @@ Deno.serve(async (req) => {
                 // CRITICAL: PUBLIC_HOLIDAY takes priority over ALL other exceptions
                 // If a PUBLIC_HOLIDAY exists for this date, day is NOT a working day
                 // regardless of any other exceptions (including MANUAL_ABSENT)
+                // Check this BEFORE incrementing workingDays
                 const hasPublicHoliday = matchingExceptions.some(ex => 
                     ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                 );
                 
                 if (hasPublicHoliday) {
-                    workingDays--;
+                    // Skip this day entirely - not a working day, no LOP, nothing
                     continue;
                 }
 
-                // Get the most recent exception (excluding PUBLIC_HOLIDAY which was already handled)
+                // Now it's safe to count as a working day
+                workingDays++;
+
+                // Get the most recent exception (PUBLIC_HOLIDAY already handled above)
                 const dateException = matchingExceptions.length > 0
                     ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
                     : null;
