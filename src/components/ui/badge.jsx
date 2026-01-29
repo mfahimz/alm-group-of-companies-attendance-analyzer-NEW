@@ -11,18 +11,27 @@ const badgeVariants = cva(
         default:
           "border-transparent bg-[#0F1E36] text-white",
         secondary:
-          "border-transparent bg-[#F1F4F8] text-[#4B5563]",
+          "border-transparent bg-[#EEF2F7] text-[#4B5563]",
         destructive:
-          "border-[#F5B5B5] bg-[#FDECEC] text-[#A61B1B]",
+          "border-transparent bg-[#FEE2E2] text-[#991B1B]",
         outline: "border-[#E2E6EC] text-[#1F2937] bg-white",
         success:
-          "border-[#BFE3C9] bg-[#EAF4EC] text-[#1F7A3A]",
+          "border-transparent bg-[#DCFCE7] text-[#166534]",
         warning:
-          "border-[#F5D38A] bg-[#FFF7E6] text-[#9A6700]",
+          "border-transparent bg-[#FEF3C7] text-[#92400E]",
         info:
-          "border-transparent bg-[#EEF4FF] text-[#1E40AF]",
-        gold:
-          "border-transparent bg-[#FEF7E6] text-[#C9A24D]",
+          "border-transparent bg-[#E0E7FF] text-[#1E3A8A]",
+        /* Section-coded badges */
+        attendance:
+          "border-transparent bg-[#E8F0FF] text-[#1D4ED8]",
+        salary:
+          "border-transparent bg-[#EAF7EF] text-[#15803D]",
+        overtime:
+          "border-transparent bg-[#FFF4E5] text-[#B45309]",
+        reports:
+          "border-transparent bg-[#F3E8FF] text-[#7C3AED]",
+        admin:
+          "border-transparent bg-[#EEF2F7] text-[#334155]",
       },
     },
     defaultVariants: {
