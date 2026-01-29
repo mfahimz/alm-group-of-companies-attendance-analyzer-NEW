@@ -359,7 +359,7 @@ export default function OvertimeTab({ project, finalReport }) {
     // ============================================
     // RENDER
     // ============================================
-    if (loadingEmployees || loadingOT || loadingSnapshots) {
+    if (loadingEmployees || loadingOT || loadingReports || loadingSnapshots) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
