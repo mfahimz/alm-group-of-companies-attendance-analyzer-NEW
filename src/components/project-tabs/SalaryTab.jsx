@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,20 +35,18 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
         queryFn: () => base44.auth.me()
     });
 
-    // Fetch finalized report directly if not passed as prop
-    const { data: fetchedFinalReport } = useQuery({
-        queryKey: ['finalReport', project?.id, project?.last_saved_report_id],
-        queryFn: async () => {
-            if (!project?.last_saved_report_id) return null;
-            const reports = await base44.entities.ReportRun.filter({ 
-                id: project.last_saved_report_id,
-                is_final: true 
-            });
-            return reports[0] || null;
-        },
-        enabled: !!project?.id && !!project?.last_saved_report_id && !finalReportProp,
+    // Fetch all report runs to find the finalized one (there should only be one with is_final=true)
+    const { data: reportRuns = [], isLoading: loadingReports } = useQuery({
+        queryKey: ['reportRuns', project?.id],
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
+        enabled: !!project?.id && !finalReportProp,
         staleTime: 5 * 60 * 1000
     });
+
+    // Find the finalized report from the list
+    const fetchedFinalReport = useMemo(() => {
+        return reportRuns.find(r => r.is_final === true) || null;
+    }, [reportRuns]);
 
     // Use prop if available, otherwise use fetched data
     const finalReport = finalReportProp || fetchedFinalReport;
