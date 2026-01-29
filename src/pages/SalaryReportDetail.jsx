@@ -287,31 +287,54 @@ export default function SalaryReportDetail() {
         }
     };
 
-    const handleRecalculateSalary = async (attendanceId, employeeName) => {
-        setRecalculating(attendanceId);
+    const handleRecalculateAll = async () => {
+        setRecalculatingAll(true);
+        setConfirmRecalcAll(false);
+        
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+        
         try {
-            const response = await base44.functions.invoke('recalculateSalarySnapshot', {
-                salary_report_id: reportId,
-                report_run_id: report?.report_run_id,
-                project_id: report?.project_id,
-                attendance_id: attendanceId,
-                mode: 'APPLY'
-            });
+            // Get all attendance_ids from the current report data
+            const attendanceIds = salaryData.map(row => row.attendance_id);
             
-            if (response.data?.success) {
-                const changedCount = response.data?.changed_fields?.length || 0;
-                toast.success(`Salary recalculated for ${employeeName}. ${changedCount} field(s) updated.`);
-                // Refresh data
-                queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
-                queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+            for (const attendanceId of attendanceIds) {
+                try {
+                    const response = await base44.functions.invoke('recalculateSalarySnapshot', {
+                        salary_report_id: reportId,
+                        report_run_id: report?.report_run_id,
+                        project_id: report?.project_id,
+                        attendance_id: attendanceId,
+                        mode: 'APPLY'
+                    });
+                    
+                    if (response.data?.success) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        errors.push(`${attendanceId}: ${response.data?.error || 'Unknown error'}`);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    errors.push(`${attendanceId}: ${error.response?.data?.error || error.message}`);
+                }
+            }
+            
+            // Refresh data
+            queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+            queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+            
+            if (errorCount === 0) {
+                toast.success(`All ${successCount} employees recalculated successfully`);
             } else {
-                toast.error(response.data?.error || 'Failed to recalculate salary');
+                toast.warning(`Recalculated ${successCount} employees. ${errorCount} failed.`);
+                console.error('Recalculation errors:', errors);
             }
         } catch (error) {
-            toast.error('Error: ' + (error.response?.data?.error || error.message || 'Failed to recalculate'));
+            toast.error('Error: ' + (error.message || 'Failed to recalculate'));
         } finally {
-            setRecalculating(null);
-            setConfirmRecalc(null);
+            setRecalculatingAll(false);
         }
     };
 
