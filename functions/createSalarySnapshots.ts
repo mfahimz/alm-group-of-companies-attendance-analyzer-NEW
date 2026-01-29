@@ -917,7 +917,7 @@ Deno.serve(async (req) => {
                 leaveDays: leaveDays,
                 leavePay: Math.round(leavePay * 100) / 100,
                 salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
-                deductibleHours: deductibleHours,
+                deductibleHours: totalDeductibleHours,
                 deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
                 netDeduction: Math.round(netDeduction * 100) / 100,
                 normalOtHours: 0,
