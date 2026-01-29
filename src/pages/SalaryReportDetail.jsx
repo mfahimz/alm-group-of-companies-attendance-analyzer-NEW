@@ -5,7 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet } from 'lucide-react';
+import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import * as XLSX from 'xlsx';
@@ -27,6 +35,8 @@ export default function SalaryReportDetail() {
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
+    const [recalculating, setRecalculating] = useState(null); // attendance_id being recalculated
+    const [confirmRecalc, setConfirmRecalc] = useState(null); // {snapshotId, name} for confirmation dialog
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
@@ -67,9 +77,17 @@ export default function SalaryReportDetail() {
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
+    const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Auto Repairs';
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
+    
+    // Can recalculate: Al Maraghi only, report finalized, project not closed, user has permission
+    const reportRun = report?.report_run_id ? liveSalarySnapshots[0] : null; // Check if finalized via snapshots
+    const canRecalculate = isAlMaraghi && 
+                           isAdminOrSupervisorOrHR && 
+                           project?.status !== 'closed' &&
+                           liveSalarySnapshots.length > 0; // Snapshots exist = report is finalized
 
     // Fetch live SalarySnapshot data for the most recent adjustment values
     const { data: liveSalarySnapshots = [] } = useQuery({
@@ -270,6 +288,29 @@ export default function SalaryReportDetail() {
         }
     };
 
+    const handleRecalculateSalary = async (snapshotId, employeeName) => {
+        setRecalculating(snapshotId);
+        try {
+            const response = await base44.functions.invoke('recalculateIndividualSalary', {
+                salary_snapshot_id: snapshotId
+            });
+            
+            if (response.data?.success) {
+                toast.success(`Salary recalculated for ${employeeName}`);
+                // Refresh data
+                queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+                queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+            } else {
+                toast.error(response.data?.error || 'Failed to recalculate salary');
+            }
+        } catch (error) {
+            toast.error('Error: ' + (error.message || 'Failed to recalculate'));
+        } finally {
+            setRecalculating(null);
+            setConfirmRecalc(null);
+        }
+    };
+
     const handleExportToExcel = () => {
         const exportData = filteredData.map(row => ({
             'Attendance ID': row.attendance_id,
@@ -461,12 +502,13 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">WPS Pay</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Balance</SortableTableHead>
+                                        {canRecalculate && <TableHead className="whitespace-nowrap bg-slate-50 text-center">Actions</TableHead>}
                                     </tr>
                                 </thead>
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                         <tr className="border-b">
-                                            <td colSpan={28} className="text-center py-12">
+                                            <td colSpan={canRecalculate ? 29 : 28} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
@@ -555,6 +597,37 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{wpsPay.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{(row.balance || 0).toFixed(2)}</td>
+                                                {canRecalculate && (
+                                                    <td className="p-2 align-middle text-center">
+                                                        {(() => {
+                                                            // Find the live snapshot for this employee
+                                                            const liveSnapshot = liveSalarySnapshots.find(s => 
+                                                                String(s.attendance_id) === String(row.attendance_id)
+                                                            );
+                                                            if (!liveSnapshot) return null;
+                                                            
+                                                            return (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => setConfirmRecalc({ 
+                                                                        snapshotId: liveSnapshot.id, 
+                                                                        name: row.name 
+                                                                    })}
+                                                                    disabled={recalculating === liveSnapshot.id}
+                                                                    className="h-7 px-2 text-xs"
+                                                                    title="Recalculate salary totals using stored attendance values"
+                                                                >
+                                                                    {recalculating === liveSnapshot.id ? (
+                                                                        <RefreshCw className="w-3 h-3 animate-spin" />
+                                                                    ) : (
+                                                                        <RefreshCw className="w-3 h-3" />
+                                                                    )}
+                                                                </Button>
+                                                            );
+                                                        })()}
+                                                    </td>
+                                                )}
                                             </tr>
                                         );
                                     })}
@@ -564,6 +637,42 @@ export default function SalaryReportDetail() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* Recalculate Confirmation Dialog */}
+            <Dialog open={!!confirmRecalc} onOpenChange={() => setConfirmRecalc(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Recalculate Salary</DialogTitle>
+                        <DialogDescription>
+                            This will recalculate salary totals for <strong>{confirmRecalc?.name}</strong> using existing attendance values.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                            <strong>Note:</strong> Attendance data will NOT change. Only derived salary values (leave pay, deductions, OT salary, totals) will be recalculated.
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmRecalc(null)}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={() => handleRecalculateSalary(confirmRecalc.snapshotId, confirmRecalc.name)}
+                            disabled={recalculating}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            {recalculating ? (
+                                <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Recalculating...
+                                </>
+                            ) : (
+                                'Recalculate'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
