@@ -282,6 +282,7 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
                 'Attendance ID': row.attendance_id,
                 'Name': row.name,
                 'Department': row.department || '-',
+                'Attendance Source': row.attendance_source || 'ANALYZED',
                 'Working Hours/Day': row.working_hours,
                 'Basic Salary': row.basic_salary,
                 'Total Salary': row.total_salary,
