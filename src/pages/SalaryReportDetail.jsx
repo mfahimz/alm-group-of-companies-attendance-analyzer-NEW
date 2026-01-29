@@ -36,7 +36,7 @@ export default function SalaryReportDetail() {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
     const [recalculating, setRecalculating] = useState(null); // attendance_id being recalculated
-    const [confirmRecalc, setConfirmRecalc] = useState(null); // {snapshotId, name} for confirmation dialog
+    const [confirmRecalc, setConfirmRecalc] = useState(null); // {snapshotId, attendanceId, name} for confirmation dialog
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
