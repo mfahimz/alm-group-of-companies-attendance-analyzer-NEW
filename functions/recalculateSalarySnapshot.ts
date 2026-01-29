@@ -269,11 +269,30 @@ Deno.serve(async (req) => {
             - adjustmentValues.otherDeduction 
             - adjustmentValues.advanceSalaryDeduction;
 
-        // WPS Pay = Final Total
-        const wpsPay = finalTotal;
-        
-        // Balance = 0 (Total - WPS Pay)
-        const balance = 0;
+        // ============================================================
+        // WPS SPLIT LOGIC (Al Maraghi Auto Repairs only)
+        // ============================================================
+        let wpsPay = finalTotal;
+        let balance = 0;
+        let wpsCapApplied = false;
+        const wpsCapEnabled = salaryRecord?.wps_cap_enabled || false;
+        const wpsCapAmount = salaryRecord?.wps_cap_amount ?? 4800;
+
+        if (wpsCapEnabled) {
+            if (finalTotal <= 0) {
+                wpsPay = 0;
+                balance = 0;
+                wpsCapApplied = false;
+            } else {
+                const cap = wpsCapAmount != null ? wpsCapAmount : 4800;
+                wpsPay = Math.min(finalTotal, cap);
+                balance = Math.max(0, finalTotal - wpsPay);
+                wpsCapApplied = finalTotal > cap;
+            }
+        } else if (finalTotal <= 0) {
+            wpsPay = 0;
+            balance = 0;
+        }
 
         // ============================================================
         // AFTER VALUES (computed)
