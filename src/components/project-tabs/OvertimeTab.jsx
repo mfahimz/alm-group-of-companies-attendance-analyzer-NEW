@@ -56,7 +56,7 @@ export default function OvertimeTab({ project, finalReport }) {
             project_id: project.id,
             report_run_id: finalReport.id
         }),
-        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
+        enabled: !!project?.id && !!finalReport?.id,
         staleTime: 0
     });
 
