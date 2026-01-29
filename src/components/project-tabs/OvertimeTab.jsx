@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import SortableTableHead from '../ui/SortableTableHead';
 
-export default function OvertimeTab({ project, finalReport }) {
+export default function OvertimeTab({ project }) {
     const queryClient = useQueryClient();
 
     // ============================================

@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import { Label } from '@/components/ui/label';
 
-export default function SalaryTab({ project, finalReport: finalReportProp }) {
+export default function SalaryTab({ project }) {
     const queryClient = useQueryClient();
     
     // ============================================
@@ -39,17 +39,14 @@ export default function SalaryTab({ project, finalReport: finalReportProp }) {
     const { data: reportRuns = [], isLoading: loadingReports } = useQuery({
         queryKey: ['reportRuns', project?.id],
         queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
-        enabled: !!project?.id && !finalReportProp,
+        enabled: !!project?.id,
         staleTime: 5 * 60 * 1000
     });
 
     // Find the finalized report from the list
-    const fetchedFinalReport = useMemo(() => {
+    const finalReport = useMemo(() => {
         return reportRuns.find(r => r.is_final === true) || null;
     }, [reportRuns]);
-
-    // Use prop if available, otherwise use fetched data
-    const finalReport = finalReportProp || fetchedFinalReport;
 
     // Fetch saved salary reports
     const { data: savedSalaryReports = [], isLoading: loadingSavedReports, refetch: refetchSavedReports } = useQuery({
