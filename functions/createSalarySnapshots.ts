@@ -843,7 +843,14 @@ Deno.serve(async (req) => {
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
             
             const hourlyRate = totalSalaryAmount / divisor / workingHours;
-            const deductibleHoursPay = hourlyRate * deductibleHours;
+            
+            // AL MARAGHI: Calculate extra prev month deductible minutes
+            const extraPrevMonthDeductibleMinutes = calculateExtraPrevMonthMinutes(emp, calculated.graceMinutes);
+            
+            // Total deductible includes regular + extra prev month
+            const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
+            const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
+            const deductibleHoursPay = hourlyRate * totalDeductibleHours;
 
             const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
 
