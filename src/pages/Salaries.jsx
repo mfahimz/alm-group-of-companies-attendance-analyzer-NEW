@@ -162,7 +162,9 @@ export default function Salaries() {
             working_hours: 9,
             basic_salary: 0,
             allowances: 0,
-            allowances_with_bonus: 0
+            allowances_with_bonus: 0,
+            wps_cap_enabled: false,
+            wps_cap_amount: 4800
         });
         setEditingSalary(null);
         setSelectedCompany('');
