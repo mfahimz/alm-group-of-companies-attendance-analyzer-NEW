@@ -194,7 +194,9 @@ export default function Salaries() {
             working_hours: salary.working_hours || 9,
             basic_salary: salary.basic_salary,
             allowances: Number(salary.allowances) || 0,
-            allowances_with_bonus: salary.allowances_with_bonus || 0
+            allowances_with_bonus: salary.allowances_with_bonus || 0,
+            wps_cap_enabled: salary.wps_cap_enabled || false,
+            wps_cap_amount: salary.wps_cap_amount ?? 4800
         });
         setEditingSalary(salary);
         setShowDialog(true);
