@@ -36,12 +36,13 @@ Deno.serve(async (req) => {
         }
 
         // Fetch all required data
-        const [punches, shifts, exceptions, allEmployees, rulesData] = await Promise.all([
+        const [punches, shifts, exceptions, allEmployees, rulesData, projectEmployees] = await Promise.all([
             base44.asServiceRole.entities.Punch.filter({ project_id }),
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id }),
             base44.asServiceRole.entities.Exception.filter({ project_id }),
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
-            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
+            base44.asServiceRole.entities.ProjectEmployee.filter({ project_id })
         ]);
 
         // Parse rules
@@ -84,12 +85,33 @@ Deno.serve(async (req) => {
         // This ensures they appear in attendance reports for proper tracking
         const uniqueEmployeeIds = [...activeEmployeeAttendanceIds];
         
+        // Add project-specific employee overrides (for unmatched attendance IDs)
+        const projectEmployeeIds = projectEmployees.map(pe => String(pe.attendance_id));
+        for (const peId of projectEmployeeIds) {
+            if (!uniqueEmployeeIds.includes(peId)) {
+                uniqueEmployeeIds.push(peId);
+            }
+        }
+        
         console.log('[runAnalysis] Total punches:', punches.length);
         console.log('[runAnalysis] Filtered employees:', filteredEmployees.length);
-        console.log('[runAnalysis] Employees to analyze (all active):', uniqueEmployeeIds.length);
+        console.log('[runAnalysis] Project employee overrides:', projectEmployees.length);
+        console.log('[runAnalysis] Employees to analyze (all active + overrides):', uniqueEmployeeIds.length);
         
-        // Use filtered employees for analysis
-        const employees = filteredEmployees;
+        // Combine master employees with project-specific overrides for lookups
+        const employees = [
+            ...filteredEmployees,
+            // Add project employees as pseudo-employees for lookups
+            ...projectEmployees.map(pe => ({
+                attendance_id: pe.attendance_id,
+                hrms_id: `PROJECT_${project_id}_${pe.attendance_id}`,
+                name: pe.name,
+                department: pe.department || 'Admin',
+                weekly_off: pe.weekly_off || 'Sunday',
+                active: true,
+                _isProjectOverride: true
+            }))
+        ];
 
         // Create report run - count ALL active employees being analyzed
         const reportRun = await base44.asServiceRole.entities.ReportRun.create({
