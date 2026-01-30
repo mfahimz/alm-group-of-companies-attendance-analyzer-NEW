@@ -644,6 +644,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                 // If there's a manual override (no shift change), use those values directly and skip calculation
                 if (!dayOverride.shiftOverride && dayOverride.lateMinutes !== undefined) {
+                    // SICK_LEAVE override: skip all time calculations
+                    if (dayOverride.type === 'SICK_LEAVE') {
+                        continue;
+                    }
                     totalLateMinutes += dayOverride.lateMinutes;
                     if (dayOverride.earlyCheckoutMinutes !== undefined) {
                         totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
@@ -651,6 +655,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     if (dayOverride.otherMinutes !== undefined) {
                         totalOtherMinutes += dayOverride.otherMinutes;
                     }
+                    continue;
+                }
+                // SICK_LEAVE override without manual minutes: still skip time calculations
+                if (dayOverride.type === 'SICK_LEAVE') {
                     continue;
                 }
             }
