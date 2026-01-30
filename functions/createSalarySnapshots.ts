@@ -891,7 +891,8 @@ Deno.serve(async (req) => {
             
             // ALWAYS recalculate attendance from shifts + exceptions + punches
             // This ensures employees with no punches but with exceptions (annual leave, etc.) are computed correctly
-            calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to);
+            // For Al Maraghi Motors: pass assumedPresentDays for salary-only assumption
+            calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to, assumedPresentDays);
 
             if (hasAnalysisResult) {
                 attendanceSource = 'ANALYZED';
