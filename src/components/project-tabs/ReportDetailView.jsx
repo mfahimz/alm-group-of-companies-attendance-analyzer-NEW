@@ -637,6 +637,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     halfAbsenceCount++;
                 } else if (dayOverride.type === 'OFF') {
                     workingDays--;
+                } else if (dayOverride.type === 'SICK_LEAVE') {
+                    // Sick leave from day override: counts as working day, no LOP, no time calculations
+                    sickLeaveCount++;
                 }
 
                 // If there's a manual override (no shift change), use those values directly and skip calculation
@@ -1687,6 +1690,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 else if (dayOverride.type === 'MANUAL_ABSENT') status = 'Absent (Edited)';
                 else if (dayOverride.type === 'MANUAL_HALF') status = 'Half Day (Edited)';
                 else if (dayOverride.type === 'OFF') status = 'Off (Edited)';
+                else if (dayOverride.type === 'SICK_LEAVE') status = 'Sick Leave (Admin)';
 
                 if (dayOverride.lateMinutes !== undefined) {
                     lateMinutesTotal = dayOverride.lateMinutes;
