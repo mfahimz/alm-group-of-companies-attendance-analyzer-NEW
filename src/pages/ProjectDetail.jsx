@@ -219,14 +219,15 @@ export default function ProjectDetail() {
                                     <Label className="text-sm font-semibold text-blue-900 mb-2 block">
                                         Salary/Deduction Divisor (Days)
                                     </Label>
-                                    <div className="flex gap-2">
+                                    <div className="flex items-center gap-2">
                                         <Input
                                             type="number"
                                             min="1"
                                             value={salaryCalcDays}
                                             onChange={(e) => setSalaryCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
-                                            className="max-w-[100px]"
+                                            className="w-20"
                                         />
+                                        <span className="text-sm text-blue-700 font-medium">days</span>
                                         <Button
                                             onClick={() => updateSalaryCalculationDaysMutation.mutate(salaryCalcDays)}
                                             disabled={updateSalaryCalculationDaysMutation.isPending || salaryCalcDays === (project?.salary_calculation_days || 30)}
@@ -244,16 +245,17 @@ export default function ProjectDetail() {
                                 {/* DIVISOR_OT */}
                                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                                     <Label className="text-sm font-semibold text-orange-900 mb-2 block">
-                                        OT Divisor (Days)
+                                        OT / Previous Month Divisor (Days)
                                     </Label>
-                                    <div className="flex gap-2">
+                                    <div className="flex items-center gap-2">
                                         <Input
                                             type="number"
                                             min="1"
                                             value={otCalcDays}
                                             onChange={(e) => setOtCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
-                                            className="max-w-[100px]"
+                                            className="w-20"
                                         />
+                                        <span className="text-sm text-orange-700 font-medium">days</span>
                                         <Button
                                             onClick={() => updateOtCalculationDaysMutation.mutate(otCalcDays)}
                                             disabled={updateOtCalculationDaysMutation.isPending || otCalcDays === (project?.ot_calculation_days || 30)}
@@ -264,7 +266,7 @@ export default function ProjectDetail() {
                                         </Button>
                                     </div>
                                     <p className="text-xs text-orange-700 mt-2">
-                                        Used for: Normal OT Salary, Special OT Salary
+                                        Used for: OT Salary, Prev Month LOP Days, Prev Month Deductible Minutes
                                     </p>
                                 </div>
                             </div>
