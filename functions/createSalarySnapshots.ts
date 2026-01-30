@@ -63,6 +63,20 @@ Deno.serve(async (req) => {
         let extraPrevMonthTo = null;
         let hasExtraPrevMonthRange = false;
 
+        // ============================================================
+        // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS (Last 2 days of month)
+        // Per payroll rules, the last 2 days of the salary month are treated
+        // as FULLY PRESENT for salary calculation only:
+        // - No LOP days
+        // - No late minutes  
+        // - No early checkout minutes
+        // - No other minutes
+        // - No deductible minutes
+        // This does NOT affect attendance data (runAnalysis.js).
+        // Exception: If employee has ANNUAL_LEAVE on those days, honor the leave.
+        // ============================================================
+        let assumedPresentDays = [];
+        
         if (isAlMaraghi) {
             const projectDateTo = new Date(project.date_to);
             const salaryMonthStart = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth(), 1);
@@ -70,6 +84,18 @@ Deno.serve(async (req) => {
             
             salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
             salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
+
+            // Calculate assumed present days: last 2 days of salary month
+            // Day before end of month (e.g., Jan 30)
+            const assumedDay1 = new Date(projectDateTo);
+            assumedDay1.setDate(assumedDay1.getDate() - 1);
+            // Last day of month (e.g., Jan 31)
+            const assumedDay2 = new Date(projectDateTo);
+            
+            assumedPresentDays = [
+                assumedDay1.toISOString().split('T')[0],
+                assumedDay2.toISOString().split('T')[0]
+            ];
 
             // Extra previous month range
             const projectDateFrom = new Date(project.date_from);
@@ -87,7 +113,8 @@ Deno.serve(async (req) => {
                 salary_month_end: salaryMonthEndStr,
                 extra_prev_month_from: extraPrevMonthFrom,
                 extra_prev_month_to: extraPrevMonthTo,
-                has_extra_range: hasExtraPrevMonthRange
+                has_extra_range: hasExtraPrevMonthRange,
+                assumed_present_days: assumedPresentDays
             });
         }
 
