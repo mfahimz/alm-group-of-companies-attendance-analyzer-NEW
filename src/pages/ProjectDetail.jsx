@@ -23,8 +23,17 @@ import { Label } from '@/components/ui/label';
 export default function ProjectDetail() {
   const urlParams = new URLSearchParams(window.location.search);
   const projectId = urlParams.get('id');
-  const [activeTab, setActiveTab] = useState('overview');
+  const tabFromUrl = urlParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || 'overview');
   const navigate = useNavigate();
+
+  // Update URL when tab changes (without full page reload)
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('tab', newTab);
+    window.history.replaceState({}, '', newUrl.toString());
+  };
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -278,7 +287,7 @@ export default function ProjectDetail() {
             {isDepartmentHead ? (
                 <ReportTab project={project} isDepartmentHead={true} />
             ) : (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl -mx-6 px-6 py-3 border-b border-slate-200">
                     <TabsList className="bg-white shadow-lg rounded-2xl p-1.5 flex flex-wrap h-auto gap-1 w-full sm:w-auto border-0">
                         <TabsTrigger

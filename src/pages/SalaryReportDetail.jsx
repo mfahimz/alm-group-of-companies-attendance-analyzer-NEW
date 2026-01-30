@@ -495,7 +495,7 @@ export default function SalaryReportDetail() {
         <div className="max-w-full mx-auto space-y-6">
             <Breadcrumb items={[
                 { label: 'Projects', href: 'Projects' },
-                { label: project?.name || 'Project', href: `ProjectDetail?id=${project?.id}` },
+                { label: project?.name || 'Project', href: `ProjectDetail?id=${project?.id}&tab=salary` },
                 { label: report?.report_name || 'Salary Report' }
             ]} />
 
