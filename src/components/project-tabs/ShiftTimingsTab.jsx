@@ -77,10 +77,35 @@ export default function ShiftTimingsTab({ project }) {
         return `${hours}:${minutes} ${period}`;
     };
 
-    const { data: employees = [] } = useQuery({
+    const { data: masterEmployees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
+
+    // Fetch project-specific employee overrides
+    const { data: projectEmployees = [] } = useQuery({
+        queryKey: ['projectEmployees', project.id],
+        queryFn: () => base44.entities.ProjectEmployee.filter({ project_id: project.id })
+    });
+
+    // Combine master employees with project overrides for lookups
+    const employees = React.useMemo(() => {
+        const combined = [...masterEmployees];
+        for (const pe of projectEmployees) {
+            // Only add if not already in master list
+            if (!masterEmployees.some(e => String(e.attendance_id) === String(pe.attendance_id))) {
+                combined.push({
+                    id: pe.id,
+                    attendance_id: pe.attendance_id,
+                    name: pe.name,
+                    department: pe.department || 'Admin',
+                    weekly_off: pe.weekly_off || 'Sunday',
+                    _isProjectOverride: true
+                });
+            }
+        }
+        return combined;
+    }, [masterEmployees, projectEmployees]);
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
