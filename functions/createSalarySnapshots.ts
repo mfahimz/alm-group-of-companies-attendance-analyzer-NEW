@@ -767,20 +767,26 @@ Deno.serve(async (req) => {
                 totalExtraDeductibleMinutes += dayDeductible;
             }
 
-            // Calculate previous month monetary values using OT Divisor
-            // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
-            const extraLopPay = extraLopDays > 0 ? (totalSalaryAmount / otDivisor) * extraLopDays : 0;
+            // Calculate previous month monetary values
+            // For the days divisor, use the number of days in the previous month (last day of prev month)
+            // e.g., if project is 29/12/2025 → 29/01/2026, prev month range is 29/12-31/12, divisor = 31 (Dec has 31 days)
+            const prevMonthLastDay = new Date(extraPrevMonthTo);
+            const daysInPrevMonth = prevMonthLastDay.getDate(); // This gives us the last day number (e.g., 31 for Dec)
             
-            // Previous month Deductible Hours Pay = (Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60)
+            // Previous month LOP Pay = (Total Salary / Days in Previous Month) * Extra LOP Days
+            const extraLopPay = extraLopDays > 0 ? (totalSalaryAmount / daysInPrevMonth) * extraLopDays : 0;
+            
+            // Previous month Deductible Hours Pay = (Total Salary / Days in Previous Month / Working Hours) * (Extra Deductible Minutes / 60)
             const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
-            const otHourlyRate = totalSalaryAmount / otDivisor / workingHours;
-            const extraDeductibleHoursPay = otHourlyRate * extraDeductibleHours;
+            const prevMonthHourlyRate = totalSalaryAmount / daysInPrevMonth / workingHours;
+            const extraDeductibleHoursPay = prevMonthHourlyRate * extraDeductibleHours;
 
             return {
                 extraDeductibleMinutes: totalExtraDeductibleMinutes,
                 extraLopDays: extraLopDays,
                 extraLopPay: Math.round(extraLopPay * 100) / 100,
-                extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay * 100) / 100
+                extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay * 100) / 100,
+                prevMonthDivisor: daysInPrevMonth
             };
         };
 
