@@ -524,6 +524,7 @@ export default function SalaryReportDetail() {
                                     {report.date_from} to {report.date_to} • {report.employee_count} employees • {report.company}
                                     {report.salary_divisor && <span className="ml-2">• Salary Divisor: {report.salary_divisor}</span>}
                                     {report.ot_divisor && <span className="ml-2">• OT Divisor: {report.ot_divisor}</span>}
+                                    {salaryData[0]?.prev_month_divisor > 0 && <span className="ml-2">• Prev Month Divisor: {salaryData[0]?.prev_month_divisor}</span>}
                                 </p>
                             </div>
                             <div className="flex gap-2">
