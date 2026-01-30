@@ -22,7 +22,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [editingDay, setEditingDay] = useState(null);
     const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
-    const [sort, setSort] = useState({ key: 'full_absence_count', direction: 'desc' });
+    const [sort, setSort] = useState({ key: 'deductible_minutes', direction: 'desc' });
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -889,6 +889,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 
                 let aVal = a[sort.key];
                 let bVal = b[sort.key];
+                
+                // For deductible sorting, use late + early (before grace deduction)
+                if (sort.key === 'deductible_minutes') {
+                    aVal = (a.late_minutes || 0) + (a.early_checkout_minutes || 0);
+                    bVal = (b.late_minutes || 0) + (b.early_checkout_minutes || 0);
+                }
                 
                 // Handle null/undefined values - push them to the end
                 if (aVal == null && bVal == null) return 0;
