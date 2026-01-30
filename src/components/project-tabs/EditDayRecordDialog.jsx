@@ -428,7 +428,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const updatePayload = {
                 day_overrides: JSON.stringify(overrides)
             };
-            
+
             // Only include abnormal_dates if not empty
             if (updatedTotals.abnormal_dates && updatedTotals.abnormal_dates.length > 0) {
                 updatePayload.abnormal_dates = updatedTotals.abnormal_dates;
@@ -439,6 +439,41 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             console.log('🔧 Analysis Result attendance_id type:', typeof analysisResult.attendance_id, analysisResult.attendance_id);
 
             await base44.entities.AnalysisResult.update(analysisResult.id, updatePayload);
+
+            // If admin sets SICK_LEAVE, also create an actual Exception record
+            if (data.type === 'SICK_LEAVE') {
+                const [day, month, year] = dayRecord.date.split('/');
+                const exceptionDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                // Check if a SICK_LEAVE exception already exists for this date/employee
+                const existingSickLeave = await base44.entities.Exception.filter({
+                    project_id: project.id,
+                    attendance_id: String(attendanceId),
+                    type: 'SICK_LEAVE'
+                });
+
+                const alreadyHasSickLeave = existingSickLeave.some(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    const targetDate = new Date(exceptionDateStr);
+                    return targetDate >= exFrom && targetDate <= exTo;
+                });
+
+                if (!alreadyHasSickLeave) {
+                    await base44.entities.Exception.create({
+                        project_id: project.id,
+                        attendance_id: String(attendanceId),
+                        date_from: exceptionDateStr,
+                        date_to: exceptionDateStr,
+                        type: 'SICK_LEAVE',
+                        details: data.details || 'Admin override from report',
+                        use_in_analysis: true,
+                        approval_status: 'approved',
+                        created_from_report: true,
+                        report_run_id: analysisResult.report_run_id
+                    });
+                }
+            }
 
             // Log the edit to audit trail
             const changes = [];
