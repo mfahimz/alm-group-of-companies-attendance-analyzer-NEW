@@ -948,6 +948,7 @@ Deno.serve(async (req) => {
                 working_days: calculated.workingDays,
                 salary_divisor: divisor,
                 ot_divisor: otDivisor,
+                prev_month_divisor: extraPrevMonthData.prevMonthDivisor || 0,
                 present_days: calculated.presentDays,
                 full_absence_count: calculated.fullAbsenceCount,
                 annual_leave_count: calculated.annualLeaveCount,
