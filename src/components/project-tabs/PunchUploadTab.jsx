@@ -154,12 +154,12 @@ export default function PunchUploadTab({ project }) {
                         }
                     }
                     // Naser Mohsin Auto Parts format: ID, FirstName, Date, Time (4 columns)
-                    // Date format: MM/DD/YYYY
+                    // Date format: DD/MM/YYYY (Day/Month/Year)
                     else if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
                         let dateStr = values[2].trim();
                         let timeStr = values[3].trim();
                         
-                        // Parse date - expecting MM/DD/YYYY format
+                        // Parse date - expecting DD/MM/YYYY format (Day/Month/Year)
                         let day, month, year;
                         
                         // Check if date is in YYYY-MM-DD format
@@ -167,14 +167,14 @@ export default function PunchUploadTab({ project }) {
                         if (isoDateMatch) {
                             [, year, month, day] = isoDateMatch;
                         } else {
-                            // Parse as MM/DD/YYYY (Naser Mohsin format)
-                            const mmddyyyyMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                            if (mmddyyyyMatch) {
-                                [, month, day, year] = mmddyyyyMatch;
+                            // Parse as DD/MM/YYYY (Naser Mohsin format - Day/Month/Year)
+                            const ddmmyyyyMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                            if (ddmmyyyyMatch) {
+                                [, day, month, year] = ddmmyyyyMatch;
                             }
                         }
                         
-                        // Convert to DD/MM/YYYY for display
+                        // Keep DD/MM/YYYY for display
                         if (day && month && year) {
                             dateStr = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
                             punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
