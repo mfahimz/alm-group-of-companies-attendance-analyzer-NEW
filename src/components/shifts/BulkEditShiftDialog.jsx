@@ -22,32 +22,37 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
     const bulkUpdateMutation = useMutation({
         mutationFn: async () => {
             const updateData = {};
-            if (updates.am_start.enabled) updateData.am_start = updates.am_start.value;
-            if (updates.am_end.enabled) updateData.am_end = updates.am_end.value;
-            if (updates.pm_start.enabled) updateData.pm_start = updates.pm_start.value;
-            if (updates.pm_end.enabled) updateData.pm_end = updates.pm_end.value;
+            if (updates.am_start.enabled && updates.am_start.value) updateData.am_start = updates.am_start.value;
+            if (updates.am_end.enabled && updates.am_end.value) updateData.am_end = updates.am_end.value;
+            if (updates.pm_start.enabled && updates.pm_start.value) updateData.pm_start = updates.pm_start.value;
+            if (updates.pm_end.enabled && updates.pm_end.value) updateData.pm_end = updates.pm_end.value;
             if (updates.applicable_days.enabled) {
                 updateData.applicable_days = company === 'Naser Mohsin Auto Parts' 
                     ? JSON.stringify(updates.applicable_days.value)
                     : updates.applicable_days.value.join(', ');
             }
 
-            await Promise.all(
-                selectedShifts.map(shift => 
-                    base44.entities.ShiftTiming.update(shift.id, {
-                        ...updateData,
-                        attendance_id: String(shift.attendance_id)
-                    })
-                )
-            );
+            // Check if there's anything to update
+            if (Object.keys(updateData).length === 0) {
+                throw new Error('No fields selected to update');
+            }
+
+            // Update shifts sequentially to avoid rate limiting
+            for (const shift of selectedShifts) {
+                await base44.entities.ShiftTiming.update(shift.id, {
+                    ...updateData,
+                    attendance_id: String(shift.attendance_id)
+                });
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', projectId]);
             toast.success(`${selectedShifts.length} shifts updated`);
             onClose();
         },
-        onError: () => {
-            toast.error('Failed to update shifts');
+        onError: (error) => {
+            console.error('Bulk update error:', error);
+            toast.error('Failed to update shifts: ' + (error.message || 'Unknown error'));
         }
     });
 
