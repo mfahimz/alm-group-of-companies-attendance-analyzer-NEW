@@ -22,7 +22,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [editingDay, setEditingDay] = useState(null);
     const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
-    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [sort, setSort] = useState({ key: 'full_absence_count', direction: 'desc' });
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -886,6 +886,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 let aVal = a[sort.key];
                 let bVal = b[sort.key];
                 
+                // Handle null/undefined values - push them to the end
+                if (aVal == null && bVal == null) return 0;
+                if (aVal == null) return 1;
+                if (bVal == null) return -1;
+                
                 if (typeof aVal === 'string') aVal = aVal.toLowerCase();
                 if (typeof bVal === 'string') bVal = bVal.toLowerCase();
                 
@@ -893,7 +898,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
                 return 0;
             });
-    }, [enrichedResults, searchTerm, sort]);
+    }, [enrichedResults, searchTerm, riskFilter, sort]);
 
     const updateVerificationMutation = useMutation({
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
