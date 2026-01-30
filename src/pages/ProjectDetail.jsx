@@ -275,7 +275,7 @@ export default function ProjectDetail() {
                                         </Button>
                                     </div>
                                     <p className="text-xs text-orange-700 mt-2">
-                                        Used for: OT Salary, Prev Month LOP Days, Prev Month Deductible Minutes
+                                        Used for: OT Salary calculations only. Previous month uses calendar days of that month.
                                     </p>
                                 </div>
                             </div>
