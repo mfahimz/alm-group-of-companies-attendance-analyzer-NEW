@@ -280,8 +280,9 @@ export default function ShiftTimingsTab({ project }) {
                     }
 
                     const employeeExists = employees.some(e => String(e.attendance_id) === String(attendance_id));
-                    if (!employeeExists) {
-                        newWarnings.push(`Unknown employee: ${attendance_id}`);
+                    const isProjectOverride = projectEmployees.some(pe => String(pe.attendance_id) === String(attendance_id));
+                    if (!employeeExists && !isProjectOverride) {
+                        newWarnings.push(`Unknown employee: ${attendance_id} (add via Employee Overrides)`);
                     }
 
                     // Validate times
