@@ -173,7 +173,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
-            // Standard format without seconds
+            // Standard format with AM/PM
             let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
@@ -188,6 +188,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return date;
             }
 
+            // Handle timestamp_raw format: "1/16/2026 8:37" or "1/16/2026 14:28" (24-hour without AM/PM)
+            // Extract time part from date/time string
+            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (dateTimeMatch) {
+                const hours = parseInt(dateTimeMatch[1]);
+                const minutes = parseInt(dateTimeMatch[2]);
+                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
+
+                const date = new Date();
+                date.setHours(hours, minutes, seconds, 0);
+                return date;
+            }
+
+            // Pure 24-hour format: "8:37" or "14:28" or "8:37:00"
             timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
