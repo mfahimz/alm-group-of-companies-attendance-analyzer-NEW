@@ -1695,9 +1695,22 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     const matchWithSeconds = ts.match(/(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))/i);
                     if (matchWithSeconds) return matchWithSeconds[1];
                 }
-                // Standard format without seconds
+                // Standard format with AM/PM
                 const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
-                return match ? match[1] : ts;
+                if (match) return match[1];
+                
+                // Handle format like "12/29/2025 8:41" or "1/16/2026 14:28" (date + 24hr time)
+                const dateTimeMatch = ts.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})/);
+                if (dateTimeMatch) {
+                    let hours = parseInt(dateTimeMatch[1]);
+                    const minutes = dateTimeMatch[2];
+                    const period = hours >= 12 ? 'PM' : 'AM';
+                    if (hours > 12) hours -= 12;
+                    if (hours === 0) hours = 12;
+                    return `${hours}:${minutes} ${period}`;
+                }
+                
+                return ts;
             };
 
             // If exception has manual minutes, use them exclusively (not added to calculations)
