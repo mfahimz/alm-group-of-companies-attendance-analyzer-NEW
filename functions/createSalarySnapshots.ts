@@ -352,6 +352,34 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
+                // ============================================================
+                // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS LOGIC
+                // If this day is in assumedDays array, treat as fully present
+                // UNLESS employee has ANNUAL_LEAVE on this day
+                // ============================================================
+                const isAssumedPresentDay = assumedDays.includes(dateStr);
+                
+                if (isAssumedPresentDay) {
+                    // Check if employee has annual leave on this assumed day
+                    const hasAnnualLeaveOnAssumedDay = employeeExceptions.some(ex => {
+                        if (ex.type !== 'ANNUAL_LEAVE') return false;
+                        try {
+                            const exFrom = new Date(ex.date_from);
+                            const exTo = new Date(ex.date_to);
+                            return currentDate >= exFrom && currentDate <= exTo;
+                        } catch { return false; }
+                    });
+                    
+                    if (!hasAnnualLeaveOnAssumedDay) {
+                        // Assumed present: count as working day, present day, NO deductions
+                        workingDays++;
+                        presentDays++;
+                        // Skip all other processing for this day - no late/early/absence tracking
+                        continue;
+                    }
+                    // If annual leave exists, fall through to normal processing
+                }
+
                 // Get ALL matching exceptions for this date BEFORE incrementing workingDays
                 // This allows PUBLIC_HOLIDAY to completely skip the day
                 const matchingExceptions = employeeExceptions.filter(ex => {
