@@ -232,23 +232,14 @@ Deno.serve(async (req) => {
         // Leave Pay = (Total Salary / Divisor) * Leave Days
         const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
         
-        // Salary Leave Amount calculation with working hours adjustment
+        // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
+        // Same formula for all employees regardless of working hours
         let salaryLeaveAmount = 0;
         const salaryLeaveDays = attendanceValues.salary_leave_days || attendanceValues.annual_leave_count;
         
         if (salaryLeaveDays > 0) {
-            if (workingHours === 8) {
-                // For 8-hour employees: (Total Salary / Divisor) * Annual Leave Count
-                salaryLeaveAmount = (totalSalary / divisor) * salaryLeaveDays;
-            } else if (workingHours === 9) {
-                // For 9-hour employees: (Total Salary * 0.8767 / Divisor) * Annual Leave Count
-                const adjustedSalary = totalSalary * 0.8767;
-                salaryLeaveAmount = (adjustedSalary / divisor) * salaryLeaveDays;
-            } else {
-                // Default to standard calculation
-                const salaryForLeave = basicSalary + allowances;
-                salaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
-            }
+            const salaryForLeave = basicSalary + allowances;
+            salaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
         }
         
         // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
