@@ -566,11 +566,14 @@ Deno.serve(async (req) => {
 
         // ============================================================
         // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
-        // Uses otDivisor for previous month calculations
+        // - Extra Deduct Min (PM): Sum of (late + early + other) for all days in prev month range
+        // - Grace is applied ONCE for the whole range (not per day)
+        // - Extra LOP Days (PM): Only check the LAST DAY of prev month (e.g., 31/12)
+        // - Divisor: Uses OT Divisor (project.ot_calculation_days)
         // ============================================================
-        const calculateExtraPrevMonthData = (emp, graceMinutesPerDay, totalSalaryAmount, workingHours) => {
+        const calculateExtraPrevMonthData = (emp, graceMinutes, totalSalaryAmount, workingHours) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) {
-                return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0 };
+                return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
             }
 
             const attendanceIdStr = String(emp.attendance_id);
@@ -593,8 +596,15 @@ Deno.serve(async (req) => {
                 'Thursday': 4, 'Friday': 5, 'Saturday': 6
             };
 
-            let totalExtraDeductibleMinutes = 0;
-            let extraLopDays = 0;  // LOP days from previous month range
+            // Accumulate raw time issues for the entire prev month range
+            let totalLateMinutes = 0;
+            let totalEarlyMinutes = 0;
+            let totalOtherMinutes = 0;
+            let totalApprovedMinutes = 0;
+            
+            // LOP: Only check the LAST day of prev month range
+            let extraLopDays = 0;
+            const lastDayOfPrevMonth = extraPrevMonthTo; // e.g., "2025-12-31"
 
             const startDate = new Date(extraPrevMonthFrom);
             const endDate = new Date(extraPrevMonthTo);
@@ -603,6 +613,7 @@ Deno.serve(async (req) => {
                 const currentDate = new Date(d);
                 const dateStr = currentDate.toISOString().split('T')[0];
                 const dayOfWeek = currentDate.getUTCDay();
+                const isLastDayOfPrevMonth = (dateStr === lastDayOfPrevMonth);
 
                 // Check weekly off
                 let weeklyOffDay = null;
@@ -634,9 +645,11 @@ Deno.serve(async (req) => {
                     ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
                     : null;
 
-                // Handle MANUAL_ABSENT as LOP for previous month
+                // Handle MANUAL_ABSENT - only count as LOP if it's the last day of prev month
                 if (dateException && dateException.type === 'MANUAL_ABSENT') {
-                    extraLopDays++;
+                    if (isLastDayOfPrevMonth) {
+                        extraLopDays = 1;
+                    }
                     continue;
                 }
 
@@ -646,10 +659,14 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
-                // Get punches for this day - NO PUNCHES = LOP day (strict rule for previous month)
+                // Get punches for this day
                 const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+                
+                // NO PUNCHES: Only count as LOP if it's the last day of prev month
                 if (rawDayPunches.length === 0) {
-                    extraLopDays++;
+                    if (isLastDayOfPrevMonth) {
+                        extraLopDays = 1;
+                    }
                     continue;
                 }
 
@@ -704,13 +721,12 @@ Deno.serve(async (req) => {
 
                 const dayPunches = filterMultiplePunches(rawDayPunches, includeSeconds);
 
-                // Track allowed minutes
+                // Track allowed/approved minutes for this day
                 let allowedMinutesForDay = 0;
-                let approvedMinutesForDay = 0;
                 if (dateException && dateException.type === 'ALLOWED_MINUTES' && 
                     dateException.approval_status === 'approved_dept_head') {
                     allowedMinutesForDay = dateException.allowed_minutes || 0;
-                    approvedMinutesForDay = allowedMinutesForDay;
+                    totalApprovedMinutes += allowedMinutesForDay;
                 }
 
                 const hasManualTimeException = dateException && (
@@ -744,41 +760,31 @@ Deno.serve(async (req) => {
                             dayEarlyMinutes += Math.round((shiftTime - punchTime) / (1000 * 60));
                         }
                     }
-                    
-                    if (allowedMinutesForDay > 0) {
-                        const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                        const excessMinutes = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                        if (totalDayMinutes > 0 && excessMinutes > 0) {
-                            const lateRatio = dayLateMinutes / totalDayMinutes;
-                            const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                            dayLateMinutes = Math.round(excessMinutes * lateRatio);
-                            dayEarlyMinutes = Math.round(excessMinutes * earlyRatio);
-                        } else {
-                            dayLateMinutes = 0;
-                            dayEarlyMinutes = 0;
-                        }
-                    }
                 }
 
-                // dayDeductible = max(0, late + early + other - grace - approved)
-                const dayDeductible = Math.max(0, 
-                    dayLateMinutes + dayEarlyMinutes + dayOtherMinutes - graceMinutesPerDay - approvedMinutesForDay
-                );
-                totalExtraDeductibleMinutes += dayDeductible;
+                // Accumulate raw time issues (no grace applied per day)
+                totalLateMinutes += dayLateMinutes;
+                totalEarlyMinutes += dayEarlyMinutes;
+                totalOtherMinutes += dayOtherMinutes;
             }
 
-            // Calculate previous month monetary values
-            // For the days divisor, use the number of days in the previous month (last day of prev month)
-            // e.g., if project is 29/12/2025 → 29/01/2026, prev month range is 29/12-31/12, divisor = 31 (Dec has 31 days)
-            const prevMonthLastDay = new Date(extraPrevMonthTo);
-            const daysInPrevMonth = prevMonthLastDay.getDate(); // This gives us the last day number (e.g., 31 for Dec)
+            // Calculate deductible minutes for the ENTIRE prev month range
+            // Grace is applied ONCE for the whole range (not per day)
+            // Formula: max(0, totalLate + totalEarly + totalOther - grace - approved)
+            const totalExtraDeductibleMinutes = Math.max(0, 
+                totalLateMinutes + totalEarlyMinutes + totalOtherMinutes - graceMinutes - totalApprovedMinutes
+            );
+
+            // Calculate previous month monetary values using OT Divisor
+            // Divisor = project.ot_calculation_days (NOT calendar days)
+            const prevMonthDivisor = otDivisor;
             
-            // Previous month LOP Pay = (Total Salary / Days in Previous Month) * Extra LOP Days
-            const extraLopPay = extraLopDays > 0 ? (totalSalaryAmount / daysInPrevMonth) * extraLopDays : 0;
+            // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
+            const extraLopPay = extraLopDays > 0 ? (totalSalaryAmount / prevMonthDivisor) * extraLopDays : 0;
             
-            // Previous month Deductible Hours Pay = (Total Salary / Days in Previous Month / Working Hours) * (Extra Deductible Minutes / 60)
+            // Previous month Deductible Hours Pay = (Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60)
             const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
-            const prevMonthHourlyRate = totalSalaryAmount / daysInPrevMonth / workingHours;
+            const prevMonthHourlyRate = totalSalaryAmount / prevMonthDivisor / workingHours;
             const extraDeductibleHoursPay = prevMonthHourlyRate * extraDeductibleHours;
 
             return {
@@ -786,7 +792,7 @@ Deno.serve(async (req) => {
                 extraLopDays: extraLopDays,
                 extraLopPay: Math.round(extraLopPay * 100) / 100,
                 extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay * 100) / 100,
-                prevMonthDivisor: daysInPrevMonth
+                prevMonthDivisor: prevMonthDivisor
             };
         };
 
