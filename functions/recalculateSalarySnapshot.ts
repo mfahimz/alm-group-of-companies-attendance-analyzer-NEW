@@ -256,13 +256,13 @@ Deno.serve(async (req) => {
         // OT Hourly Rate (uses OT Divisor)
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         
-        // Previous month calculations (uses prevMonthDivisor - days in that month) - Al Maraghi Motors only
-        // Previous month LOP Pay = (Total Salary / prevMonthDivisor) * Extra LOP Days
+        // Previous month calculations (uses OT Divisor) - Al Maraghi Motors only
+        // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
         const extraPrevMonthLopPay = attendanceValues.extra_prev_month_lop_days > 0 && prevMonthDivisor > 0
             ? (totalSalary / prevMonthDivisor) * attendanceValues.extra_prev_month_lop_days 
             : 0;
         
-        // Previous month Deductible Hours Pay = (Total Salary / prevMonthDivisor / workingHours) * (Extra Deductible Minutes / 60)
+        // Previous month Deductible Hours Pay = (Total Salary / OT Divisor / workingHours) * (Extra Deductible Minutes / 60)
         const prevMonthHourlyRate = prevMonthDivisor > 0 ? totalSalary / prevMonthDivisor / workingHours : 0;
         const extraPrevMonthDeductibleHours = attendanceValues.extra_prev_month_deductible_minutes / 60;
         const extraPrevMonthDeductibleHoursPay = prevMonthHourlyRate * extraPrevMonthDeductibleHours;
