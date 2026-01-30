@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Trash2, CheckCircle, Star } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, Star, Save } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
@@ -319,12 +319,20 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {run.is_final && (
-                                                        <Badge className="bg-green-100 text-green-700 border-green-300">
-                                                            <Star className="w-3 h-3 mr-1 fill-green-700" />
-                                                            Final Report
-                                                        </Badge>
-                                                    )}
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {run.is_final && (
+                                                            <Badge className="bg-green-100 text-green-700 border-green-300">
+                                                                <Star className="w-3 h-3 mr-1 fill-green-700" />
+                                                                Final
+                                                            </Badge>
+                                                        )}
+                                                        {project.last_saved_report_id === run.id && (
+                                                            <Badge className="bg-blue-100 text-blue-700 border-blue-300">
+                                                                <Save className="w-3 h-3 mr-1" />
+                                                                Saved
+                                                            </Badge>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex gap-1 justify-end">
