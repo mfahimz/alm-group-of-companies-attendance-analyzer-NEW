@@ -132,7 +132,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const deleteReportMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // Fetch and delete all associated data for this report
+            // Fetch all associated data for this report
             const [resultsToDelete, snapshotsToDelete] = await Promise.all([
                 base44.entities.AnalysisResult.filter({ 
                     project_id: project.id, 
@@ -144,13 +144,29 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 })
             ]);
             
-            // Delete all results and snapshots in parallel
-            const deletePromises = [
-                ...resultsToDelete.map(r => base44.entities.AnalysisResult.delete(r.id)),
-                ...snapshotsToDelete.map(s => base44.entities.SalarySnapshot.delete(s.id))
-            ];
+            // Delete in batches of 5 with delays to avoid rate limiting
+            const BATCH_SIZE = 5;
+            const DELAY_MS = 200;
             
-            await Promise.all(deletePromises);
+            const deleteInBatches = async (items, deleteFunc) => {
+                for (let i = 0; i < items.length; i += BATCH_SIZE) {
+                    const batch = items.slice(i, i + BATCH_SIZE);
+                    await Promise.all(batch.map(item => deleteFunc(item.id)));
+                    if (i + BATCH_SIZE < items.length) {
+                        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+                    }
+                }
+            };
+            
+            // Delete results first
+            if (resultsToDelete.length > 0) {
+                await deleteInBatches(resultsToDelete, (id) => base44.entities.AnalysisResult.delete(id));
+            }
+            
+            // Then delete snapshots
+            if (snapshotsToDelete.length > 0) {
+                await deleteInBatches(snapshotsToDelete, (id) => base44.entities.SalarySnapshot.delete(id));
+            }
             
             // Finally, delete the report run itself
             await base44.entities.ReportRun.delete(reportRunId);
@@ -161,8 +177,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id] });
             toast.success('Report and associated salary data deleted successfully');
         },
-        onError: () => {
-            toast.error('Failed to delete report');
+        onError: (error) => {
+            console.error('[ReportTab] Delete error:', error);
+            toast.error('Failed to delete report: ' + (error.message || 'Unknown error'));
         }
     });
 
