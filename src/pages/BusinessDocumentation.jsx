@@ -484,6 +484,45 @@ export default function BusinessDocumentation() {
                         <li>System prevents finalization if any employee is missing salary data</li>
                     </ul>
 
+                    <h3 className="text-xl font-semibold mt-6">Assumed Present Days (Al Maraghi Motors Only)</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-900 mb-2">🔒 Locked Payroll Rule</h4>
+                        <p className="text-sm text-blue-800 mb-3">
+                            For Al Maraghi Motors projects, the <strong>last 2 days of the salary month</strong> are automatically treated as 
+                            <strong> fully present</strong> for salary calculation purposes. This rule exists because attendance data may not be 
+                            available for those days at the time of payroll processing.
+                        </p>
+                        
+                        <h5 className="font-semibold text-blue-900 mt-3 mb-2">How It Works:</h5>
+                        <ul className="text-sm text-blue-800">
+                            <li>The last 2 days of the month (e.g., Jan 30 & Jan 31 for January payroll) are assumed present</li>
+                            <li>No LOP deduction occurs for those days</li>
+                            <li>No late minutes, early checkout minutes, or other deductions for those days</li>
+                            <li>Employee is treated as fully paid and clean for those days</li>
+                        </ul>
+                        
+                        <h5 className="font-semibold text-blue-900 mt-3 mb-2">Exception - Annual Leave:</h5>
+                        <p className="text-sm text-blue-800">
+                            If an employee has <strong>Annual Leave</strong> scheduled on one of the assumed days, the annual leave takes precedence. 
+                            The assumption does NOT override existing annual leave exceptions.
+                        </p>
+                        
+                        <h5 className="font-semibold text-blue-900 mt-3 mb-2">What This Does NOT Affect:</h5>
+                        <ul className="text-sm text-blue-800">
+                            <li><strong>Attendance Data:</strong> The actual punch records and attendance analysis remain unchanged</li>
+                            <li><strong>Attendance Reports:</strong> Reports still show real attendance data for those days</li>
+                            <li><strong>Punches or Exceptions:</strong> No fake punches or exceptions are created</li>
+                            <li><strong>Other Companies:</strong> This rule applies ONLY to Al Maraghi Motors</li>
+                        </ul>
+                        
+                        <h5 className="font-semibold text-blue-900 mt-3 mb-2">Carry-Forward Rule:</h5>
+                        <p className="text-sm text-blue-800">
+                            Any actual deductions that occur on assumed days (real late arrivals, absences) will naturally be captured 
+                            and deducted in the <strong>next month's salary calculation</strong> when the attendance data becomes available. 
+                            This prevents double-deductions and maintains audit integrity.
+                        </p>
+                    </div>
+
                     <h3 className="text-xl font-semibold mt-6">How Deductions are Controlled and Reviewed</h3>
                     <p>
                         Multiple safeguards exist to prevent incorrect deductions:
