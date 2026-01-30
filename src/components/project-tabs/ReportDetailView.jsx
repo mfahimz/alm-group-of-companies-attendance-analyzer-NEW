@@ -1229,13 +1229,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
+    // Helper to convert minutes to hours (decimal format, 2 decimal places)
+    const minutesToHours = (minutes) => {
+        if (!minutes || minutes === 0) return 0;
+        return Math.round((minutes / 60) * 100) / 100; // e.g., 90 min = 1.50 hrs
+    };
+
     const exportToExcel = () => {
         if (filteredResults.length === 0) {
             toast.error('No data to export');
             return;
         }
 
-        // Build headers matching the visible table columns
+        // Build headers matching the visible table columns - using Hours instead of Minutes
         const headers = [
             'Attendance ID',
             'Name',
@@ -1246,12 +1252,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             'Sick Leave',
             'LOP Days',
             'Half Days',
-            'Late Minutes',
-            'Early Checkout',
-            ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved Minutes'] : []),
-            'Other Minutes',
-            'Grace',
-            'Deductible',
+            'Late (Hours)',
+            'Early Checkout (Hours)',
+            ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
+            'Other (Hours)',
+            'Grace (Hours)',
+            'Deductible (Hours)',
             'Notes'
         ];
 
@@ -1272,19 +1278,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 r.manual_sick_leave_count ?? r.sick_leave_count ?? 0,
                 r.manual_full_absence_count ?? r.full_absence_count,
                 r.half_absence_count || 0,
-                r.late_minutes || 0,
-                r.early_checkout_minutes || 0
+                minutesToHours(late),
+                minutesToHours(early)
             ];
 
             // Add approved minutes only if company allows it
             if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
-                baseRow.push(r.approved_minutes || 0);
+                baseRow.push(minutesToHours(r.approved_minutes || 0));
             }
 
             baseRow.push(
-                r.other_minutes || 0,
-                grace,
-                deductible,
+                minutesToHours(r.other_minutes || 0),
+                minutesToHours(grace),
+                minutesToHours(deductible),
                 r.notes || ''
             );
 
