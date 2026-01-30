@@ -39,9 +39,9 @@ export default function EmployeeSelectionDialog({ open, onOpenChange, company, o
     const employeesToSearch = searchAllCompanies ? allActiveEmployees : companyEmployees;
     
     const filteredEmployees = employeesToSearch.filter(e =>
-        e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.hrms_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.attendance_id.toLowerCase().includes(searchTerm.toLowerCase())
+        (e.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(e.hrms_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(e.attendance_id || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const toggleEmployee = (hrmsId) => {
