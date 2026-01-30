@@ -296,7 +296,8 @@ Deno.serve(async (req) => {
         };
 
         // RECALCULATE attendance for each employee (same logic as UI)
-        const recalculateEmployeeAttendance = (emp, dateFrom, dateTo) => {
+        // For Al Maraghi Motors: assumedPresentDays are treated as fully present for salary
+        const recalculateEmployeeAttendance = (emp, dateFrom, dateTo, assumedDays = []) => {
             const attendanceIdStr = String(emp.attendance_id);
             const includeSeconds = project.company === 'Al Maraghi Automotive';
             
