@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Lock, Copy, Trash2, Calendar, Users, AlertCircle, FileText, Pencil, CheckCircle } from 'lucide-react';
+import { Lock, Copy, Trash2, Calendar, Users, AlertCircle, FileText, Pencil, CheckCircle, UserPlus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
@@ -15,9 +15,11 @@ import { createPageUrl } from '../../utils';
 import AnomalyDetectionCard from './AnomalyDetectionCard';
 import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
 import CloseProjectDialog from './CloseProjectDialog';
+import ProjectEmployeeOverrideDialog from '../projects/ProjectEmployeeOverrideDialog';
 
 export default function OverviewTab({ project }) {
     const [showCloseDialog, setShowCloseDialog] = useState(false);
+    const [showEmployeeOverrideDialog, setShowEmployeeOverrideDialog] = useState(false);
 
     const { data: lastSavedReport } = useQuery({
         queryKey: ['lastSavedReport', project.last_saved_report_id],
@@ -71,7 +73,22 @@ export default function OverviewTab({ project }) {
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
+    // Fetch project-specific employee overrides
+    const { data: projectEmployees = [] } = useQuery({
+        queryKey: ['projectEmployees', project.id],
+        queryFn: () => base44.entities.ProjectEmployee.filter({ project_id: project.id })
+    });
+
     const uniqueEmployees = new Set(punches.map(p => String(p.attendance_id))).size;
+
+    // Check for unmatched attendance IDs
+    const unmatchedCount = React.useMemo(() => {
+        if (!punches.length) return 0;
+        const masterIds = new Set(employees.map(e => String(e.attendance_id)));
+        const projectIds = new Set(projectEmployees.map(e => String(e.attendance_id)));
+        const punchIds = new Set(punches.map(p => String(p.attendance_id)));
+        return Array.from(punchIds).filter(id => !masterIds.has(id) && !projectIds.has(id)).length;
+    }, [punches, employees, projectEmployees]);
 
     // Calculate working days (Monday to Saturday, excluding Sundays)
     const calculateWorkingDays = () => {
@@ -399,6 +416,36 @@ export default function OverviewTab({ project }) {
             {/* AI Anomaly Detection */}
             <AnomalyDetectionCard project={project} />
 
+            {/* Unmatched Employees Warning */}
+            {unmatchedCount > 0 && isAdmin && (
+                <Card className="border-amber-200 bg-amber-50">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-amber-900">
+                                        {unmatchedCount} Unmatched Attendance ID{unmatchedCount > 1 ? 's' : ''} Found
+                                    </p>
+                                    <p className="text-sm text-amber-700 mt-1">
+                                        Some punch records have attendance IDs that don't exist in the employee master list.
+                                        Add project-specific overrides to include them in analysis.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button 
+                                onClick={() => setShowEmployeeOverrideDialog(true)}
+                                variant="outline"
+                                className="border-amber-300 hover:bg-amber-100"
+                            >
+                                <UserPlus className="w-4 h-4 mr-2" />
+                                Manage Overrides
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Actions */}
             <Card className="border-0 bg-white shadow-sm">
                 <CardHeader>
@@ -407,6 +454,21 @@ export default function OverviewTab({ project }) {
                 <CardContent className="flex flex-wrap gap-3">
                     {(isAdmin || isSupervisor || isUser) && (
                     <>
+                        {isAdmin && (
+                            <Button
+                                onClick={() => setShowEmployeeOverrideDialog(true)}
+                                variant="outline"
+                                disabled={project.status === 'closed'}
+                            >
+                                <UserPlus className="w-4 h-4 mr-2" />
+                                Employee Overrides
+                                {projectEmployees.length > 0 && (
+                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded">
+                                        {projectEmployees.length}
+                                    </span>
+                                )}
+                            </Button>
+                        )}
                         <Button
                             onClick={() => lockMutation.mutate()}
                             disabled={project.status === 'locked' || project.status === 'closed' || lockMutation.isPending}
@@ -589,6 +651,12 @@ export default function OverviewTab({ project }) {
                 onClose={() => setShowCloseDialog(false)}
                 project={project}
                 lastSavedReport={lastSavedReport}
+            />
+
+            <ProjectEmployeeOverrideDialog
+                open={showEmployeeOverrideDialog}
+                onOpenChange={setShowEmployeeOverrideDialog}
+                project={project}
             />
         </div>
     );
