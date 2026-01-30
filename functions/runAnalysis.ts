@@ -802,38 +802,73 @@ Deno.serve(async (req) => {
         };
 
         // Process all employees and build results array
+        // Using smaller batches with delays to handle database load issues
         const allResults = [];
         const processedAttendanceIds = new Set();
+        const ANALYSIS_BATCH_SIZE = 5; // Process 5 employees at a time
+        const ANALYSIS_BATCH_DELAY = 500; // 500ms delay between analysis batches
         
-        for (const attendance_id of uniqueEmployeeIds) {
-            // Double-check for duplicates - string comparison
-            const idStr = String(attendance_id);
-            if (processedAttendanceIds.has(idStr)) {
-                console.warn('[runAnalysis] Skipping duplicate attendance_id:', attendance_id);
-                continue;
+        // Convert to array for batch processing
+        const employeeIdsArray = [...uniqueEmployeeIds];
+        
+        for (let i = 0; i < employeeIdsArray.length; i += ANALYSIS_BATCH_SIZE) {
+            const batchIds = employeeIdsArray.slice(i, i + ANALYSIS_BATCH_SIZE);
+            
+            // Process batch of employees
+            for (const attendance_id of batchIds) {
+                const idStr = String(attendance_id);
+                if (processedAttendanceIds.has(idStr)) {
+                    console.warn('[runAnalysis] Skipping duplicate attendance_id:', attendance_id);
+                    continue;
+                }
+                
+                processedAttendanceIds.add(idStr);
+                const result = await analyzeEmployee(attendance_id);
+                allResults.push({
+                    project_id,
+                    report_run_id: reportRun.id,
+                    ...result
+                });
             }
             
-            processedAttendanceIds.add(idStr);
-            const result = await analyzeEmployee(attendance_id);
-            allResults.push({
-                project_id,
-                report_run_id: reportRun.id,
-                ...result
-            });
+            // Log progress
+            console.log(`[runAnalysis] Processed batch ${Math.floor(i / ANALYSIS_BATCH_SIZE) + 1}/${Math.ceil(employeeIdsArray.length / ANALYSIS_BATCH_SIZE)} (${Math.min(i + ANALYSIS_BATCH_SIZE, employeeIdsArray.length)}/${employeeIdsArray.length} employees)`);
+            
+            // Add delay between analysis batches to reduce database load
+            if (i + ANALYSIS_BATCH_SIZE < employeeIdsArray.length) {
+                await new Promise(resolve => setTimeout(resolve, ANALYSIS_BATCH_DELAY));
+            }
         }
         
         console.log('[runAnalysis] Processed employees:', allResults.length);
         console.log('[runAnalysis] Unique attendance IDs processed:', processedAttendanceIds.size);
 
-        // Save results in batches with delay to avoid rate limits
-        const batchSize = 50;
-        for (let i = 0; i < allResults.length; i += batchSize) {
-            const batch = allResults.slice(i, i + batchSize);
-            await base44.asServiceRole.entities.AnalysisResult.bulkCreate(batch);
+        // Save results in smaller batches with longer delays
+        const SAVE_BATCH_SIZE = 10; // Save 10 results at a time (reduced from 50)
+        const SAVE_BATCH_DELAY = 300; // 300ms delay between save batches
+        
+        for (let i = 0; i < allResults.length; i += SAVE_BATCH_SIZE) {
+            const batch = allResults.slice(i, i + SAVE_BATCH_SIZE);
             
-            // Add delay between batches to avoid rate limits
-            if (i + batchSize < allResults.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+            // Retry logic for save operations
+            let retries = 3;
+            while (retries > 0) {
+                try {
+                    await base44.asServiceRole.entities.AnalysisResult.bulkCreate(batch);
+                    break; // Success, exit retry loop
+                } catch (saveError) {
+                    retries--;
+                    console.warn(`[runAnalysis] Save batch failed, retries left: ${retries}`, saveError.message);
+                    if (retries === 0) throw saveError;
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+                }
+            }
+            
+            console.log(`[runAnalysis] Saved batch ${Math.floor(i / SAVE_BATCH_SIZE) + 1}/${Math.ceil(allResults.length / SAVE_BATCH_SIZE)}`);
+            
+            // Add delay between save batches
+            if (i + SAVE_BATCH_SIZE < allResults.length) {
+                await new Promise(resolve => setTimeout(resolve, SAVE_BATCH_DELAY));
             }
         }
 
