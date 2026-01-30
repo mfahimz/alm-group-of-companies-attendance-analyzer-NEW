@@ -37,12 +37,40 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                 throw new Error('No fields selected to update');
             }
 
-            // Update shifts sequentially to avoid rate limiting
+            // Helper function to update with retry
+            const updateWithRetry = async (shift, maxRetries = 3) => {
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        await base44.entities.ShiftTiming.update(shift.id, {
+                            ...updateData,
+                            attendance_id: String(shift.attendance_id)
+                        });
+                        return; // Success
+                    } catch (err) {
+                        if (attempt === maxRetries) throw err;
+                        // Wait with exponential backoff before retry
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    }
+                }
+            };
+
+            // Update shifts sequentially with retry logic
+            let successCount = 0;
+            const errors = [];
+            
             for (const shift of selectedShifts) {
-                await base44.entities.ShiftTiming.update(shift.id, {
-                    ...updateData,
-                    attendance_id: String(shift.attendance_id)
-                });
+                try {
+                    await updateWithRetry(shift);
+                    successCount++;
+                    // Small delay between updates to avoid overwhelming the server
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (err) {
+                    errors.push({ shift, error: err.message });
+                }
+            }
+
+            if (errors.length > 0) {
+                throw new Error(`Updated ${successCount}/${selectedShifts.length} shifts. ${errors.length} failed.`);
             }
         },
         onSuccess: () => {
@@ -52,7 +80,8 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
         },
         onError: (error) => {
             console.error('Bulk update error:', error);
-            toast.error('Failed to update shifts: ' + (error.message || 'Unknown error'));
+            queryClient.invalidateQueries(['shifts', projectId]); // Refresh to show partial updates
+            toast.error(error.message || 'Failed to update shifts');
         }
     });
 
