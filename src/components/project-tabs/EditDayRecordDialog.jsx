@@ -35,6 +35,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user';
+    const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
 
     const { data: punches = [] } = useQuery({
@@ -609,6 +610,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                                 <SelectItem value="MANUAL_ABSENT">Absent</SelectItem>
                                 <SelectItem value="MANUAL_HALF">Half Day</SelectItem>
                                 <SelectItem value="OFF">Off/Leave</SelectItem>
+                                {isAdmin && (
+                                    <SelectItem value="SICK_LEAVE">Sick Leave (Admin Only)</SelectItem>
+                                )}
                             </SelectContent>
                         </Select>
                     </div>
