@@ -146,11 +146,10 @@ Deno.serve(async (req) => {
         // ============================================================
         // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay (current month)
         const divisor = snapshot.salary_divisor || project.salary_calculation_days || 30;
-        // DIVISOR_OT: Used for OT Hourly Rate
+        // DIVISOR_OT: Used for OT Hourly Rate AND Previous Month calculations
         const otDivisor = project.ot_calculation_days || divisor;
-        // DIVISOR_PREV_MONTH: Used for Previous Month LOP Pay, Previous Month Deductible Hours Pay
-        // This is the number of days in the previous month (e.g., 31 for December)
-        const prevMonthDivisor = snapshot.prev_month_divisor || otDivisor;
+        // DIVISOR_PREV_MONTH: Same as OT Divisor (project.ot_calculation_days)
+        const prevMonthDivisor = otDivisor;
 
         if (divisor <= 0) {
             return Response.json({ error: 'Invalid salary_divisor: must be greater than 0' }, { status: 400 });
