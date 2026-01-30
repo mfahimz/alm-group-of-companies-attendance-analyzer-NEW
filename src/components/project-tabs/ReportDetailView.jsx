@@ -1374,17 +1374,46 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 for (const s of applicableShifts) {
                     // Check if shift has applicable_days specified
                     if (s.applicable_days) {
+                        const appDays = s.applicable_days;
+                        
+                        // Try JSON array first
                         try {
-                            const applicableDaysArray = JSON.parse(s.applicable_days);
+                            const applicableDaysArray = JSON.parse(appDays);
                             if (Array.isArray(applicableDaysArray) && applicableDaysArray.length > 0) {
-                                // Check if current day is in the applicable days list
                                 if (applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
                                     shift = s;
                                     break;
                                 }
+                                continue; // Move to next shift if JSON parsed but day not found
                             }
                         } catch (e) {
-                            // If parsing fails, continue to next shift
+                            // Not JSON, try string matching
+                        }
+                        
+                        // Handle string format like "Monday to Thursday and Saturday" or "Friday"
+                        const appDaysLower = appDays.toLowerCase();
+                        const dayLower = currentDayName.toLowerCase();
+                        
+                        // Direct match (e.g., "Friday")
+                        if (appDaysLower.includes(dayLower)) {
+                            shift = s;
+                            break;
+                        }
+                        
+                        // Handle range patterns like "Monday to Thursday"
+                        const rangeMatch = appDaysLower.match(/(\w+)\s+to\s+(\w+)/);
+                        if (rangeMatch) {
+                            const dayOrder = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                            const startIdx = dayOrder.indexOf(rangeMatch[1]);
+                            const endIdx = dayOrder.indexOf(rangeMatch[2]);
+                            const currentIdx = dayOrder.indexOf(dayLower);
+                            
+                            if (startIdx !== -1 && endIdx !== -1 && currentIdx !== -1) {
+                                if (currentIdx >= startIdx && currentIdx <= endIdx) {
+                                    shift = s;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
