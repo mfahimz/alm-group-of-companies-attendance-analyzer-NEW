@@ -73,6 +73,14 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
+        // ============================================================
+        // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS NOTE
+        // The last 2 days of the salary month are treated as fully present
+        // for salary calculation. This is handled in createSalarySnapshots.js
+        // and the stored attendance values already reflect this rule.
+        // Recalculation uses stored values - no recomputation of assumed days.
+        // ============================================================
+
         // PROJECT STATUS CHECK: Cannot recalculate on closed projects
         if (project.status === 'closed') {
             return Response.json({ 
