@@ -883,6 +883,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return true;
             })
             .sort((a, b) => {
+                // Always push "no punches" employees to the end
+                if (a.has_no_punches && !b.has_no_punches) return 1;
+                if (!a.has_no_punches && b.has_no_punches) return -1;
+                
                 let aVal = a[sort.key];
                 let bVal = b[sort.key];
                 
