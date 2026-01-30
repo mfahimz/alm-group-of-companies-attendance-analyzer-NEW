@@ -452,7 +452,7 @@ export default function PunchUploadTab({ project }) {
                                     CSV format: attendance_id, first_name, date, time
                                 </p>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Date format: MM/DD/YYYY, Time format: HH:MM (will be converted to AM/PM automatically)
+                                    Date format: DD/MM/YYYY (Day/Month/Year), Time format: HH:MM (will be converted to AM/PM automatically)
                                 </p>
                             </>
                         ) : (
