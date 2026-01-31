@@ -43,6 +43,9 @@ export default function SalaryReportDetail() {
     const [selectedSnapshot, setSelectedSnapshot] = useState(null);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
 
+    // Admin-only editable fields for attendance values
+    const [adminEditableData, setAdminEditableData] = useState({});
+
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
         const isSalaryUnlockedFromTab = sessionStorage.getItem('salary_tab_pin_unlocked') === 'true';
@@ -104,6 +107,7 @@ export default function SalaryReportDetail() {
     // DERIVED VALUES
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
     const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
@@ -186,8 +190,24 @@ export default function SalaryReportDetail() {
         }));
     };
 
+    // Admin-only handler for attendance fields
+    const handleAdminChange = (hrmsId, field, value) => {
+        setAdminEditableData(prev => ({
+            ...prev,
+            [hrmsId]: {
+                ...(prev[hrmsId] || {}),
+                [field]: value === '' ? 0 : parseFloat(value) || 0
+            }
+        }));
+    };
+
     const getValue = (row, field) => {
         return editableData[row.hrms_id]?.[field] ?? row[field] ?? 0;
+    };
+
+    // Get admin-editable value (for attendance fields)
+    const getAdminValue = (row, field) => {
+        return adminEditableData[row.hrms_id]?.[field] ?? row[field] ?? 0;
     };
 
     const calculateTotals = (row) => {
@@ -201,13 +221,16 @@ export default function SalaryReportDetail() {
         
         const totalSalary = row.total_salary || 0;
         const workingHours = row.working_hours || 9;
+        const basicSalary = row.basic_salary || 0;
+        const allowances = row.allowances || 0;
         
         // Recalculate OT salaries based on current edits using DIVISOR_OT
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         const normalOtHours = getValue(row, 'normalOtHours') || 0;
         const specialOtHours = getValue(row, 'specialOtHours') || 0;
-        const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
-        const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
+        // OT, incentive, salary advance, bonus: NO rounding for decimals
+        const normalOtSalary = otHourlyRate * 1.25 * normalOtHours;
+        const specialOtSalary = otHourlyRate * 1.5 * specialOtHours;
         const totalOtSalary = normalOtSalary + specialOtSalary;
         
         const bonus = getValue(row, 'bonus') || 0;
@@ -215,9 +238,35 @@ export default function SalaryReportDetail() {
         const otherDeduction = getValue(row, 'otherDeduction') || 0;
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
         
-        // Use stored values for leave calculations (already calculated with DIVISOR_LEAVE_DEDUCTION)
-        const netDeduction = row.netDeduction || 0;
-        const deductibleHoursPay = row.deductibleHoursPay || 0;
+        // Admin editable values - if admin edited, recalculate leave values
+        let netDeduction = row.netDeduction || 0;
+        let deductibleHoursPay = row.deductibleHoursPay || 0;
+        let leavePay = row.leavePay || 0;
+        let salaryLeaveAmount = row.salaryLeaveAmount || 0;
+        
+        // If admin has edited leave-related fields, recalculate
+        if (isAdmin && adminEditableData[row.hrms_id]) {
+            const adminEdits = adminEditableData[row.hrms_id];
+            const annualLeaveCount = adminEdits.annual_leave_count ?? row.annual_leave_count ?? 0;
+            const fullAbsenceCount = adminEdits.full_absence_count ?? row.full_absence_count ?? 0;
+            const salaryLeaveDays = adminEdits.salary_leave_days ?? row.salary_leave_days ?? annualLeaveCount;
+            const deductibleMinutes = adminEdits.deductible_minutes ?? row.deductible_minutes ?? 0;
+            
+            const leaveDays = annualLeaveCount + fullAbsenceCount;
+            leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
+            
+            // Salary Leave Amount with rounding to nearest 5 (up)
+            const salaryForLeave = basicSalary + allowances;
+            const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+            salaryLeaveAmount = rawSalaryLeaveAmount > 0 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5 : 0;
+            
+            netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+            
+            // Deductible hours pay
+            const hourlyRateDeduction = totalSalary / divisor / workingHours;
+            const deductibleHours = deductibleMinutes / 60;
+            deductibleHoursPay = hourlyRateDeduction * deductibleHours;
+        }
         
         // Previous month deductions (Al Maraghi Motors - calculated using OT divisor)
         const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
@@ -255,17 +304,21 @@ export default function SalaryReportDetail() {
             balance = 0;
         }
 
-        return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary };
+        return { 
+            total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary,
+            leavePay, salaryLeaveAmount, netDeduction, deductibleHoursPay
+        };
     };
 
     const handleSave = async () => {
-        // Check if there are any changes (edits OR verification changes)
+        // Check if there are any changes (edits OR verification changes OR admin edits)
         const hasEdits = Object.keys(editableData).length > 0;
+        const hasAdminEdits = Object.keys(adminEditableData).length > 0;
         const originalData = report?.snapshot_data ? JSON.parse(report.snapshot_data) : [];
         const originalVerified = originalData.filter(r => r.salary_verified).map(r => String(r.attendance_id));
         const verificationChanged = JSON.stringify([...originalVerified].sort()) !== JSON.stringify([...verifiedEmployees].sort());
         
-        if (!hasEdits && !verificationChanged) {
+        if (!hasEdits && !verificationChanged && !hasAdminEdits) {
             toast.info('No changes to save');
             return;
         }
@@ -277,11 +330,14 @@ export default function SalaryReportDetail() {
             // Add verification status
             row.salary_verified = verifiedEmployees.includes(String(row.attendance_id));
             const edits = editableData[row.hrms_id];
-            if (!edits) return row;
+            const adminEdits = adminEditableData[row.hrms_id];
+            if (!edits && !adminEdits) return row;
 
             const updated = { ...row };
             const totalSalary = row.total_salary || 0;
             const workingHours = row.working_hours || 9;
+            const basicSalary = row.basic_salary || 0;
+            const allowances = row.allowances || 0;
 
             // DIVISOR_OT: Use ot_divisor for OT calculations
             // [MERGE_NOTE: If merging, use salary_divisor for both]
@@ -289,19 +345,53 @@ export default function SalaryReportDetail() {
             const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
             const otHourlyRate = totalSalary / otDivisor / workingHours;
 
-            // Apply edits using DIVISOR_OT for OT calculations
-            if ('normalOtHours' in edits) {
+            // Apply regular edits using DIVISOR_OT for OT calculations
+            // OT: NO rounding for decimals
+            if (edits && 'normalOtHours' in edits) {
                 updated.normalOtHours = edits.normalOtHours;
-                updated.normalOtSalary = Math.round(otHourlyRate * 1.25 * edits.normalOtHours * 100) / 100;
+                updated.normalOtSalary = otHourlyRate * 1.25 * edits.normalOtHours;
             }
-            if ('specialOtHours' in edits) {
+            if (edits && 'specialOtHours' in edits) {
                 updated.specialOtHours = edits.specialOtHours;
-                updated.specialOtSalary = Math.round(otHourlyRate * 1.5 * edits.specialOtHours * 100) / 100;
+                updated.specialOtSalary = otHourlyRate * 1.5 * edits.specialOtHours;
             }
-            if ('otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
-            if ('bonus' in edits) updated.bonus = edits.bonus;
-            if ('incentive' in edits) updated.incentive = edits.incentive;
-            if ('advanceSalaryDeduction' in edits) updated.advanceSalaryDeduction = edits.advanceSalaryDeduction;
+            if (edits && 'otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
+            if (edits && 'bonus' in edits) updated.bonus = edits.bonus;
+            if (edits && 'incentive' in edits) updated.incentive = edits.incentive;
+            if (edits && 'advanceSalaryDeduction' in edits) updated.advanceSalaryDeduction = edits.advanceSalaryDeduction;
+
+            // Apply admin edits (attendance values) - Admin only
+            if (adminEdits) {
+                if ('annual_leave_count' in adminEdits) updated.annual_leave_count = adminEdits.annual_leave_count;
+                if ('full_absence_count' in adminEdits) updated.full_absence_count = adminEdits.full_absence_count;
+                if ('salary_leave_days' in adminEdits) updated.salary_leave_days = adminEdits.salary_leave_days;
+                if ('deductible_minutes' in adminEdits) updated.deductible_minutes = adminEdits.deductible_minutes;
+                
+                // Recalculate leave values based on admin edits
+                const annualLeaveCount = updated.annual_leave_count || 0;
+                const fullAbsenceCount = updated.full_absence_count || 0;
+                const salaryLeaveDays = updated.salary_leave_days || annualLeaveCount;
+                const deductibleMinutes = updated.deductible_minutes || 0;
+                
+                const leaveDays = annualLeaveCount + fullAbsenceCount;
+                const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
+                
+                // Salary Leave Amount with rounding to nearest 5 (up)
+                const salaryForLeave = basicSalary + allowances;
+                const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+                const salaryLeaveAmount = rawSalaryLeaveAmount > 0 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5 : 0;
+                
+                updated.leaveDays = leaveDays;
+                updated.leavePay = Math.round(leavePay * 100) / 100;
+                updated.salaryLeaveAmount = salaryLeaveAmount;
+                updated.netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
+                
+                // Deductible hours pay
+                const hourlyRateDeduction = totalSalary / divisor / workingHours;
+                const deductibleHours = deductibleMinutes / 60;
+                updated.deductibleHours = Math.round(deductibleHours * 100) / 100;
+                updated.deductibleHoursPay = Math.round(hourlyRateDeduction * deductibleHours * 100) / 100;
+            }
 
             // Recalculate total (include previous month deductions)
             const totalOtSalary = (updated.normalOtSalary || 0) + (updated.specialOtSalary || 0);
@@ -381,6 +471,7 @@ export default function SalaryReportDetail() {
 
             toast.success('Report saved successfully');
             setEditableData({});
+            setAdminEditableData({});
             queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
             queryClient.invalidateQueries({ queryKey: ['salaryReports', report.project_id] });
             queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
