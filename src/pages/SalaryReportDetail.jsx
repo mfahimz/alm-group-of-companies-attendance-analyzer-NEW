@@ -779,16 +779,17 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Working Days</SortableTableHead>
                                         <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present Days</SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP Days</SortableTableHead>
-                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50">Annual Leave {isAdmin && '(Edit)'}</SortableTableHead>
+                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50">Annual Leave {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP Days {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
-                                        <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days {isAdmin && '(Edit)'}</SortableTableHead>
-                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Amount</SortableTableHead>
-                                        <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours {isAdmin && '(Edit)'}</SortableTableHead>
+                                        <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Amt {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deduct Min {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Hrs (PM)</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_lop_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra LOP Days (PM)</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Min (PM) {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_lop_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra LOP Days (PM) {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_lop_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra LOP Pay (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_deductible_hours_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra Deduct Pay (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hours</SortableTableHead>
@@ -829,7 +830,7 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle font-semibold">{row.total_salary?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.working_days?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.present_days?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle text-red-600 font-semibold">{(getAdminValue(row, 'full_absence_count')).toFixed(2)}</td>
+                                                {/* Annual Leave - Admin editable */}
                                                 <td className={`p-${isAdmin ? '1' : '2'} align-middle text-blue-600`}>
                                                     {isAdmin ? (
                                                         <Input
@@ -837,14 +838,43 @@ export default function SalaryReportDetail() {
                                                             step="0.01"
                                                             value={getAdminValue(row, 'annual_leave_count')}
                                                             onChange={(e) => handleAdminChange(row.hrms_id, 'annual_leave_count', e.target.value)}
-                                                            className="h-8 text-xs w-20 bg-blue-50"
+                                                            className="h-8 text-xs w-16 bg-blue-50"
                                                         />
                                                     ) : (
                                                         (row.annual_leave_count || 0).toFixed(2)
                                                     )}
                                                 </td>
+                                                {/* LOP Days - Admin editable */}
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle text-red-600 font-semibold`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getAdminValue(row, 'full_absence_count')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'full_absence_count', e.target.value)}
+                                                            className="h-8 text-xs w-16 bg-red-50"
+                                                        />
+                                                    ) : (
+                                                        (row.full_absence_count || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                {/* Leave Days (calculated) */}
                                                 <td className="p-2 align-middle bg-amber-50">{(getAdminValue(row, 'annual_leave_count') + getAdminValue(row, 'full_absence_count')).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{leavePay.toFixed(2)}</td>
+                                                {/* Leave Pay - Admin editable */}
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-amber-100`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getAdminValue(row, 'leavePay')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'leavePay', e.target.value)}
+                                                            className="h-8 text-xs w-20 bg-amber-200"
+                                                        />
+                                                    ) : (
+                                                        leavePay.toFixed(2)
+                                                    )}
+                                                </td>
+                                                {/* Salary Leave Days - Admin editable */}
                                                 <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-amber-50`}>
                                                     {isAdmin ? (
                                                         <Input
@@ -852,14 +882,41 @@ export default function SalaryReportDetail() {
                                                             step="0.01"
                                                             value={getAdminValue(row, 'salary_leave_days')}
                                                             onChange={(e) => handleAdminChange(row.hrms_id, 'salary_leave_days', e.target.value)}
-                                                            className="h-8 text-xs w-20 bg-amber-100"
+                                                            className="h-8 text-xs w-16 bg-amber-100"
                                                         />
                                                     ) : (
                                                         (row.salary_leave_days || 0).toFixed(2)
                                                     )}
                                                 </td>
-                                                <td className="p-2 align-middle bg-amber-100">{salaryLeaveAmount.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-red-50 font-semibold">{netDeduction.toFixed(2)}</td>
+                                                {/* Salary Leave Amount - Admin editable */}
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-amber-100`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="1"
+                                                            value={getAdminValue(row, 'salaryLeaveAmount')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'salaryLeaveAmount', e.target.value)}
+                                                            className="h-8 text-xs w-20 bg-amber-200"
+                                                        />
+                                                    ) : (
+                                                        salaryLeaveAmount.toFixed(2)
+                                                    )}
+                                                </td>
+                                                {/* Net Deduction - Admin editable */}
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-red-50 font-semibold`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getAdminValue(row, 'netDeduction')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'netDeduction', e.target.value)}
+                                                            className="h-8 text-xs w-20 bg-red-100"
+                                                        />
+                                                    ) : (
+                                                        netDeduction.toFixed(2)
+                                                    )}
+                                                </td>
+                                                {/* Deductible Minutes - Admin editable */}
                                                 <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-purple-50`}>
                                                     {isAdmin ? (
                                                         <Input
@@ -867,15 +924,41 @@ export default function SalaryReportDetail() {
                                                             step="1"
                                                             value={getAdminValue(row, 'deductible_minutes')}
                                                             onChange={(e) => handleAdminChange(row.hrms_id, 'deductible_minutes', e.target.value)}
-                                                            className="h-8 text-xs w-20 bg-purple-100"
+                                                            className="h-8 text-xs w-16 bg-purple-100"
                                                         />
                                                     ) : (
                                                         (row.deductibleHours || 0).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-purple-100">{deductibleHoursPay.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-orange-50">{((row.extra_prev_month_deductible_minutes || 0) / 60).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-orange-50">{(row.extra_prev_month_lop_days || 0).toFixed(2)}</td>
+                                                {/* Extra Prev Month Deductible Minutes - Admin editable */}
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-orange-50`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="1"
+                                                            value={getAdminValue(row, 'extra_prev_month_deductible_minutes')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'extra_prev_month_deductible_minutes', e.target.value)}
+                                                            className="h-8 text-xs w-16 bg-orange-100"
+                                                        />
+                                                    ) : (
+                                                        ((row.extra_prev_month_deductible_minutes || 0) / 60).toFixed(2)
+                                                    )}
+                                                </td>
+                                                {/* Extra Prev Month LOP Days - Admin editable */}
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-orange-50`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getAdminValue(row, 'extra_prev_month_lop_days')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'extra_prev_month_lop_days', e.target.value)}
+                                                            className="h-8 text-xs w-16 bg-orange-100"
+                                                        />
+                                                    ) : (
+                                                        (row.extra_prev_month_lop_days || 0).toFixed(2)
+                                                    )}
+                                                </td>
                                                 <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_lop_pay || 0).toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_deductible_hours_pay || 0).toFixed(2)}</td>
                                                 <td className="p-1 align-middle bg-blue-50">
