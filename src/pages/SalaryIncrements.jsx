@@ -117,14 +117,51 @@ export default function SalaryIncrements() {
         }
     });
 
+    // Fetch finalized salary snapshots to check if increments are used
+    const { data: salarySnapshots = [] } = useQuery({
+        queryKey: ['salarySnapshots', 'Al Maraghi Motors'],
+        queryFn: async () => {
+            // Get all salary snapshots for Al Maraghi Motors from finalized reports
+            const snapshots = await base44.entities.SalarySnapshot.filter({ });
+            return snapshots;
+        },
+        enabled: salaryUnlocked
+    });
+
+    // Check if an increment has been used in any finalized salary snapshot
+    const isIncrementUsed = (increment) => {
+        if (!increment || salarySnapshots.length === 0) return false;
+        
+        // An increment is "used" if any snapshot exists where:
+        // - Same employee (by employee_id or attendance_id)
+        // - Snapshot's salary_month_start >= increment.effective_month
+        // This means the increment was applicable during that salary period
+        return salarySnapshots.some(snapshot => {
+            const sameEmployee = String(snapshot.hrms_id) === String(increment.employee_id) ||
+                                 String(snapshot.attendance_id) === String(increment.attendance_id);
+            
+            if (!sameEmployee) return false;
+            
+            // Check if snapshot's salary month is on or after increment effective date
+            const snapshotMonth = snapshot.salary_month_start || snapshot.created_date?.substring(0, 10);
+            return snapshotMonth && snapshotMonth >= increment.effective_month;
+        });
+    };
+
     const deleteIncrementMutation = useMutation({
-        mutationFn: (id) => base44.entities.SalaryIncrement.delete(id),
+        mutationFn: async (increment) => {
+            // Double-check on delete that increment is not used
+            if (isIncrementUsed(increment)) {
+                throw new Error('This salary increment has been used in finalized payroll and cannot be deleted.');
+            }
+            return base44.entities.SalaryIncrement.delete(increment.id);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['salaryIncrements']);
             toast.success('Salary increment deleted');
         },
-        onError: () => {
-            toast.error('Failed to delete salary increment');
+        onError: (error) => {
+            toast.error(error.message || 'Failed to delete salary increment');
         }
     });
 
@@ -176,9 +213,15 @@ export default function SalaryIncrements() {
         createIncrementMutation.mutate(formData);
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = (increment) => {
+        // Check if increment is used BEFORE showing confirm dialog
+        if (isIncrementUsed(increment)) {
+            toast.error('This salary increment has been used in finalized payroll and cannot be deleted.');
+            return;
+        }
+        
         if (window.confirm('Delete this salary increment record? This action cannot be undone.')) {
-            deleteIncrementMutation.mutate(id);
+            deleteIncrementMutation.mutate(increment);
         }
     };
 
@@ -433,14 +476,20 @@ export default function SalaryIncrements() {
                                                             {new Date(increment.created_date).toLocaleDateString()}
                                                         </TableCell>
                                                         <TableCell className="text-right">
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant="ghost"
-                                                                onClick={() => handleDelete(increment.id)}
-                                                                className="text-red-600 hover:text-red-800"
-                                                            >
-                                                                Delete
-                                                            </Button>
+                                                            {isIncrementUsed(increment) ? (
+                                                                <span className="text-xs text-slate-400 px-2 py-1 bg-slate-100 rounded" title="Used in finalized salary. Deletion locked.">
+                                                                    🔒 Locked
+                                                                </span>
+                                                            ) : (
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="ghost"
+                                                                    onClick={() => handleDelete(increment)}
+                                                                    className="text-red-600 hover:text-red-800"
+                                                                >
+                                                                    Delete
+                                                                </Button>
+                                                            )}
                                                         </TableCell>
                                                     </TableRow>
                                                 );
