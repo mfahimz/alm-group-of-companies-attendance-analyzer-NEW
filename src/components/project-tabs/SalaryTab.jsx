@@ -156,6 +156,19 @@ export default function SalaryTab({ project }) {
 
         setIsGenerating(true);
         try {
+            // CRITICAL: Invalidate and refetch snapshots to ensure fresh data from database
+            // Do NOT use stale snapshot data from memory
+            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project?.id, finalReport?.id] });
+            const freshSnapshots = await queryClient.fetchQuery({
+                queryKey: ['salarySnapshots', project?.id, finalReport?.id],
+                queryFn: async () => {
+                    return await base44.entities.SalarySnapshot.filter({
+                        project_id: project.id,
+                        report_run_id: finalReport.id
+                    });
+                }
+            });
+            console.log('[SalaryTab] Fetched fresh snapshots before report generation:', freshSnapshots.length);
             // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
             // [MERGE_NOTE: If merging divisors, this becomes the single divisor for all calculations]
             const divisor = project.salary_calculation_days || 30;
