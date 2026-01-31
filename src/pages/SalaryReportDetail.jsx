@@ -259,7 +259,13 @@ export default function SalaryReportDetail() {
     };
 
     const handleSave = async () => {
-        if (Object.keys(editableData).length === 0) {
+        // Check if there are any changes (edits OR verification changes)
+        const hasEdits = Object.keys(editableData).length > 0;
+        const originalData = report?.snapshot_data ? JSON.parse(report.snapshot_data) : [];
+        const originalVerified = originalData.filter(r => r.salary_verified).map(r => String(r.attendance_id));
+        const verificationChanged = JSON.stringify([...originalVerified].sort()) !== JSON.stringify([...verifiedEmployees].sort());
+        
+        if (!hasEdits && !verificationChanged) {
             toast.info('No changes to save');
             return;
         }
@@ -267,8 +273,6 @@ export default function SalaryReportDetail() {
         setIsSaving(true);
         try {
             // Merge edits into snapshot data + verification status
-            const originalData = JSON.parse(report.snapshot_data);
-
             const updatedData = originalData.map(row => {
             // Add verification status
             row.salary_verified = verifiedEmployees.includes(String(row.attendance_id));
