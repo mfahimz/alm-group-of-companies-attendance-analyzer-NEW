@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw, Eye } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import PINLock from '../components/ui/PINLock';
 import SortableTableHead from '../components/ui/SortableTableHead';
+import SalarySnapshotDialog from '../components/salary/SalarySnapshotDialog';
 
 export default function SalaryReportDetail() {
     const queryClient = useQueryClient();
@@ -38,6 +39,7 @@ export default function SalaryReportDetail() {
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
     const [recalculatingAll, setRecalculatingAll] = useState(false);
     const [confirmRecalcAll, setConfirmRecalcAll] = useState(false);
+    const [selectedSnapshot, setSelectedSnapshot] = useState(null);
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
@@ -623,12 +625,13 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-100 font-bold">WPS Pay</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-100 font-bold">Balance</SortableTableHead>
                                         <TableHead className="whitespace-nowrap bg-slate-100 text-center">Cap</TableHead>
+                                        <TableHead className="whitespace-nowrap bg-slate-50 text-center sticky right-0 z-20">View</TableHead>
                                     </tr>
                                 </thead>
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                     <tr className="border-b">
-                                    <td colSpan={31} className="text-center py-12">
+                                    <td colSpan={32} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
@@ -723,6 +726,17 @@ export default function SalaryReportDetail() {
                                                         <span className="text-slate-400 text-xs">—</span>
                                                     )}
                                                 </td>
+                                                <td className="p-2 align-middle bg-white text-center sticky right-0 z-10">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setSelectedSnapshot(row)}
+                                                        title="View Salary Details"
+                                                        className="h-7 w-7 p-0"
+                                                    >
+                                                        <Eye className="w-4 h-4 text-indigo-600" />
+                                                    </Button>
+                                                </td>
                                                 </tr>
                                         );
                                     })}
@@ -732,6 +746,20 @@ export default function SalaryReportDetail() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* Salary Snapshot Detail Dialog */}
+            <SalarySnapshotDialog
+                open={!!selectedSnapshot}
+                onClose={() => setSelectedSnapshot(null)}
+                snapshot={selectedSnapshot}
+                project={project}
+                reportRunId={report?.report_run_id}
+                canRecalculate={canRecalculate}
+                onRecalculated={() => {
+                    queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+                    queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+                }}
+            />
 
             {/* Recalculate All Confirmation Dialog */}
             <Dialog open={confirmRecalcAll} onOpenChange={setConfirmRecalcAll}>
