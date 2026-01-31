@@ -176,6 +176,11 @@ export default function SalaryReportDetail() {
     // ============================================
     // HANDLERS
     // ============================================
+    // Check if bonus has decimal values
+    const hasDecimalBonus = (bonus) => {
+        return (bonus || 0) % 1 !== 0;
+    };
+
     const handleChange = (hrmsId, field, value) => {
         setEditableData(prev => ({
             ...prev,
@@ -480,6 +485,7 @@ export default function SalaryReportDetail() {
         const exportData = filteredData.map(row => {
             // Calculate totals for export to get correct WPS values
             const { total, wpsPay, balance, wpsCapApplied } = calculateTotals(row);
+            const shouldRound = !hasDecimalBonus(getValue(row, 'bonus'));
             return {
                 'Attendance ID': row.attendance_id,
                 'Name': row.name,
@@ -509,9 +515,9 @@ export default function SalaryReportDetail() {
                 'Bonus': row.bonus || 0,
                 'Incentive': row.incentive || 0,
                 'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
-                'Total': total,
-                'WPS Pay': wpsPay,
-                'Balance': balance,
+                'Total': shouldRound ? Math.round(total) : total,
+                'WPS Pay': shouldRound ? Math.round(wpsPay) : wpsPay,
+                'Balance': shouldRound ? Math.round(balance) : balance,
                 'WPS Cap Applied': wpsCapApplied ? 'Yes' : 'No',
                 'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
             };
@@ -725,6 +731,7 @@ export default function SalaryReportDetail() {
                                         </tr>
                                     ) : filteredData.map((row) => {
                                         const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
+                                        const shouldRound = !hasDecimalBonus(getValue(row, 'bonus'));
                                         return (
                                             <tr key={row.hrms_id} className="border-b transition-colors hover:bg-muted/50">
                                                 <td className="p-2 align-middle sticky left-0 bg-white z-10">
@@ -808,9 +815,9 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{total}</td>
-                                                <td className="p-2 align-middle bg-green-100 font-bold">{wpsPay}</td>
-                                                <td className="p-2 align-middle bg-amber-100 font-bold">{balance}</td>
+                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{shouldRound ? Math.round(total) : total}</td>
+                                                <td className="p-2 align-middle bg-green-100 font-bold">{shouldRound ? Math.round(wpsPay) : wpsPay}</td>
+                                                <td className="p-2 align-middle bg-amber-100 font-bold">{shouldRound ? Math.round(balance) : balance}</td>
                                                 <td className="p-2 align-middle bg-slate-50 text-center">
                                                     {wpsCapApplied ? (
                                                         <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded text-xs font-medium">
