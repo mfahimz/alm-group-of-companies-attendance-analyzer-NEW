@@ -983,30 +983,28 @@ Deno.serve(async (req) => {
             let attendanceSource;
             
             // Use finalized AnalysisResult values if available
-            // Do NOT recalculate attendance - grace minutes already applied
-            let calculated;
-            
-            if (hasAnalysisResult) {
-                // Use finalized AnalysisResult values directly
-                // deductible_minutes already has grace applied - do NOT reapply
-                calculated = {
-                    workingDays: analysisResult.working_days,
-                    presentDays: analysisResult.present_days,
-                    fullAbsenceCount: analysisResult.full_absence_count,
-                    halfAbsenceCount: analysisResult.half_absence_count,
-                    sickLeaveCount: analysisResult.sick_leave_count,
-                    annualLeaveCount: analysisResult.annual_leave_count,
-                    lateMinutes: analysisResult.late_minutes,
-                    earlyCheckoutMinutes: analysisResult.early_checkout_minutes,
-                    otherMinutes: analysisResult.other_minutes,
-                    approvedMinutes: analysisResult.approved_minutes,
-                    deductibleMinutes: analysisResult.deductible_minutes,
-                    graceMinutes: analysisResult.grace_minutes
-                };
-                attendanceSource = 'ANALYZED';
-                analyzedCount++;
-                console.log(`[createSalarySnapshots] Using finalized AnalysisResult for ${emp.name} (${emp.attendance_id})`);
-            } else {
+             // Do NOT recalculate attendance - grace minutes already applied
+             if (hasAnalysisResult) {
+                 // Use finalized AnalysisResult values directly
+                 // deductible_minutes already has grace applied - do NOT reapply
+                 calculated = {
+                     workingDays: analysisResult.working_days,
+                     presentDays: analysisResult.present_days,
+                     fullAbsenceCount: analysisResult.full_absence_count,
+                     halfAbsenceCount: analysisResult.half_absence_count,
+                     sickLeaveCount: analysisResult.sick_leave_count,
+                     annualLeaveCount: analysisResult.annual_leave_count,
+                     lateMinutes: analysisResult.late_minutes,
+                     earlyCheckoutMinutes: analysisResult.early_checkout_minutes,
+                     otherMinutes: analysisResult.other_minutes,
+                     approvedMinutes: analysisResult.approved_minutes,
+                     deductibleMinutes: analysisResult.deductible_minutes,
+                     graceMinutes: analysisResult.grace_minutes
+                 };
+                 attendanceSource = 'ANALYZED';
+                 analyzedCount++;
+                 console.log(`[createSalarySnapshots] Using finalized AnalysisResult for ${emp.name} (${emp.attendance_id}): ${analysisResult.deductible_minutes} deductible minutes`);
+             } else {
                 // NO_ATTENDANCE_DATA: Employee missing from analysis
                 // Use zero attendance for salary safety
                 calculated = {
