@@ -39,7 +39,60 @@ Deno.serve(async (req) => {
         }
 
         const project = projects[0];
+        // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
         const divisor = project.salary_calculation_days || 30;
+        // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
+        const otDivisor = project.ot_calculation_days || divisor;
+        const isAlMaraghi = project.company === 'Al Maraghi Motors';
+
+        // ============================================================
+        // AL MARAGHI MOTORS: Calculate salary month ranges
+        // ============================================================
+        let salaryMonthStartStr = null;
+        let salaryMonthEndStr = null;
+        let extraPrevMonthFrom = null;
+        let extraPrevMonthTo = null;
+        let hasExtraPrevMonthRange = false;
+        let assumedPresentDays = [];
+        
+        if (isAlMaraghi) {
+            const projectDateTo = new Date(project.date_to);
+            const salaryMonthStart = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth(), 1);
+            const salaryMonthEnd = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth() + 1, 0);
+            
+            salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
+            salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
+
+            // Calculate assumed present days: last 2 days of salary month
+            const assumedDay1 = new Date(projectDateTo);
+            assumedDay1.setDate(assumedDay1.getDate() - 1);
+            const assumedDay2 = new Date(projectDateTo);
+            
+            assumedPresentDays = [
+                assumedDay1.toISOString().split('T')[0],
+                assumedDay2.toISOString().split('T')[0]
+            ];
+
+            // Extra previous month range
+            const projectDateFrom = new Date(project.date_from);
+            const dayBeforeSalaryMonth = new Date(salaryMonthStart);
+            dayBeforeSalaryMonth.setDate(dayBeforeSalaryMonth.getDate() - 1);
+
+            if (projectDateFrom < salaryMonthStart) {
+                extraPrevMonthFrom = project.date_from;
+                extraPrevMonthTo = dayBeforeSalaryMonth.toISOString().split('T')[0];
+                hasExtraPrevMonthRange = true;
+            }
+
+            console.log('[createSalarySnapshotsForDateRange] Al Maraghi salary month ranges:', {
+                salary_month_start: salaryMonthStartStr,
+                salary_month_end: salaryMonthEndStr,
+                extra_prev_month_from: extraPrevMonthFrom,
+                extra_prev_month_to: extraPrevMonthTo,
+                has_extra_range: hasExtraPrevMonthRange,
+                assumed_present_days: assumedPresentDays
+            });
+        }
 
         // Verify report exists
         const reports = await base44.asServiceRole.entities.ReportRun.filter({ id: report_run_id, project_id: project_id });
