@@ -1106,14 +1106,15 @@ Deno.serve(async (req) => {
             
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-            // CRITICAL FIX: Use the finalized deductible_minutes from AnalysisResult directly
-            // The Attendance Report already applied grace, so we must NOT apply it again
-            // If no AnalysisResult exists (NO_ATTENDANCE_DATA), calculate it fresh
+            // CRITICAL: Calculate deductible_minutes using the ADJUSTED time values
+            // The day_overrides modify late/early/other minutes, so we must recalculate deductible
+            // Formula: max(0, (adjusted_late + adjusted_early + adjusted_other) - grace - approved)
             let deductibleMinutes;
-            if (hasAnalysisResult && analysisResult.deductible_minutes !== undefined && analysisResult.deductible_minutes !== null) {
-                // Use the exact value from the finalized Attendance Report (grace already applied)
-                deductibleMinutes = analysisResult.deductible_minutes;
-                console.log(`[createSalarySnapshots] ${emp.name}: Using AnalysisResult.deductible_minutes = ${deductibleMinutes}`);
+            if (hasAnalysisResult) {
+                // Recalculate deductible using adjusted time values (with day_overrides applied)
+                const totalTimeIssues = calculated.lateMinutes + calculated.earlyCheckoutMinutes + calculated.otherMinutes;
+                deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
+                console.log(`[createSalarySnapshots] ${emp.name}: Calculated deductible_minutes = ${deductibleMinutes} (late=${calculated.lateMinutes} + early=${calculated.earlyCheckoutMinutes} + other=${calculated.otherMinutes} - grace=${calculated.graceMinutes} - approved=${calculated.approvedMinutes})`);
             } else {
                 // Fallback: Calculate for employees without AnalysisResult
                 const totalTimeIssues = calculated.lateMinutes + calculated.earlyCheckoutMinutes + calculated.otherMinutes;
