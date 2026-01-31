@@ -32,6 +32,12 @@ export default function SalarySnapshotDialog({
 
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
 
+    // Check if bonus has decimal values
+    const hasDecimalBonus = () => {
+        const bonus = snapshot.bonus || 0;
+        return bonus % 1 !== 0;
+    };
+
     // Format month name from date
     const formatSalaryMonth = () => {
         if (snapshot.salary_month_start) {
@@ -68,14 +74,20 @@ export default function SalarySnapshotDialog({
     };
 
     // Row component for consistent styling
-    const DataRow = ({ label, value, highlight = false, negative = false }) => (
-        <div className={`flex justify-between py-1.5 ${highlight ? 'font-semibold' : ''}`}>
-            <span className="text-slate-600">{label}</span>
-            <span className={`font-medium ${negative && Number(value) > 0 ? 'text-red-600' : ''} ${highlight ? 'text-slate-900' : 'text-slate-800'}`}>
-                {value}
-            </span>
-        </div>
-    );
+    const DataRow = ({ label, value, highlight = false, negative = false, shouldRound = false }) => {
+        let displayValue = value;
+        if (shouldRound && !hasDecimalBonus()) {
+            displayValue = Math.round(Number(value) || 0);
+        }
+        return (
+            <div className={`flex justify-between py-1.5 ${highlight ? 'font-semibold' : ''}`}>
+                <span className="text-slate-600">{label}</span>
+                <span className={`font-medium ${negative && Number(value) > 0 ? 'text-red-600' : ''} ${highlight ? 'text-slate-900' : 'text-slate-800'}`}>
+                    {displayValue}
+                </span>
+            </div>
+        );
+    };
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
@@ -115,9 +127,9 @@ export default function SalarySnapshotDialog({
                     </h3>
                     <div className="divide-y divide-slate-100">
                         <DataRow label="Total Salary" value={snapshot.total_salary} />
-                        <DataRow label="Net Salary (Total)" value={snapshot.total} highlight />
-                        <DataRow label="WPS Pay" value={snapshot.wpsPay} highlight />
-                        <DataRow label="Balance" value={snapshot.balance} />
+                        <DataRow label="Net Salary (Total)" value={snapshot.total} highlight shouldRound />
+                        <DataRow label="WPS Pay" value={snapshot.wpsPay} highlight shouldRound />
+                        <DataRow label="Balance" value={snapshot.balance} shouldRound />
                         <div className="pt-2 mt-2 border-t border-slate-200">
                             <DataRow label="Working Days" value={snapshot.working_days} />
                             <DataRow label="Present Days" value={snapshot.present_days} />
