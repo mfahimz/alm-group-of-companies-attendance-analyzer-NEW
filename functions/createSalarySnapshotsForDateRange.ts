@@ -802,7 +802,7 @@ Deno.serve(async (req) => {
         
         for (const emp of eligibleEmployees) {
             // Find matching salary record (REQUIRED for salary snapshot)
-            const salary = salaries.find(s => 
+            const baseSalary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
                 String(s.attendance_id) === String(emp.attendance_id)
             );
