@@ -225,7 +225,9 @@ export default function SalaryReportDetail() {
         const allowances = row.allowances || 0;
         
         // Recalculate OT salaries based on current edits using DIVISOR_OT
-        const otHourlyRate = totalSalary / otDivisor / workingHours;
+        // RULE: If ot_base_salary exists (employee has increments), use it for OT; otherwise use current salary
+        const otBaseSalary = row.ot_base_salary || totalSalary;
+        const otHourlyRate = otBaseSalary / otDivisor / workingHours;
         const normalOtHours = getValue(row, 'normalOtHours') || 0;
         const specialOtHours = getValue(row, 'specialOtHours') || 0;
         // OT, incentive, salary advance, bonus: NO rounding for decimals
@@ -343,7 +345,9 @@ export default function SalaryReportDetail() {
             // [MERGE_NOTE: If merging, use salary_divisor for both]
             const divisor = row.salary_divisor || report?.salary_divisor || 30;
             const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
-            const otHourlyRate = totalSalary / otDivisor / workingHours;
+            // RULE: If ot_base_salary exists (employee has increments), use it for OT; otherwise use current salary
+            const otBaseSalary = row.ot_base_salary || totalSalary;
+            const otHourlyRate = otBaseSalary / otDivisor / workingHours;
 
             // Apply regular edits using DIVISOR_OT for OT calculations
             // OT: NO rounding for decimals
