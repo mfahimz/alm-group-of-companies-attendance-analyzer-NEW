@@ -938,10 +938,28 @@ Deno.serve(async (req) => {
             const deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
             
+            // Current month hourly rate uses salary divisor
             const hourlyRate = totalSalaryAmount / divisor / workingHours;
-            const deductibleHoursPay = hourlyRate * deductibleHours;
+            
+            // Current month deductible hours pay (uses salary divisor)
+            const currentMonthDeductibleHoursPay = hourlyRate * deductibleHours;
+            
+            // AL MARAGHI: Calculate extra prev month data (uses OT divisor and PREVIOUS MONTH salary)
+            const extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
+            const extraPrevMonthDeductibleMinutes = extraPrevMonthData.extraDeductibleMinutes;
+            const extraPrevMonthLopDays = extraPrevMonthData.extraLopDays;
+            const extraPrevMonthLopPay = extraPrevMonthData.extraLopPay;
+            const extraPrevMonthDeductibleHoursPay = extraPrevMonthData.extraDeductibleHoursPay;
+            
+            // Total deductible hours pay = current month (salary divisor) + prev month (OT divisor)
+            const totalDeductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
+            
+            // Total deductible minutes (for display purposes)
+            const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
+            const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
 
-            const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
+            // Final total calculation
+            const finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay;
 
             // ============================================================
             // WPS SPLIT LOGIC (Al Maraghi Motors only)
