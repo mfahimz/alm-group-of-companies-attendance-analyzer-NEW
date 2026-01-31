@@ -821,9 +821,9 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Amt {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction {isAdmin && '✎'}</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deduct Min {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deduct Hrs {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Min (PM) {isAdmin && '✎'}</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Hrs (PM) {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_lop_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra LOP Days (PM) {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_lop_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra LOP Pay (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_deductible_hours_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra Deduct Pay (PM)</SortableTableHead>
@@ -951,29 +951,29 @@ export default function SalaryReportDetail() {
                                                         netDeduction.toFixed(2)
                                                     )}
                                                 </td>
-                                                {/* Deductible Minutes - Admin editable */}
+                                                {/* Deductible Hours - Admin editable (stored as minutes, displayed as hours) */}
                                                 <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-purple-50`}>
                                                     {isAdmin ? (
                                                         <Input
                                                             type="number"
-                                                            step="1"
-                                                            value={getAdminValue(row, 'deductible_minutes')}
-                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'deductible_minutes', e.target.value)}
+                                                            step="0.01"
+                                                            value={((adminEditableData[row.hrms_id]?.deductible_minutes ?? row.deductible_minutes ?? 0) / 60).toFixed(2)}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'deductible_minutes', parseFloat(e.target.value || 0) * 60)}
                                                             className="h-8 text-xs w-16 bg-purple-100"
                                                         />
                                                     ) : (
-                                                        (row.deductibleHours || 0).toFixed(2)
+                                                        ((row.deductible_minutes || 0) / 60).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-purple-100">{deductibleHoursPay.toFixed(2)}</td>
-                                                {/* Extra Prev Month Deductible Minutes - Admin editable */}
+                                                {/* Extra Prev Month Deductible Hours - Admin editable (stored as minutes, displayed as hours) */}
                                                 <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-orange-50`}>
                                                     {isAdmin ? (
                                                         <Input
                                                             type="number"
-                                                            step="1"
-                                                            value={getAdminValue(row, 'extra_prev_month_deductible_minutes')}
-                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'extra_prev_month_deductible_minutes', e.target.value)}
+                                                            step="0.01"
+                                                            value={((adminEditableData[row.hrms_id]?.extra_prev_month_deductible_minutes ?? row.extra_prev_month_deductible_minutes ?? 0) / 60).toFixed(2)}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'extra_prev_month_deductible_minutes', parseFloat(e.target.value || 0) * 60)}
                                                             className="h-8 text-xs w-16 bg-orange-100"
                                                         />
                                                     ) : (
