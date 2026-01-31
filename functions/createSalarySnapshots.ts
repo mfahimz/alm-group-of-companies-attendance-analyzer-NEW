@@ -982,20 +982,38 @@ Deno.serve(async (req) => {
             let calculated;
             let attendanceSource;
             
-            // ALWAYS recalculate attendance from shifts + exceptions + punches
-            // This ensures employees with no punches but with exceptions (annual leave, etc.) are computed correctly
-            // For Al Maraghi Motors: pass assumedPresentDays for salary-only assumption
-            calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to, assumedPresentDays);
-
             if (hasAnalysisResult) {
+                // ============================================================
+                // CRITICAL: Use the FINALIZED values from AnalysisResult directly
+                // The Attendance Report is the source of truth - do NOT recalculate
+                // ============================================================
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
+                
+                // Use values directly from the finalized AnalysisResult
+                calculated = {
+                    workingDays: analysisResult.working_days || 0,
+                    presentDays: analysisResult.present_days || 0,
+                    fullAbsenceCount: analysisResult.full_absence_count || 0,
+                    halfAbsenceCount: analysisResult.half_absence_count || 0,
+                    sickLeaveCount: analysisResult.sick_leave_count || 0,
+                    annualLeaveCount: analysisResult.annual_leave_count || 0,
+                    lateMinutes: analysisResult.late_minutes || 0,
+                    earlyCheckoutMinutes: analysisResult.early_checkout_minutes || 0,
+                    otherMinutes: analysisResult.other_minutes || 0,
+                    approvedMinutes: analysisResult.approved_minutes || 0,
+                    graceMinutes: analysisResult.grace_minutes || 15
+                };
+                
+                console.log(`[createSalarySnapshots] ${emp.name}: Using FINALIZED AnalysisResult values (deductible_minutes=${analysisResult.deductible_minutes}, late=${calculated.lateMinutes}, early=${calculated.earlyCheckoutMinutes}, other=${calculated.otherMinutes})`);
             } else {
                 // Employee had no AnalysisResult (was missing from original report run)
-                // But we still computed their attendance from exceptions/shifts
+                // Recalculate attendance from shifts + exceptions + punches
+                // For Al Maraghi Motors: pass assumedPresentDays for salary-only assumption
                 attendanceSource = 'NO_ATTENDANCE_DATA';
                 noAttendanceCount++;
-                console.log(`[createSalarySnapshots] Computing attendance for missing employee ${emp.name} (${emp.attendance_id}) - will use exceptions/shifts`);
+                calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to, assumedPresentDays);
+                console.log(`[createSalarySnapshots] ${emp.name} (${emp.attendance_id}): No AnalysisResult - calculated from shifts/exceptions`);
             }
 
             // Current month salary values (may be from increment)
