@@ -631,6 +631,12 @@ Deno.serve(async (req) => {
         // - Extra LOP Days (PM): Only check the LAST DAY of prev month (e.g., 31/12)
         // - Divisor: Uses OT Divisor (project.ot_calculation_days)
         // - IMPORTANT: Uses prevMonthSalaryAmount for calculations (historical salary)
+        // 
+        // PROJECT-SPECIFIC OVERRIDE: "January – Al Maraghi Motors"
+        // For this project ONLY:
+        //   - Previous month hours/deductible: 29/12/2025 → 31/12/2025
+        //   - Previous month LOP days: ONLY 31/12/2025 counts
+        //   - This is a one-time exception, NOT a global rule change
         // ============================================================
         const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) {
@@ -640,10 +646,31 @@ Deno.serve(async (req) => {
             const attendanceIdStr = String(emp.attendance_id);
             const includeSeconds = false; // Al Maraghi doesn't use seconds
             
+            // ============================================================
+            // PROJECT-SPECIFIC OVERRIDE: "January – Al Maraghi Motors"
+            // Override previous month date range for this specific project
+            // ============================================================
+            const isJanuaryAlMaraghiProject = project.name === 'January – Al Maraghi Motors';
+            
+            let effectivePrevMonthFrom = extraPrevMonthFrom;
+            let effectivePrevMonthTo = extraPrevMonthTo;
+            let effectiveLopOnlyDate = extraPrevMonthTo; // Default: last day of prev month range
+            
+            if (isJanuaryAlMaraghiProject) {
+                // For "January – Al Maraghi Motors" ONLY:
+                // - Previous month hours: 29/12/2025 → 31/12/2025
+                // - Previous month LOP days: ONLY 31/12/2025
+                effectivePrevMonthFrom = '2025-12-29';
+                effectivePrevMonthTo = '2025-12-31';
+                effectiveLopOnlyDate = '2025-12-31';
+                
+                console.log(`[createSalarySnapshots] PROJECT OVERRIDE: "January – Al Maraghi Motors" - Using prev month range 29-31 Dec, LOP only on 31 Dec`);
+            }
+            
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr &&
-                p.punch_date >= extraPrevMonthFrom && 
-                p.punch_date <= extraPrevMonthTo
+                p.punch_date >= effectivePrevMonthFrom && 
+                p.punch_date <= effectivePrevMonthTo
             );
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
             const employeeExceptions = allExceptions.filter(e => 
@@ -663,12 +690,12 @@ Deno.serve(async (req) => {
             let totalOtherMinutes = 0;
             let totalApprovedMinutes = 0;
             
-            // LOP: Only check the LAST day of prev month range
+            // LOP: Only check the specific LOP day (last day of prev month range)
             let extraLopDays = 0;
-            const lastDayOfPrevMonth = extraPrevMonthTo; // e.g., "2025-12-31"
+            const lastDayOfPrevMonth = effectiveLopOnlyDate; // e.g., "2025-12-31"
 
-            const startDate = new Date(extraPrevMonthFrom);
-            const endDate = new Date(extraPrevMonthTo);
+            const startDate = new Date(effectivePrevMonthFrom);
+            const endDate = new Date(effectivePrevMonthTo);
 
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const currentDate = new Date(d);
