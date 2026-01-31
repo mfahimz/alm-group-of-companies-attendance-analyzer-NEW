@@ -68,6 +68,7 @@ import ReportDetail from './pages/ReportDetail';
 import Reports from './pages/Reports';
 import RulesSettings from './pages/RulesSettings';
 import Salaries from './pages/Salaries';
+import SalaryIncrements from './pages/SalaryIncrements';
 import SalaryReportDetail from './pages/SalaryReportDetail';
 import SecurityAudit from './pages/SecurityAudit';
 import SystemHealth from './pages/SystemHealth';
@@ -76,7 +77,6 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import SalaryIncrements from './pages/SalaryIncrements';
 import __Layout from './Layout.jsx';
 
 
@@ -102,6 +102,7 @@ export const PAGES = {
     "Reports": Reports,
     "RulesSettings": RulesSettings,
     "Salaries": Salaries,
+    "SalaryIncrements": SalaryIncrements,
     "SalaryReportDetail": SalaryReportDetail,
     "SecurityAudit": SecurityAudit,
     "SystemHealth": SystemHealth,
@@ -110,7 +111,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "SalaryIncrements": SalaryIncrements,
 }
 
 export const pagesConfig = {

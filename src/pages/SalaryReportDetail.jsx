@@ -421,7 +421,7 @@ export default function SalaryReportDetail() {
                 'Net Deduction': row.netDeduction || 0,
                 'Deductible Hours': row.deductibleHours || 0,
                 'Deductible Hours Pay': row.deductibleHoursPay || 0,
-                'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
+                'Extra Deductible Hrs (Prev Month)': Math.round(((row.extra_prev_month_deductible_minutes || 0) / 60) * 100) / 100,
                 'Extra LOP Days (Prev Month)': row.extra_prev_month_lop_days || 0,
                 'Extra LOP Pay (Prev Month)': row.extra_prev_month_lop_pay || 0,
                 'Extra Deductible Pay (Prev Month)': row.extra_prev_month_deductible_hours_pay || 0,
@@ -606,7 +606,7 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Min (PM)</SortableTableHead>
+                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Hrs (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_lop_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra LOP Days (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_lop_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra LOP Pay (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_deductible_hours_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra Deduct Pay (PM)</SortableTableHead>
@@ -650,7 +650,7 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle bg-red-50 font-semibold">{row.netDeduction?.toFixed(2) || '0.00'}</td>
                                                 <td className="p-2 align-middle bg-purple-50">{row.deductibleHours?.toFixed(2) || '0.00'}</td>
                                                 <td className="p-2 align-middle bg-purple-100">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-orange-50">{row.extra_prev_month_deductible_minutes || 0}</td>
+                                                <td className="p-2 align-middle bg-orange-50">{((row.extra_prev_month_deductible_minutes || 0) / 60).toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-orange-50">{(row.extra_prev_month_lop_days || 0).toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_lop_pay || 0).toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_deductible_hours_pay || 0).toFixed(2)}</td>

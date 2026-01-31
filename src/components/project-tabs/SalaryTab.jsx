@@ -382,7 +382,7 @@ export default function SalaryTab({ project }) {
                 'Net Deduction': row.netDeduction || 0,
                 'Deductible Hours': row.deductibleHours || 0,
                 'Deductible Hours Pay': row.deductibleHoursPay || 0,
-                'Extra Deductible Min (Prev Month)': row.extra_prev_month_deductible_minutes || 0,
+                'Extra Deductible Hrs (Prev Month)': Math.round(((row.extra_prev_month_deductible_minutes || 0) / 60) * 100) / 100,
                 'Extra LOP Days (Prev Month)': row.extra_prev_month_lop_days || 0,
                 'Extra LOP Pay (Prev Month)': row.extra_prev_month_lop_pay || 0,
                 'Extra Deductible Pay (Prev Month)': row.extra_prev_month_deductible_hours_pay || 0,
