@@ -421,7 +421,7 @@ export default function SalaryTab({ project }) {
                         </CardTitle>
                         <Button 
                             onClick={handleOpenGenerateDialog}
-                            disabled={!hasFinalReport || salarySnapshots.length === 0}
+                            disabled={!hasFinalReport || loadingSnapshots || salarySnapshots.length === 0}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
                             <Plus className="w-4 h-4 mr-2" />
