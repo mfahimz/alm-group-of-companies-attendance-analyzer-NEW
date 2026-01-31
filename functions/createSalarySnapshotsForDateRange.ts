@@ -874,12 +874,67 @@ Deno.serve(async (req) => {
             let calculated;
             let attendanceSource;
             
-            // ALWAYS recalculate for custom date range with assumed present days support
+            // For custom date range, always recalculate attendance
             calculated = recalculateEmployeeAttendance(emp, date_from, date_to, assumedPresentDays);
 
             if (hasAnalysisResult) {
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
+
+                // CRITICAL: Apply day_overrides from AnalysisResult to adjust time minutes
+                // The day_overrides contain manual edits made in the Attendance Report UI
+                let adjustedLateMinutes = calculated.lateMinutes;
+                let adjustedEarlyMinutes = calculated.earlyCheckoutMinutes;
+                let adjustedOtherMinutes = calculated.otherMinutes;
+
+                if (analysisResult.day_overrides) {
+                    try {
+                        const dayOverrides = JSON.parse(analysisResult.day_overrides);
+
+                        // Apply each day override's adjustment
+                        for (const [dateStr, override] of Object.entries(dayOverrides)) {
+                            if (override.type === 'MANUAL_PRESENT' || override.lateMinutes !== undefined || 
+                                override.earlyCheckoutMinutes !== undefined || override.otherMinutes !== undefined) {
+
+                                // Subtract original values
+                                if (override.originalLateMinutes !== undefined) {
+                                    adjustedLateMinutes -= override.originalLateMinutes;
+                                }
+                                if (override.originalEarlyCheckout !== undefined) {
+                                    adjustedEarlyMinutes -= override.originalEarlyCheckout;
+                                }
+                                if (override.originalOtherMinutes !== undefined) {
+                                    adjustedOtherMinutes -= override.originalOtherMinutes;
+                                }
+
+                                // Add new values from override
+                                if (override.lateMinutes !== undefined) {
+                                    adjustedLateMinutes += override.lateMinutes;
+                                }
+                                if (override.earlyCheckoutMinutes !== undefined) {
+                                    adjustedEarlyMinutes += override.earlyCheckoutMinutes;
+                                }
+                                if (override.otherMinutes !== undefined) {
+                                    adjustedOtherMinutes += override.otherMinutes;
+                                }
+                            }
+                        }
+
+                        // Ensure no negative values
+                        adjustedLateMinutes = Math.max(0, adjustedLateMinutes);
+                        adjustedEarlyMinutes = Math.max(0, adjustedEarlyMinutes);
+                        adjustedOtherMinutes = Math.max(0, adjustedOtherMinutes);
+
+                        // Update calculated values with adjusted amounts
+                        calculated.lateMinutes = adjustedLateMinutes;
+                        calculated.earlyCheckoutMinutes = adjustedEarlyMinutes;
+                        calculated.otherMinutes = adjustedOtherMinutes;
+
+                        console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Applied day_overrides - Late: ${analysisResult.late_minutes} -> ${adjustedLateMinutes}, Early: ${analysisResult.early_checkout_minutes} -> ${adjustedEarlyMinutes}, Other: ${analysisResult.other_minutes} -> ${adjustedOtherMinutes}`);
+                    } catch (e) {
+                        console.warn(`[createSalarySnapshotsForDateRange] ${emp.name}: Failed to parse day_overrides, using raw calculated values`);
+                    }
+                }
             } else {
                 attendanceSource = 'NO_ATTENDANCE_DATA';
                 noAttendanceCount++;
