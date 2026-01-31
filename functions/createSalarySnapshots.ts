@@ -126,7 +126,8 @@ Deno.serve(async (req) => {
         const reportRun = reports[0];
 
         // Fetch all related data - INCLUDING punches, shifts, exceptions for recalculation
-        const [employees, salaries, analysisResults, allExceptions, punches, shifts, rulesData] = await Promise.all([
+        // Also fetch salary increments for Al Maraghi Motors salary resolution
+        const [employees, salaries, analysisResults, allExceptions, punches, shifts, rulesData, salaryIncrements] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.AnalysisResult.filter({ 
@@ -136,7 +137,10 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.Exception.filter({ project_id: project_id }),
             base44.asServiceRole.entities.Punch.filter({ project_id: project_id }),
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }),
-            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
+            isAlMaraghi 
+                ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true })
+                : Promise.resolve([])
         ]);
 
         console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results`);
