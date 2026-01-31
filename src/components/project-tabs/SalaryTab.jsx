@@ -178,7 +178,16 @@ export default function SalaryTab({ project }) {
                     throw new Error(response.data.error);
                 }
 
+                // Use the recalculated snapshots directly - they already have all prev month fields
                 calculatedData = response.data?.snapshots || [];
+                console.log('[SalaryTab] Custom date range snapshots received:', calculatedData.length, 'with sample:', 
+                    calculatedData[0] ? {
+                        extra_prev_month_deductible_minutes: calculatedData[0].extra_prev_month_deductible_minutes,
+                        extra_prev_month_lop_days: calculatedData[0].extra_prev_month_lop_days,
+                        extra_prev_month_lop_pay: calculatedData[0].extra_prev_month_lop_pay,
+                        extra_prev_month_deductible_hours_pay: calculatedData[0].extra_prev_month_deductible_hours_pay
+                    } : 'no data'
+                );
             } else {
                 // Use existing snapshot data for full date range
                 calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
