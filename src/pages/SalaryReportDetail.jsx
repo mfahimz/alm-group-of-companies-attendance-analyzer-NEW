@@ -779,13 +779,13 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Working Days</SortableTableHead>
                                         <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present Days</SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP Days</SortableTableHead>
-                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50">Annual Leave</SortableTableHead>
+                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50">Annual Leave {isAdmin && '(Edit)'}</SortableTableHead>
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
                                         <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days</SortableTableHead>
+                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days {isAdmin && '(Edit)'}</SortableTableHead>
                                         <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Amount</SortableTableHead>
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours {isAdmin && '(Edit)'}</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Hrs (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="extra_prev_month_lop_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra LOP Days (PM)</SortableTableHead>
@@ -815,7 +815,7 @@ export default function SalaryReportDetail() {
                                             </td>
                                         </tr>
                                     ) : filteredData.map((row) => {
-                                        const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
+                                        const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, leavePay, salaryLeaveAmount, netDeduction, deductibleHoursPay } = calculateTotals(row);
                                         return (
                                             <tr key={row.hrms_id} className="border-b transition-colors hover:bg-muted/50">
                                                 <td className="p-2 align-middle sticky left-0 bg-white z-10">
@@ -829,15 +829,51 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle font-semibold">{row.total_salary?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.working_days?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.present_days?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle text-red-600 font-semibold">{row.full_absence_count?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle text-blue-600">{row.annual_leave_count?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{row.leaveDays?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{row.leavePay?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{(row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{row.salaryLeaveAmount?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-red-50 font-semibold">{row.netDeduction?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-purple-50">{row.deductibleHours?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-purple-100">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</td>
+                                                <td className="p-2 align-middle text-red-600 font-semibold">{(getAdminValue(row, 'full_absence_count')).toFixed(2)}</td>
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle text-blue-600`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getAdminValue(row, 'annual_leave_count')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'annual_leave_count', e.target.value)}
+                                                            className="h-8 text-xs w-20 bg-blue-50"
+                                                        />
+                                                    ) : (
+                                                        (row.annual_leave_count || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-amber-50">{(getAdminValue(row, 'annual_leave_count') + getAdminValue(row, 'full_absence_count')).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100">{leavePay.toFixed(2)}</td>
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-amber-50`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getAdminValue(row, 'salary_leave_days')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'salary_leave_days', e.target.value)}
+                                                            className="h-8 text-xs w-20 bg-amber-100"
+                                                        />
+                                                    ) : (
+                                                        (row.salary_leave_days || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-amber-100">{salaryLeaveAmount.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-red-50 font-semibold">{netDeduction.toFixed(2)}</td>
+                                                <td className={`p-${isAdmin ? '1' : '2'} align-middle bg-purple-50`}>
+                                                    {isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="1"
+                                                            value={getAdminValue(row, 'deductible_minutes')}
+                                                            onChange={(e) => handleAdminChange(row.hrms_id, 'deductible_minutes', e.target.value)}
+                                                            className="h-8 text-xs w-20 bg-purple-100"
+                                                        />
+                                                    ) : (
+                                                        (row.deductibleHours || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-purple-100">{deductibleHoursPay.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-orange-50">{((row.extra_prev_month_deductible_minutes || 0) / 60).toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-orange-50">{(row.extra_prev_month_lop_days || 0).toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_lop_pay || 0).toFixed(2)}</td>
@@ -862,7 +898,7 @@ export default function SalaryReportDetail() {
                                                     />
                                                 </td>
                                                 <td className="p-2 align-middle bg-cyan-100">{specialOtSalary.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-cyan-200 font-semibold">{totalOtSalary.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-cyan-200 font-semibold">{totalOtSalary.toFixed(4)}</td>
                                                 <td className="p-1 align-middle bg-red-50">
                                                     <Input
                                                         type="number"
