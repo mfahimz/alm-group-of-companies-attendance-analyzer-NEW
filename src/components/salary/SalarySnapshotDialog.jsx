@@ -169,11 +169,11 @@ export default function SalarySnapshotDialog({
                         Overtime & Adjustments
                     </h3>
                     <div className="divide-y divide-slate-100">
-                        <DataRow label="Normal OT Hours" value={snapshot.normalOtHours} />
-                        <DataRow label="Special OT Hours" value={snapshot.specialOtHours} />
-                        <DataRow label="OT Amount" value={snapshot.totalOtSalary || ((snapshot.normalOtSalary || 0) + (snapshot.specialOtSalary || 0))} />
-                        <DataRow label="Bonus" value={snapshot.bonus} />
-                        <DataRow label="Incentive" value={snapshot.incentive} />
+                        <DataRow label="Normal OT Hours" value={snapshot.normalOtHours} noRound />
+                        <DataRow label="Special OT Hours" value={snapshot.specialOtHours} noRound />
+                        <DataRow label="OT Amount" value={snapshot.totalOtSalary || ((snapshot.normalOtSalary || 0) + (snapshot.specialOtSalary || 0))} noRound />
+                        <DataRow label="Bonus" value={snapshot.bonus} noRound />
+                        <DataRow label="Incentive" value={snapshot.incentive} noRound />
                     </div>
                 </div>
 
