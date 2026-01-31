@@ -955,12 +955,16 @@ Deno.serve(async (req) => {
             const extraPrevMonthLopPay = extraPrevMonthData.extraLopPay;
             const extraPrevMonthDeductibleHoursPay = extraPrevMonthData.extraDeductibleHoursPay;
             
-            // Current month deductible hours (separate from prev month)
-            const currentMonthDeductibleHours = Math.round(deductibleHours * 100) / 100;
+            // Total deductible hours pay = current month + prev month (FIX Issue 2)
+            const totalDeductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
+            
+            // Total deductible minutes and hours (for display)
+            const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
+            const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
 
             // Final total calculation:
             // Total = Base Salary - Net Deduction - CurrentMonthDeductibleHoursPay - PrevMonthLopPay - PrevMonthDeductibleHoursPay
-            const finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay;
+            const finalTotal = totalSalaryAmount - netDeduction - totalDeductibleHoursPay - extraPrevMonthLopPay;
             
             console.log(`[createSalarySnapshotsForDateRange] Employee ${emp.name}: prevMonth deduct=${extraPrevMonthDeductibleMinutes}min, LOP=${extraPrevMonthLopDays}, lopPay=${extraPrevMonthLopPay}, deductPay=${extraPrevMonthDeductibleHoursPay}`);
 
@@ -1030,9 +1034,9 @@ Deno.serve(async (req) => {
                 leaveDays: leaveDays,
                 leavePay: Math.round(leavePay * 100) / 100,
                 salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
-                // Current month deductible hours (separate)
-                deductibleHours: currentMonthDeductibleHours,
-                deductibleHoursPay: currentMonthDeductibleHoursPay,
+                // Total deductible hours (current + prev month combined)
+                deductibleHours: totalDeductibleHours,
+                deductibleHoursPay: Math.round(totalDeductibleHoursPay * 100) / 100,
                 netDeduction: Math.round(netDeduction * 100) / 100,
                 normalOtHours: 0,
                 normalOtSalary: 0,
