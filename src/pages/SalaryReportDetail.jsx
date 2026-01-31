@@ -810,7 +810,6 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Total Salary</SortableTableHead>
                                         <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Working Days</SortableTableHead>
                                         <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present Days</SortableTableHead>
-                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP Days</SortableTableHead>
                                         <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50">Annual Leave {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP Days {isAdmin && '✎'}</SortableTableHead>
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
@@ -843,7 +842,7 @@ export default function SalaryReportDetail() {
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                     <tr className="border-b">
-                                    <td colSpan={33} className="text-center py-12">
+                                    <td colSpan={34} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
