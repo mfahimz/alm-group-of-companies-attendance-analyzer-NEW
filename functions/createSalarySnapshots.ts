@@ -984,13 +984,66 @@ Deno.serve(async (req) => {
             
             if (hasAnalysisResult) {
                 // ============================================================
-                // CRITICAL: Use the FINALIZED values from AnalysisResult directly
-                // The Attendance Report is the source of truth - do NOT recalculate
+                // CRITICAL: Use values from AnalysisResult WITH day_overrides applied
+                // The day_overrides contain manual edits made in the Attendance Report UI
+                // These overrides adjust late/early/other minutes for specific days
                 // ============================================================
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
-                
-                // Use values directly from the finalized AnalysisResult
+
+                // Parse day overrides to adjust time minutes
+                let adjustedLateMinutes = analysisResult.late_minutes || 0;
+                let adjustedEarlyMinutes = analysisResult.early_checkout_minutes || 0;
+                let adjustedOtherMinutes = analysisResult.other_minutes || 0;
+
+                if (analysisResult.day_overrides) {
+                    try {
+                        const dayOverrides = JSON.parse(analysisResult.day_overrides);
+
+                        // Apply each day override's adjustment
+                        for (const [dateStr, override] of Object.entries(dayOverrides)) {
+                            // If override has explicit time values, adjust the totals
+                            // The override stores the NEW values, and original values
+                            // We need to: subtract original, add new
+                            if (override.type === 'MANUAL_PRESENT' || override.lateMinutes !== undefined || 
+                                override.earlyCheckoutMinutes !== undefined || override.otherMinutes !== undefined) {
+
+                                // Subtract original values (if stored)
+                                if (override.originalLateMinutes !== undefined) {
+                                    adjustedLateMinutes -= override.originalLateMinutes;
+                                }
+                                if (override.originalEarlyCheckout !== undefined) {
+                                    adjustedEarlyMinutes -= override.originalEarlyCheckout;
+                                }
+                                if (override.originalOtherMinutes !== undefined) {
+                                    adjustedOtherMinutes -= override.originalOtherMinutes;
+                                }
+
+                                // Add new values from override
+                                if (override.lateMinutes !== undefined) {
+                                    adjustedLateMinutes += override.lateMinutes;
+                                }
+                                if (override.earlyCheckoutMinutes !== undefined) {
+                                    adjustedEarlyMinutes += override.earlyCheckoutMinutes;
+                                }
+                                if (override.otherMinutes !== undefined) {
+                                    adjustedOtherMinutes += override.otherMinutes;
+                                }
+                            }
+                        }
+
+                        // Ensure no negative values
+                        adjustedLateMinutes = Math.max(0, adjustedLateMinutes);
+                        adjustedEarlyMinutes = Math.max(0, adjustedEarlyMinutes);
+                        adjustedOtherMinutes = Math.max(0, adjustedOtherMinutes);
+
+                        console.log(`[createSalarySnapshots] ${emp.name}: Applied day_overrides - Late: ${analysisResult.late_minutes} -> ${adjustedLateMinutes}, Early: ${analysisResult.early_checkout_minutes} -> ${adjustedEarlyMinutes}, Other: ${analysisResult.other_minutes} -> ${adjustedOtherMinutes}`);
+                    } catch (e) {
+                        console.warn(`[createSalarySnapshots] ${emp.name}: Failed to parse day_overrides, using raw values`);
+                    }
+                }
+
+                // Use adjusted values (with day overrides applied)
                 calculated = {
                     workingDays: analysisResult.working_days || 0,
                     presentDays: analysisResult.present_days || 0,
@@ -998,14 +1051,14 @@ Deno.serve(async (req) => {
                     halfAbsenceCount: analysisResult.half_absence_count || 0,
                     sickLeaveCount: analysisResult.sick_leave_count || 0,
                     annualLeaveCount: analysisResult.annual_leave_count || 0,
-                    lateMinutes: analysisResult.late_minutes || 0,
-                    earlyCheckoutMinutes: analysisResult.early_checkout_minutes || 0,
-                    otherMinutes: analysisResult.other_minutes || 0,
+                    lateMinutes: adjustedLateMinutes,
+                    earlyCheckoutMinutes: adjustedEarlyMinutes,
+                    otherMinutes: adjustedOtherMinutes,
                     approvedMinutes: analysisResult.approved_minutes || 0,
                     graceMinutes: analysisResult.grace_minutes || 15
                 };
-                
-                console.log(`[createSalarySnapshots] ${emp.name}: Using FINALIZED AnalysisResult values (deductible_minutes=${analysisResult.deductible_minutes}, late=${calculated.lateMinutes}, early=${calculated.earlyCheckoutMinutes}, other=${calculated.otherMinutes})`);
+
+                console.log(`[createSalarySnapshots] ${emp.name}: Using AnalysisResult with day_overrides (late=${calculated.lateMinutes}, early=${calculated.earlyCheckoutMinutes}, other=${calculated.otherMinutes})`);
             } else {
                 // Employee had no AnalysisResult (was missing from original report run)
                 // Recalculate attendance from shifts + exceptions + punches
