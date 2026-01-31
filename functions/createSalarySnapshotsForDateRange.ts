@@ -913,8 +913,10 @@ Deno.serve(async (req) => {
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
             const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
             
+            // Salary Leave Amount with rounding UP to nearest multiple of 5
             const salaryForLeave = basicSalary + allowancesAmount;
-            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+            const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+            const salaryLeaveAmount = rawSalaryLeaveAmount > 0 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5 : 0;
             
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
@@ -953,6 +955,25 @@ Deno.serve(async (req) => {
             // Total deductible minutes and hours (for display)
             const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
             const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
+
+            // ============================================================
+            // OT SALARY CALCULATION
+            // RULE: If employee has ANY salary increments, use PREVIOUS MONTH salary for OT
+            // If no increments exist, use current month salary for OT
+            // ============================================================
+            let otBaseSalary = totalSalaryAmount; // Default: current month
+            if (isAlMaraghi && salaryIncrements.length > 0) {
+                const empHasIncrements = salaryIncrements.some(inc => 
+                    String(inc.employee_id) === String(emp.hrms_id) ||
+                    String(inc.attendance_id) === String(emp.attendance_id)
+                );
+                if (empHasIncrements) {
+                    // Use previous month salary for OT calculations
+                    otBaseSalary = prevMonthTotalSalary;
+                    console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Using prev month salary (${prevMonthTotalSalary}) for OT (has increments)`);
+                }
+            }
+            const otHourlyRate = otBaseSalary / otDivisor / workingHours;
 
             // Final total calculation:
             // Total = Base Salary - Net Deduction - CurrentMonthDeductibleHoursPay - PrevMonthLopPay - PrevMonthDeductibleHoursPay
@@ -1000,6 +1021,7 @@ Deno.serve(async (req) => {
                 basic_salary: basicSalary,
                 allowances: allowancesAmount,
                 total_salary: totalSalaryAmount,
+                ot_base_salary: otBaseSalary, // Salary used for OT calculations (prev month if increments exist)
                 working_hours: workingHours,
                 working_days: calculated.workingDays,
                 salary_divisor: divisor,
