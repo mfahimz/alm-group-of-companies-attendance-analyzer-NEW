@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
 
         // ============================================================
         // AL MARAGHI MOTORS: Calculate salary month ranges
+        // Based on the CUSTOM date_to parameter (not project.date_to)
         // ============================================================
         let salaryMonthStartStr = null;
         let salaryMonthEndStr = null;
@@ -56,24 +57,26 @@ Deno.serve(async (req) => {
         let assumedPresentDays = [];
         
         if (isAlMaraghi) {
-            const projectDateTo = new Date(project.date_to);
-            const salaryMonthStart = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth(), 1);
-            const salaryMonthEnd = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth() + 1, 0);
+            // Use the CUSTOM date_to for salary month calculation
+            const customDateTo = new Date(date_to);
+            const salaryMonthStart = new Date(customDateTo.getFullYear(), customDateTo.getMonth(), 1);
+            const salaryMonthEnd = new Date(customDateTo.getFullYear(), customDateTo.getMonth() + 1, 0);
             
             salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
             salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
 
             // Calculate assumed present days: last 2 days of salary month
-            const assumedDay1 = new Date(projectDateTo);
+            const assumedDay1 = new Date(salaryMonthEnd);
             assumedDay1.setDate(assumedDay1.getDate() - 1);
-            const assumedDay2 = new Date(projectDateTo);
+            const assumedDay2 = new Date(salaryMonthEnd);
             
             assumedPresentDays = [
                 assumedDay1.toISOString().split('T')[0],
                 assumedDay2.toISOString().split('T')[0]
             ];
 
-            // Extra previous month range
+            // Extra previous month range: check if PROJECT date_from is before salary month start
+            // This determines if the project spans into the previous month
             const projectDateFrom = new Date(project.date_from);
             const dayBeforeSalaryMonth = new Date(salaryMonthStart);
             dayBeforeSalaryMonth.setDate(dayBeforeSalaryMonth.getDate() - 1);
@@ -85,6 +88,7 @@ Deno.serve(async (req) => {
             }
 
             console.log('[createSalarySnapshotsForDateRange] Al Maraghi salary month ranges:', {
+                custom_date_to: date_to,
                 salary_month_start: salaryMonthStartStr,
                 salary_month_end: salaryMonthEndStr,
                 extra_prev_month_from: extraPrevMonthFrom,
