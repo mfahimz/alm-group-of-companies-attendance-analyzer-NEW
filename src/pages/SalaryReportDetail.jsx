@@ -360,37 +360,69 @@ export default function SalaryReportDetail() {
             if (edits && 'incentive' in edits) updated.incentive = edits.incentive;
             if (edits && 'advanceSalaryDeduction' in edits) updated.advanceSalaryDeduction = edits.advanceSalaryDeduction;
 
-            // Apply admin edits (attendance values) - Admin only
+            // Apply admin edits (attendance values + calculated overrides) - Admin only
             if (adminEdits) {
+                // Attendance input fields
                 if ('annual_leave_count' in adminEdits) updated.annual_leave_count = adminEdits.annual_leave_count;
                 if ('full_absence_count' in adminEdits) updated.full_absence_count = adminEdits.full_absence_count;
                 if ('salary_leave_days' in adminEdits) updated.salary_leave_days = adminEdits.salary_leave_days;
                 if ('deductible_minutes' in adminEdits) updated.deductible_minutes = adminEdits.deductible_minutes;
+                if ('extra_prev_month_deductible_minutes' in adminEdits) updated.extra_prev_month_deductible_minutes = adminEdits.extra_prev_month_deductible_minutes;
+                if ('extra_prev_month_lop_days' in adminEdits) updated.extra_prev_month_lop_days = adminEdits.extra_prev_month_lop_days;
                 
-                // Recalculate leave values based on admin edits
+                // Calculated field overrides (admin can set these directly)
+                if ('leavePay' in adminEdits) updated.leavePay = Math.round(adminEdits.leavePay * 100) / 100;
+                if ('salaryLeaveAmount' in adminEdits) updated.salaryLeaveAmount = adminEdits.salaryLeaveAmount;
+                if ('netDeduction' in adminEdits) updated.netDeduction = Math.round(adminEdits.netDeduction * 100) / 100;
+                
+                // Get final values (edited or existing)
                 const annualLeaveCount = updated.annual_leave_count || 0;
                 const fullAbsenceCount = updated.full_absence_count || 0;
                 const salaryLeaveDays = updated.salary_leave_days || annualLeaveCount;
                 const deductibleMinutes = updated.deductible_minutes || 0;
+                const extraPrevMonthDeductMinutes = updated.extra_prev_month_deductible_minutes || 0;
+                const extraPrevMonthLopDays = updated.extra_prev_month_lop_days || 0;
                 
-                const leaveDays = annualLeaveCount + fullAbsenceCount;
-                const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
+                // Auto-recalculate leaveDays
+                updated.leaveDays = annualLeaveCount + fullAbsenceCount;
                 
-                // Salary Leave Amount with rounding to nearest 5 (up)
-                const salaryForLeave = basicSalary + allowances;
-                const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
-                const salaryLeaveAmount = rawSalaryLeaveAmount > 0 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5 : 0;
+                // Auto-recalculate leavePay if not directly edited
+                if (!('leavePay' in adminEdits) && ('annual_leave_count' in adminEdits || 'full_absence_count' in adminEdits)) {
+                    const leavePay = updated.leaveDays > 0 ? (totalSalary / divisor) * updated.leaveDays : 0;
+                    updated.leavePay = Math.round(leavePay * 100) / 100;
+                }
                 
-                updated.leaveDays = leaveDays;
-                updated.leavePay = Math.round(leavePay * 100) / 100;
-                updated.salaryLeaveAmount = salaryLeaveAmount;
-                updated.netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
+                // Auto-recalculate salaryLeaveAmount if not directly edited
+                if (!('salaryLeaveAmount' in adminEdits) && 'salary_leave_days' in adminEdits) {
+                    const salaryForLeave = basicSalary + allowances;
+                    const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+                    updated.salaryLeaveAmount = rawSalaryLeaveAmount > 0 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5 : 0;
+                }
                 
-                // Deductible hours pay
+                // Auto-recalculate netDeduction if not directly edited
+                if (!('netDeduction' in adminEdits)) {
+                    updated.netDeduction = Math.round(Math.max(0, (updated.leavePay || 0) - (updated.salaryLeaveAmount || 0)) * 100) / 100;
+                }
+                
+                // Deductible hours pay calculation
                 const hourlyRateDeduction = totalSalary / divisor / workingHours;
                 const deductibleHours = deductibleMinutes / 60;
                 updated.deductibleHours = Math.round(deductibleHours * 100) / 100;
-                updated.deductibleHoursPay = Math.round(hourlyRateDeduction * deductibleHours * 100) / 100;
+                const currentMonthDeductibleHoursPay = hourlyRateDeduction * deductibleHours;
+                
+                // Previous month deductible calculations
+                const prevMonthHourlyRate = totalSalary / otDivisor / workingHours;
+                const extraDeductibleHours = extraPrevMonthDeductMinutes / 60;
+                const extraPrevMonthDeductibleHoursPay = prevMonthHourlyRate * extraDeductibleHours;
+                updated.extra_prev_month_deductible_hours_pay = Math.round(extraPrevMonthDeductibleHoursPay * 100) / 100;
+                
+                // Previous month LOP pay
+                const prevMonthDivisor = otDivisor;
+                const extraPrevMonthLopPay = extraPrevMonthLopDays > 0 ? (totalSalary / prevMonthDivisor) * extraPrevMonthLopDays : 0;
+                updated.extra_prev_month_lop_pay = Math.round(extraPrevMonthLopPay * 100) / 100;
+                
+                // Total deductible hours pay
+                updated.deductibleHoursPay = Math.round((currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay) * 100) / 100;
             }
 
             // Recalculate total (include previous month deductions)
