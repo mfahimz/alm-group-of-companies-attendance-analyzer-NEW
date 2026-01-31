@@ -565,8 +565,6 @@ export default function SalaryTab({ project }) {
                                     type="date"
                                     value={newReportDateFrom}
                                     onChange={(e) => setNewReportDateFrom(e.target.value)}
-                                    min={finalReport?.date_from}
-                                    max={newReportDateTo || finalReport?.date_to}
                                 />
                             </div>
                             <div>
@@ -575,16 +573,18 @@ export default function SalaryTab({ project }) {
                                     type="date"
                                     value={newReportDateTo}
                                     onChange={(e) => setNewReportDateTo(e.target.value)}
-                                    min={newReportDateFrom || finalReport?.date_from}
-                                    max={finalReport?.date_to}
                                 />
                             </div>
                         </div>
                         <div className="bg-slate-50 p-3 rounded text-sm text-slate-600">
-                            <p><strong>Finalized Report Period:</strong> {finalReport?.date_from} to {finalReport?.date_to}</p>
+                            <p><strong>Attendance Report Period:</strong> {finalReport?.date_from} to {finalReport?.date_to}</p>
+                            <p><strong>Salary Month:</strong> {newReportDateFrom} to {newReportDateTo}</p>
                             <p><strong>Employees:</strong> {salarySnapshots.length}</p>
                             <p><strong>Company:</strong> {project?.company}</p>
                             <p><strong>Salary Calculation Divisor:</strong> {project?.salary_calculation_days || 30} days</p>
+                            {isAlMaraghi && (
+                                <p className="text-amber-700 mt-1"><strong>Note:</strong> Last 2 days of month are "assumed present" for salary (no deductions).</p>
+                            )}
                         </div>
                         {(newReportDateFrom !== finalReport?.date_from || newReportDateTo !== finalReport?.date_to) && (
                             <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
