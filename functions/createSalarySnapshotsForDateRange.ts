@@ -560,6 +560,230 @@ Deno.serve(async (req) => {
         };
 
         // ============================================================
+        // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
+        // ============================================================
+        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours) => {
+            if (!isAlMaraghi || !hasExtraPrevMonthRange) {
+                return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
+            }
+
+            const attendanceIdStr = String(emp.attendance_id);
+            const includeSeconds = false;
+            
+            // PROJECT-SPECIFIC OVERRIDE: "January – Al Maraghi Motors"
+            const isJanuaryAlMaraghiProject = project.name === 'January - Al Maraghi Motors' || 
+                                               project.name === 'January – Al Maraghi Motors';
+            
+            let effectivePrevMonthFrom = extraPrevMonthFrom;
+            let effectivePrevMonthTo = extraPrevMonthTo;
+            let effectiveLopOnlyDate = extraPrevMonthTo;
+            
+            if (isJanuaryAlMaraghiProject) {
+                effectivePrevMonthFrom = '2025-12-29';
+                effectivePrevMonthTo = '2025-12-31';
+                effectiveLopOnlyDate = '2025-12-31';
+                
+                console.log(`[createSalarySnapshotsForDateRange] PROJECT OVERRIDE: Using prev month range 29-31 Dec, LOP only on 31 Dec`);
+            }
+            
+            const employeePunches = punches.filter(p => 
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= effectivePrevMonthFrom && 
+                p.punch_date <= effectivePrevMonthTo
+            );
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
+            const employeeExceptions = allExceptions.filter(e => 
+                (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+                e.use_in_analysis !== false &&
+                e.is_custom_type !== true
+            );
+
+            const dayNameToNumber = {
+                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                'Thursday': 4, 'Friday': 5, 'Saturday': 6
+            };
+
+            let totalLateMinutes = 0;
+            let totalEarlyMinutes = 0;
+            let totalOtherMinutes = 0;
+            let totalApprovedMinutes = 0;
+            let extraLopDays = 0;
+            const lastDayOfPrevMonth = effectiveLopOnlyDate;
+
+            const startDate = new Date(effectivePrevMonthFrom);
+            const endDate = new Date(effectivePrevMonthTo);
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDate = new Date(d);
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const dayOfWeek = currentDate.getUTCDay();
+                const isLastDayOfPrevMonth = (dateStr === lastDayOfPrevMonth);
+
+                let weeklyOffDay = null;
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                } else if (emp.weekly_off) {
+                    weeklyOffDay = dayNameToNumber[emp.weekly_off];
+                }
+                
+                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    continue;
+                }
+
+                const matchingExceptions = employeeExceptions.filter(ex => {
+                    try {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        return currentDate >= exFrom && currentDate <= exTo;
+                    } catch { return false; }
+                });
+
+                const hasPublicHoliday = matchingExceptions.some(ex => 
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
+                if (hasPublicHoliday) continue;
+
+                const dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                    : null;
+
+                if (dateException && dateException.type === 'MANUAL_ABSENT') {
+                    if (isLastDayOfPrevMonth) {
+                        extraLopDays = 1;
+                    }
+                    continue;
+                }
+
+                if (dateException && [
+                    'MANUAL_PRESENT', 'MANUAL_HALF', 'SICK_LEAVE', 'ANNUAL_LEAVE'
+                ].includes(dateException.type)) {
+                    continue;
+                }
+
+                const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+                
+                if (rawDayPunches.length === 0) {
+                    if (isLastDayOfPrevMonth) {
+                        extraLopDays = 1;
+                    }
+                    continue;
+                }
+
+                const isShiftEffective = (s) => {
+                    if (!s.effective_from || !s.effective_to) return true;
+                    const from = new Date(s.effective_from);
+                    const to = new Date(s.effective_to);
+                    return currentDate >= from && currentDate <= to;
+                };
+
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const currentDayName = dayNames[dayOfWeek];
+
+                let shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
+                if (!shift) {
+                    const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
+                    for (const s of applicableShifts) {
+                        if (s.applicable_days) {
+                            try {
+                                const applicableDaysArray = JSON.parse(s.applicable_days);
+                                if (Array.isArray(applicableDaysArray) && applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
+                                    shift = s;
+                                    break;
+                                }
+                            } catch {}
+                        }
+                    }
+                    if (!shift) {
+                        if (dayOfWeek === 5) {
+                            shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s)) ||
+                                    employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        } else {
+                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        }
+                    }
+                }
+
+                if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                    const isFriday = dayOfWeek === 5;
+                    if (dateException.include_friday || !isFriday) {
+                        shift = {
+                            am_start: dateException.new_am_start,
+                            am_end: dateException.new_am_end,
+                            pm_start: dateException.new_pm_start,
+                            pm_end: dateException.new_pm_end
+                        };
+                    }
+                }
+
+                if (!shift) continue;
+
+                const dayPunches = filterMultiplePunches(rawDayPunches, includeSeconds);
+
+                let allowedMinutesForDay = 0;
+                if (dateException && dateException.type === 'ALLOWED_MINUTES' && 
+                    dateException.approval_status === 'approved_dept_head') {
+                    allowedMinutesForDay = dateException.allowed_minutes || 0;
+                    totalApprovedMinutes += allowedMinutesForDay;
+                }
+
+                const hasManualTimeException = dateException && (
+                    dateException.type === 'MANUAL_LATE' || 
+                    dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                    (dateException.late_minutes > 0) ||
+                    (dateException.early_checkout_minutes > 0) ||
+                    (dateException.other_minutes > 0)
+                );
+
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+                let dayOtherMinutes = 0;
+
+                if (hasManualTimeException) {
+                    if (dateException.late_minutes > 0) dayLateMinutes = dateException.late_minutes;
+                    if (dateException.early_checkout_minutes > 0) dayEarlyMinutes = dateException.early_checkout_minutes;
+                    if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
+                } else if (dayPunches.length > 0) {
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
+                    
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+                        
+                        if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
+                            dayLateMinutes += Math.round((punchTime - shiftTime) / (1000 * 60));
+                        }
+                        if ((match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') && punchTime < shiftTime) {
+                            dayEarlyMinutes += Math.round((shiftTime - punchTime) / (1000 * 60));
+                        }
+                    }
+                }
+
+                totalLateMinutes += dayLateMinutes;
+                totalEarlyMinutes += dayEarlyMinutes;
+                totalOtherMinutes += dayOtherMinutes;
+            }
+
+            const totalExtraDeductibleMinutes = Math.max(0, 
+                totalLateMinutes + totalEarlyMinutes + totalOtherMinutes - graceMinutes - totalApprovedMinutes
+            );
+
+            const prevMonthDivisor = otDivisor;
+            const extraLopPay = extraLopDays > 0 ? (prevMonthSalaryAmount / prevMonthDivisor) * extraLopDays : 0;
+            const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
+            const prevMonthHourlyRate = prevMonthSalaryAmount / prevMonthDivisor / workingHours;
+            const extraDeductibleHoursPay = prevMonthHourlyRate * extraDeductibleHours;
+
+            return {
+                extraDeductibleMinutes: totalExtraDeductibleMinutes,
+                extraLopDays: extraLopDays,
+                extraLopPay: Math.round(extraLopPay * 100) / 100,
+                extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay * 100) / 100,
+                prevMonthDivisor: prevMonthDivisor
+            };
+        };
+
+        // ============================================================
         // NEW LOGIC: Create salary snapshots for ALL active employees
         // ============================================================
         const snapshots = [];
