@@ -918,9 +918,20 @@ Deno.serve(async (req) => {
             
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-            // Calculate deductible
-            const totalTimeIssues = calculated.lateMinutes + calculated.earlyCheckoutMinutes + calculated.otherMinutes;
-            const deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
+            // CRITICAL FIX: Use the finalized deductible_minutes from AnalysisResult directly
+            // The Attendance Report already applied grace, so we must NOT apply it again
+            // If no AnalysisResult exists (NO_ATTENDANCE_DATA), calculate it fresh
+            let deductibleMinutes;
+            if (hasAnalysisResult && analysisResult.deductible_minutes !== undefined && analysisResult.deductible_minutes !== null) {
+                // Use the exact value from the finalized Attendance Report (grace already applied)
+                deductibleMinutes = analysisResult.deductible_minutes;
+                console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Using AnalysisResult.deductible_minutes = ${deductibleMinutes}`);
+            } else {
+                // Fallback: Calculate for employees without AnalysisResult
+                const totalTimeIssues = calculated.lateMinutes + calculated.earlyCheckoutMinutes + calculated.otherMinutes;
+                deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
+                console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Calculated deductible_minutes = ${deductibleMinutes} (no AnalysisResult)`);
+            }
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
             
             // Current month hourly rate uses salary divisor
