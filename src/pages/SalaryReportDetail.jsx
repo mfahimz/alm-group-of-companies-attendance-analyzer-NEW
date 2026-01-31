@@ -85,6 +85,21 @@ export default function SalaryReportDetail() {
         staleTime: 0
     });
 
+    // Load verified employees from report snapshot_data
+    React.useEffect(() => {
+        if (report?.snapshot_data) {
+            try {
+                const data = JSON.parse(report.snapshot_data);
+                const verified = data
+                    .filter(row => row.salary_verified === true)
+                    .map(row => String(row.attendance_id));
+                setVerifiedEmployees(verified);
+            } catch {
+                // Ignore parse errors
+            }
+        }
+    }, [report?.snapshot_data]);
+
     // ============================================
     // DERIVED VALUES
     // ============================================
