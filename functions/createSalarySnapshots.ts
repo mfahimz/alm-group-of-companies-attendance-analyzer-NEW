@@ -1083,15 +1083,15 @@ Deno.serve(async (req) => {
             // Total deductible hours pay = current month (salary divisor) + prev month (OT divisor)
             const totalDeductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
             
-            // Total deductible minutes (for display purposes)
-            const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
-            const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
+            // CRITICAL: Do NOT combine current month and prev month deductible hours
+             // Store ONLY current month deductible hours in deductibleHours field
+             // Prev month data is stored separately in extra_prev_month_deductible_minutes
 
-            // Final total calculation
-            // Current month: netDeduction (leave) + currentMonthDeductibleHoursPay (time)
-            // Previous month: extraPrevMonthLopPay (leave) + extraPrevMonthDeductibleHoursPay (time)
-            // Conditional rounding: Only round if bonus has NO decimal values
-            let finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay;
+             // Final total calculation
+             // Current month: netDeduction (leave) + currentMonthDeductibleHoursPay (time)
+             // Previous month: extraPrevMonthLopPay (leave) + extraPrevMonthDeductibleHoursPay (time)
+             // Conditional rounding: Only round if bonus has NO decimal values
+             let finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay;
             const bonusHasDecimals = (salary?.bonus || 0) % 1 !== 0;
             if (!bonusHasDecimals) {
                 finalTotal = Math.round(finalTotal);
