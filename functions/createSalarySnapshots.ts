@@ -630,8 +630,9 @@ Deno.serve(async (req) => {
         // - Grace is applied ONCE for the whole range (not per day)
         // - Extra LOP Days (PM): Only check the LAST DAY of prev month (e.g., 31/12)
         // - Divisor: Uses OT Divisor (project.ot_calculation_days)
+        // - IMPORTANT: Uses prevMonthSalaryAmount for calculations (historical salary)
         // ============================================================
-        const calculateExtraPrevMonthData = (emp, graceMinutes, totalSalaryAmount, workingHours) => {
+        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) {
                 return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
             }
