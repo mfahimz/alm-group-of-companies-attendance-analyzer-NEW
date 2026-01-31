@@ -32,25 +32,6 @@ export default function SalarySnapshotDialog({
 
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
 
-    // Format currency - whole numbers (0 decimals)
-    const formatCurrency = (value) => {
-        const num = Number(value) || 0;
-        return Math.round(num).toString();
-    };
-
-    // Format with normal decimal rounding (for deductible hours pay)
-    const formatRounded = (value) => {
-        const num = Number(value) || 0;
-        return Math.round(num * 100) / 100; // Normal rounding
-    };
-
-    // Format without rounding (show whole numbers for display)
-    const formatNoRound = (value) => {
-        const num = Number(value) || 0;
-        // Show as-is without additional rounding
-        return Math.round(num).toString();
-    };
-
     // Format month name from date
     const formatSalaryMonth = () => {
         if (snapshot.salary_month_start) {
@@ -87,11 +68,11 @@ export default function SalarySnapshotDialog({
     };
 
     // Row component for consistent styling
-    const DataRow = ({ label, value, highlight = false, negative = false, noRound = false }) => (
+    const DataRow = ({ label, value, highlight = false, negative = false }) => (
         <div className={`flex justify-between py-1.5 ${highlight ? 'font-semibold' : ''}`}>
             <span className="text-slate-600">{label}</span>
             <span className={`font-medium ${negative && Number(value) > 0 ? 'text-red-600' : ''} ${highlight ? 'text-slate-900' : 'text-slate-800'}`}>
-                {noRound ? formatNoRound(value) : formatCurrency(value)}
+                {value}
             </span>
         </div>
     );
@@ -157,8 +138,8 @@ export default function SalarySnapshotDialog({
                         <DataRow label="Current Month Deductible Hours Pay" value={snapshot.deductibleHoursPay} negative />
                         <DataRow label="Previous Month LOP Pay" value={snapshot.extra_prev_month_lop_pay} negative />
                         <DataRow label="Previous Month Deductible Hours Pay" value={snapshot.extra_prev_month_deductible_hours_pay} negative />
-                        <DataRow label="Other Deduction" value={snapshot.otherDeduction} negative noRound />
-                        <DataRow label="Advance Salary Deduction" value={snapshot.advanceSalaryDeduction} negative noRound />
+                        <DataRow label="Other Deduction" value={snapshot.otherDeduction} negative />
+                        <DataRow label="Advance Salary Deduction" value={snapshot.advanceSalaryDeduction} negative />
                     </div>
                 </div>
 
@@ -169,11 +150,11 @@ export default function SalarySnapshotDialog({
                         Overtime & Adjustments
                     </h3>
                     <div className="divide-y divide-slate-100">
-                        <DataRow label="Normal OT Hours" value={snapshot.normalOtHours} noRound />
-                        <DataRow label="Special OT Hours" value={snapshot.specialOtHours} noRound />
-                        <DataRow label="OT Amount" value={snapshot.totalOtSalary || ((snapshot.normalOtSalary || 0) + (snapshot.specialOtSalary || 0))} noRound />
-                        <DataRow label="Bonus" value={snapshot.bonus} noRound />
-                        <DataRow label="Incentive" value={snapshot.incentive} noRound />
+                        <DataRow label="Normal OT Hours" value={snapshot.normalOtHours} />
+                        <DataRow label="Special OT Hours" value={snapshot.specialOtHours} />
+                        <DataRow label="OT Amount" value={snapshot.totalOtSalary || ((snapshot.normalOtSalary || 0) + (snapshot.specialOtSalary || 0))} />
+                        <DataRow label="Bonus" value={snapshot.bonus} />
+                        <DataRow label="Incentive" value={snapshot.incentive} />
                     </div>
                 </div>
 
