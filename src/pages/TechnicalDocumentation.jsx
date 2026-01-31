@@ -781,8 +781,7 @@ export default function TechnicalDocumentation() {
 
                     <h3 className="text-xl font-semibold mt-6">Late / Early Minute Calculations</h3>
                     <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto">
-{`// ATTENDANCE REPORT ANALYSIS (RunAnalysisTab.jsx)
-// Late calculation for AM shift
+{`// Late calculation for AM shift
 const shiftStart = parseTime(shift.am_start);
 const firstPunch = parseTime(punches[0].timestamp_raw);
 const lateMinutes = Math.max(0, firstPunch - shiftStart - gracePeriod);
@@ -799,35 +798,9 @@ const allowedMinutesExceptions = exceptions.filter(e =>
 );
 const totalAllowed = allowedMinutesExceptions.reduce((sum, e) => sum + e.allowed_minutes, 0);
 
-// Final deductible minutes (saved to AnalysisResult.deductible_minutes)
-const deductibleMinutes = Math.max(0, 
-  lateMinutes + earlyMinutes + otherMinutes - gracePeriod - totalAllowed
-);
-
-// SALARY SNAPSHOT CREATION (createSalarySnapshots.js)
-// CRITICAL: Use AnalysisResult.deductible_minutes directly - NO second grace application
-if (hasAnalysisResult && analysisResult.deductible_minutes !== undefined) {
-  // Use exact value from finalized Attendance Report (grace already applied)
-  deductibleMinutes = analysisResult.deductible_minutes;
-} else {
-  // Fallback: Calculate for employees without AnalysisResult
-  deductibleMinutes = Math.max(0, late + early + other - grace - approved);
-}`}
+const finalLateMinutes = Math.max(0, lateMinutes - totalAllowed);
+const finalEarlyMinutes = Math.max(0, earlyMinutes - totalAllowed);`}
                     </pre>
-                    <div className="bg-red-50 border border-red-200 rounded p-3 mt-3 text-sm">
-                        <p className="font-semibold text-red-900 mb-2">⚠️ Critical Rule: No Double Grace Application</p>
-                        <p className="text-red-800">
-                            Grace minutes are applied <strong>once</strong> during Attendance Report analysis and saved to 
-                            <code className="bg-red-100 px-1 rounded mx-1">AnalysisResult.deductible_minutes</code>. 
-                            The Salary Report creation functions (<code className="bg-red-100 px-1 rounded mx-1">createSalarySnapshots.js</code> 
-                            and <code className="bg-red-100 px-1 rounded mx-1">createSalarySnapshotsForDateRange.js</code>) must use this exact 
-                            value without recalculating or reapplying grace.
-                        </p>
-                        <p className="text-red-800 mt-2">
-                            <strong>Impact if violated:</strong> Employees would receive double grace benefit (e.g., 45 min late - 15 grace = 30 min, 
-                            then 30 - 15 again = 15 min), resulting in incorrect salary deductions and audit failures.
-                        </p>
-                    </div>
 
                     <h3 className="text-xl font-semibold mt-6">Half Day and LOP Logic</h3>
                     <ul className="text-sm">

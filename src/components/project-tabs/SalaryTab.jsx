@@ -156,19 +156,6 @@ export default function SalaryTab({ project }) {
 
         setIsGenerating(true);
         try {
-            // CRITICAL: Invalidate and refetch snapshots to ensure fresh data from database
-            // Do NOT use stale snapshot data from memory
-            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project?.id, finalReport?.id] });
-            const freshSnapshots = await queryClient.fetchQuery({
-                queryKey: ['salarySnapshots', project?.id, finalReport?.id],
-                queryFn: async () => {
-                    return await base44.entities.SalarySnapshot.filter({
-                        project_id: project.id,
-                        report_run_id: finalReport.id
-                    });
-                }
-            });
-            console.log('[SalaryTab] Fetched fresh snapshots before report generation:', freshSnapshots.length);
             // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
             // [MERGE_NOTE: If merging divisors, this becomes the single divisor for all calculations]
             const divisor = project.salary_calculation_days || 30;
@@ -202,9 +189,8 @@ export default function SalaryTab({ project }) {
                     } : 'no data'
                 );
             } else {
-                // Use fresh snapshot data for full date range (NOT stale memory data)
-                calculatedData = freshSnapshots.map(snapshot => ({ ...snapshot }));
-                console.log('[SalaryTab] Using fresh snapshots for report:', calculatedData.length);
+                // Use existing snapshot data for full date range
+                calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
             }
 
             // Merge OT data from OvertimeData entity into calculated data

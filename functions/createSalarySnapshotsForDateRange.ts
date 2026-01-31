@@ -874,67 +874,12 @@ Deno.serve(async (req) => {
             let calculated;
             let attendanceSource;
             
-            // For custom date range, always recalculate attendance
+            // ALWAYS recalculate for custom date range with assumed present days support
             calculated = recalculateEmployeeAttendance(emp, date_from, date_to, assumedPresentDays);
 
             if (hasAnalysisResult) {
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
-
-                // CRITICAL: Apply day_overrides from AnalysisResult to adjust time minutes
-                // The day_overrides contain manual edits made in the Attendance Report UI
-                let adjustedLateMinutes = calculated.lateMinutes;
-                let adjustedEarlyMinutes = calculated.earlyCheckoutMinutes;
-                let adjustedOtherMinutes = calculated.otherMinutes;
-
-                if (analysisResult.day_overrides) {
-                    try {
-                        const dayOverrides = JSON.parse(analysisResult.day_overrides);
-
-                        // Apply each day override's adjustment
-                        for (const [dateStr, override] of Object.entries(dayOverrides)) {
-                            if (override.type === 'MANUAL_PRESENT' || override.lateMinutes !== undefined || 
-                                override.earlyCheckoutMinutes !== undefined || override.otherMinutes !== undefined) {
-
-                                // Subtract original values
-                                if (override.originalLateMinutes !== undefined) {
-                                    adjustedLateMinutes -= override.originalLateMinutes;
-                                }
-                                if (override.originalEarlyCheckout !== undefined) {
-                                    adjustedEarlyMinutes -= override.originalEarlyCheckout;
-                                }
-                                if (override.originalOtherMinutes !== undefined) {
-                                    adjustedOtherMinutes -= override.originalOtherMinutes;
-                                }
-
-                                // Add new values from override
-                                if (override.lateMinutes !== undefined) {
-                                    adjustedLateMinutes += override.lateMinutes;
-                                }
-                                if (override.earlyCheckoutMinutes !== undefined) {
-                                    adjustedEarlyMinutes += override.earlyCheckoutMinutes;
-                                }
-                                if (override.otherMinutes !== undefined) {
-                                    adjustedOtherMinutes += override.otherMinutes;
-                                }
-                            }
-                        }
-
-                        // Ensure no negative values
-                        adjustedLateMinutes = Math.max(0, adjustedLateMinutes);
-                        adjustedEarlyMinutes = Math.max(0, adjustedEarlyMinutes);
-                        adjustedOtherMinutes = Math.max(0, adjustedOtherMinutes);
-
-                        // Update calculated values with adjusted amounts
-                        calculated.lateMinutes = adjustedLateMinutes;
-                        calculated.earlyCheckoutMinutes = adjustedEarlyMinutes;
-                        calculated.otherMinutes = adjustedOtherMinutes;
-
-                        console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Applied day_overrides - Late: ${analysisResult.late_minutes} -> ${adjustedLateMinutes}, Early: ${analysisResult.early_checkout_minutes} -> ${adjustedEarlyMinutes}, Other: ${analysisResult.other_minutes} -> ${adjustedOtherMinutes}`);
-                    } catch (e) {
-                        console.warn(`[createSalarySnapshotsForDateRange] ${emp.name}: Failed to parse day_overrides, using raw calculated values`);
-                    }
-                }
             } else {
                 attendanceSource = 'NO_ATTENDANCE_DATA';
                 noAttendanceCount++;
@@ -968,27 +913,14 @@ Deno.serve(async (req) => {
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
             const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
             
-            // Salary Leave Amount with rounding UP to nearest multiple of 5
             const salaryForLeave = basicSalary + allowancesAmount;
-            const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
-            const salaryLeaveAmount = rawSalaryLeaveAmount > 0 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5 : 0;
+            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
             
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-            // CRITICAL FIX: Use the finalized deductible_minutes from AnalysisResult directly
-            // The Attendance Report already applied grace, so we must NOT apply it again
-            // If no AnalysisResult exists (NO_ATTENDANCE_DATA), calculate it fresh
-            let deductibleMinutes;
-            if (hasAnalysisResult && analysisResult.deductible_minutes !== undefined && analysisResult.deductible_minutes !== null) {
-                // Use the exact value from the finalized Attendance Report (grace already applied)
-                deductibleMinutes = analysisResult.deductible_minutes;
-                console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Using AnalysisResult.deductible_minutes = ${deductibleMinutes}`);
-            } else {
-                // Fallback: Calculate for employees without AnalysisResult
-                const totalTimeIssues = calculated.lateMinutes + calculated.earlyCheckoutMinutes + calculated.otherMinutes;
-                deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
-                console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Calculated deductible_minutes = ${deductibleMinutes} (no AnalysisResult)`);
-            }
+            // Calculate deductible
+            const totalTimeIssues = calculated.lateMinutes + calculated.earlyCheckoutMinutes + calculated.otherMinutes;
+            const deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
             
             // Current month hourly rate uses salary divisor
@@ -1010,25 +942,6 @@ Deno.serve(async (req) => {
             // Total deductible minutes and hours (for display)
             const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
             const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
-
-            // ============================================================
-            // OT SALARY CALCULATION
-            // RULE: If employee has ANY salary increments, use PREVIOUS MONTH salary for OT
-            // If no increments exist, use current month salary for OT
-            // ============================================================
-            let otBaseSalary = totalSalaryAmount; // Default: current month
-            if (isAlMaraghi && salaryIncrements.length > 0) {
-                const empHasIncrements = salaryIncrements.some(inc => 
-                    String(inc.employee_id) === String(emp.hrms_id) ||
-                    String(inc.attendance_id) === String(emp.attendance_id)
-                );
-                if (empHasIncrements) {
-                    // Use previous month salary for OT calculations
-                    otBaseSalary = prevMonthTotalSalary;
-                    console.log(`[createSalarySnapshotsForDateRange] ${emp.name}: Using prev month salary (${prevMonthTotalSalary}) for OT (has increments)`);
-                }
-            }
-            const otHourlyRate = otBaseSalary / otDivisor / workingHours;
 
             // Final total calculation:
             // Total = Base Salary - Net Deduction - CurrentMonthDeductibleHoursPay - PrevMonthLopPay - PrevMonthDeductibleHoursPay
@@ -1076,7 +989,6 @@ Deno.serve(async (req) => {
                 basic_salary: basicSalary,
                 allowances: allowancesAmount,
                 total_salary: totalSalaryAmount,
-                ot_base_salary: otBaseSalary, // Salary used for OT calculations (prev month if increments exist)
                 working_hours: workingHours,
                 working_days: calculated.workingDays,
                 salary_divisor: divisor,

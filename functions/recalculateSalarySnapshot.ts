@@ -241,14 +241,12 @@ Deno.serve(async (req) => {
         
         // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
         // Same formula for all employees regardless of working hours
-        // IMPORTANT: Round UP to nearest multiple of 5
         let salaryLeaveAmount = 0;
         const salaryLeaveDays = attendanceValues.salary_leave_days || attendanceValues.annual_leave_count;
         
         if (salaryLeaveDays > 0) {
             const salaryForLeave = basicSalary + allowances;
-            const rawSalaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
-            salaryLeaveAmount = Math.ceil(rawSalaryLeaveAmount / 5) * 5;
+            salaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
         }
         
         // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
@@ -264,10 +262,7 @@ Deno.serve(async (req) => {
         const currentMonthDeductibleHoursPay = hourlyRateDeduction * deductibleHours;
 
         // OT Hourly Rate (uses OT Divisor)
-        // RULE: If snapshot has ot_base_salary (employee had increments), use that for OT
-        // Otherwise use current total salary
-        const otBaseSalary = snapshot.ot_base_salary || totalSalary;
-        const otHourlyRate = otBaseSalary / otDivisor / workingHours;
+        const otHourlyRate = totalSalary / otDivisor / workingHours;
         
         // Previous month calculations (uses OT Divisor) - Al Maraghi Motors only
         // FIX Issue 5: For recalculation, we use stored snapshot values since we don't have access
