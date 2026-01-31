@@ -283,7 +283,7 @@ export default function SalaryTab({ project }) {
                     balanceAmount = 0;
                 }
 
-                return {
+                const result = {
                     ...row,
                     normalOtHours,
                     specialOtHours,
@@ -298,8 +298,8 @@ export default function SalaryTab({ project }) {
                     salary_divisor: divisor,
                     ot_divisor: otDivisor,
                     // Preserve previous month fields from recalculated data
-                    extra_prev_month_deductible_minutes: row.extra_prev_month_deductible_minutes || 0,
-                    extra_prev_month_lop_days: row.extra_prev_month_lop_days || 0,
+                    extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
+                    extra_prev_month_lop_days: extraPrevMonthLopDays,
                     extra_prev_month_lop_pay: extraPrevMonthLopPay,
                     extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
                     prev_month_divisor: row.prev_month_divisor || 0,
@@ -312,6 +312,8 @@ export default function SalaryTab({ project }) {
                     wps_cap_amount: wpsCapAmount,
                     wps_cap_applied: wpsCapApplied
                 };
+                
+                return result;
             });
 
             // Calculate totals
