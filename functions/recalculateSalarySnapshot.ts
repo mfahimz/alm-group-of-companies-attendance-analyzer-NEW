@@ -241,12 +241,14 @@ Deno.serve(async (req) => {
         
         // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
         // Same formula for all employees regardless of working hours
+        // IMPORTANT: Round UP to nearest multiple of 5
         let salaryLeaveAmount = 0;
         const salaryLeaveDays = attendanceValues.salary_leave_days || attendanceValues.annual_leave_count;
         
         if (salaryLeaveDays > 0) {
             const salaryForLeave = basicSalary + allowances;
-            salaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
+            const rawSalaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
+            salaryLeaveAmount = Math.ceil(rawSalaryLeaveAmount / 5) * 5;
         }
         
         // Net Deduction = max(0, Leave Pay - Salary Leave Amount)

@@ -1028,8 +1028,10 @@ Deno.serve(async (req) => {
             
             // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
             // Same formula for all employees regardless of working hours
+            // IMPORTANT: Round UP to nearest multiple of 5
             const salaryForLeave = basicSalary + allowancesAmount;
-            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+            const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+            const salaryLeaveAmount = rawSalaryLeaveAmount > 0 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5 : 0;
             
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
