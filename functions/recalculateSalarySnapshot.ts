@@ -235,9 +235,9 @@ Deno.serve(async (req) => {
 
         // Leave Days = Annual Leave + LOP (excludes sick leave per Al Maraghi rule)
         const leaveDays = attendanceValues.annual_leave_count + attendanceValues.full_absence_count;
-        
-        // Leave Pay = (Total Salary / Divisor) * Leave Days
-        const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
+
+        // Leave Pay = (Total Salary / Divisor) * Leave Days (ROUNDED TO 0 DECIMALS)
+        const leavePay = leaveDays > 0 ? Math.round((totalSalary / divisor) * leaveDays) : 0;
         
         // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
         // Same formula for all employees regardless of working hours
@@ -285,17 +285,17 @@ Deno.serve(async (req) => {
         const totalDeductibleMinutes = attendanceValues.deductible_minutes + attendanceValues.extra_prev_month_deductible_minutes;
         const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
         
-        // Total deductible hours pay = current month + prev month
-        const deductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
+        // Total deductible hours pay = current month + prev month (ROUNDED TO 0 DECIMALS)
+        const deductibleHoursPay = Math.round(currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay);
         
-        // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours (ROUNDED)
-        const normalOtSalary = Math.round(otHourlyRate * 1.25 * adjustmentValues.normalOtHours * 100) / 100;
+        // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours (ROUNDED TO 0 DECIMALS)
+        const normalOtSalary = Math.round(otHourlyRate * 1.25 * adjustmentValues.normalOtHours);
 
-        // Special OT Salary = OT Hourly Rate * 1.5 * Special OT Hours (ROUNDED)
-        const specialOtSalary = Math.round(otHourlyRate * 1.5 * adjustmentValues.specialOtHours * 100) / 100;
+        // Special OT Salary = OT Hourly Rate * 1.5 * Special OT Hours (ROUNDED TO 0 DECIMALS)
+        const specialOtSalary = Math.round(otHourlyRate * 1.5 * adjustmentValues.specialOtHours);
 
-        // Total OT Salary (ROUNDED)
-        const totalOtSalary = Math.round((normalOtSalary + specialOtSalary) * 100) / 100;
+        // Total OT Salary (ROUNDED TO 0 DECIMALS)
+        const totalOtSalary = Math.round(normalOtSalary + specialOtSalary);
 
         // Final Total = Total Salary + OT + Bonus + Incentive 
         //             - Net Deduction (current month leave)
@@ -348,20 +348,20 @@ Deno.serve(async (req) => {
         // AFTER VALUES (computed)
         // ============================================================
         const afterValues = {
-            leaveDays: Math.round(leaveDays * 100) / 100,
-            leavePay: Math.round(leavePay * 100) / 100,
-            salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
-            netDeduction: Math.round(netDeduction * 100) / 100,
+            leaveDays: Math.round(leaveDays),
+            leavePay: Math.round(leavePay),
+            salaryLeaveAmount: Math.round(salaryLeaveAmount),
+            netDeduction: Math.round(netDeduction),
             deductibleHours: totalDeductibleHours,
-            deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
-            extra_prev_month_lop_pay: Math.round(extraPrevMonthLopPay * 100) / 100,
-            extra_prev_month_deductible_hours_pay: Math.round(extraPrevMonthDeductibleHoursPay * 100) / 100,
-            normalOtSalary: Math.round(normalOtSalary * 100) / 100,
-            specialOtSalary: Math.round(specialOtSalary * 100) / 100,
-            totalOtSalary: Math.round(totalOtSalary * 100) / 100,
-            total: Math.round(finalTotal * 100) / 100,
-            wpsPay: Math.round(wpsPay * 100) / 100,
-            balance: Math.round(balance * 100) / 100,
+            deductibleHoursPay: Math.round(deductibleHoursPay),
+            extra_prev_month_lop_pay: Math.round(extraPrevMonthLopPay),
+            extra_prev_month_deductible_hours_pay: Math.round(extraPrevMonthDeductibleHoursPay),
+            normalOtSalary: Math.round(normalOtSalary),
+            specialOtSalary: Math.round(specialOtSalary),
+            totalOtSalary: Math.round(totalOtSalary),
+            total: Math.round(finalTotal),
+            wpsPay: Math.round(wpsPay),
+            balance: Math.round(balance),
             wps_cap_enabled: wpsCapEnabled,
             wps_cap_amount: wpsCapAmount,
             wps_cap_applied: wpsCapApplied

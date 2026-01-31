@@ -865,20 +865,20 @@ Deno.serve(async (req) => {
             // Divisor = project.ot_calculation_days (NOT calendar days)
             // IMPORTANT: Uses prevMonthSalaryAmount (historical salary for that month)
             const prevMonthDivisor = otDivisor;
-            
-            // Previous month LOP Pay = (Prev Month Total Salary / OT Divisor) * Extra LOP Days
-            const extraLopPay = extraLopDays > 0 ? (prevMonthSalaryAmount / prevMonthDivisor) * extraLopDays : 0;
-            
-            // Previous month Deductible Hours Pay = (Prev Month Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60)
+
+            // Previous month LOP Pay = (Prev Month Total Salary / OT Divisor) * Extra LOP Days (ROUNDED TO 0 DECIMALS)
+            const extraLopPay = extraLopDays > 0 ? Math.round((prevMonthSalaryAmount / prevMonthDivisor) * extraLopDays) : 0;
+
+            // Previous month Deductible Hours Pay = (Prev Month Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60) (ROUNDED TO 0 DECIMALS)
             const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
             const prevMonthHourlyRate = prevMonthSalaryAmount / prevMonthDivisor / workingHours;
-            const extraDeductibleHoursPay = prevMonthHourlyRate * extraDeductibleHours;
+            const extraDeductibleHoursPay = Math.round(prevMonthHourlyRate * extraDeductibleHours);
 
             return {
                 extraDeductibleMinutes: totalExtraDeductibleMinutes,
                 extraLopDays: extraLopDays,
-                extraLopPay: Math.round(extraLopPay * 100) / 100,
-                extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay * 100) / 100,
+                extraLopPay: Math.round(extraLopPay),
+                extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay),
                 prevMonthDivisor: prevMonthDivisor
             };
         };
@@ -1054,7 +1054,7 @@ Deno.serve(async (req) => {
 
             // Calculate derived salary values
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
-            const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
+            const leavePay = leaveDays > 0 ? Math.round((totalSalaryAmount / divisor) * leaveDays) : 0;
             
             // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
             // Same formula for all employees regardless of working hours
@@ -1082,8 +1082,8 @@ Deno.serve(async (req) => {
             const extraPrevMonthLopPay = extraPrevMonthData.extraLopPay;
             const extraPrevMonthDeductibleHoursPay = extraPrevMonthData.extraDeductibleHoursPay;
             
-            // Total deductible hours pay = current month (salary divisor) + prev month (OT divisor)
-            const totalDeductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
+            // Total deductible hours pay = current month (salary divisor) + prev month (OT divisor) (ROUNDED TO 0 DECIMALS)
+            const totalDeductibleHoursPay = Math.round(currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay);
             
             // Total deductible minutes (for display purposes)
             const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
@@ -1154,17 +1154,17 @@ Deno.serve(async (req) => {
                 deductible_minutes: deductibleMinutes,
                 extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
                 extra_prev_month_lop_days: extraPrevMonthLopDays,
-                extra_prev_month_lop_pay: extraPrevMonthLopPay,
-                extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
+                extra_prev_month_lop_pay: Math.round(extraPrevMonthLopPay),
+                extra_prev_month_deductible_hours_pay: Math.round(extraPrevMonthDeductibleHoursPay),
                 salary_month_start: salaryMonthStartStr,
                 salary_month_end: salaryMonthEndStr,
                 salary_leave_days: salaryLeaveDays,
                 leaveDays: leaveDays,
-                leavePay: Math.round(leavePay * 100) / 100,
-                salaryLeaveAmount: Math.round(salaryLeaveAmount * 100) / 100,
+                leavePay: Math.round(leavePay),
+                salaryLeaveAmount: Math.round(salaryLeaveAmount),
                 deductibleHours: totalDeductibleHours,
-                deductibleHoursPay: Math.round(totalDeductibleHoursPay * 100) / 100,
-                netDeduction: Math.round(netDeduction * 100) / 100,
+                deductibleHoursPay: Math.round(totalDeductibleHoursPay),
+                netDeduction: Math.round(netDeduction),
                 // OT & Adjustment Fields (editable, initialized to 0, will be rounded on recalculation)
                 normalOtHours: 0,
                 normalOtSalary: 0,
@@ -1176,9 +1176,9 @@ Deno.serve(async (req) => {
                 bonus: 0,
                 incentive: 0,
                 advanceSalaryDeduction: 0,
-                total: Math.round(finalTotal * 100) / 100,
-                wpsPay: Math.round(wpsAmount * 100) / 100,
-                balance: Math.round(balanceAmount * 100) / 100,
+                total: Math.round(finalTotal),
+                wpsPay: Math.round(wpsAmount),
+                balance: Math.round(balanceAmount),
                 wps_cap_enabled: wpsCapEnabled,
                 wps_cap_amount: wpsCapAmount,
                 wps_cap_applied: wpsCapApplied,
