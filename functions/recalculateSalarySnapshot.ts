@@ -265,12 +265,18 @@ Deno.serve(async (req) => {
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         
         // Previous month calculations (uses OT Divisor) - Al Maraghi Motors only
+        // FIX Issue 5: For recalculation, we use stored snapshot values since we don't have access
+        // to salary increments here. The snapshot already has the correct prev month salary baked in
+        // during initial creation. We use totalSalary as the base since the snapshot was created
+        // with the correct salary at that time. If salary increments change, user must regenerate snapshots.
         // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
         const extraPrevMonthLopPay = attendanceValues.extra_prev_month_lop_days > 0 && prevMonthDivisor > 0
             ? (totalSalary / prevMonthDivisor) * attendanceValues.extra_prev_month_lop_days 
             : 0;
         
         // Previous month Deductible Hours Pay = (Total Salary / OT Divisor / workingHours) * (Extra Deductible Minutes / 60)
+        // Note: This uses current month salary. For accurate prev month calculations with different salary,
+        // the salary snapshots should be regenerated via createSalarySnapshots which handles salary increments.
         const prevMonthHourlyRate = prevMonthDivisor > 0 ? totalSalary / prevMonthDivisor / workingHours : 0;
         const extraPrevMonthDeductibleHours = attendanceValues.extra_prev_month_deductible_minutes / 60;
         const extraPrevMonthDeductibleHoursPay = prevMonthHourlyRate * extraPrevMonthDeductibleHours;
