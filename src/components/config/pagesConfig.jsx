@@ -109,6 +109,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'ceo']
     },
+    SalaryIncrements: {
+        name: 'SalaryIncrements',
+        title: 'Salary Increments',
+        icon: DollarSign,
+        category: 'HRManagement',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
     QuarterlyMinutesManagement: {
         name: 'QuarterlyMinutesManagement',
         title: 'Quarterly Minutes',
