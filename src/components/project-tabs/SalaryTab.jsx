@@ -110,11 +110,25 @@ export default function SalaryTab({ project }) {
     // ============================================
 
     // Initialize date range when opening dialog
+    // Al Maraghi Motors rule: Salary month = 1st to last day of month containing project.date_to
+    // The last 2 days of the month are "assumed present" for salary calculation
     const handleOpenGenerateDialog = () => {
-        if (finalReport) {
-            setNewReportDateFrom(finalReport.date_from);
-            setNewReportDateTo(finalReport.date_to);
-            setNewReportName(`Salary Report ${finalReport.date_from} to ${finalReport.date_to}`);
+        if (finalReport && project) {
+            // Calculate salary month based on project.date_to (the attendance period end)
+            const projectEndDate = new Date(project.date_to + 'T00:00:00');
+            const salaryMonthStart = new Date(projectEndDate.getFullYear(), projectEndDate.getMonth(), 1);
+            const salaryMonthEnd = new Date(projectEndDate.getFullYear(), projectEndDate.getMonth() + 1, 0); // Last day of month
+            
+            const formatDate = (d) => d.toISOString().split('T')[0];
+            
+            // Default From: 1st of salary month
+            const defaultFrom = formatDate(salaryMonthStart);
+            // Default To: Last day of salary month (includes assumed present days for Al Maraghi)
+            const defaultTo = formatDate(salaryMonthEnd);
+            
+            setNewReportDateFrom(defaultFrom);
+            setNewReportDateTo(defaultTo);
+            setNewReportName(`Salary Report ${defaultFrom} to ${defaultTo}`);
         }
         setShowGenerateDialog(true);
     };
