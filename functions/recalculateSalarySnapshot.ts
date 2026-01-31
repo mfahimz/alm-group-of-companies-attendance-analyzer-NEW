@@ -264,7 +264,10 @@ Deno.serve(async (req) => {
         const currentMonthDeductibleHoursPay = hourlyRateDeduction * deductibleHours;
 
         // OT Hourly Rate (uses OT Divisor)
-        const otHourlyRate = totalSalary / otDivisor / workingHours;
+        // RULE: If snapshot has ot_base_salary (employee had increments), use that for OT
+        // Otherwise use current total salary
+        const otBaseSalary = snapshot.ot_base_salary || totalSalary;
+        const otHourlyRate = otBaseSalary / otDivisor / workingHours;
         
         // Previous month calculations (uses OT Divisor) - Al Maraghi Motors only
         // FIX Issue 5: For recalculation, we use stored snapshot values since we don't have access
