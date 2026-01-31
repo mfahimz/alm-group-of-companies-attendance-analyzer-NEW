@@ -303,7 +303,7 @@ Deno.serve(async (req) => {
         //             - Previous Month LOP Pay
         //             - Previous Month Deductible Hours Pay
         //             - Other Deduction - Advance
-        const finalTotal = totalSalary 
+        let finalTotal = totalSalary 
             + totalOtSalary 
             + adjustmentValues.bonus 
             + adjustmentValues.incentive
@@ -313,6 +313,12 @@ Deno.serve(async (req) => {
             - extraPrevMonthDeductibleHoursPay
             - adjustmentValues.otherDeduction 
             - adjustmentValues.advanceSalaryDeduction;
+
+        // Conditional rounding: Only round final total if bonus has NO decimal values
+        const bonusHasDecimals = (adjustmentValues.bonus || 0) % 1 !== 0;
+        if (!bonusHasDecimals) {
+            finalTotal = Math.round(finalTotal);
+        }
 
         // ============================================================
         // WPS SPLIT LOGIC (Al Maraghi Motors only)
@@ -333,8 +339,12 @@ Deno.serve(async (req) => {
                 const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
                 // Calculate raw excess over cap
                 const rawExcess = Math.max(0, finalTotal - cap);
-                // Round balance DOWN to nearest 100
-                balance = Math.floor(rawExcess / 100) * 100;
+                // Round balance DOWN to nearest 100 (only if bonus has no decimals)
+                if (!bonusHasDecimals) {
+                    balance = Math.floor(rawExcess / 100) * 100;
+                } else {
+                    balance = rawExcess;
+                }
                 // WPS gets the rest (total - balance)
                 wpsPay = finalTotal - balance;
                 wpsCapApplied = rawExcess > 0;
