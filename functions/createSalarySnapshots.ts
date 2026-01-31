@@ -875,16 +875,78 @@ Deno.serve(async (req) => {
         
         for (const emp of eligibleEmployees) {
             // Find matching salary record (REQUIRED for salary snapshot)
-            const salary = salaries.find(s => 
+            const baseSalary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
                 String(s.attendance_id) === String(emp.attendance_id)
             );
             
             // Skip if no salary record - employee is not eligible for salary
-            if (!salary) {
+            if (!baseSalary) {
                 console.log(`[createSalarySnapshots] Skipping ${emp.name} (${emp.attendance_id}) - no salary record`);
                 continue;
             }
+            
+            // ============================================================
+            // AL MARAGHI MOTORS: SALARY INCREMENT RESOLUTION
+            // For current month salary: use increment effective for salary month
+            // For previous month calculations: use increment effective for that month
+            // ============================================================
+            let currentMonthSalary = { ...baseSalary };
+            let prevMonthSalary = { ...baseSalary };
+            
+            if (isAlMaraghi && salaryIncrements.length > 0) {
+                // Get increments for this employee
+                const empIncrements = salaryIncrements.filter(inc => 
+                    String(inc.employee_id) === String(emp.hrms_id) ||
+                    String(inc.attendance_id) === String(emp.attendance_id)
+                );
+                
+                if (empIncrements.length > 0) {
+                    // Current month salary (use salary month start for resolution)
+                    const currentMonthStr = salaryMonthStartStr; // e.g., "2026-01-01"
+                    const applicableCurrentIncrements = empIncrements
+                        .filter(inc => inc.effective_month <= currentMonthStr)
+                        .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
+                    
+                    if (applicableCurrentIncrements.length > 0) {
+                        const currentInc = applicableCurrentIncrements[0];
+                        currentMonthSalary = {
+                            ...baseSalary,
+                            basic_salary: currentInc.new_basic_salary || baseSalary.basic_salary,
+                            allowances: currentInc.new_allowances || baseSalary.allowances,
+                            allowances_with_bonus: currentInc.new_allowances_with_bonus || baseSalary.allowances_with_bonus,
+                            total_salary: currentInc.new_total_salary || baseSalary.total_salary
+                        };
+                        console.log(`[createSalarySnapshots] ${emp.name}: Using increment effective ${currentInc.effective_month} for current month salary`);
+                    }
+                    
+                    // Previous month salary (for OT and prev month deductions)
+                    // Previous month is the month BEFORE the salary month
+                    if (hasExtraPrevMonthRange && extraPrevMonthFrom) {
+                        const prevMonthDate = new Date(extraPrevMonthFrom);
+                        const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
+                        
+                        const applicablePrevIncrements = empIncrements
+                            .filter(inc => inc.effective_month <= prevMonthStr)
+                            .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
+                        
+                        if (applicablePrevIncrements.length > 0) {
+                            const prevInc = applicablePrevIncrements[0];
+                            prevMonthSalary = {
+                                ...baseSalary,
+                                basic_salary: prevInc.new_basic_salary || baseSalary.basic_salary,
+                                allowances: prevInc.new_allowances || baseSalary.allowances,
+                                allowances_with_bonus: prevInc.new_allowances_with_bonus || baseSalary.allowances_with_bonus,
+                                total_salary: prevInc.new_total_salary || baseSalary.total_salary
+                            };
+                            console.log(`[createSalarySnapshots] ${emp.name}: Using increment effective ${prevInc.effective_month} for previous month salary`);
+                        }
+                    }
+                }
+            }
+            
+            // Use resolved salaries (currentMonthSalary for current month, prevMonthSalary for previous month)
+            const salary = currentMonthSalary;
 
             // Check if employee has analysis result
             const analysisResult = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
