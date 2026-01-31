@@ -838,14 +838,15 @@ Deno.serve(async (req) => {
 
             // Calculate previous month monetary values using OT Divisor
             // Divisor = project.ot_calculation_days (NOT calendar days)
+            // IMPORTANT: Uses prevMonthSalaryAmount (historical salary for that month)
             const prevMonthDivisor = otDivisor;
             
-            // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
-            const extraLopPay = extraLopDays > 0 ? (totalSalaryAmount / prevMonthDivisor) * extraLopDays : 0;
+            // Previous month LOP Pay = (Prev Month Total Salary / OT Divisor) * Extra LOP Days
+            const extraLopPay = extraLopDays > 0 ? (prevMonthSalaryAmount / prevMonthDivisor) * extraLopDays : 0;
             
-            // Previous month Deductible Hours Pay = (Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60)
+            // Previous month Deductible Hours Pay = (Prev Month Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60)
             const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
-            const prevMonthHourlyRate = totalSalaryAmount / prevMonthDivisor / workingHours;
+            const prevMonthHourlyRate = prevMonthSalaryAmount / prevMonthDivisor / workingHours;
             const extraDeductibleHoursPay = prevMonthHourlyRate * extraDeductibleHours;
 
             return {
