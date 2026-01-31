@@ -115,11 +115,17 @@ export default function SalaryTab({ project }) {
     const handleOpenGenerateDialog = () => {
         if (finalReport && project) {
             // Calculate salary month based on project.date_to (the attendance period end)
-            const projectEndDate = new Date(project.date_to + 'T00:00:00');
-            const salaryMonthStart = new Date(projectEndDate.getFullYear(), projectEndDate.getMonth(), 1);
-            const salaryMonthEnd = new Date(projectEndDate.getFullYear(), projectEndDate.getMonth() + 1, 0); // Last day of month
+            // CRITICAL: Parse date as local date parts to avoid timezone issues
+            const [year, month, day] = project.date_to.split('-').map(Number);
+            const salaryMonthStart = new Date(year, month - 1, 1); // month is 0-indexed
+            const salaryMonthEnd = new Date(year, month, 0); // Last day of month (month is 0-indexed, so month gives last day of month-1)
             
-            const formatDate = (d) => d.toISOString().split('T')[0];
+            const formatDate = (d) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${dd}`;
+            };
             
             // Default From: 1st of salary month
             const defaultFrom = formatDate(salaryMonthStart);
