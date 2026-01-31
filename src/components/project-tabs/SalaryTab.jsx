@@ -285,6 +285,14 @@ export default function SalaryTab({ project }) {
                     // Store divisors used for reference
                     salary_divisor: divisor,
                     ot_divisor: otDivisor,
+                    // Preserve previous month fields from recalculated data
+                    extra_prev_month_deductible_minutes: row.extra_prev_month_deductible_minutes || 0,
+                    extra_prev_month_lop_days: row.extra_prev_month_lop_days || 0,
+                    extra_prev_month_lop_pay: extraPrevMonthLopPay,
+                    extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
+                    prev_month_divisor: row.prev_month_divisor || 0,
+                    salary_month_start: row.salary_month_start || null,
+                    salary_month_end: row.salary_month_end || null,
                     total: Math.round(finalTotal * 100) / 100,
                     wpsPay: Math.round(wpsAmount * 100) / 100,
                     balance: Math.round(balanceAmount * 100) / 100,
