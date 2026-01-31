@@ -973,10 +973,14 @@ Deno.serve(async (req) => {
                 console.log(`[createSalarySnapshots] Computing attendance for missing employee ${emp.name} (${emp.attendance_id}) - will use exceptions/shifts`);
             }
 
+            // Current month salary values (may be from increment)
             const totalSalaryAmount = salary?.total_salary || 0;
-            const workingHours = salary?.working_hours || 9;
+            const workingHours = salary?.working_hours || baseSalary?.working_hours || 9;
             const basicSalary = salary?.basic_salary || 0;
             const allowancesAmount = Number(salary?.allowances) || 0;
+            
+            // Previous month salary values (for OT and prev month deductions)
+            const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
 
             // Get salary leave days from ANNUAL_LEAVE exceptions
             let salaryLeaveDays = calculated.annualLeaveCount;
