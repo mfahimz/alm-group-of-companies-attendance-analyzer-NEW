@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw, Eye } from 'lucide-react';
+import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw, Eye, CheckCircle } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -23,6 +23,7 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import PINLock from '../components/ui/PINLock';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import SalarySnapshotDialog from '../components/salary/SalarySnapshotDialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function SalaryReportDetail() {
     const queryClient = useQueryClient();
@@ -40,6 +41,7 @@ export default function SalaryReportDetail() {
     const [recalculatingAll, setRecalculatingAll] = useState(false);
     const [confirmRecalcAll, setConfirmRecalcAll] = useState(false);
     const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+    const [verifiedEmployees, setVerifiedEmployees] = useState([]);
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
@@ -48,6 +50,21 @@ export default function SalaryReportDetail() {
             setSalaryUnlocked(true);
         }
     }, [salaryUnlocked]);
+
+    // Load verified employees from report snapshot_data
+    React.useEffect(() => {
+        if (report?.snapshot_data) {
+            try {
+                const data = JSON.parse(report.snapshot_data);
+                const verified = data
+                    .filter(row => row.salary_verified === true)
+                    .map(row => String(row.attendance_id));
+                setVerifiedEmployees(verified);
+            } catch {
+                // Ignore parse errors
+            }
+        }
+    }, [report?.snapshot_data]);
 
     // ============================================
     // QUERIES
@@ -118,13 +135,14 @@ export default function SalaryReportDetail() {
                     otherDeduction: editableData[row.hrms_id]?.otherDeduction ?? liveSnapshot?.otherDeduction ?? row.otherDeduction ?? 0,
                     bonus: editableData[row.hrms_id]?.bonus ?? liveSnapshot?.bonus ?? row.bonus ?? 0,
                     incentive: editableData[row.hrms_id]?.incentive ?? liveSnapshot?.incentive ?? row.incentive ?? 0,
-                    advanceSalaryDeduction: editableData[row.hrms_id]?.advanceSalaryDeduction ?? liveSnapshot?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0
+                    advanceSalaryDeduction: editableData[row.hrms_id]?.advanceSalaryDeduction ?? liveSnapshot?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0,
+                    isVerified: verifiedEmployees.includes(String(row.attendance_id))
                 };
             });
         } catch {
             return [];
         }
-    }, [report?.snapshot_data, editableData, liveSalarySnapshots]);
+    }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
 
     // Filter and sort data
     const filteredData = useMemo(() => {
@@ -248,10 +266,12 @@ export default function SalaryReportDetail() {
 
         setIsSaving(true);
         try {
-            // Merge edits into snapshot data
+            // Merge edits into snapshot data + verification status
             const originalData = JSON.parse(report.snapshot_data);
 
             const updatedData = originalData.map(row => {
+            // Add verification status
+            row.salary_verified = verifiedEmployees.includes(String(row.attendance_id));
             const edits = editableData[row.hrms_id];
             if (!edits) return row;
 
@@ -340,6 +360,29 @@ export default function SalaryReportDetail() {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Toggle verification for a single employee
+    const toggleVerification = (attendanceId) => {
+        const attendanceIdStr = String(attendanceId);
+        const newVerified = verifiedEmployees.includes(attendanceIdStr) 
+            ? verifiedEmployees.filter(id => id !== attendanceIdStr)
+            : [...verifiedEmployees, attendanceIdStr];
+        setVerifiedEmployees(newVerified);
+    };
+
+    // Verify all employees with clean records (positive total)
+    const verifyAllClean = () => {
+        const cleanEmployees = salaryData
+            .filter(r => {
+                const { total } = calculateTotals(r);
+                return total > 0;
+            })
+            .map(r => String(r.attendance_id));
+        
+        const newVerified = [...new Set([...verifiedEmployees, ...cleanEmployees])];
+        setVerifiedEmployees(newVerified);
+        toast.success(`${cleanEmployees.length} employees verified`);
     };
 
     const handleRecalculateAll = async () => {
@@ -536,10 +579,10 @@ export default function SalaryReportDetail() {
                             </div>
                             <div className="flex gap-2">
                                 <Button
-                                    onClick={handleSave}
-                                    disabled={isSaving || Object.keys(editableData).length === 0}
-                                    className="bg-green-600 hover:bg-green-700"
-                                >
+                                            onClick={handleSave}
+                                            disabled={isSaving}
+                                            className="bg-green-600 hover:bg-green-700"
+                                        >
                                     <Save className="w-4 h-4 mr-2" />
                                     {isSaving ? 'Saving...' : 'Save Changes'}
                                 </Button>
@@ -584,18 +627,33 @@ export default function SalaryReportDetail() {
                                     className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>
-                            <p className="text-sm text-slate-500 mt-2">
-                                Showing {filteredData.length} of {salaryData.length} employees
-                            </p>
-                        </div>
+                            <div className="flex items-center gap-4 mt-2">
+                                <p className="text-sm text-slate-500">
+                                    Showing {filteredData.length} of {salaryData.length} employees
+                                </p>
+                                <p className="text-sm text-slate-500">
+                                    Verified: <span className="font-medium text-green-600">{verifiedEmployees.length}</span> / {salaryData.length}
+                                </p>
+                                <Button
+                                    onClick={verifyAllClean}
+                                    variant="outline"
+                                    size="sm"
+                                    className="ml-auto"
+                                >
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Verify All Positive
+                                </Button>
+                            </div>
+                            </div>
 
                         {/* Salary Table */}
                         <div className="border rounded-lg relative overflow-x-auto overflow-y-auto max-h-[600px]">
                             <table className="w-full min-w-max caption-bottom text-sm">
                                 <thead className="sticky top-0 z-10 bg-slate-50">
                                     <tr className="border-b">
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-0 z-20">Attendance ID</SortableTableHead>
-                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[100px] z-20">Name</SortableTableHead>
+                                        <TableHead className="w-12 bg-slate-50 sticky left-0 z-20">✓</TableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[48px] z-20">Attendance ID</SortableTableHead>
+                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[148px] z-20">Name</SortableTableHead>
                                         <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Total Salary</SortableTableHead>
                                         <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Working Days</SortableTableHead>
                                         <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present Days</SortableTableHead>
@@ -631,7 +689,7 @@ export default function SalaryReportDetail() {
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                     <tr className="border-b">
-                                    <td colSpan={32} className="text-center py-12">
+                                    <td colSpan={33} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
@@ -639,8 +697,14 @@ export default function SalaryReportDetail() {
                                         const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
                                         return (
                                             <tr key={row.hrms_id} className="border-b transition-colors hover:bg-muted/50">
-                                                <td className="p-2 align-middle font-medium sticky left-0 bg-white z-10">{row.attendance_id}</td>
-                                                <td className="p-2 align-middle font-medium sticky left-[100px] bg-white z-10">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
+                                                <td className="p-2 align-middle sticky left-0 bg-white z-10">
+                                                    <Checkbox
+                                                        checked={row.isVerified}
+                                                        onCheckedChange={() => toggleVerification(row.attendance_id)}
+                                                    />
+                                                </td>
+                                                <td className="p-2 align-middle font-medium sticky left-[48px] bg-white z-10">{row.attendance_id}</td>
+                                                <td className="p-2 align-middle font-medium sticky left-[148px] bg-white z-10">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
                                                 <td className="p-2 align-middle font-semibold">{row.total_salary?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.working_days?.toFixed(2)}</td>
                                                 <td className="p-2 align-middle">{row.present_days?.toFixed(2)}</td>
