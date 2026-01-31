@@ -893,7 +893,8 @@ Deno.serve(async (req) => {
             const allowancesAmount = Number(salary?.allowances) || 0;
             const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
 
-            // Get salary leave days from ANNUAL_LEAVE exceptions within custom date range
+            // Get salary leave days from ANNUAL_LEAVE exceptions
+            // FIX Issue 4: Use same logic as createSalarySnapshots.js - direct sum, no proportional calculation
             let salaryLeaveDays = calculated.annualLeaveCount;
             const empAnnualLeaveExceptions = allExceptions.filter(exc => 
                 String(exc.attendance_id) === String(emp.attendance_id) &&
@@ -901,26 +902,9 @@ Deno.serve(async (req) => {
             );
             
             if (empAnnualLeaveExceptions.length > 0) {
-                const customStartDate = new Date(date_from);
-                const customEndDate = new Date(date_to);
-                let totalSalaryLeaveDaysOverride = 0;
-                
-                for (const exc of empAnnualLeaveExceptions) {
-                    if (exc.salary_leave_days && exc.salary_leave_days > 0) {
-                        const exFrom = new Date(exc.date_from);
-                        const exTo = new Date(exc.date_to);
-                        const fullRange = Math.ceil((exTo - exFrom) / (1000 * 60 * 60 * 24)) + 1;
-                        
-                        const rangeStart = exFrom < customStartDate ? customStartDate : exFrom;
-                        const rangeEnd = exTo > customEndDate ? customEndDate : exTo;
-                        
-                        if (rangeStart <= rangeEnd) {
-                            const overlapDays = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24)) + 1;
-                            const proportion = overlapDays / fullRange;
-                            totalSalaryLeaveDaysOverride += Math.round(exc.salary_leave_days * proportion * 100) / 100;
-                        }
-                    }
-                }
+                const totalSalaryLeaveDaysOverride = empAnnualLeaveExceptions.reduce((sum, exc) => {
+                    return sum + (exc.salary_leave_days ?? 0);
+                }, 0);
                 if (totalSalaryLeaveDaysOverride > 0) {
                     salaryLeaveDays = totalSalaryLeaveDaysOverride;
                 }
