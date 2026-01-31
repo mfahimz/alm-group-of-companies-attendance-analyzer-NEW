@@ -1226,8 +1226,93 @@ export default function BusinessDocumentation() {
                     </div>
                 </Section>
 
+                {/* Salary Increments */}
+                <Section id="salary-increments" title="12. Salary Increments (Al Maraghi Motors)" icon={DollarSign}>
+                    <h3 className="text-xl font-semibold mt-0">What Salary Increments Are</h3>
+                    <p>
+                        A salary increment is a <strong>permanent change</strong> to an employee's salary that takes effect 
+                        from a specific month onward. It is NOT a bonus or one-time adjustment - it permanently changes 
+                        the base salary used for all future calculations.
+                    </p>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                        <h4 className="font-semibold text-blue-900 mb-2">Key Characteristics:</h4>
+                        <ul className="text-sm text-blue-800">
+                            <li><strong>Permanent:</strong> Once effective, the new salary applies to all future periods</li>
+                            <li><strong>Month-Based:</strong> Effective date is always the 1st of a month</li>
+                            <li><strong>Non-Retroactive:</strong> Does NOT apply to past salary calculations</li>
+                            <li><strong>All Components:</strong> Affects Basic Salary, Allowances, and Allowances with Bonus</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Why This Matters for Payroll</h3>
+                    <p>
+                        When calculating salaries, the system must use the <strong>correct salary for each time period</strong>:
+                    </p>
+                    <ul>
+                        <li><strong>Current Month Salary:</strong> Uses the salary effective for the salary month being calculated</li>
+                        <li><strong>Previous Month Deductions:</strong> Uses the salary that was effective in the previous month</li>
+                        <li><strong>Overtime (OT):</strong> OT belongs to the previous month, so it uses the previous month's salary rate</li>
+                    </ul>
+                    
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-3">
+                        <h4 className="font-semibold text-amber-900 mb-2">Example:</h4>
+                        <p className="text-sm text-amber-800">
+                            Employee has salary increment effective <strong>February 2026</strong>:
+                        </p>
+                        <ul className="text-sm text-amber-800 mt-2">
+                            <li>January 2026 salary calculation → Uses <strong>old salary</strong> (increment not yet effective)</li>
+                            <li>January OT calculated in February report → Uses <strong>old salary</strong> (OT was worked in January)</li>
+                            <li>February 2026 salary calculation → Uses <strong>new incremented salary</strong></li>
+                            <li>February OT calculated in March report → Uses <strong>new salary</strong> (OT was worked in February)</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">How to Add a Salary Increment</h3>
+                    <div className="bg-slate-100 border border-slate-300 rounded-lg p-4">
+                        <ol className="text-sm">
+                            <li className="mb-2"><strong>Step 1:</strong> Go to HR Management → Salary Increments</li>
+                            <li className="mb-2"><strong>Step 2:</strong> Click "Add Salary Increment"</li>
+                            <li className="mb-2"><strong>Step 3:</strong> Select the employee</li>
+                            <li className="mb-2"><strong>Step 4:</strong> Set the Effective Month (e.g., February 2026)</li>
+                            <li className="mb-2"><strong>Step 5:</strong> Enter the new Basic Salary, Allowances, and Allowances with Bonus</li>
+                            <li className="mb-2"><strong>Step 6:</strong> Select a reason (Annual Review, Promotion, etc.)</li>
+                            <li className="mb-2"><strong>Step 7:</strong> Click Save</li>
+                        </ol>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">What Does NOT Change</h3>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <ul className="text-sm text-red-800">
+                            <li>Salary increments do NOT affect <strong>Attendance data</strong></li>
+                            <li>Salary increments do NOT affect <strong>AnalysisResult</strong> records</li>
+                            <li>Salary increments do NOT affect <strong>Punches or Exceptions</strong></li>
+                            <li>Salary increments do NOT overwrite the <strong>base EmployeeSalary</strong> record</li>
+                            <li>Existing salary increments are <strong>never modified</strong> - only new ones are added</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Recalculation Safety</h3>
+                    <p>
+                        When recalculating salary for an old project:
+                    </p>
+                    <ul>
+                        <li>The system uses the salary that was <strong>valid at that time</strong></li>
+                        <li>Later increments are <strong>NOT applied retroactively</strong></li>
+                        <li>This ensures <strong>audit safety</strong> and <strong>deterministic results</strong></li>
+                    </ul>
+                    
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-3">
+                        <h4 className="font-semibold text-green-900 mb-2">Audit Guarantee:</h4>
+                        <p className="text-sm text-green-800">
+                            The complete history of all salary increments is preserved. You can always see what salary 
+                            was effective for any month, who created the increment, and when it was created.
+                        </p>
+                    </div>
+                </Section>
+
                 {/* Change Management */}
-                <Section id="changes" title="12. Change Management" icon={AlertCircle}>
+                <Section id="changes" title="13. Change Management" icon={AlertCircle}>
                     <h3 className="text-xl font-semibold mt-0">What Happens When Rules Change</h3>
                     <p>
                         When your company changes attendance policies (e.g., new grace period, different shift times):
