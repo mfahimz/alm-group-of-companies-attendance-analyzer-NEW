@@ -1063,9 +1063,9 @@ Deno.serve(async (req) => {
             
             const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-            // Calculate deductible: (late + early + other) - grace - approved
-            const totalTimeIssues = calculated.lateMinutes + calculated.earlyCheckoutMinutes + calculated.otherMinutes;
-            const deductibleMinutes = Math.max(0, totalTimeIssues - calculated.graceMinutes - calculated.approvedMinutes);
+            // Use finalized deductible_minutes from AnalysisResult
+            // Grace minutes are already applied - do NOT recalculate or reapply
+            const deductibleMinutes = calculated.deductibleMinutes;
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
             
             // Current month hourly rate uses salary divisor
