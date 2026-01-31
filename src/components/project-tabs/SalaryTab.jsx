@@ -202,8 +202,9 @@ export default function SalaryTab({ project }) {
                     } : 'no data'
                 );
             } else {
-                // Use existing snapshot data for full date range
-                calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
+                // Use fresh snapshot data for full date range (NOT stale memory data)
+                calculatedData = freshSnapshots.map(snapshot => ({ ...snapshot }));
+                console.log('[SalaryTab] Using fresh snapshots for report:', calculatedData.length);
             }
 
             // Merge OT data from OvertimeData entity into calculated data
