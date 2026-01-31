@@ -365,12 +365,11 @@ Deno.serve(async (req) => {
                 
                 if (isAssumedPresentDay) {
                     // Check if employee has annual leave on this assumed day
+                    // FIX Issue 3: Use date string comparison to avoid timezone issues
                     const hasAnnualLeaveOnAssumedDay = employeeExceptions.some(ex => {
                         if (ex.type !== 'ANNUAL_LEAVE') return false;
                         try {
-                            const exFrom = new Date(ex.date_from);
-                            const exTo = new Date(ex.date_to);
-                            return currentDate >= exFrom && currentDate <= exTo;
+                            return dateStr >= ex.date_from && dateStr <= ex.date_to;
                         } catch { return false; }
                     });
                     
@@ -386,11 +385,10 @@ Deno.serve(async (req) => {
 
                 // Get ALL matching exceptions for this date BEFORE incrementing workingDays
                 // This allows PUBLIC_HOLIDAY to completely skip the day
+                // FIX Issue 3: Use date string comparison to avoid timezone issues
                 const matchingExceptions = employeeExceptions.filter(ex => {
                     try {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return currentDate >= exFrom && currentDate <= exTo;
+                        return dateStr >= ex.date_from && dateStr <= ex.date_to;
                     } catch { return false; }
                 });
 
@@ -440,11 +438,10 @@ Deno.serve(async (req) => {
                 }
 
                 // Check for annual leave
+                // FIX Issue 3: Use date string comparison to avoid timezone issues
                 const annualLeaveException = employeeExceptions.find(ex => {
                     try {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return ex.type === 'ANNUAL_LEAVE' && currentDate >= exFrom && currentDate <= exTo;
+                        return ex.type === 'ANNUAL_LEAVE' && dateStr >= ex.date_from && dateStr <= ex.date_to;
                     } catch { return false; }
                 });
 
