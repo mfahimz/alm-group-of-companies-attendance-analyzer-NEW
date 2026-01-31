@@ -199,6 +199,15 @@ export default function SalaryTab({ project }) {
             // [MERGE_NOTE: If merging divisors, change otDivisor to use divisor (salary_calculation_days) instead]
             const otDivisor = project.ot_calculation_days || 30;
             
+            console.log('[SalaryTab] Processing calculatedData, first row prev month fields:', 
+                calculatedData[0] ? {
+                    extra_prev_month_deductible_minutes: calculatedData[0].extra_prev_month_deductible_minutes,
+                    extra_prev_month_lop_days: calculatedData[0].extra_prev_month_lop_days,
+                    extra_prev_month_lop_pay: calculatedData[0].extra_prev_month_lop_pay,
+                    extra_prev_month_deductible_hours_pay: calculatedData[0].extra_prev_month_deductible_hours_pay
+                } : 'no data'
+            );
+            
             calculatedData = calculatedData.map(row => {
                 const otRecord = overtimeData.find(ot => 
                     String(ot.attendance_id) === String(row.attendance_id)
@@ -236,6 +245,9 @@ export default function SalaryTab({ project }) {
                 const advanceSalaryDeduction = snapshotRecord?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0;
 
                 // Previous month deductions (Al Maraghi Motors - from recalculated snapshots)
+                // CRITICAL: These must come from the row (recalculated data), NOT snapshot
+                const extraPrevMonthDeductibleMinutes = row.extra_prev_month_deductible_minutes || 0;
+                const extraPrevMonthLopDays = row.extra_prev_month_lop_days || 0;
                 const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
                 const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
 
