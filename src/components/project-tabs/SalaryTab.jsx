@@ -235,8 +235,13 @@ export default function SalaryTab({ project }) {
                 const otherDeduction = snapshotRecord?.otherDeduction ?? row.otherDeduction ?? 0;
                 const advanceSalaryDeduction = snapshotRecord?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0;
 
+                // Previous month deductions (Al Maraghi Motors - from recalculated snapshots)
+                const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
+                const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
+
                 const finalTotal = totalSalary + totalOtSalary + bonus + incentive
-                    - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+                    - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
+                    - otherDeduction - advanceSalaryDeduction;
 
                 // WPS SPLIT LOGIC (Al Maraghi Motors only)
                 // Balance must always be a multiple of 100 (round down)
