@@ -87,11 +87,11 @@ export default function SalarySnapshotDialog({
     };
 
     // Row component for consistent styling
-    const DataRow = ({ label, value, highlight = false, negative = false }) => (
+    const DataRow = ({ label, value, highlight = false, negative = false, noRound = false }) => (
         <div className={`flex justify-between py-1.5 ${highlight ? 'font-semibold' : ''}`}>
             <span className="text-slate-600">{label}</span>
             <span className={`font-medium ${negative && Number(value) > 0 ? 'text-red-600' : ''} ${highlight ? 'text-slate-900' : 'text-slate-800'}`}>
-                {formatCurrency(value)}
+                {noRound ? formatNoRound(value) : formatCurrency(value)}
             </span>
         </div>
     );
