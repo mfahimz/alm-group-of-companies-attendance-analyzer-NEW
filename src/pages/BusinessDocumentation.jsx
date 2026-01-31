@@ -442,15 +442,17 @@ export default function BusinessDocumentation() {
                         Minutes are converted to salary deductions using this calculation:
                     </p>
                     <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
-                        <p className="text-sm mb-2"><strong>Step 1:</strong> Calculate total deductible minutes:</p>
-                        <p className="text-sm ml-4">Total Minutes = Late Minutes + Early Checkout Minutes + Other Minutes - Approved Minutes</p>
+                        <p className="text-sm mb-2"><strong>Step 1:</strong> Calculate deductible minutes in Attendance Report:</p>
+                        <p className="text-sm ml-4">Deductible Minutes = Late Minutes + Early Checkout Minutes + Other Minutes - Grace Minutes - Approved Minutes</p>
+                        <p className="text-sm ml-4 text-blue-700 mt-1"><em>Grace is applied once during attendance analysis and saved in the finalized report</em></p>
                         
                         <p className="text-sm mt-3 mb-2"><strong>Step 2:</strong> Convert minutes to hours:</p>
-                        <p className="text-sm ml-4">Hours = Total Minutes ÷ 60</p>
+                        <p className="text-sm ml-4">Hours = Deductible Minutes ÷ 60</p>
                         
-                        <p className="text-sm mt-3 mb-2"><strong>Step 3:</strong> Calculate deduction:</p>
+                        <p className="text-sm mt-3 mb-2"><strong>Step 3:</strong> Calculate deduction in Salary Report:</p>
                         <p className="text-sm ml-4">Per Hour Rate = Monthly Salary ÷ (30 days × 8 hours)</p>
                         <p className="text-sm ml-4">Minute Deduction = Hours × Per Hour Rate</p>
+                        <p className="text-sm ml-4 text-red-700 mt-1"><em>Grace is NOT applied again in salary calculation - uses exact deductible minutes from Attendance Report</em></p>
                     </div>
 
                     <p className="text-sm bg-amber-50 border border-amber-200 rounded p-3 mt-4">
