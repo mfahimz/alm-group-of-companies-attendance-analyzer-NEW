@@ -1019,8 +1019,9 @@ Deno.serve(async (req) => {
             // Current month deductible hours pay (uses salary divisor)
             const currentMonthDeductibleHoursPay = hourlyRate * deductibleHours;
             
-            // AL MARAGHI: Calculate extra prev month data (uses OT divisor)
-            const extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, totalSalaryAmount, workingHours);
+            // AL MARAGHI: Calculate extra prev month data (uses OT divisor and PREVIOUS MONTH salary)
+            // IMPORTANT: Uses prevMonthTotalSalary for historical accuracy
+            const extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
             const extraPrevMonthDeductibleMinutes = extraPrevMonthData.extraDeductibleMinutes;
             const extraPrevMonthLopDays = extraPrevMonthData.extraLopDays;
             const extraPrevMonthLopPay = extraPrevMonthData.extraLopPay;
