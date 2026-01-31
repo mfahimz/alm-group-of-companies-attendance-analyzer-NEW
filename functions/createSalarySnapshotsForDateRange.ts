@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
                 : Promise.resolve([])
         ]);
 
-        console.log(`[createSalarySnapshotsForDateRange] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results`);
+        console.log(`[createSalarySnapshotsForDateRange] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments`);
 
         // Parse rules
         let rules = null;
