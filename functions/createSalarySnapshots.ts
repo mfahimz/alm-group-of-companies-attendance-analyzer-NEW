@@ -982,20 +982,50 @@ Deno.serve(async (req) => {
             let calculated;
             let attendanceSource;
             
-            // ALWAYS recalculate attendance from shifts + exceptions + punches
-            // This ensures employees with no punches but with exceptions (annual leave, etc.) are computed correctly
-            // For Al Maraghi Motors: pass assumedPresentDays for salary-only assumption
-            calculated = recalculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to, assumedPresentDays);
-
+            // Use finalized AnalysisResult values if available
+            // Do NOT recalculate attendance - grace minutes already applied
+            let calculated;
+            
             if (hasAnalysisResult) {
+                // Use finalized AnalysisResult values directly
+                // deductible_minutes already has grace applied - do NOT reapply
+                calculated = {
+                    workingDays: analysisResult.working_days,
+                    presentDays: analysisResult.present_days,
+                    fullAbsenceCount: analysisResult.full_absence_count,
+                    halfAbsenceCount: analysisResult.half_absence_count,
+                    sickLeaveCount: analysisResult.sick_leave_count,
+                    annualLeaveCount: analysisResult.annual_leave_count,
+                    lateMinutes: analysisResult.late_minutes,
+                    earlyCheckoutMinutes: analysisResult.early_checkout_minutes,
+                    otherMinutes: analysisResult.other_minutes,
+                    approvedMinutes: analysisResult.approved_minutes,
+                    deductibleMinutes: analysisResult.deductible_minutes,
+                    graceMinutes: analysisResult.grace_minutes
+                };
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
+                console.log(`[createSalarySnapshots] Using finalized AnalysisResult for ${emp.name} (${emp.attendance_id})`);
             } else {
-                // Employee had no AnalysisResult (was missing from original report run)
-                // But we still computed their attendance from exceptions/shifts
+                // NO_ATTENDANCE_DATA: Employee missing from analysis
+                // Use zero attendance for salary safety
+                calculated = {
+                    workingDays: 0,
+                    presentDays: 0,
+                    fullAbsenceCount: 0,
+                    halfAbsenceCount: 0,
+                    sickLeaveCount: 0,
+                    annualLeaveCount: 0,
+                    lateMinutes: 0,
+                    earlyCheckoutMinutes: 0,
+                    otherMinutes: 0,
+                    approvedMinutes: 0,
+                    deductibleMinutes: 0,
+                    graceMinutes: 0
+                };
                 attendanceSource = 'NO_ATTENDANCE_DATA';
                 noAttendanceCount++;
-                console.log(`[createSalarySnapshots] Computing attendance for missing employee ${emp.name} (${emp.attendance_id}) - will use exceptions/shifts`);
+                console.log(`[createSalarySnapshots] No AnalysisResult for ${emp.name} (${emp.attendance_id}) - using zero attendance`);
             }
 
             // Current month salary values (may be from increment)
