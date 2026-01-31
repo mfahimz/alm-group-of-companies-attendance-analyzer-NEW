@@ -154,11 +154,11 @@ export default function SalarySnapshotDialog({
                     </h3>
                     <div className="divide-y divide-slate-100">
                         <DataRow label="Leave Deduction (Net)" value={snapshot.netDeduction} negative />
-                        <DataRow label="Current Month Deductible Hours Pay" value={snapshot.deductibleHoursPay} negative />
+                        <DataRow label="Current Month Deductible Hours Pay" value={formatRounded(snapshot.deductibleHoursPay)} negative />
                         <DataRow label="Previous Month LOP Pay" value={snapshot.extra_prev_month_lop_pay} negative />
-                        <DataRow label="Previous Month Deductible Hours Pay" value={snapshot.extra_prev_month_deductible_hours_pay} negative />
-                        <DataRow label="Other Deduction" value={snapshot.otherDeduction} negative />
-                        <DataRow label="Advance Salary Deduction" value={snapshot.advanceSalaryDeduction} negative />
+                        <DataRow label="Previous Month Deductible Hours Pay" value={formatRounded(snapshot.extra_prev_month_deductible_hours_pay)} negative />
+                        <DataRow label="Other Deduction" value={snapshot.otherDeduction} negative noRound />
+                        <DataRow label="Advance Salary Deduction" value={snapshot.advanceSalaryDeduction} negative noRound />
                     </div>
                 </div>
 
