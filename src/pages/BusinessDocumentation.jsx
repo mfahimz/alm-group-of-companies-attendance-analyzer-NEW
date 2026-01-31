@@ -486,7 +486,7 @@ export default function BusinessDocumentation() {
 
                     <h3 className="text-xl font-semibold mt-6">Assumed Present Days (Al Maraghi Motors Only)</h3>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="font-semibold text-blue-900 mb-2">🔒 Locked Payroll Rule</h4>
+                        <h4 className="font-semibold text-blue-900 mb-2">Locked Payroll Rule</h4>
                         <p className="text-sm text-blue-800 mb-3">
                             For Al Maraghi Motors projects, the <strong>last 2 days of the salary month</strong> are automatically treated as 
                             <strong> fully present</strong> for salary calculation purposes. This rule exists because attendance data may not be 
