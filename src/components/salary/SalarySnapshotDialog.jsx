@@ -32,9 +32,22 @@ export default function SalarySnapshotDialog({
 
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
 
-    // Format currency
+    // Format currency - standard 2 decimal places
     const formatCurrency = (value) => {
         const num = Number(value) || 0;
+        return num.toFixed(2);
+    };
+
+    // Format with normal decimal rounding (for deductible hours pay)
+    const formatRounded = (value) => {
+        const num = Number(value) || 0;
+        return Math.round(num * 100) / 100; // Normal rounding
+    };
+
+    // Format without rounding (show full precision, max 2 decimals for display)
+    const formatNoRound = (value) => {
+        const num = Number(value) || 0;
+        // Show as-is without additional rounding
         return num.toFixed(2);
     };
 
