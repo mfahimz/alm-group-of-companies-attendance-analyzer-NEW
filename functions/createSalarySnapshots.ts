@@ -650,7 +650,9 @@ Deno.serve(async (req) => {
             // PROJECT-SPECIFIC OVERRIDE: "January – Al Maraghi Motors"
             // Override previous month date range for this specific project
             // ============================================================
-            const isJanuaryAlMaraghiProject = project.name === 'January – Al Maraghi Motors';
+            // Check for both regular hyphen and en-dash variants of the project name
+            const isJanuaryAlMaraghiProject = project.name === 'January - Al Maraghi Motors' || 
+                                               project.name === 'January – Al Maraghi Motors';
             
             let effectivePrevMonthFrom = extraPrevMonthFrom;
             let effectivePrevMonthTo = extraPrevMonthTo;
