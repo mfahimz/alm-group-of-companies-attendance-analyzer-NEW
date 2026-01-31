@@ -1165,11 +1165,13 @@ Deno.serve(async (req) => {
                 deductibleHours: totalDeductibleHours,
                 deductibleHoursPay: Math.round(totalDeductibleHoursPay * 100) / 100,
                 netDeduction: Math.round(netDeduction * 100) / 100,
+                // OT & Adjustment Fields (editable, initialized to 0, will be rounded on recalculation)
                 normalOtHours: 0,
                 normalOtSalary: 0,
                 specialOtHours: 0,
                 specialOtSalary: 0,
                 totalOtSalary: 0,
+                // Adjustment Fields (NOT rounded - user-entered values)
                 otherDeduction: 0,
                 bonus: 0,
                 incentive: 0,

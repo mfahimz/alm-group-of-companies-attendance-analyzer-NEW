@@ -288,14 +288,14 @@ Deno.serve(async (req) => {
         // Total deductible hours pay = current month + prev month
         const deductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
         
-        // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours
+        // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours (ROUNDED)
         const normalOtSalary = Math.round(otHourlyRate * 1.25 * adjustmentValues.normalOtHours * 100) / 100;
-        
-        // Special OT Salary = OT Hourly Rate * 1.5 * Special OT Hours
+
+        // Special OT Salary = OT Hourly Rate * 1.5 * Special OT Hours (ROUNDED)
         const specialOtSalary = Math.round(otHourlyRate * 1.5 * adjustmentValues.specialOtHours * 100) / 100;
-        
-        // Total OT Salary
-        const totalOtSalary = normalOtSalary + specialOtSalary;
+
+        // Total OT Salary (ROUNDED)
+        const totalOtSalary = Math.round((normalOtSalary + specialOtSalary) * 100) / 100;
 
         // Final Total = Total Salary + OT + Bonus + Incentive 
         //             - Net Deduction (current month leave)
@@ -356,9 +356,9 @@ Deno.serve(async (req) => {
             deductibleHoursPay: Math.round(deductibleHoursPay * 100) / 100,
             extra_prev_month_lop_pay: Math.round(extraPrevMonthLopPay * 100) / 100,
             extra_prev_month_deductible_hours_pay: Math.round(extraPrevMonthDeductibleHoursPay * 100) / 100,
-            normalOtSalary: normalOtSalary,
-            specialOtSalary: specialOtSalary,
-            totalOtSalary: totalOtSalary,
+            normalOtSalary: Math.round(normalOtSalary * 100) / 100,
+            specialOtSalary: Math.round(specialOtSalary * 100) / 100,
+            totalOtSalary: Math.round(totalOtSalary * 100) / 100,
             total: Math.round(finalTotal * 100) / 100,
             wpsPay: Math.round(wpsPay * 100) / 100,
             balance: Math.round(balance * 100) / 100,
