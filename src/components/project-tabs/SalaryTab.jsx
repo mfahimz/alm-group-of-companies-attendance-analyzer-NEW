@@ -57,7 +57,8 @@ export default function SalaryTab({ project }) {
     });
 
     // Fetch salary snapshots for generating reports
-    const { data: salarySnapshots = [] } = useQuery({
+    // Note: We need to wait for reportRuns to load before we can determine finalReport
+    const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
         queryKey: ['salarySnapshots', project?.id, finalReport?.id],
         queryFn: async () => {
             const snapshots = await base44.entities.SalarySnapshot.filter({
@@ -66,7 +67,7 @@ export default function SalaryTab({ project }) {
             });
             return snapshots;
         },
-        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
+        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true && !loadingReports,
         staleTime: 0
     });
 
