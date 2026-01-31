@@ -206,9 +206,9 @@ export default function SalaryReportDetail() {
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         const normalOtHours = getValue(row, 'normalOtHours') || 0;
         const specialOtHours = getValue(row, 'specialOtHours') || 0;
-        const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
-        const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
-        const totalOtSalary = normalOtSalary + specialOtSalary;
+        const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours);
+        const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours);
+        const totalOtSalary = Math.round(normalOtSalary + specialOtSalary);
         
         const bonus = getValue(row, 'bonus') || 0;
         const incentive = getValue(row, 'incentive') || 0;
@@ -290,31 +290,31 @@ export default function SalaryReportDetail() {
             const otHourlyRate = totalSalary / otDivisor / workingHours;
 
             // Apply edits using DIVISOR_OT for OT calculations
-            if ('normalOtHours' in edits) {
-                updated.normalOtHours = edits.normalOtHours;
-                updated.normalOtSalary = Math.round(otHourlyRate * 1.25 * edits.normalOtHours * 100) / 100;
-            }
-            if ('specialOtHours' in edits) {
-                updated.specialOtHours = edits.specialOtHours;
-                updated.specialOtSalary = Math.round(otHourlyRate * 1.5 * edits.specialOtHours * 100) / 100;
-            }
+             if ('normalOtHours' in edits) {
+                 updated.normalOtHours = edits.normalOtHours;
+                 updated.normalOtSalary = Math.round(otHourlyRate * 1.25 * edits.normalOtHours);
+             }
+             if ('specialOtHours' in edits) {
+                 updated.specialOtHours = edits.specialOtHours;
+                 updated.specialOtSalary = Math.round(otHourlyRate * 1.5 * edits.specialOtHours);
+             }
             if ('otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
             if ('bonus' in edits) updated.bonus = edits.bonus;
             if ('incentive' in edits) updated.incentive = edits.incentive;
             if ('advanceSalaryDeduction' in edits) updated.advanceSalaryDeduction = edits.advanceSalaryDeduction;
 
             // Recalculate total (include previous month deductions)
-            const totalOtSalary = (updated.normalOtSalary || 0) + (updated.specialOtSalary || 0);
-            const netDeduction = updated.netDeduction || 0;
-            const deductibleHoursPay = updated.deductibleHoursPay || 0;
-            const extraPrevMonthLopPay = updated.extra_prev_month_lop_pay || 0;
-            const extraPrevMonthDeductibleHoursPay = updated.extra_prev_month_deductible_hours_pay || 0;
+             const totalOtSalary = (updated.normalOtSalary || 0) + (updated.specialOtSalary || 0);
+             const netDeduction = updated.netDeduction || 0;
+             const deductibleHoursPay = updated.deductibleHoursPay || 0;
+             const extraPrevMonthLopPay = updated.extra_prev_month_lop_pay || 0;
+             const extraPrevMonthDeductibleHoursPay = updated.extra_prev_month_deductible_hours_pay || 0;
 
-            const finalTotal = totalSalary + totalOtSalary + (updated.bonus || 0) + (updated.incentive || 0)
-                                - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
-                                - (updated.otherDeduction || 0) - (updated.advanceSalaryDeduction || 0);
+             const finalTotal = totalSalary + totalOtSalary + (updated.bonus || 0) + (updated.incentive || 0)
+                                 - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
+                                 - (updated.otherDeduction || 0) - (updated.advanceSalaryDeduction || 0);
 
-            updated.total = Math.round(finalTotal * 100) / 100;
+             updated.total = Math.round(finalTotal);
 
             // WPS SPLIT LOGIC (Al Maraghi Motors only)
             const wpsCapEnabled = updated.wps_cap_enabled || false;
@@ -324,11 +324,11 @@ export default function SalaryReportDetail() {
                 const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
                 const rawExcess = Math.max(0, finalTotal - cap);
                 const balance = Math.floor(rawExcess / 100) * 100;
-                updated.wpsPay = Math.round((finalTotal - balance) * 100) / 100;
+                updated.wpsPay = Math.round(finalTotal - balance);
                 updated.balance = balance;
                 updated.wps_cap_applied = rawExcess > 0;
             } else {
-                updated.wpsPay = Math.round(Math.max(0, finalTotal) * 100) / 100;
+                updated.wpsPay = Math.round(Math.max(0, finalTotal));
                 updated.balance = 0;
                 updated.wps_cap_applied = false;
             }
@@ -337,23 +337,23 @@ export default function SalaryReportDetail() {
             });
 
             // Calculate new totals
-            let totalSalaryAmount = 0;
-            let totalDeductions = 0;
-            let totalOtSalary = 0;
+             let totalSalaryAmount = 0;
+             let totalDeductions = 0;
+             let totalOtSalary = 0;
 
-            updatedData.forEach(row => {
-                totalSalaryAmount += row.total || 0;
-                totalDeductions += (row.netDeduction || 0) + (row.deductibleHoursPay || 0) + (row.otherDeduction || 0) + (row.advanceSalaryDeduction || 0);
-                totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
-            });
+             updatedData.forEach(row => {
+                 totalSalaryAmount += row.total || 0;
+                 totalDeductions += (row.netDeduction || 0) + (row.deductibleHoursPay || 0) + (row.otherDeduction || 0) + (row.advanceSalaryDeduction || 0);
+                 totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
+             });
 
-            // Update the report
-            await base44.entities.SalaryReport.update(report.id, {
-                snapshot_data: JSON.stringify(updatedData),
-                total_salary_amount: Math.round(totalSalaryAmount * 100) / 100,
-                total_deductions: Math.round(totalDeductions * 100) / 100,
-                total_ot_salary: Math.round(totalOtSalary * 100) / 100
-            });
+             // Update the report
+             await base44.entities.SalaryReport.update(report.id, {
+                 snapshot_data: JSON.stringify(updatedData),
+                 total_salary_amount: Math.round(totalSalaryAmount),
+                 total_deductions: Math.round(totalDeductions),
+                 total_ot_salary: Math.round(totalOtSalary)
+             });
 
             // Also update the live SalarySnapshot entities for bidirectional sync
             // This ensures OvertimeTab sees the same values
@@ -489,22 +489,22 @@ export default function SalaryReportDetail() {
                 'Present Days': row.present_days || 0,
                 'LOP Days': row.full_absence_count || 0,
                 'Annual Leave Days': row.annual_leave_count || 0,
-                'Leave Days': row.leaveDays || 0,
-                'Leave Pay': row.leavePay || 0,
-                'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
-                'Salary Leave Amount': row.salaryLeaveAmount || 0,
-                'Net Deduction': row.netDeduction || 0,
+                'Leave Days': Math.round(row.leaveDays || 0),
+                'Leave Pay': Math.round(row.leavePay || 0),
+                'Salary Leave Days': Math.round(row.salary_leave_days || row.salaryLeaveDays || 0),
+                'Salary Leave Amount': Math.round(row.salaryLeaveAmount || 0),
+                'Net Deduction': Math.round(row.netDeduction || 0),
                 'Deductible Hours': row.deductibleHours || 0,
-                'Deductible Hours Pay': row.deductibleHoursPay || 0,
-                'Extra Deductible Hrs (Prev Month)': Math.round(((row.extra_prev_month_deductible_minutes || 0) / 60) * 100) / 100,
-                'Extra LOP Days (Prev Month)': row.extra_prev_month_lop_days || 0,
-                'Extra LOP Pay (Prev Month)': row.extra_prev_month_lop_pay || 0,
-                'Extra Deductible Pay (Prev Month)': row.extra_prev_month_deductible_hours_pay || 0,
+                'Deductible Hours Pay': Math.round(row.deductibleHoursPay || 0),
+                'Extra Deductible Hrs (Prev Month)': Math.round((row.extra_prev_month_deductible_minutes || 0) / 60),
+                'Extra LOP Days (Prev Month)': Math.round(row.extra_prev_month_lop_days || 0),
+                'Extra LOP Pay (Prev Month)': Math.round(row.extra_prev_month_lop_pay || 0),
+                'Extra Deductible Pay (Prev Month)': Math.round(row.extra_prev_month_deductible_hours_pay || 0),
                 'Normal OT Hours': row.normalOtHours || 0,
-                'Normal OT Salary': row.normalOtSalary || 0,
+                'Normal OT Salary': Math.round(row.normalOtSalary || 0),
                 'Special OT Hours': row.specialOtHours || 0,
-                'Special OT Salary': row.specialOtSalary || 0,
-                'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
+                'Special OT Salary': Math.round(row.specialOtSalary || 0),
+                'Total OT Salary': Math.round((row.normalOtSalary || 0) + (row.specialOtSalary || 0)),
                 'Other Deduction': row.otherDeduction || 0,
                 'Bonus': row.bonus || 0,
                 'Incentive': row.incentive || 0,
@@ -735,22 +735,22 @@ export default function SalaryReportDetail() {
                                                 </td>
                                                 <td className="p-2 align-middle font-medium sticky left-[48px] bg-white z-10">{row.attendance_id}</td>
                                                 <td className="p-2 align-middle font-medium sticky left-[148px] bg-white z-10">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
-                                                <td className="p-2 align-middle font-semibold">{row.total_salary?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle">{row.working_days?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle">{row.present_days?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle text-red-600 font-semibold">{row.full_absence_count?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle text-blue-600">{row.annual_leave_count?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{row.leaveDays?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{row.leavePay?.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{(row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{row.salaryLeaveAmount?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-red-50 font-semibold">{row.netDeduction?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-purple-50">{row.deductibleHours?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-purple-100">{row.deductibleHoursPay?.toFixed(2) || '0.00'}</td>
-                                                <td className="p-2 align-middle bg-orange-50">{((row.extra_prev_month_deductible_minutes || 0) / 60).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-orange-50">{(row.extra_prev_month_lop_days || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_lop_pay || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-orange-100">{(row.extra_prev_month_deductible_hours_pay || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle font-semibold">{Math.round(row.total_salary || 0)}</td>
+                                                <td className="p-2 align-middle">{Math.round(row.working_days || 0)}</td>
+                                                <td className="p-2 align-middle">{Math.round(row.present_days || 0)}</td>
+                                                <td className="p-2 align-middle text-red-600 font-semibold">{Math.round(row.full_absence_count || 0)}</td>
+                                                <td className="p-2 align-middle text-blue-600">{Math.round(row.annual_leave_count || 0)}</td>
+                                                <td className="p-2 align-middle bg-amber-50">{Math.round(row.leaveDays || 0)}</td>
+                                                <td className="p-2 align-middle bg-amber-100">{Math.round(row.leavePay || 0)}</td>
+                                                <td className="p-2 align-middle bg-amber-50">{Math.round(row.salary_leave_days || row.salaryLeaveDays || 0)}</td>
+                                                <td className="p-2 align-middle bg-amber-100">{Math.round(row.salaryLeaveAmount || 0) || '0'}</td>
+                                                <td className="p-2 align-middle bg-red-50 font-semibold">{Math.round(row.netDeduction || 0) || '0'}</td>
+                                                <td className="p-2 align-middle bg-purple-50">{Math.round(row.deductibleHours || 0) || '0'}</td>
+                                                <td className="p-2 align-middle bg-purple-100">{Math.round(row.deductibleHoursPay || 0) || '0'}</td>
+                                                <td className="p-2 align-middle bg-orange-50">{Math.round((row.extra_prev_month_deductible_minutes || 0) / 60)}</td>
+                                                <td className="p-2 align-middle bg-orange-50">{Math.round(row.extra_prev_month_lop_days || 0)}</td>
+                                                <td className="p-2 align-middle bg-orange-100">{Math.round(row.extra_prev_month_lop_pay || 0)}</td>
+                                                <td className="p-2 align-middle bg-orange-100">{Math.round(row.extra_prev_month_deductible_hours_pay || 0)}</td>
                                                 <td className="p-1 align-middle bg-blue-50">
                                                     <Input
                                                         type="number"
@@ -760,7 +760,7 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-blue-100">{normalOtSalary.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-blue-100">{Math.round(normalOtSalary)}</td>
                                                 <td className="p-1 align-middle bg-cyan-50">
                                                     <Input
                                                         type="number"
@@ -770,8 +770,8 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-cyan-100">{specialOtSalary.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-cyan-200 font-semibold">{totalOtSalary.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-cyan-100">{Math.round(specialOtSalary)}</td>
+                                                <td className="p-2 align-middle bg-cyan-200 font-semibold">{Math.round(totalOtSalary)}</td>
                                                 <td className="p-1 align-middle bg-red-50">
                                                     <Input
                                                         type="number"
@@ -808,9 +808,9 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-green-100 font-bold">{wpsPay.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100 font-bold">{balance.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{Math.round(total)}</td>
+                                                <td className="p-2 align-middle bg-green-100 font-bold">{Math.round(wpsPay)}</td>
+                                                <td className="p-2 align-middle bg-amber-100 font-bold">{Math.round(balance)}</td>
                                                 <td className="p-2 align-middle bg-slate-50 text-center">
                                                     {wpsCapApplied ? (
                                                         <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded text-xs font-medium">

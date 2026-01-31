@@ -32,10 +32,10 @@ export default function SalarySnapshotDialog({
 
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
 
-    // Format currency - standard 2 decimal places
+    // Format currency - whole numbers (0 decimals)
     const formatCurrency = (value) => {
         const num = Number(value) || 0;
-        return num.toFixed(2);
+        return Math.round(num).toString();
     };
 
     // Format with normal decimal rounding (for deductible hours pay)
@@ -44,11 +44,11 @@ export default function SalarySnapshotDialog({
         return Math.round(num * 100) / 100; // Normal rounding
     };
 
-    // Format without rounding (show full precision, max 2 decimals for display)
+    // Format without rounding (show whole numbers for display)
     const formatNoRound = (value) => {
         const num = Number(value) || 0;
         // Show as-is without additional rounding
-        return num.toFixed(2);
+        return Math.round(num).toString();
     };
 
     // Format month name from date
@@ -154,9 +154,9 @@ export default function SalarySnapshotDialog({
                     </h3>
                     <div className="divide-y divide-slate-100">
                         <DataRow label="Leave Deduction (Net)" value={snapshot.netDeduction} negative />
-                        <DataRow label="Current Month Deductible Hours Pay" value={formatRounded(snapshot.deductibleHoursPay)} negative />
+                        <DataRow label="Current Month Deductible Hours Pay" value={snapshot.deductibleHoursPay} negative />
                         <DataRow label="Previous Month LOP Pay" value={snapshot.extra_prev_month_lop_pay} negative />
-                        <DataRow label="Previous Month Deductible Hours Pay" value={formatRounded(snapshot.extra_prev_month_deductible_hours_pay)} negative />
+                        <DataRow label="Previous Month Deductible Hours Pay" value={snapshot.extra_prev_month_deductible_hours_pay} negative />
                         <DataRow label="Other Deduction" value={snapshot.otherDeduction} negative noRound />
                         <DataRow label="Advance Salary Deduction" value={snapshot.advanceSalaryDeduction} negative noRound />
                     </div>
