@@ -355,10 +355,36 @@ export default function SalaryReportDetail() {
                 total_ot_salary: Math.round(totalOtSalary * 100) / 100
             });
 
+            // Also update the live SalarySnapshot entities for bidirectional sync
+            // This ensures OvertimeTab sees the same values
+            for (const row of updatedData) {
+                const edits = editableData[row.hrms_id];
+                if (!edits) continue;
+                
+                // Find the live snapshot for this employee
+                const liveSnapshot = liveSalarySnapshots.find(s => 
+                    String(s.attendance_id) === String(row.attendance_id)
+                );
+                
+                if (liveSnapshot) {
+                    const updatePayload = {};
+                    if ('otherDeduction' in edits) updatePayload.otherDeduction = edits.otherDeduction;
+                    if ('bonus' in edits) updatePayload.bonus = edits.bonus;
+                    if ('incentive' in edits) updatePayload.incentive = edits.incentive;
+                    if ('advanceSalaryDeduction' in edits) updatePayload.advanceSalaryDeduction = edits.advanceSalaryDeduction;
+                    
+                    if (Object.keys(updatePayload).length > 0) {
+                        await base44.entities.SalarySnapshot.update(liveSnapshot.id, updatePayload);
+                    }
+                }
+            }
+
             toast.success('Report saved successfully');
             setEditableData({});
             queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
             queryClient.invalidateQueries({ queryKey: ['salaryReports', report.project_id] });
+            queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', report?.project_id] });
         } catch (error) {
             toast.error('Failed to save: ' + error.message);
         } finally {
