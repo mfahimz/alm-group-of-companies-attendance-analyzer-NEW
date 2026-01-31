@@ -946,7 +946,7 @@ Deno.serve(async (req) => {
             const hourlyRate = totalSalaryAmount / divisor / workingHours;
             
             // Current month deductible hours pay (uses salary divisor)
-            const currentMonthDeductibleHoursPay = hourlyRate * deductibleHours;
+            const currentMonthDeductibleHoursPay = Math.round(hourlyRate * deductibleHours * 100) / 100;
             
             // AL MARAGHI: Calculate extra prev month data (uses OT divisor and PREVIOUS MONTH salary)
             const extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
@@ -955,15 +955,14 @@ Deno.serve(async (req) => {
             const extraPrevMonthLopPay = extraPrevMonthData.extraLopPay;
             const extraPrevMonthDeductibleHoursPay = extraPrevMonthData.extraDeductibleHoursPay;
             
-            // Total deductible hours pay = current month (salary divisor) + prev month (OT divisor)
-            const totalDeductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
-            
-            // Total deductible minutes (for display purposes)
-            const totalDeductibleMinutes = deductibleMinutes + extraPrevMonthDeductibleMinutes;
-            const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
+            // Current month deductible hours (separate from prev month)
+            const currentMonthDeductibleHours = Math.round(deductibleHours * 100) / 100;
 
-            // Final total calculation
+            // Final total calculation:
+            // Total = Base Salary - Net Deduction - CurrentMonthDeductibleHoursPay - PrevMonthLopPay - PrevMonthDeductibleHoursPay
             const finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay;
+            
+            console.log(`[createSalarySnapshotsForDateRange] Employee ${emp.name}: prevMonth deduct=${extraPrevMonthDeductibleMinutes}min, LOP=${extraPrevMonthLopDays}, lopPay=${extraPrevMonthLopPay}, deductPay=${extraPrevMonthDeductibleHoursPay}`);
 
             // ============================================================
             // WPS SPLIT LOGIC (Al Maraghi Motors only)
