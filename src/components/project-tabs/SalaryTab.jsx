@@ -351,6 +351,8 @@ export default function SalaryTab({ project }) {
             setShowGenerateDialog(false);
             setNewReportName('');
             refetchSavedReports();
+            // Invalidate salary snapshots cache to force fresh data
+            queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project?.id, finalReport?.id] });
         } catch (error) {
             toast.error('Failed to generate report: ' + error.message);
         } finally {
