@@ -632,11 +632,10 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
+                // FIX Issue 3: Use date string comparison to avoid timezone issues
                 const matchingExceptions = employeeExceptions.filter(ex => {
                     try {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return currentDate >= exFrom && currentDate <= exTo;
+                        return dateStr >= ex.date_from && dateStr <= ex.date_to;
                     } catch { return false; }
                 });
 
