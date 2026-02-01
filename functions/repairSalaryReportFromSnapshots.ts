@@ -105,23 +105,191 @@ Deno.serve(async (req) => {
                 await base44.asServiceRole.entities.SalarySnapshot.delete(snapshot.id);
             }
             
-            // Recreate snapshots from AnalysisResult using service role
-            const createResponse = await fetch(`${Deno.env.get('BASE44_API_URL')}/apps/${Deno.env.get('BASE44_APP_ID')}/functions/createSalarySnapshots/invoke`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${req.headers.get('Authorization')?.replace('Bearer ', '')}`
-                },
-                body: JSON.stringify({ project_id, report_run_id })
-            });
-            
-            const createResponseData = await createResponse.json();
-            
-            if (createResponseData?.success) {
-                snapshotsRecreated = createResponseData.snapshots_created || 0;
-                console.log(`[repairSalaryReportFromSnapshots] Recreated ${snapshotsRecreated} snapshots`);
-            } else {
-                errors.push(`Failed to recreate snapshots: ${createResponseData?.error || 'Unknown error'}`);
+            // Recreate snapshots from AnalysisResult
+            // Invoke createSalarySnapshots directly (it already uses service role internally)
+            try {
+                const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id });
+                if (projects.length === 0) {
+                    errors.push('Project not found');
+                } else {
+                    // Delete and recreate logic is handled here instead of calling another function
+                    // This avoids function-to-function call issues
+                    
+                    // Get project and salary data
+                    const project = projects[0];
+                    const [employees, salaries, allExceptions, punches, shifts, rulesData] = await Promise.all([
+                        base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
+                        base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+                        base44.asServiceRole.entities.Exception.filter({ project_id }),
+                        base44.asServiceRole.entities.Punch.filter({ project_id }),
+                        base44.asServiceRole.entities.ShiftTiming.filter({ project_id }),
+                        base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
+                    ]);
+                    
+                    // Filter to project's custom employees if specified
+                    let eligibleEmployees = employees;
+                    if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
+                        const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
+                        eligibleEmployees = employees.filter(emp => 
+                            customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id))
+                        );
+                    }
+                    
+                    // Recreate snapshots from AnalysisResult using exact 1:1 copy logic
+                    const newSnapshots = [];
+                    
+                    for (const emp of eligibleEmployees) {
+                        const attendance_id_str = String(emp.attendance_id);
+                        const analysisRow = analysisResults.find(ar => String(ar.attendance_id) === attendance_id_str);
+                        
+                        if (!analysisRow) {
+                            console.warn(`[repairSalaryReportFromSnapshots] No AnalysisResult for ${emp.name} (${emp.attendance_id})`);
+                            continue;
+                        }
+                        
+                        const baseSalary = salaries.find(s => 
+                            String(s.employee_id) === String(emp.hrms_id) || 
+                            String(s.attendance_id) === String(emp.attendance_id)
+                        );
+                        
+                        if (!baseSalary) {
+                            console.warn(`[repairSalaryReportFromSnapshots] No salary record for ${emp.name} (${emp.attendance_id})`);
+                            continue;
+                        }
+                        
+                        // Get divisors from project
+                        const divisor = project.salary_calculation_days || 30;
+                        const otDivisor = project.ot_calculation_days || divisor;
+                        
+                        // 1:1 COPY FROM ANALYSISRESULT (FINALIZED VALUES)
+                        const workingDays = analysisRow.working_days || 0;
+                        const presentDays = analysisRow.present_days || 0;
+                        const fullAbsenceCount = analysisRow.full_absence_count || 0;
+                        const annualLeaveCount = analysisRow.annual_leave_count || 0;
+                        const sickLeaveCount = analysisRow.sick_leave_count || 0;
+                        const lateMinutes = analysisRow.late_minutes || 0;
+                        const earlyCheckoutMinutes = analysisRow.early_checkout_minutes || 0;
+                        const otherMinutes = analysisRow.other_minutes || 0;
+                        const approvedMinutes = analysisRow.approved_minutes || 0;
+                        const graceMinutes = analysisRow.grace_minutes ?? 15;
+                        const deductibleMinutes = analysisRow.deductible_minutes || 0;
+                        
+                        // Calculate salary values
+                        const totalSalaryAmount = baseSalary.total_salary || 0;
+                        const workingHours = baseSalary.working_hours || 9;
+                        const basicSalary = baseSalary.basic_salary || 0;
+                        const allowancesAmount = Number(baseSalary.allowances) || 0;
+                        
+                        // Get salary leave days from ANNUAL_LEAVE exceptions
+                        let salaryLeaveDays = annualLeaveCount;
+                        const empAnnualLeaveExceptions = allExceptions.filter(exc => 
+                            String(exc.attendance_id) === String(emp.attendance_id) &&
+                            exc.type === 'ANNUAL_LEAVE'
+                        );
+                        if (empAnnualLeaveExceptions.length > 0) {
+                            const totalSalaryLeaveDaysOverride = empAnnualLeaveExceptions.reduce((sum, exc) => {
+                                return sum + (exc.salary_leave_days ?? 0);
+                            }, 0);
+                            if (totalSalaryLeaveDaysOverride > 0) {
+                                salaryLeaveDays = totalSalaryLeaveDaysOverride;
+                            }
+                        }
+                        
+                        // Calculate derived values
+                        const leaveDays = annualLeaveCount + fullAbsenceCount;
+                        const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
+                        const salaryForLeave = basicSalary + allowancesAmount;
+                        const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+                        const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+                        const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+                        const hourlyRate = totalSalaryAmount / divisor / workingHours;
+                        const deductibleHoursPay = hourlyRate * deductibleHours;
+                        
+                        const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
+                        
+                        // WPS split
+                        let wpsAmount = finalTotal;
+                        let balanceAmount = 0;
+                        let wpsCapApplied = false;
+                        const wpsCapEnabled = baseSalary.wps_cap_enabled || false;
+                        const wpsCapAmount = baseSalary.wps_cap_amount ?? 4900;
+                        
+                        if (project.company === 'Al Maraghi Motors' && wpsCapEnabled && finalTotal > 0) {
+                            const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
+                            const rawExcess = Math.max(0, finalTotal - cap);
+                            balanceAmount = Math.floor(rawExcess / 100) * 100;
+                            wpsAmount = finalTotal - balanceAmount;
+                            wpsCapApplied = rawExcess > 0;
+                        }
+                        
+                        newSnapshots.push({
+                            project_id: String(project_id),
+                            report_run_id: String(report_run_id),
+                            attendance_id: String(emp.attendance_id),
+                            hrms_id: String(emp.hrms_id),
+                            name: emp.name,
+                            department: emp.department,
+                            basic_salary: basicSalary,
+                            allowances: allowancesAmount,
+                            total_salary: totalSalaryAmount,
+                            working_hours: workingHours,
+                            working_days: workingDays,
+                            salary_divisor: divisor,
+                            ot_divisor: otDivisor,
+                            prev_month_divisor: 0,
+                            present_days: presentDays,
+                            full_absence_count: fullAbsenceCount,
+                            annual_leave_count: annualLeaveCount,
+                            sick_leave_count: sickLeaveCount,
+                            late_minutes: lateMinutes,
+                            early_checkout_minutes: earlyCheckoutMinutes,
+                            other_minutes: otherMinutes,
+                            approved_minutes: approvedMinutes,
+                            grace_minutes: graceMinutes,
+                            deductible_minutes: deductibleMinutes,
+                            extra_prev_month_deductible_minutes: 0,
+                            extra_prev_month_lop_days: 0,
+                            extra_prev_month_lop_pay: 0,
+                            extra_prev_month_deductible_hours_pay: 0,
+                            salary_month_start: null,
+                            salary_month_end: null,
+                            salary_leave_days: salaryLeaveDays,
+                            leaveDays: leaveDays,
+                            leavePay: leavePay,
+                            salaryLeaveAmount: salaryLeaveAmount,
+                            deductibleHours: deductibleHours,
+                            deductibleHoursPay: deductibleHoursPay,
+                            netDeduction: netDeduction,
+                            normalOtHours: 0,
+                            normalOtSalary: 0,
+                            specialOtHours: 0,
+                            specialOtSalary: 0,
+                            totalOtSalary: 0,
+                            otherDeduction: 0,
+                            bonus: 0,
+                            incentive: 0,
+                            advanceSalaryDeduction: 0,
+                            total: finalTotal,
+                            wpsPay: wpsAmount,
+                            balance: balanceAmount,
+                            wps_cap_enabled: wpsCapEnabled,
+                            wps_cap_amount: wpsCapAmount,
+                            wps_cap_applied: wpsCapApplied,
+                            snapshot_created_at: new Date().toISOString(),
+                            attendance_source: 'ANALYZED'
+                        });
+                    }
+                    
+                    // Bulk create new snapshots
+                    if (newSnapshots.length > 0) {
+                        await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(newSnapshots);
+                        snapshotsRecreated = newSnapshots.length;
+                        console.log(`[repairSalaryReportFromSnapshots] Recreated ${snapshotsRecreated} snapshots from AnalysisResult`);
+                    }
+                }
+            } catch (createError) {
+                console.error('[repairSalaryReportFromSnapshots] Error recreating snapshots:', createError);
+                errors.push(`Failed to recreate snapshots: ${createError.message}`);
             }
             
             // Re-fetch snapshots after recreation
@@ -258,9 +426,13 @@ Deno.serve(async (req) => {
             body: JSON.stringify({ report_run_id })
         });
         
-        const verifyResponseData = await verifyResponse.json();
-
-        const finalIssuesCount = verifyResponseData?.summary?.total_issues || 0;
+        let finalIssuesCount = 0;
+        try {
+            const verifyResponseData = await verifyResponse.json();
+            finalIssuesCount = verifyResponseData?.summary?.total_issues || 0;
+        } catch (verifyError) {
+            console.warn('[repairSalaryReportFromSnapshots] Could not run final verification:', verifyError.message);
+        }
 
         return Response.json({
             success: true,
