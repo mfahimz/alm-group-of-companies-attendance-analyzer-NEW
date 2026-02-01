@@ -22,6 +22,7 @@ export default function SalaryTab({ project }) {
     // ============================================
     const [salaryUnlocked, setSalaryUnlocked] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [generationProgress, setGenerationProgress] = useState('');
     const [showGenerateDialog, setShowGenerateDialog] = useState(false);
     const [newReportName, setNewReportName] = useState('');
     const [newReportDateFrom, setNewReportDateFrom] = useState('');
@@ -155,16 +156,24 @@ export default function SalaryTab({ project }) {
         }
 
         setIsGenerating(true);
+        setGenerationProgress('Initializing calculation...');
+        
         try {
             // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
             // [MERGE_NOTE: If merging divisors, this becomes the single divisor for all calculations]
             const divisor = project.salary_calculation_days || 30;
+
+            setGenerationProgress(`Loading salary snapshots for ${salarySnapshots.length} employees...`);
+            await new Promise(resolve => setTimeout(resolve, 300)); // Visual feedback
 
             // CRITICAL FIX: ALWAYS use finalized SalarySnapshot values
             // date_from/date_to are just report metadata, they MUST NOT trigger attendance recalculation
             // Salary MUST use finalized AnalysisResult values regardless of report date range
             const calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
 
+            setGenerationProgress('Calculating overtime and adjustments...');
+            await new Promise(resolve => setTimeout(resolve, 300)); // Visual feedback
+            
             // Merge OT data from OvertimeData entity into calculated data
             // ALSO merge adjustment fields from SalarySnapshot
             // DIVISOR_OT: Use ot_calculation_days for OT salary calculations
@@ -287,6 +296,9 @@ export default function SalaryTab({ project }) {
                 return result;
             });
 
+            setGenerationProgress('Calculating report totals...');
+            await new Promise(resolve => setTimeout(resolve, 200)); // Visual feedback
+            
             // Calculate totals
             let totalSalaryAmount = 0;
             let totalDeductions = 0;
@@ -298,6 +310,9 @@ export default function SalaryTab({ project }) {
                 totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
             });
 
+            setGenerationProgress('Saving report to database...');
+            await new Promise(resolve => setTimeout(resolve, 200)); // Visual feedback
+            
             // Save the report with both divisors
             // otDivisor already defined above
             await base44.entities.SalaryReport.create({
@@ -318,12 +333,17 @@ export default function SalaryTab({ project }) {
                 notes: null
             });
 
+            setGenerationProgress('Finalizing report...');
+            await new Promise(resolve => setTimeout(resolve, 200)); // Visual feedback
+            
             toast.success(`Salary report "${newReportName}" generated successfully`);
             setShowGenerateDialog(false);
             setNewReportName('');
+            setGenerationProgress('');
             refetchSavedReports();
         } catch (error) {
             toast.error('Failed to generate report: ' + error.message);
+            setGenerationProgress('');
         } finally {
             setIsGenerating(false);
         }
@@ -603,8 +623,22 @@ export default function SalaryTab({ project }) {
                             <strong>Important:</strong> Salary report uses finalized attendance values from the attendance report period ({finalReport?.date_from} to {finalReport?.date_to}). The salary report date range is for display and organizational purposes only.
                         </div>
                     </div>
+                    {isGenerating && (
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                                <span className="text-sm font-medium text-indigo-900">{generationProgress}</span>
+                            </div>
+                            <div className="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
+                                <div className="bg-indigo-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                            </div>
+                            <p className="text-xs text-indigo-700">
+                                Please wait while we process {salarySnapshots.length} employees...
+                            </p>
+                        </div>
+                    )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowGenerateDialog(false)}>
+                        <Button variant="outline" onClick={() => setShowGenerateDialog(false)} disabled={isGenerating}>
                             Cancel
                         </Button>
                         <Button 
