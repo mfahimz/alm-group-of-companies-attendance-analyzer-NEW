@@ -265,18 +265,17 @@ Deno.serve(async (req) => {
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         
         // ============================================================
-        // DISABLED: Previous Month Deductions
-        // Extra prev month logic is DISABLED for Al Maraghi Motors.
-        // All stored extra_prev_month_* values are ignored in calculations.
-        // Only current month deductions are applied to final total.
+        // DISABLED: Previous month deduction logic
+        // Previous month deductions have been removed from Al Maraghi Motors
+        // to eliminate hidden deductions from salary totals.
         // ============================================================
         const extraPrevMonthLopPay = 0;
         const extraPrevMonthDeductibleHoursPay = 0;
         
-        // Deductible hours = current month only (ignoring extra_prev_month_deductible_minutes)
+        // Total deductible hours = current month only (no prev month)
         const totalDeductibleHours = deductibleHours;
         
-        // Total deductible hours pay = current month only
+        // Total deductible hours pay = current month only (no prev month)
         const deductibleHoursPay = currentMonthDeductibleHoursPay;
         
         // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours
@@ -292,7 +291,7 @@ Deno.serve(async (req) => {
         //             - Net Deduction (current month leave)
         //             - Current Month Deductible Hours Pay
         //             - Other Deduction - Advance
-        // Previous month deductions DISABLED (forced to 0)
+        // NO PREVIOUS MONTH DEDUCTIONS
         let finalTotal = totalSalary 
             + totalOtSalary 
             + adjustmentValues.bonus 
@@ -407,9 +406,9 @@ Deno.serve(async (req) => {
             deductibleHours: afterValues.deductibleHours,
             deductibleHoursPay: afterValues.deductibleHoursPay,
             
-            // Previous month calculations (using OT divisor)
-            extra_prev_month_lop_pay: afterValues.extra_prev_month_lop_pay,
-            extra_prev_month_deductible_hours_pay: afterValues.extra_prev_month_deductible_hours_pay,
+            // Previous month calculations - DISABLED (forced to zero)
+            extra_prev_month_lop_pay: 0,
+            extra_prev_month_deductible_hours_pay: 0,
             
             // OT calculations (recalculated based on existing OT hours, using OT divisor)
             normalOtSalary: afterValues.normalOtSalary,

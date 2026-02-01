@@ -1073,28 +1073,23 @@ Deno.serve(async (req) => {
             const currentMonthDeductibleHoursPay = hourlyRate * deductibleHours;
             
             // ============================================================
-            // DISABLED: Previous Month Deductions
-            // Extra prev month logic is DISABLED for Al Maraghi Motors.
-            // All deductions are calculated from the salary month period only.
-            // Previous month attendance days outside salary month are not carried forward.
+            // DISABLED: Previous month deduction logic
+            // Previous month deductions have been removed from Al Maraghi Motors
+            // to eliminate hidden deductions from salary totals.
+            // All deductions are now visible in the current month report.
             // ============================================================
             const extraPrevMonthDeductibleMinutes = 0;
             const extraPrevMonthLopDays = 0;
             const extraPrevMonthLopPay = 0;
             const extraPrevMonthDeductibleHoursPay = 0;
             
-            // Total deductible hours pay = current month only (salary divisor)
+            // Total deductible hours pay = current month only (no prev month)
             const totalDeductibleHoursPay = currentMonthDeductibleHoursPay;
             
-            // CRITICAL: Do NOT combine current month and prev month deductible hours
-             // Store ONLY current month deductible hours in deductibleHours field
-             // Prev month data is stored separately in extra_prev_month_deductible_minutes
-
-             // Final total calculation
-             // Only current month: netDeduction (leave) + currentMonthDeductibleHoursPay (time)
-             // Previous month deductions DISABLED (forced to 0)
-             // Conditional rounding: Only round if bonus has NO decimal values
-             let finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay;
+            // Final total calculation (NO previous month deductions)
+            // Current month: netDeduction (leave) + currentMonthDeductibleHoursPay (time)
+            // Conditional rounding: Only round if bonus has NO decimal values
+            let finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay;
             const bonusHasDecimals = (salary?.bonus || 0) % 1 !== 0;
             if (!bonusHasDecimals) {
                 finalTotal = Math.round(finalTotal);
@@ -1151,7 +1146,7 @@ Deno.serve(async (req) => {
                 working_days: calculated.workingDays,
                 salary_divisor: divisor,
                 ot_divisor: otDivisor,
-                prev_month_divisor: 0,  // DISABLED
+                prev_month_divisor: extraPrevMonthData.prevMonthDivisor || 0,
                 present_days: calculated.presentDays,
                 full_absence_count: calculated.fullAbsenceCount,
                 annual_leave_count: calculated.annualLeaveCount,
@@ -1162,10 +1157,10 @@ Deno.serve(async (req) => {
                 approved_minutes: calculated.approvedMinutes,
                 grace_minutes: calculated.graceMinutes,
                 deductible_minutes: deductibleMinutes,
-                extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
-                extra_prev_month_lop_days: extraPrevMonthLopDays,
-                extra_prev_month_lop_pay: extraPrevMonthLopPay,
-                extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
+                extra_prev_month_deductible_minutes: 0,  // DISABLED - no longer used
+                extra_prev_month_lop_days: 0,  // DISABLED - no longer used
+                extra_prev_month_lop_pay: 0,  // DISABLED - no longer used
+                extra_prev_month_deductible_hours_pay: 0,  // DISABLED - no longer used
                 salary_month_start: salaryMonthStartStr,
                 salary_month_end: salaryMonthEndStr,
                 salary_leave_days: salaryLeaveDays,
