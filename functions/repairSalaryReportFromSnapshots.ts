@@ -105,17 +105,23 @@ Deno.serve(async (req) => {
                 await base44.asServiceRole.entities.SalarySnapshot.delete(snapshot.id);
             }
             
-            // Recreate snapshots from AnalysisResult
-            const createResponse = await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
-                project_id,
-                report_run_id
+            // Recreate snapshots from AnalysisResult using service role
+            const createResponse = await fetch(`${Deno.env.get('BASE44_API_URL')}/apps/${Deno.env.get('BASE44_APP_ID')}/functions/createSalarySnapshots/invoke`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${req.headers.get('Authorization')?.replace('Bearer ', '')}`
+                },
+                body: JSON.stringify({ project_id, report_run_id })
             });
             
-            if (createResponse.data?.success) {
-                snapshotsRecreated = createResponse.data.snapshots_created || 0;
+            const createResponseData = await createResponse.json();
+            
+            if (createResponseData?.success) {
+                snapshotsRecreated = createResponseData.snapshots_created || 0;
                 console.log(`[repairSalaryReportFromSnapshots] Recreated ${snapshotsRecreated} snapshots`);
             } else {
-                errors.push(`Failed to recreate snapshots: ${createResponse.data?.error || 'Unknown error'}`);
+                errors.push(`Failed to recreate snapshots: ${createResponseData?.error || 'Unknown error'}`);
             }
             
             // Re-fetch snapshots after recreation
@@ -243,11 +249,18 @@ Deno.serve(async (req) => {
         // ============================================================
         // FINAL VERIFICATION: Run audit again
         // ============================================================
-        const verifyResponse = await base44.asServiceRole.functions.invoke('auditReportRunIntegrity', {
-            report_run_id
+        const verifyResponse = await fetch(`${Deno.env.get('BASE44_API_URL')}/apps/${Deno.env.get('BASE44_APP_ID')}/functions/auditReportRunIntegrity/invoke`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${req.headers.get('Authorization')?.replace('Bearer ', '')}`
+            },
+            body: JSON.stringify({ report_run_id })
         });
+        
+        const verifyResponseData = await verifyResponse.json();
 
-        const finalIssuesCount = verifyResponse.data?.summary?.total_issues || 0;
+        const finalIssuesCount = verifyResponseData?.summary?.total_issues || 0;
 
         return Response.json({
             success: true,
