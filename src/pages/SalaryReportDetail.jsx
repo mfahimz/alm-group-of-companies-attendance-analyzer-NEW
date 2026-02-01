@@ -85,17 +85,6 @@ export default function SalaryReportDetail() {
         staleTime: 0
     });
 
-    // Fetch AnalysisResult to get CORRECT deductible minutes (post-grace)
-    const { data: analysisResults = [] } = useQuery({
-        queryKey: ['analysisResults', report?.project_id, report?.report_run_id],
-        queryFn: () => base44.entities.AnalysisResult.filter({ 
-            project_id: report.project_id,
-            report_run_id: report.report_run_id 
-        }),
-        enabled: !!report?.project_id && !!report?.report_run_id,
-        staleTime: 0
-    });
-
     // Load verified employees from report snapshot_data
     React.useEffect(() => {
         if (report?.snapshot_data) {
@@ -127,31 +116,22 @@ export default function SalaryReportDetail() {
                            project?.status !== 'closed' &&
                            liveSalarySnapshots.length > 0; // Snapshots exist = report is finalized
 
-    // Parse snapshot data and merge with live adjustment values + CORRECT deductible hours from AnalysisResult
+    // Parse snapshot data and merge with live adjustment values
+    // CRITICAL: Use ONLY snapshot_data - it contains immutable finalized values
+    // DO NOT fetch AnalysisResult - it gets overwritten on re-finalization
     const salaryData = useMemo(() => {
         if (!report?.snapshot_data) return [];
         try {
             const data = JSON.parse(report.snapshot_data);
             return data.map(row => {
-                // Get live snapshot for this employee for the latest adjustments
+                // Get live snapshot for this employee for the latest adjustments (OT/bonus/deductions only)
                 const liveSnapshot = liveSalarySnapshots.find(s => 
                     String(s.attendance_id) === String(row.attendance_id)
                 );
                 
-                // CRITICAL FIX: Get CORRECT deductible minutes from AnalysisResult
-                // The stored snapshot has 11 min (0.18 hrs) due to double grace subtraction bug
-                // AnalysisResult has 13 min (0.22 hrs) which is correct (post-grace)
-                const analysis = analysisResults.find(a => 
-                    String(a.attendance_id) === String(row.attendance_id)
-                );
-                const correctDeductibleMinutes = analysis?.deductible_minutes ?? row.deductible_minutes ?? 0;
-                const correctDeductibleHours = Math.round((correctDeductibleMinutes / 60) * 100) / 100;
-                
                 return {
                     ...row,
-                    // Override with correct values from AnalysisResult
-                    deductible_minutes: correctDeductibleMinutes,
-                    deductibleHours: correctDeductibleHours,
+                    // Use stored snapshot values for attendance (immutable after finalization)
                     normalOtHours: editableData[row.hrms_id]?.normalOtHours ?? row.normalOtHours ?? 0,
                     specialOtHours: editableData[row.hrms_id]?.specialOtHours ?? row.specialOtHours ?? 0,
                     // Use live snapshot values for adjustments (can be edited in Overtime & Adjustments tab)
@@ -165,7 +145,7 @@ export default function SalaryReportDetail() {
         } catch {
             return [];
         }
-    }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees, analysisResults]);
+    }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
 
     // Filter and sort data
     const filteredData = useMemo(() => {
@@ -246,11 +226,8 @@ export default function SalaryReportDetail() {
         // Use stored values for leave calculations (already calculated with DIVISOR_LEAVE_DEDUCTION)
         const netDeduction = row.netDeduction || 0;
 
-        // CRITICAL FIX: RECALCULATE deductibleHoursPay from CORRECT deductibleHours (from AnalysisResult)
-        // The stored value in JSON is WRONG (old buggy logic)
-        const correctDeductibleHours = row.deductibleHours || 0; // Already corrected in salaryData useMemo
-        const hourlyRate = totalSalary / divisor / workingHours;
-        const deductibleHoursPay = Math.round(hourlyRate * correctDeductibleHours);
+        // Use finalized deductibleHoursPay from snapshot (immutable after finalization)
+        const deductibleHoursPay = row.deductibleHoursPay || 0;
 
         // Previous month deductions (Al Maraghi Motors - calculated using OT divisor)
         const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
