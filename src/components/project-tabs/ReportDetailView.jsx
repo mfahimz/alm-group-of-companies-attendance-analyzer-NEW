@@ -806,9 +806,42 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
             
             // PERMANENT LOCK: For FINALIZED reports, ALWAYS use stored AnalysisResult values
-            // NEVER recalculate attendance values for finalized reports (is_final === true)
-            // This ensures attendance exports and salary calculations use the SAME finalized data
+            // CRITICAL: Apply day_overrides to get CORRECTED summary values
+            // day_overrides contain edits that were made but never "baked into" the summary fields
             if (project.status === 'closed' || reportRun.is_final) {
+                // Parse day_overrides to apply corrections
+                let dayOverrides = {};
+                if (result.day_overrides) {
+                    try {
+                        dayOverrides = JSON.parse(result.day_overrides);
+                    } catch (e) {
+                        dayOverrides = {};
+                    }
+                }
+                
+                // Start with stored raw values
+                let correctedLate = result.late_minutes || 0;
+                let correctedEarly = result.early_checkout_minutes || 0;
+                let correctedOther = result.other_minutes || 0;
+                
+                // Apply day_overrides corrections to get true values
+                Object.values(dayOverrides).forEach(override => {
+                    if (override.originalLateMinutes !== undefined && override.lateMinutes !== undefined) {
+                        correctedLate = correctedLate - override.originalLateMinutes + override.lateMinutes;
+                    }
+                    if (override.originalEarlyCheckout !== undefined && override.earlyCheckoutMinutes !== undefined) {
+                        correctedEarly = correctedEarly - override.originalEarlyCheckout + override.earlyCheckoutMinutes;
+                    }
+                    if (override.originalOtherMinutes !== undefined && override.otherMinutes !== undefined) {
+                        correctedOther = correctedOther - override.originalOtherMinutes + override.otherMinutes;
+                    }
+                });
+                
+                // Recalculate deductible with corrected values
+                const grace = result.grace_minutes ?? 15;
+                const approved = result.approved_minutes || 0;
+                const correctedDeductible = Math.max(0, correctedLate + correctedEarly + correctedOther - grace - approved);
+                
                 return {
                     ...result,
                     name: employee?.name || 'Unknown',
@@ -818,13 +851,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     half_absence_count: result.half_absence_count,
                     sick_leave_count: result.sick_leave_count || 0,
                     annual_leave_count: result.annual_leave_count || 0,
-                    late_minutes: result.late_minutes || 0,
-                    early_checkout_minutes: result.early_checkout_minutes || 0,
-                    other_minutes: result.other_minutes || 0,
+                    late_minutes: correctedLate,
+                    early_checkout_minutes: correctedEarly,
+                    other_minutes: correctedOther,
                     approved_minutes: result.approved_minutes || 0,
-                    deductible_minutes: result.deductible_minutes || 0,
-                    grace_minutes: result.grace_minutes ?? 15,
-                    has_no_punches: false // Can't determine for finalized projects
+                    deductible_minutes: result.manual_deductible_minutes ?? correctedDeductible,
+                    grace_minutes: grace,
+                    has_no_punches: false
                 };
             }
             
@@ -1266,9 +1299,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         ];
 
         const rows = filteredResults.map(r => {
-            // PERMANENT LOCK: For finalized reports, ALWAYS use stored deductible_minutes
-            // NEVER recalculate from late/early/grace for exports
-            // This ensures attendance exports match salary calculations exactly
+            // PERMANENT LOCK: For finalized reports, use corrected values (day_overrides already applied in enrichedResults)
+            // enrichedResults now contains CORRECTED late/early/other values with day_overrides applied
             const deductible = r.manual_deductible_minutes ?? r.deductible_minutes ?? 0;
             const late = r.late_minutes || 0;
             const early = r.early_checkout_minutes || 0;
