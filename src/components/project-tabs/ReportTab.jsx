@@ -362,16 +362,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                             </Button>
                                                         </Link>
                                                         {!isDepartmentHead && isAdminOrSupervisor && !run.is_final && (
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant="ghost"
-                                                                onClick={() => handleMarkFinal(run.id)}
-                                                                disabled={markFinalMutation.isPending}
-                                                                title="Mark as final report for salary"
-                                                            >
-                                                                <Star className="w-4 h-4 text-amber-600" />
-                                                            </Button>
-                                                        )}
+                                                             <Button 
+                                                                 size="sm" 
+                                                                 variant="ghost"
+                                                                 onClick={() => handleMarkFinal(run.id)}
+                                                                 disabled={markFinalMutation.isPending || run.is_final}
+                                                                 title={run.is_final ? "Report already finalized" : "Mark as final report for salary"}
+                                                             >
+                                                                 <Star className="w-4 h-4 text-amber-600" />
+                                                             </Button>
+                                                         )}
                                                         {!isDepartmentHead && isAdmin && (
                                                             <Button 
                                                                 size="sm" 
