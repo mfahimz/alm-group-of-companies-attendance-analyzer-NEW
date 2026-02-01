@@ -342,35 +342,35 @@ export default function ProjectDetail() {
                 </div>
 
                 <TabsContent value="overview">
-                    <OverviewTab project={project} />
+                    {activeTab === 'overview' && <OverviewTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="shifts">
-                    <ShiftTimingsTab project={project} />
+                    {activeTab === 'shifts' && <ShiftTimingsTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="punches">
-                    <PunchUploadTab project={project} />
+                    {activeTab === 'punches' && <PunchUploadTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="exceptions">
-                    <ExceptionsTab project={project} />
+                    {activeTab === 'exceptions' && <ExceptionsTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="overtime">
-                    <OvertimeTab project={project} />
+                    {activeTab === 'overtime' && <OvertimeTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="analysis">
-                    <RunAnalysisTab project={project} />
+                    {activeTab === 'analysis' && <RunAnalysisTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="report">
-                    <ReportTab project={project} />
+                    {activeTab === 'report' && <ReportTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="salary">
-                    <SalaryTab project={project} />
+                    {activeTab === 'salary' && <SalaryTab project={project} />}
                 </TabsContent>
             </Tabs>
             )}
