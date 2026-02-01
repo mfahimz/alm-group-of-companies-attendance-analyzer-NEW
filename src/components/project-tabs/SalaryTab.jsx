@@ -292,7 +292,7 @@ export default function SalaryTab({ project }) {
             let totalDeductions = 0;
             let totalOtSalary = 0;
 
-            calculatedData.forEach(row => {
+            finalCalculatedData.forEach(row => {
                 totalSalaryAmount += row.total || 0;
                 totalDeductions += (row.netDeduction || 0) + (row.deductibleHoursPay || 0) + (row.otherDeduction || 0) + (row.advanceSalaryDeduction || 0);
                 totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
