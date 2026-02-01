@@ -159,39 +159,11 @@ export default function SalaryTab({ project }) {
             // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
             // [MERGE_NOTE: If merging divisors, this becomes the single divisor for all calculations]
             const divisor = project.salary_calculation_days || 30;
-            const isCustomDateRange = newReportDateFrom !== finalReport.date_from || newReportDateTo !== finalReport.date_to;
 
-            let calculatedData;
-
-            if (isCustomDateRange) {
-                // RECALCULATE for custom date range by calling backend function
-                toast.info('Recalculating attendance for custom date range...');
-                
-                const response = await base44.functions.invoke('createSalarySnapshotsForDateRange', {
-                    project_id: project.id,
-                    report_run_id: finalReport.id,
-                    date_from: newReportDateFrom,
-                    date_to: newReportDateTo
-                });
-
-                if (response.data?.error) {
-                    throw new Error(response.data.error);
-                }
-
-                // Use the recalculated snapshots directly - they already have all prev month fields
-                calculatedData = response.data?.snapshots || [];
-                console.log('[SalaryTab] Custom date range snapshots received:', calculatedData.length, 'with sample:', 
-                    calculatedData[0] ? {
-                        extra_prev_month_deductible_minutes: calculatedData[0].extra_prev_month_deductible_minutes,
-                        extra_prev_month_lop_days: calculatedData[0].extra_prev_month_lop_days,
-                        extra_prev_month_lop_pay: calculatedData[0].extra_prev_month_lop_pay,
-                        extra_prev_month_deductible_hours_pay: calculatedData[0].extra_prev_month_deductible_hours_pay
-                    } : 'no data'
-                );
-            } else {
-                // Use existing snapshot data for full date range
-                calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
-            }
+            // CRITICAL FIX: ALWAYS use finalized SalarySnapshot values
+            // date_from/date_to are just report metadata, they MUST NOT trigger attendance recalculation
+            // Salary MUST use finalized AnalysisResult values regardless of report date range
+            const calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
 
             // Merge OT data from OvertimeData entity into calculated data
             // ALSO merge adjustment fields from SalarySnapshot
