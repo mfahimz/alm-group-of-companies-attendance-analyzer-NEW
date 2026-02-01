@@ -607,6 +607,9 @@ export default function SalaryReportDetail() {
                                     {report.ot_divisor && <span className="ml-2">• OT Divisor: {report.ot_divisor}</span>}
                                     {salaryData[0]?.prev_month_divisor > 0 && <span className="ml-2">• Prev Month Divisor: {salaryData[0]?.prev_month_divisor}</span>}
                                 </p>
+                                <div className="mt-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
+                                    <strong>Note:</strong> If you see incorrect deductible hours (e.g., 0.18 hrs instead of 0.22 hrs), re-finalize the report in the Report tab to regenerate with correct values.
+                                </div>
                                 {isAlMaraghi && (
                                     <div className="mt-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700 inline-block">
                                         <strong>Note:</strong> As per Al Maraghi Motors payroll rules, the last 2 days of the month are treated as present for salary calculation.
