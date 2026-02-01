@@ -293,9 +293,9 @@ Deno.serve(async (req) => {
             }
             
             // Re-fetch snapshots after recreation
-            const newSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({ report_run_id });
+            const refetchedSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({ report_run_id });
             salarySnapshots.length = 0;
-            salarySnapshots.push(...newSnapshots);
+            salarySnapshots.push(...refetchedSnapshots);
         }
 
         // ============================================================
