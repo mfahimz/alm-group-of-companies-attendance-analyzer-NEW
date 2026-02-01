@@ -507,10 +507,6 @@ export default function SalaryReportDetail() {
                 'Net Deduction': row.netDeduction || 0,
                 'Deductible Hours': row.deductibleHours || 0,
                 'Deductible Hours Pay': row.deductibleHoursPay || 0,
-                'Extra Deductible Hrs (Prev Month)': (row.extra_prev_month_deductible_minutes || 0) / 60,
-                'Extra LOP Days (Prev Month)': row.extra_prev_month_lop_days || 0,
-                'Extra LOP Pay (Prev Month)': row.extra_prev_month_lop_pay || 0,
-                'Extra Deductible Pay (Prev Month)': row.extra_prev_month_deductible_hours_pay || 0,
                 'Normal OT Hours': row.normalOtHours || 0,
                 'Normal OT Salary': row.normalOtSalary || 0,
                 'Special OT Hours': row.specialOtHours || 0,
@@ -710,10 +706,6 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_deductible_minutes" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra Deduct Hrs (PM)</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_lop_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-50">Extra LOP Days (PM)</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_lop_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra LOP Pay (PM)</SortableTableHead>
-                                        <SortableTableHead sortKey="extra_prev_month_deductible_hours_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-orange-100">Extra Deduct Pay (PM)</SortableTableHead>
                                         <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hours</SortableTableHead>
                                         <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
                                         <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Hours</SortableTableHead>
@@ -733,7 +725,7 @@ export default function SalaryReportDetail() {
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                     <tr className="border-b">
-                                    <td colSpan={33} className="text-center py-12">
+                                    <td colSpan={29} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
@@ -762,10 +754,6 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle bg-red-50 font-semibold">{row.netDeduction || 0 || '0'}</td>
                                                 <td className="p-2 align-middle bg-purple-50">{row.deductibleHours || 0 || '0'}</td>
                                                 <td className="p-2 align-middle bg-purple-100">{row.deductibleHoursPay || 0 || '0'}</td>
-                                                <td className="p-2 align-middle bg-orange-50">{(row.extra_prev_month_deductible_minutes || 0) / 60}</td>
-                                                <td className="p-2 align-middle bg-orange-50">{row.extra_prev_month_lop_days || 0}</td>
-                                                <td className="p-2 align-middle bg-orange-100">{row.extra_prev_month_lop_pay || 0}</td>
-                                                <td className="p-2 align-middle bg-orange-100">{row.extra_prev_month_deductible_hours_pay || 0}</td>
                                                 <td className="p-1 align-middle bg-blue-50">
                                                     <Input
                                                         type="number"
