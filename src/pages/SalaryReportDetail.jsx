@@ -85,6 +85,17 @@ export default function SalaryReportDetail() {
         staleTime: 0
     });
 
+    // Fetch AnalysisResult to get CORRECT deductible minutes (post-grace)
+    const { data: analysisResults = [] } = useQuery({
+        queryKey: ['analysisResults', report?.project_id, report?.report_run_id],
+        queryFn: () => base44.entities.AnalysisResult.filter({ 
+            project_id: report.project_id,
+            report_run_id: report.report_run_id 
+        }),
+        enabled: !!report?.project_id && !!report?.report_run_id,
+        staleTime: 0
+    });
+
     // Load verified employees from report snapshot_data
     React.useEffect(() => {
         if (report?.snapshot_data) {
@@ -116,7 +127,7 @@ export default function SalaryReportDetail() {
                            project?.status !== 'closed' &&
                            liveSalarySnapshots.length > 0; // Snapshots exist = report is finalized
 
-    // Parse snapshot data and merge with live adjustment values
+    // Parse snapshot data and merge with live adjustment values + CORRECT deductible hours from AnalysisResult
     const salaryData = useMemo(() => {
         if (!report?.snapshot_data) return [];
         try {
@@ -127,8 +138,20 @@ export default function SalaryReportDetail() {
                     String(s.attendance_id) === String(row.attendance_id)
                 );
                 
+                // CRITICAL FIX: Get CORRECT deductible minutes from AnalysisResult
+                // The stored snapshot has 11 min (0.18 hrs) due to double grace subtraction bug
+                // AnalysisResult has 13 min (0.22 hrs) which is correct (post-grace)
+                const analysis = analysisResults.find(a => 
+                    String(a.attendance_id) === String(row.attendance_id)
+                );
+                const correctDeductibleMinutes = analysis?.deductible_minutes ?? row.deductible_minutes ?? 0;
+                const correctDeductibleHours = Math.round((correctDeductibleMinutes / 60) * 100) / 100;
+                
                 return {
                     ...row,
+                    // Override with correct values from AnalysisResult
+                    deductible_minutes: correctDeductibleMinutes,
+                    deductibleHours: correctDeductibleHours,
                     normalOtHours: editableData[row.hrms_id]?.normalOtHours ?? row.normalOtHours ?? 0,
                     specialOtHours: editableData[row.hrms_id]?.specialOtHours ?? row.specialOtHours ?? 0,
                     // Use live snapshot values for adjustments (can be edited in Overtime & Adjustments tab)
@@ -142,7 +165,7 @@ export default function SalaryReportDetail() {
         } catch {
             return [];
         }
-    }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
+    }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees, analysisResults]);
 
     // Filter and sort data
     const filteredData = useMemo(() => {
