@@ -599,11 +599,9 @@ export default function SalaryTab({ project }) {
                                 <p className="text-amber-700 mt-1"><strong>Note:</strong> Last 2 days of month are "assumed present" for salary (no deductions).</p>
                             )}
                         </div>
-                        {(newReportDateFrom !== finalReport?.date_from || newReportDateTo !== finalReport?.date_to) && (
-                            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
-                                <strong>Custom Date Range:</strong> Attendance data will be recalculated based on the selected date range. This may take a moment.
-                            </div>
-                        )}
+                        <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                            <strong>Important:</strong> Salary report uses finalized attendance values from the attendance report period ({finalReport?.date_from} to {finalReport?.date_to}). The salary report date range is for display and organizational purposes only.
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowGenerateDialog(false)}>
