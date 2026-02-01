@@ -211,6 +211,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin']
     },
+    SalaryDataIntegrityRepair: {
+        name: 'SalaryDataIntegrityRepair',
+        title: 'Salary Data Repair',
+        icon: Database,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
     MigrationTools: {
         name: 'MigrationTools',
         title: 'Migration Tools',
