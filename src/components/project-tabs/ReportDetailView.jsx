@@ -805,8 +805,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
             
-            // For closed projects, use saved data from AnalysisResult (punches are deleted)
-            if (project.status === 'closed') {
+            // PERMANENT LOCK: For FINALIZED reports, ALWAYS use stored AnalysisResult values
+            // NEVER recalculate attendance values for finalized reports (is_final === true)
+            // This ensures attendance exports and salary calculations use the SAME finalized data
+            if (project.status === 'closed' || reportRun.is_final) {
                 return {
                     ...result,
                     name: employee?.name || 'Unknown',
@@ -819,11 +821,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     late_minutes: result.late_minutes || 0,
                     early_checkout_minutes: result.early_checkout_minutes || 0,
                     other_minutes: result.other_minutes || 0,
-                    has_no_punches: false // Can't determine for closed projects
+                    approved_minutes: result.approved_minutes || 0,
+                    deductible_minutes: result.deductible_minutes || 0,
+                    grace_minutes: result.grace_minutes ?? 15,
+                    has_no_punches: false // Can't determine for finalized projects
                 };
             }
             
-            // Check if employee has any punches at all
+            // For non-finalized open projects only: recalculate from live punch data
             const attendanceIdStr = String(result.attendance_id);
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr &&
@@ -832,7 +837,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             );
             const hasNoPunches = employeePunches.length === 0;
             
-            // For open projects, recalculate from punch data
             const { 
                 totalLateMinutes, 
                 totalEarlyCheckout, 
@@ -1262,11 +1266,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         ];
 
         const rows = filteredResults.map(r => {
+            // PERMANENT LOCK: For finalized reports, ALWAYS use stored deductible_minutes
+            // NEVER recalculate from late/early/grace for exports
+            // This ensures attendance exports match salary calculations exactly
+            const deductible = r.manual_deductible_minutes ?? r.deductible_minutes ?? 0;
             const late = r.late_minutes || 0;
             const early = r.early_checkout_minutes || 0;
             const grace = r.grace_minutes ?? 15;
-            const calculatedDeductible = Math.max(0, late + early - grace);
-            const deductible = r.manual_deductible_minutes ?? calculatedDeductible;
 
             const baseRow = [
                 r.attendance_id,
