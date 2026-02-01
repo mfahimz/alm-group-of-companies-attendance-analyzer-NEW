@@ -299,7 +299,7 @@ export default function SalaryTab({ project }) {
             });
 
             // Save the report with both divisors
-            // otDivisor already defined above at line 156
+            // otDivisor already defined above
             await base44.entities.SalaryReport.create({
                 project_id: project.id,
                 report_run_id: finalReport.id,
@@ -309,13 +309,13 @@ export default function SalaryTab({ project }) {
                 company: project.company,
                 salary_divisor: divisor,      // DIVISOR_LEAVE_DEDUCTION
                 ot_divisor: otDivisor,        // DIVISOR_OT [MERGE_NOTE: Remove if merging]
-                employee_count: calculatedData.length,
+                employee_count: finalCalculatedData.length,
                 total_salary_amount: Math.round(totalSalaryAmount * 100) / 100,
                 total_deductions: Math.round(totalDeductions * 100) / 100,
                 total_ot_salary: Math.round(totalOtSalary * 100) / 100,
-                snapshot_data: JSON.stringify(calculatedData),
+                snapshot_data: JSON.stringify(finalCalculatedData),
                 generated_by: currentUser?.email,
-                notes: isCustomDateRange ? `Custom date range: ${newReportDateFrom} to ${newReportDateTo}` : null
+                notes: null
             });
 
             toast.success(`Salary report "${newReportName}" generated successfully`);
