@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         const reportRun = reports[0];
 
         // Fetch core data - NO punches/shifts/rules since we use finalized AnalysisResult
-        const [employees, salaries, analysisResults, allExceptions, salaryIncrements] = await Promise.all([
+        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.AnalysisResult.filter({ 
@@ -136,14 +136,15 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.Exception.filter({ project_id: project_id }),
             isAlMaraghi 
                 ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true })
-                : Promise.resolve([])
+                : Promise.resolve([]),
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
         ]);
 
         console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments`);
 
         // Parse rules
         let rules = null;
-        if (rulesData.length > 0) {
+        if (rulesData && rulesData.length > 0) {
             try {
                 rules = JSON.parse(rulesData[0].rules_json);
             } catch (e) {
