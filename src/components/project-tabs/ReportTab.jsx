@@ -186,13 +186,13 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const markFinalMutation = useMutation({
         mutationFn: async (reportRunId) => {
             // Call backend function to mark final and create snapshots
-            await base44.functions.invoke('markFinalReport', {
+            const result = await base44.functions.invoke('markFinalReport', {
                 project_id: project.id,
                 report_run_id: reportRunId
             });
-            return reportRunId;
+            return { reportRunId, result };
         },
-        onSuccess: async (reportRunId) => {
+        onSuccess: async ({ reportRunId, result }) => {
             // Force refetch all relevant queries - do NOT rely on staleTime
             // Use refetchType: 'all' to ensure immediate refetch even if data is "fresh"
             await Promise.all([
@@ -204,8 +204,28 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             ]);
             toast.success('Report marked as final. Salary snapshots created.');
         },
-        onError: (error) => {
-            toast.error('Failed to mark report as final: ' + error.message);
+        onError: async (error) => {
+            // CRITICAL: Invalidate queries on error to reflect backend rollback
+            // Backend may have rolled back is_final=false if validation failed
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' })
+            ]);
+            
+            // Show detailed error message
+            const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
+            const actionRequired = error?.response?.data?.action_required;
+            
+            if (actionRequired) {
+                toast.error(`${errorMsg}\n\nAction required: ${actionRequired}`, {
+                    duration: 10000
+                });
+            } else {
+                toast.error('Failed to mark report as final: ' + errorMsg, {
+                    duration: 5000
+                });
+            }
         }
     });
 
