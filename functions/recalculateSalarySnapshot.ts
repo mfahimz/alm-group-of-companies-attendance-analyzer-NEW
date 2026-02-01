@@ -264,29 +264,20 @@ Deno.serve(async (req) => {
         // OT Hourly Rate (uses OT Divisor)
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         
-        // Previous month calculations (uses OT Divisor) - Al Maraghi Motors only
-        // FIX Issue 5: For recalculation, we use stored snapshot values since we don't have access
-        // to salary increments here. The snapshot already has the correct prev month salary baked in
-        // during initial creation. We use totalSalary as the base since the snapshot was created
-        // with the correct salary at that time. If salary increments change, user must regenerate snapshots.
-        // Previous month LOP Pay = (Total Salary / OT Divisor) * Extra LOP Days
-        const extraPrevMonthLopPay = attendanceValues.extra_prev_month_lop_days > 0 && prevMonthDivisor > 0
-            ? (totalSalary / prevMonthDivisor) * attendanceValues.extra_prev_month_lop_days 
-            : 0;
+        // ============================================================
+        // DISABLED: Previous Month Deductions
+        // Extra prev month logic is DISABLED for Al Maraghi Motors.
+        // All stored extra_prev_month_* values are ignored in calculations.
+        // Only current month deductions are applied to final total.
+        // ============================================================
+        const extraPrevMonthLopPay = 0;
+        const extraPrevMonthDeductibleHoursPay = 0;
         
-        // Previous month Deductible Hours Pay = (Total Salary / OT Divisor / workingHours) * (Extra Deductible Minutes / 60)
-        // Note: This uses current month salary. For accurate prev month calculations with different salary,
-        // the salary snapshots should be regenerated via createSalarySnapshots which handles salary increments.
-        const prevMonthHourlyRate = prevMonthDivisor > 0 ? totalSalary / prevMonthDivisor / workingHours : 0;
-        const extraPrevMonthDeductibleHours = attendanceValues.extra_prev_month_deductible_minutes / 60;
-        const extraPrevMonthDeductibleHoursPay = prevMonthHourlyRate * extraPrevMonthDeductibleHours;
+        // Deductible hours = current month only (ignoring extra_prev_month_deductible_minutes)
+        const totalDeductibleHours = deductibleHours;
         
-        // Total deductible hours (for display)
-        const totalDeductibleMinutes = attendanceValues.deductible_minutes + attendanceValues.extra_prev_month_deductible_minutes;
-        const totalDeductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
-        
-        // Total deductible hours pay = current month + prev month
-        const deductibleHoursPay = currentMonthDeductibleHoursPay + extraPrevMonthDeductibleHoursPay;
+        // Total deductible hours pay = current month only
+        const deductibleHoursPay = currentMonthDeductibleHoursPay;
         
         // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours
         const normalOtSalary = otHourlyRate * 1.25 * adjustmentValues.normalOtHours;
@@ -300,17 +291,14 @@ Deno.serve(async (req) => {
         // Final Total = Total Salary + OT + Bonus + Incentive 
         //             - Net Deduction (current month leave)
         //             - Current Month Deductible Hours Pay
-        //             - Previous Month LOP Pay
-        //             - Previous Month Deductible Hours Pay
         //             - Other Deduction - Advance
+        // Previous month deductions DISABLED (forced to 0)
         let finalTotal = totalSalary 
             + totalOtSalary 
             + adjustmentValues.bonus 
             + adjustmentValues.incentive
             - netDeduction 
             - currentMonthDeductibleHoursPay
-            - extraPrevMonthLopPay
-            - extraPrevMonthDeductibleHoursPay
             - adjustmentValues.otherDeduction 
             - adjustmentValues.advanceSalaryDeduction;
 
