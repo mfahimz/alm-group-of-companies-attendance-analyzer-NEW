@@ -171,16 +171,7 @@ export default function SalaryTab({ project }) {
             // [MERGE_NOTE: If merging divisors, change otDivisor to use divisor (salary_calculation_days) instead]
             const otDivisor = project.ot_calculation_days || 30;
             
-            console.log('[SalaryTab] Processing calculatedData, first row prev month fields:', 
-                calculatedData[0] ? {
-                    extra_prev_month_deductible_minutes: calculatedData[0].extra_prev_month_deductible_minutes,
-                    extra_prev_month_lop_days: calculatedData[0].extra_prev_month_lop_days,
-                    extra_prev_month_lop_pay: calculatedData[0].extra_prev_month_lop_pay,
-                    extra_prev_month_deductible_hours_pay: calculatedData[0].extra_prev_month_deductible_hours_pay
-                } : 'no data'
-            );
-            
-            calculatedData = calculatedData.map(row => {
+            const finalCalculatedData = calculatedData.map(row => {
                 const otRecord = overtimeData.find(ot => 
                     String(ot.attendance_id) === String(row.attendance_id)
                 );
