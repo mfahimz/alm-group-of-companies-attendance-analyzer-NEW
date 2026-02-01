@@ -117,8 +117,23 @@ export default function SalaryTab({ project }) {
     // Initialize date range when opening dialog
     // Al Maraghi Motors rule: Salary month = 1st to last day of month containing project.date_to
     // The last 2 days of the month are "assumed present" for salary calculation
-    const handleOpenGenerateDialog = () => {
-        if (finalReport && project) {
+    const handleOpenGenerateDialog = async () => {
+        if (!finalReport) {
+            toast.error('No finalized report found');
+            return;
+        }
+
+        if (loadingSnapshots) {
+            toast.error('Salary snapshots are still loading. Please wait...');
+            return;
+        }
+
+        if (salarySnapshots.length === 0) {
+            toast.error('No salary snapshots found for finalized report. Please try refreshing the page.');
+            return;
+        }
+
+        if (project) {
             // Calculate salary month based on project.date_to (the attendance period end)
             // CRITICAL: Parse date as local date parts to avoid timezone issues
             const [year, month, day] = project.date_to.split('-').map(Number);
@@ -154,8 +169,16 @@ export default function SalaryTab({ project }) {
             toast.error('Please select date range');
             return;
         }
+        if (!finalReport || !finalReport.is_final) {
+            toast.error('No finalized report found. Please finalize a report in the Report tab first.');
+            return;
+        }
+        if (loadingSnapshots) {
+            toast.error('Salary snapshots are still loading. Please wait a moment and try again.');
+            return;
+        }
         if (salarySnapshots.length === 0) {
-            toast.error('No salary snapshots available. Please finalize the report first.');
+            toast.error(`No salary snapshots found for report "${finalReport.report_name}". This may indicate a data integrity issue. Please try refreshing the page or contact support.`);
             return;
         }
 
@@ -472,11 +495,12 @@ export default function SalaryTab({ project }) {
                         </CardTitle>
                         <Button 
                             onClick={handleOpenGenerateDialog}
-                            disabled={!hasFinalReport || (loadingSnapshots && salarySnapshots.length === 0)}
+                            disabled={!hasFinalReport || loadingSnapshots}
                             className="bg-indigo-600 hover:bg-indigo-700"
+                            title={loadingSnapshots ? 'Loading salary snapshots...' : !hasFinalReport ? 'No finalized report available' : ''}
                         >
                             <Plus className="w-4 h-4 mr-2" />
-                            Generate New Report
+                            {loadingSnapshots ? 'Loading...' : 'Generate New Report'}
                         </Button>
                     </CardHeader>
                     <CardContent>
