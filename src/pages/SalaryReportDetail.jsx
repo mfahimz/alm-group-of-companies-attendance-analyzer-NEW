@@ -222,14 +222,14 @@ export default function SalaryReportDetail() {
         // DIVISOR_LEAVE_DEDUCTION: For leave/deduction calculations (stored in snapshot)
         // [MERGE_NOTE: If merging, use single divisor for all]
         const divisor = row.salary_divisor || report?.salary_divisor || 30;
-        
+
         // DIVISOR_OT: For OT salary calculations
         // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
         const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
-        
+
         const totalSalary = row.total_salary || 0;
         const workingHours = row.working_hours || 9;
-        
+
         // Recalculate OT salaries based on current edits using DIVISOR_OT
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         const normalOtHours = getValue(row, 'normalOtHours') || 0;
@@ -237,16 +237,21 @@ export default function SalaryReportDetail() {
         const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours);
         const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours);
         const totalOtSalary = Math.round(normalOtSalary + specialOtSalary);
-        
+
         const bonus = getValue(row, 'bonus') || 0;
         const incentive = getValue(row, 'incentive') || 0;
         const otherDeduction = getValue(row, 'otherDeduction') || 0;
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
-        
+
         // Use stored values for leave calculations (already calculated with DIVISOR_LEAVE_DEDUCTION)
         const netDeduction = row.netDeduction || 0;
-        const deductibleHoursPay = row.deductibleHoursPay || 0;
-        
+
+        // CRITICAL FIX: RECALCULATE deductibleHoursPay from CORRECT deductibleHours (from AnalysisResult)
+        // The stored value in JSON is WRONG (old buggy logic)
+        const correctDeductibleHours = row.deductibleHours || 0; // Already corrected in salaryData useMemo
+        const hourlyRate = totalSalary / divisor / workingHours;
+        const deductibleHoursPay = Math.round(hourlyRate * correctDeductibleHours);
+
         // Previous month deductions (Al Maraghi Motors - calculated using OT divisor)
         const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
         const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
