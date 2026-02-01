@@ -297,7 +297,15 @@ export default function SalaryTab({ project }) {
                     // Store divisors used for reference
                     salary_divisor: divisor,
                     ot_divisor: otDivisor,
-                    // Preserve previous month fields from recalculated data
+                    // CRITICAL: Preserve finalized attendance values (DO NOT RECOMPUTE)
+                    deductible_minutes: row.deductible_minutes || 0,
+                    deductibleHours: row.deductibleHours || 0,
+                    deductibleHoursPay: row.deductibleHoursPay || 0,
+                    leaveDays: row.leaveDays || 0,
+                    leavePay: row.leavePay || 0,
+                    salaryLeaveAmount: row.salaryLeaveAmount || 0,
+                    netDeduction: row.netDeduction || 0,
+                    // Preserve previous month fields from recalculated data (DISABLED - should be 0)
                     extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
                     extra_prev_month_lop_days: extraPrevMonthLopDays,
                     extra_prev_month_lop_pay: extraPrevMonthLopPay,
