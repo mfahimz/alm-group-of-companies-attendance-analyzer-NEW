@@ -37,11 +37,13 @@ export default function SalaryTab({ project }) {
     });
 
     // Fetch all report runs to find the finalized one (there should only be one with is_final=true)
+    // staleTime: 0 to ensure we always see the latest is_final status after marking final
     const { data: reportRuns = [], isLoading: loadingReports } = useQuery({
         queryKey: ['reportRuns', project?.id],
         queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
         enabled: !!project?.id,
-        staleTime: 5 * 60 * 1000
+        staleTime: 0,
+        gcTime: 5 * 60 * 1000
     });
 
     // Find the finalized report from the list
@@ -58,7 +60,8 @@ export default function SalaryTab({ project }) {
     });
 
     // Fetch salary snapshots for generating reports
-    // Note: We need to wait for reportRuns to load before we can determine finalReport
+    // CRITICAL: Do NOT wait for loadingReports - snapshots can load in parallel while reports load
+    // This prevents UI deadlock when there are many historical reports
     const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
         queryKey: ['salarySnapshots', project?.id, finalReport?.id],
         queryFn: async () => {
@@ -68,8 +71,9 @@ export default function SalaryTab({ project }) {
             });
             return snapshots;
         },
-        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true && !loadingReports,
-        staleTime: 0
+        enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
+        staleTime: 0,
+        gcTime: 5 * 60 * 1000
     });
 
     // Fetch exceptions for date range filtering
