@@ -414,26 +414,6 @@ Deno.serve(async (req) => {
             }
         }
 
-        // ============================================================
-        // FINAL VERIFICATION: Run audit again
-        // ============================================================
-        const verifyResponse = await fetch(`${Deno.env.get('BASE44_API_URL')}/apps/${Deno.env.get('BASE44_APP_ID')}/functions/auditReportRunIntegrity/invoke`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${req.headers.get('Authorization')?.replace('Bearer ', '')}`
-            },
-            body: JSON.stringify({ report_run_id })
-        });
-        
-        let finalIssuesCount = 0;
-        try {
-            const verifyResponseData = await verifyResponse.json();
-            finalIssuesCount = verifyResponseData?.summary?.total_issues || 0;
-        } catch (verifyError) {
-            console.warn('[repairSalaryReportFromSnapshots] Could not run final verification:', verifyError.message);
-        }
-
         return Response.json({
             success: true,
             report_run_id,
@@ -443,14 +423,7 @@ Deno.serve(async (req) => {
                 reports_regenerated: reportsRegenerated
             },
             errors: errors.length > 0 ? errors : null,
-            final_verification: {
-                total_issues: finalIssuesCount,
-                status: finalIssuesCount === 0 ? 'CLEAN' : 'STILL_HAS_ISSUES',
-                message: finalIssuesCount === 0 
-                    ? '✅ REPAIR SUCCESSFUL - 0 mismatches after repair'
-                    : `⚠️ REPAIR INCOMPLETE - ${finalIssuesCount} mismatches remain`
-            },
-            message: `Repair complete: ${snapshotsRecreated} snapshots recreated, ${reportsRegenerated} reports regenerated. Final status: ${finalIssuesCount === 0 ? 'CLEAN' : `${finalIssuesCount} issues remain`}`
+            message: `Repair complete: ${snapshotsRecreated} snapshots recreated, ${reportsRegenerated} reports regenerated.`
         });
 
     } catch (error) {
