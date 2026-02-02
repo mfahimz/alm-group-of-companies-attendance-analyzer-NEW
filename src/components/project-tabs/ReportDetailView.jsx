@@ -2115,12 +2115,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </td>
                                         <td className="p-2 align-middle">
                                             {(() => {
-                                                // PERMANENT LOCK: For finalized reports, use stored deductible_minutes directly
-                                                const displayDeductible = result.deductible_minutes || 0;
-                                                const late = result.late_minutes || 0;
-                                                const early = result.early_checkout_minutes || 0;
-                                                const grace = result.grace_minutes ?? 15;
-                                                
+                                                // Use stored deductible_minutes from AnalysisResult
+                                                // Formula: ((late + early) - grace) + other - approved
+                                                const displayDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? 0;
+
                                                 return (
                                                     <div className="flex flex-col">
                                                         <InlineEditableCell
