@@ -209,34 +209,39 @@ export default function SalaryReportDetail() {
         // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
         const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
 
-        const totalSalary = row.total_salary || 0;
+        const totalSalary = getValue(row, 'total_salary') || row.total_salary || 0;
         const workingHours = row.working_hours || 9;
 
         // Recalculate OT salaries based on current edits using DIVISOR_OT
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         const normalOtHours = getValue(row, 'normalOtHours') || 0;
         const specialOtHours = getValue(row, 'specialOtHours') || 0;
-        const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours);
-        const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours);
-        const totalOtSalary = Math.round(normalOtSalary + specialOtSalary);
+        const normalOtSalary = getValue(row, 'normalOtSalary') ?? Math.round(otHourlyRate * 1.25 * normalOtHours);
+        const specialOtSalary = getValue(row, 'specialOtSalary') ?? Math.round(otHourlyRate * 1.5 * specialOtHours);
+        const totalOtSalary = getValue(row, 'totalOtSalary') ?? Math.round(normalOtSalary + specialOtSalary);
 
         const bonus = getValue(row, 'bonus') || 0;
         const incentive = getValue(row, 'incentive') || 0;
         const otherDeduction = getValue(row, 'otherDeduction') || 0;
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
 
-        // Use stored values for leave calculations (already calculated with DIVISOR_LEAVE_DEDUCTION)
-        const netDeduction = row.netDeduction || 0;
-
-        // Use finalized deductibleHoursPay from snapshot (immutable after finalization)
-        const deductibleHoursPay = row.deductibleHoursPay || 0;
+        // If admin edited attendance fields, recalculate derived amounts
+        const leaveDays = getValue(row, 'leaveDays') || row.leaveDays || 0;
+        const salaryLeaveDays = getValue(row, 'salary_leave_days') || row.salary_leave_days || row.salaryLeaveDays || 0;
+        const deductibleHours = getValue(row, 'deductibleHours') || row.deductibleHours || 0;
+        
+        // Recalculate if admin edited, otherwise use stored values
+        const leavePay = getValue(row, 'leavePay') ?? ((totalSalary / divisor) * leaveDays);
+        const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount') ?? ((totalSalary / divisor) * salaryLeaveDays);
+        const netDeduction = getValue(row, 'netDeduction') ?? (leavePay - salaryLeaveAmount);
+        const deductibleHoursPay = getValue(row, 'deductibleHoursPay') ?? ((totalSalary / divisor / workingHours) * deductibleHours);
 
         // Previous month deductions (Al Maraghi Motors - calculated using OT divisor)
         const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
         const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
 
         const total = totalSalary + totalOtSalary + bonus + incentive
-                      - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
+                      - Math.round(netDeduction) - Math.round(deductibleHoursPay) - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
                       - otherDeduction - advanceSalaryDeduction;
 
         // WPS SPLIT LOGIC (Al Maraghi Motors only)
