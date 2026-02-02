@@ -805,43 +805,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
             
-            // PERMANENT LOCK: For FINALIZED reports, ALWAYS use stored AnalysisResult values
-            // CRITICAL: Apply day_overrides to get CORRECTED summary values
-            // day_overrides contain edits that were made but never "baked into" the summary fields
+            // PERMANENT LOCK: For FINALIZED reports, use stored AnalysisResult values DIRECTLY
+            // NO recalculation, NO formula derivation - use finalized fields AS-IS
             if (project.status === 'closed' || reportRun.is_final) {
-                // Parse day_overrides to apply corrections
-                let dayOverrides = {};
-                if (result.day_overrides) {
-                    try {
-                        dayOverrides = JSON.parse(result.day_overrides);
-                    } catch (e) {
-                        dayOverrides = {};
-                    }
-                }
-                
-                // Start with stored raw values
-                let correctedLate = result.late_minutes || 0;
-                let correctedEarly = result.early_checkout_minutes || 0;
-                let correctedOther = result.other_minutes || 0;
-                
-                // Apply day_overrides corrections to get true values
-                Object.values(dayOverrides).forEach(override => {
-                    if (override.originalLateMinutes !== undefined && override.lateMinutes !== undefined) {
-                        correctedLate = correctedLate - override.originalLateMinutes + override.lateMinutes;
-                    }
-                    if (override.originalEarlyCheckout !== undefined && override.earlyCheckoutMinutes !== undefined) {
-                        correctedEarly = correctedEarly - override.originalEarlyCheckout + override.earlyCheckoutMinutes;
-                    }
-                    if (override.originalOtherMinutes !== undefined && override.otherMinutes !== undefined) {
-                        correctedOther = correctedOther - override.originalOtherMinutes + override.otherMinutes;
-                    }
-                });
-                
-                // Recalculate deductible with corrected values
-                const grace = result.grace_minutes ?? 15;
-                const approved = result.approved_minutes || 0;
-                const correctedDeductible = Math.max(0, correctedLate + correctedEarly + correctedOther - grace - approved);
-                
                 return {
                     ...result,
                     name: employee?.name || 'Unknown',
@@ -851,12 +817,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     half_absence_count: result.half_absence_count,
                     sick_leave_count: result.sick_leave_count || 0,
                     annual_leave_count: result.annual_leave_count || 0,
-                    late_minutes: correctedLate,
-                    early_checkout_minutes: correctedEarly,
-                    other_minutes: correctedOther,
+                    late_minutes: result.late_minutes || 0,
+                    early_checkout_minutes: result.early_checkout_minutes || 0,
+                    other_minutes: result.other_minutes || 0,
                     approved_minutes: result.approved_minutes || 0,
-                    deductible_minutes: result.manual_deductible_minutes ?? correctedDeductible,
-                    grace_minutes: grace,
+                    deductible_minutes: result.deductible_minutes || 0,
+                    grace_minutes: result.grace_minutes ?? 15,
                     has_no_punches: false
                 };
             }
@@ -1299,9 +1265,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         ];
 
         const rows = filteredResults.map(r => {
-            // PERMANENT LOCK: For finalized reports, use corrected values (day_overrides already applied in enrichedResults)
-            // enrichedResults now contains CORRECTED late/early/other values with day_overrides applied
-            const deductible = r.manual_deductible_minutes ?? r.deductible_minutes ?? 0;
+            // PERMANENT LOCK: For finalized reports, use stored AnalysisResult values DIRECTLY
+            const deductible = r.deductible_minutes || 0;
             const late = r.late_minutes || 0;
             const early = r.early_checkout_minutes || 0;
             const grace = r.grace_minutes ?? 15;
@@ -2150,12 +2115,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </td>
                                         <td className="p-2 align-middle">
                                             {(() => {
-                                                 const late = result.late_minutes || 0;
-                                                 const early = result.early_checkout_minutes || 0;
-                                                 const grace = result.grace_minutes ?? 15;
-                                                 const calculatedDeductible = Math.max(0, late + early - grace);
-                                                const displayDeductible = result.manual_deductible_minutes ?? calculatedDeductible;
-                                                const isManualOverride = result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined;
+                                                // PERMANENT LOCK: For finalized reports, use stored deductible_minutes directly
+                                                const displayDeductible = result.deductible_minutes || 0;
+                                                const late = result.late_minutes || 0;
+                                                const early = result.early_checkout_minutes || 0;
+                                                const grace = result.grace_minutes ?? 15;
                                                 
                                                 return (
                                                     <div className="flex flex-col">
@@ -2166,17 +2130,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                 field: 'manual_deductible_minutes', 
                                                                 value 
                                                             })}
-                                                            isEditable={isAdmin}
-                                                            className={`font-bold ${isManualOverride ? 'text-purple-600' : (displayDeductible > 0 ? 'text-red-600' : 'text-green-600')}`}
+                                                            isEditable={isAdmin && !reportRun.is_final}
+                                                            className={`font-bold ${displayDeductible > 0 ? 'text-red-600' : 'text-green-600'}`}
                                                         />
-                                                        {!isManualOverride && (
-                                                            <span className="text-[10px] text-slate-500">
-                                                                {late + early} - {grace}
-                                                            </span>
-                                                        )}
-                                                        {isManualOverride && (
+                                                        {reportRun.is_final && (
                                                             <span className="text-[10px] text-purple-600">
-                                                                Manual Override
+                                                                Finalized
                                                             </span>
                                                         )}
                                                     </div>

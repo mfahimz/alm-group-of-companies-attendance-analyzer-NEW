@@ -979,61 +979,27 @@ Deno.serve(async (req) => {
             let calculated;
             let attendanceSource;
             
-            // Use finalized AnalysisResult values if available
-             // CRITICAL: Apply day_overrides to get CORRECTED values
-             // day_overrides contain report edits that were saved but never baked into summary fields
-             if (hasAnalysisResult) {
-                 // Parse day_overrides to apply corrections
-                 let dayOverrides = {};
-                 if (analysisResult.day_overrides) {
-                     try {
-                         dayOverrides = JSON.parse(analysisResult.day_overrides);
-                     } catch (e) {
-                         dayOverrides = {};
-                     }
-                 }
-                 
-                 // Start with stored raw values
-                 let correctedLate = analysisResult.late_minutes || 0;
-                 let correctedEarly = analysisResult.early_checkout_minutes || 0;
-                 let correctedOther = analysisResult.other_minutes || 0;
-                 
-                 // Apply day_overrides corrections
-                 Object.values(dayOverrides).forEach(override => {
-                     if (override.originalLateMinutes !== undefined && override.lateMinutes !== undefined) {
-                         correctedLate = correctedLate - override.originalLateMinutes + override.lateMinutes;
-                     }
-                     if (override.originalEarlyCheckout !== undefined && override.earlyCheckoutMinutes !== undefined) {
-                         correctedEarly = correctedEarly - override.originalEarlyCheckout + override.earlyCheckoutMinutes;
-                     }
-                     if (override.originalOtherMinutes !== undefined && override.otherMinutes !== undefined) {
-                         correctedOther = correctedOther - override.originalOtherMinutes + override.otherMinutes;
-                     }
-                 });
-                 
-                 // Recalculate deductible with corrected values
-                 const grace = analysisResult.grace_minutes ?? 15;
-                 const approved = analysisResult.approved_minutes || 0;
-                 const correctedDeductible = Math.max(0, correctedLate + correctedEarly + correctedOther - grace - approved);
-                 
-                 calculated = {
-                     workingDays: analysisResult.working_days,
-                     presentDays: analysisResult.present_days,
-                     fullAbsenceCount: analysisResult.full_absence_count,
-                     halfAbsenceCount: analysisResult.half_absence_count,
-                     sickLeaveCount: analysisResult.sick_leave_count,
-                     annualLeaveCount: analysisResult.annual_leave_count,
-                     lateMinutes: correctedLate,
-                     earlyCheckoutMinutes: correctedEarly,
-                     otherMinutes: correctedOther,
-                     approvedMinutes: approved,
-                     deductibleMinutes: analysisResult.manual_deductible_minutes ?? correctedDeductible,
-                     graceMinutes: grace
-                 };
-                 attendanceSource = 'ANALYZED';
-                 analyzedCount++;
-                 console.log(`[createSalarySnapshots] Using finalized AnalysisResult for ${emp.name} (${emp.attendance_id}): ${calculated.lateMinutes} late, ${calculated.earlyCheckoutMinutes} early, ${calculated.deductibleMinutes} deductible (overrides applied)`);
-             } else {
+            // PERMANENT LOCK: For finalized reports, use AnalysisResult values AS-IS (1:1 copy)
+            // NO recalculation, NO day_overrides processing - use stored finalized values directly
+            if (hasAnalysisResult) {
+                calculated = {
+                    workingDays: analysisResult.working_days || 0,
+                    presentDays: analysisResult.present_days || 0,
+                    fullAbsenceCount: analysisResult.full_absence_count || 0,
+                    halfAbsenceCount: analysisResult.half_absence_count || 0,
+                    sickLeaveCount: analysisResult.sick_leave_count || 0,
+                    annualLeaveCount: analysisResult.annual_leave_count || 0,
+                    lateMinutes: analysisResult.late_minutes || 0,
+                    earlyCheckoutMinutes: analysisResult.early_checkout_minutes || 0,
+                    otherMinutes: analysisResult.other_minutes || 0,
+                    approvedMinutes: analysisResult.approved_minutes || 0,
+                    deductibleMinutes: analysisResult.deductible_minutes || 0,
+                    graceMinutes: analysisResult.grace_minutes ?? 15
+                };
+                attendanceSource = 'ANALYZED';
+                analyzedCount++;
+                console.log(`[createSalarySnapshots] 1:1 copy from AnalysisResult for ${emp.name} (${emp.attendance_id}): deductible=${calculated.deductibleMinutes}`);
+            } else {
                 // NO_ATTENDANCE_DATA: Employee missing from analysis
                 // Use zero attendance for salary safety
                 calculated = {
