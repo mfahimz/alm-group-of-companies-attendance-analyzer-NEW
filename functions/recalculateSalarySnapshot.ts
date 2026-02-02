@@ -255,7 +255,7 @@ Deno.serve(async (req) => {
         // CRITICAL: Use allowances (NOT allowances_with_bonus)
         // Same formula for all employees regardless of working hours
         let salaryLeaveAmount = 0;
-        const salaryLeaveDays = attendanceValues.salary_leave_days || attendanceValues.annual_leave_count;
+        const salaryLeaveDays = snapshot.override_salary_leave_days ?? snapshot.salary_leave_days ?? snapshot.annual_leave_count ?? 0;
         
         if (salaryLeaveDays > 0) {
             const salaryForLeave = basicSalary + allowances;
