@@ -1021,11 +1021,22 @@ Deno.serve(async (req) => {
                 console.log(`[createSalarySnapshots] No AnalysisResult for ${emp.name} (${emp.attendance_id}) - using zero attendance`);
             }
 
-            // Current month salary values (may be from increment)
+            // ============================================================
+            // SALARY COMPONENTS (3 separate entities)
+            // ============================================================
+            // COMPONENT 1: Basic Salary (base pay)
+            const basicSalary = salary?.basic_salary || 0;
+            
+            // COMPONENT 2: Allowances WITHOUT bonus (used for salary leave amount)
+            // CRITICAL: This is "allowances" field, NOT "allowances_with_bonus"
+            const allowancesAmount = Number(salary?.allowances) || 0;
+            
+            // COMPONENT 3: Allowances WITH bonus (stored but not used in calculations here)
+            // const allowancesWithBonus = Number(salary?.allowances_with_bonus) || 0;
+            
+            // Total Salary = Component 1 + Component 2 + Component 3
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || baseSalary?.working_hours || 9;
-            const basicSalary = salary?.basic_salary || 0;
-            const allowancesAmount = Number(salary?.allowances) || 0;
             
             // Previous month salary values (for OT and prev month deductions)
             const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;

@@ -200,10 +200,19 @@ Deno.serve(async (req) => {
         };
 
         // ============================================================
-        // BASE SALARY VALUES
+        // SALARY COMPONENTS (3 separate entities)
         // ============================================================
+        // COMPONENT 1: Basic Salary (base pay)
         const basicSalary = snapshot.basic_salary || salaryRecord.basic_salary || 0;
+        
+        // COMPONENT 2: Allowances WITHOUT bonus (used for salary leave amount)
+        // CRITICAL: This is "allowances" field, NOT "allowances_with_bonus"
         const allowances = snapshot.allowances || Number(salaryRecord.allowances) || 0;
+        
+        // COMPONENT 3: Allowances WITH bonus (stored in DB but not used here)
+        // const allowancesWithBonus = snapshot.allowances_with_bonus || Number(salaryRecord.allowances_with_bonus) || 0;
+        
+        // Total Salary = Component 1 + Component 2 + Component 3
         const totalSalary = snapshot.total_salary || salaryRecord.total_salary || 0;
 
         // ============================================================
