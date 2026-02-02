@@ -1029,6 +1029,15 @@ Deno.serve(async (req) => {
             
             // Previous month salary values (for OT and prev month deductions)
             const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
+            
+            // DISABLED: Previous month deduction calculation (no longer used)
+            const extraPrevMonthData = {
+                extraDeductibleMinutes: 0,
+                extraLopDays: 0,
+                extraLopPay: 0,
+                extraDeductibleHoursPay: 0,
+                prevMonthDivisor: otDivisor
+            };
 
             // Get salary leave days from ANNUAL_LEAVE exceptions
             let salaryLeaveDays = calculated.annualLeaveCount;
