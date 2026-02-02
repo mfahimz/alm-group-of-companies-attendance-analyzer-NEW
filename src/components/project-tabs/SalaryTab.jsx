@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import { Label } from '@/components/ui/label';
+import SalarySnapshotRow from './SalarySnapshotRow';
+import SalarySnapshotDialog from '../salary/SalarySnapshotDialog';
 
 export default function SalaryTab({ project }) {
     const queryClient = useQueryClient();
