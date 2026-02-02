@@ -225,18 +225,19 @@ export default function SalaryReportDetail() {
         const otherDeduction = getValue(row, 'otherDeduction') || 0;
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
 
-        // If admin edited attendance fields, recalculate derived amounts
+        // Get current attendance values (may be admin-edited)
         const annualLeaveCount = getValue(row, 'annual_leave_count') ?? row.annual_leave_count ?? 0;
         const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
         const leaveDays = getValue(row, 'leaveDays') ?? (annualLeaveCount + fullAbsenceCount);
         const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
         const deductibleHours = getValue(row, 'deductibleHours') ?? row.deductibleHours ?? 0;
         
-        // Recalculate if admin edited, otherwise use stored values
-        const leavePay = getValue(row, 'leavePay') ?? ((totalSalary / divisor) * leaveDays);
-        const salaryLeaveAmount = getValue(row, 'salaryLeaveAmount') ?? ((totalSalary / divisor) * salaryLeaveDays);
-        const netDeduction = getValue(row, 'netDeduction') ?? (leavePay - salaryLeaveAmount);
-        const deductibleHoursPay = getValue(row, 'deductibleHoursPay') ?? ((totalSalary / divisor / workingHours) * deductibleHours);
+        // ALWAYS recalculate derived monetary amounts based on current attendance values
+        // This ensures live updates when admin edits attendance fields
+        const leavePay = (totalSalary / divisor) * leaveDays;
+        const salaryLeaveAmount = (totalSalary / divisor) * salaryLeaveDays;
+        const netDeduction = leavePay - salaryLeaveAmount;
+        const deductibleHoursPay = (totalSalary / divisor / workingHours) * deductibleHours;
 
         // Previous month deductions (Al Maraghi Motors - calculated using OT divisor)
         const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
