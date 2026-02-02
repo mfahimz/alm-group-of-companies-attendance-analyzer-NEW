@@ -168,20 +168,23 @@ Deno.serve(async (req) => {
 
         // ============================================================
         // READ-ONLY ATTENDANCE VALUES (NEVER MODIFY THESE)
+        // ADMIN DAY OVERRIDES: If override field is set, use it; otherwise use finalized value
         // ============================================================
         const attendanceValues = {
             deductible_minutes: snapshot.deductible_minutes || 0,
-            annual_leave_count: snapshot.annual_leave_count || 0,
-            sick_leave_count: snapshot.sick_leave_count || 0,
-            full_absence_count: snapshot.full_absence_count || 0,
-            salary_leave_days: snapshot.salary_leave_days || 0,
+            // Effective attendance values (with admin overrides if present)
+            present_days: snapshot.override_present_days ?? snapshot.present_days ?? 0,
+            annual_leave_count: snapshot.override_annual_leave_count ?? snapshot.annual_leave_count ?? 0,
+            sick_leave_count: snapshot.override_sick_leave_count ?? snapshot.sick_leave_count ?? 0,
+            full_absence_count: snapshot.override_full_absence_count ?? snapshot.full_absence_count ?? 0,
+            salary_leave_days: snapshot.override_salary_leave_days ?? snapshot.salary_leave_days ?? 0,
+            working_days: snapshot.override_working_days ?? snapshot.working_days ?? 0,
+            // Time-based (never overridden)
             late_minutes: snapshot.late_minutes || 0,
             early_checkout_minutes: snapshot.early_checkout_minutes || 0,
             other_minutes: snapshot.other_minutes || 0,
             approved_minutes: snapshot.approved_minutes || 0,
             grace_minutes: snapshot.grace_minutes || 15,
-            working_days: snapshot.working_days || 0,
-            present_days: snapshot.present_days || 0,
             // Previous month data (Al Maraghi Motors only)
             extra_prev_month_deductible_minutes: snapshot.extra_prev_month_deductible_minutes || 0,
             extra_prev_month_lop_days: snapshot.extra_prev_month_lop_days || 0
