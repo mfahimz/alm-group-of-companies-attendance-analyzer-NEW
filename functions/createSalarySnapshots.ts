@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
             console.log('[createSalarySnapshots] No user auth, likely service role call');
         }
 
-        const { project_id, report_run_id } = await req.json();
+        const { project_id, report_run_id, batch_mode = false, batch_start = 0, batch_size = 10 } = await req.json();
         console.log('[createSalarySnapshots] Params:', { project_id, report_run_id });
 
         if (!project_id || !report_run_id) {
@@ -1186,7 +1186,27 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Bulk create snapshots
+        // BATCH MODE: Process in chunks for progress tracking
+        if (batch_mode) {
+            const batchSnapshots = snapshots.slice(batch_start, batch_start + batch_size);
+            
+            if (batchSnapshots.length > 0) {
+                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(batchSnapshots);
+                console.log(`[createSalarySnapshots] Batch created ${batchSnapshots.length} snapshots (${batch_start}-${batch_start + batch_size})`);
+            }
+            
+            return Response.json({
+                success: true,
+                batch_mode: true,
+                batch_completed: batchSnapshots.length,
+                total_employees: snapshots.length,
+                current_position: batch_start + batchSnapshots.length,
+                has_more: (batch_start + batch_size) < snapshots.length,
+                current_batch: batchSnapshots.map(s => ({ attendance_id: s.attendance_id, name: s.name }))
+            });
+        }
+        
+        // STANDARD MODE: Bulk create all snapshots at once
         if (snapshots.length > 0) {
             console.log(`[createSalarySnapshots] Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
             await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
