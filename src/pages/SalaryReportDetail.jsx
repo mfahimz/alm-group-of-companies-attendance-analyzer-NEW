@@ -235,7 +235,9 @@ export default function SalaryReportDetail() {
         // ALWAYS recalculate derived monetary amounts based on current attendance values
         // This ensures live updates when admin edits attendance fields
         const leavePay = (totalSalary / divisor) * leaveDays;
-        const salaryLeaveAmount = (totalSalary / divisor) * salaryLeaveDays;
+        const basicSalary = row.basic_salary || 0;
+        const allowances = row.allowances || 0;
+        const salaryLeaveAmount = ((basicSalary + allowances) / divisor) * salaryLeaveDays;
         const netDeduction = leavePay - salaryLeaveAmount;
         const deductibleHoursPay = (totalSalary / divisor / workingHours) * deductibleHours;
 
