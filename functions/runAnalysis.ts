@@ -771,15 +771,16 @@ Deno.serve(async (req) => {
             // ============================================================================
             // CRITICAL: DEDUCTIBLE_MINUTES CALCULATION (IMMUTABLE FOR SALARY)
             // ============================================================================
-            // deductible_minutes = (late + early + other) - grace - approved
+            // deductible_minutes = ((late + early) - grace) + other - approved
+            // Order matters: grace applies to late/early first, then other minutes added on top
             // This value is FINAL and stored in AnalysisResult for salary calculation
             // Salary calculations fetch this directly, NO recalculation
             // For Al Maraghi Motors, once report is finalized, this is locked
             // DO NOT modify this formula without updating all downstream salary logic
             // ============================================================================
             const graceMinutes = baseGrace + carriedGrace;
-            const totalTimeIssues = lateMinutes + earlyCheckoutMinutes + otherMinutes;
-            const deductibleMinutes = totalTimeIssues - graceMinutes - totalApprovedMinutes;
+            const lateEarlyAfterGrace = Math.max(0, (lateMinutes + earlyCheckoutMinutes) - graceMinutes);
+            const deductibleMinutes = lateEarlyAfterGrace + otherMinutes - totalApprovedMinutes;
 
             return {
                 attendance_id,
