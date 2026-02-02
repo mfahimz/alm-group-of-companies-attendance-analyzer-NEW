@@ -195,17 +195,17 @@ Deno.serve(async (req) => {
                             }
                         }
                         
-                        // Calculate derived values
+                        // Calculate derived values - ALL rounded to 2 decimal places
                         const leaveDays = annualLeaveCount + fullAbsenceCount;
-                        const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
+                        const leavePay = Math.round((leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0) * 100) / 100;
                         const salaryForLeave = basicSalary + allowancesAmount;
-                        const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
-                        const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+                        const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0) * 100) / 100;
+                        const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
                         const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
-                        const hourlyRate = totalSalaryAmount / divisor / workingHours;
-                        const deductibleHoursPay = hourlyRate * deductibleHours;
+                        const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
+                        const deductibleHoursPay = Math.round((hourlyRate * deductibleHours) * 100) / 100;
                         
-                        const finalTotal = totalSalaryAmount - netDeduction - deductibleHoursPay;
+                        const finalTotal = Math.round((totalSalaryAmount - netDeduction - deductibleHoursPay) * 100) / 100;
                         
                         // WPS split
                         let wpsAmount = finalTotal;
@@ -217,8 +217,8 @@ Deno.serve(async (req) => {
                         if (project.company === 'Al Maraghi Motors' && wpsCapEnabled && finalTotal > 0) {
                             const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
                             const rawExcess = Math.max(0, finalTotal - cap);
-                            balanceAmount = Math.floor(rawExcess / 100) * 100;
-                            wpsAmount = finalTotal - balanceAmount;
+                            balanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
+                            wpsAmount = Math.round((finalTotal - balanceAmount) * 100) / 100;
                             wpsCapApplied = rawExcess > 0;
                         }
                         
