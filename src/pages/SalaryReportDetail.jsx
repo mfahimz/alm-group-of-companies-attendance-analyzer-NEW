@@ -42,6 +42,7 @@ export default function SalaryReportDetail() {
     const [confirmRecalcAll, setConfirmRecalcAll] = useState(false);
     const [selectedSnapshot, setSelectedSnapshot] = useState(null);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
+    const [adminEditMode, setAdminEditMode] = useState(false);
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
@@ -104,6 +105,7 @@ export default function SalaryReportDetail() {
     // DERIVED VALUES
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdmin = userRole === 'admin';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
     const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
@@ -290,7 +292,7 @@ export default function SalaryReportDetail() {
             if (!edits) return row;
 
             const updated = { ...row };
-            const totalSalary = row.total_salary || 0;
+            const totalSalary = edits.total_salary ?? row.total_salary ?? 0;
             const workingHours = row.working_hours || 9;
 
             // DIVISOR_OT: Use ot_divisor for OT calculations
@@ -299,15 +301,32 @@ export default function SalaryReportDetail() {
             const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
             const otHourlyRate = totalSalary / otDivisor / workingHours;
 
+            // Apply all admin edits
+            if ('total_salary' in edits) updated.total_salary = edits.total_salary;
+            if ('working_days' in edits) updated.working_days = edits.working_days;
+            if ('present_days' in edits) updated.present_days = edits.present_days;
+            if ('full_absence_count' in edits) updated.full_absence_count = edits.full_absence_count;
+            if ('annual_leave_count' in edits) updated.annual_leave_count = edits.annual_leave_count;
+            if ('leaveDays' in edits) updated.leaveDays = edits.leaveDays;
+            if ('leavePay' in edits) updated.leavePay = edits.leavePay;
+            if ('salary_leave_days' in edits) updated.salary_leave_days = edits.salary_leave_days;
+            if ('salaryLeaveAmount' in edits) updated.salaryLeaveAmount = edits.salaryLeaveAmount;
+            if ('netDeduction' in edits) updated.netDeduction = edits.netDeduction;
+            if ('deductibleHours' in edits) updated.deductibleHours = edits.deductibleHours;
+            if ('deductibleHoursPay' in edits) updated.deductibleHoursPay = edits.deductibleHoursPay;
+            
             // Apply edits using DIVISOR_OT for OT calculations
              if ('normalOtHours' in edits) {
                  updated.normalOtHours = edits.normalOtHours;
-                 updated.normalOtSalary = Math.round(otHourlyRate * 1.25 * edits.normalOtHours);
+                 updated.normalOtSalary = edits.normalOtSalary ?? Math.round(otHourlyRate * 1.25 * edits.normalOtHours);
              }
              if ('specialOtHours' in edits) {
                  updated.specialOtHours = edits.specialOtHours;
-                 updated.specialOtSalary = Math.round(otHourlyRate * 1.5 * edits.specialOtHours);
+                 updated.specialOtSalary = edits.specialOtSalary ?? Math.round(otHourlyRate * 1.5 * edits.specialOtHours);
              }
+            if ('normalOtSalary' in edits) updated.normalOtSalary = edits.normalOtSalary;
+            if ('specialOtSalary' in edits) updated.specialOtSalary = edits.specialOtSalary;
+            if ('totalOtSalary' in edits) updated.totalOtSalary = edits.totalOtSalary;
             if ('otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
             if ('bonus' in edits) updated.bonus = edits.bonus;
             if ('incentive' in edits) updated.incentive = edits.incentive;
@@ -618,6 +637,17 @@ export default function SalaryReportDetail() {
                                 )}
                             </div>
                             <div className="flex gap-2">
+                                {isAdmin && (
+                                    <Button
+                                        onClick={() => setAdminEditMode(!adminEditMode)}
+                                        variant={adminEditMode ? "default" : "ghost"}
+                                        size="sm"
+                                        className={adminEditMode ? "bg-indigo-600 hover:bg-indigo-700" : "text-slate-400 hover:text-slate-600"}
+                                        title="Double-click any cell to edit (Admin only)"
+                                    >
+                                        {adminEditMode ? 'Edit Mode: ON' : '⚡'}
+                                    </Button>
+                                )}
                                 <Button
                                             onClick={handleSave}
                                             disabled={isSaving}
@@ -742,19 +772,163 @@ export default function SalaryReportDetail() {
                                                 </td>
                                                 <td className="p-2 align-middle font-medium sticky left-[48px] bg-white z-10">{row.attendance_id}</td>
                                                 <td className="p-2 align-middle font-medium sticky left-[148px] bg-white z-10">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
-                                                <td className="p-2 align-middle font-semibold">{row.total_salary || 0}</td>
-                                                <td className="p-2 align-middle">{row.working_days || 0}</td>
-                                                <td className="p-2 align-middle">{row.present_days || 0}</td>
-                                                <td className="p-2 align-middle text-red-600 font-semibold">{row.full_absence_count || 0}</td>
-                                                <td className="p-2 align-middle text-blue-600">{row.annual_leave_count || 0}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{(row.leaveDays || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{(row.leavePay || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{(row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{(row.salaryLeaveAmount || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-red-50 font-semibold">{(row.netDeduction || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-purple-50">{(row.deductibleHours || 0).toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-purple-100">{(row.deductibleHoursPay || 0).toFixed(2)}</td>
-                                                <td className="p-1 align-middle bg-blue-50">
+                                                <td className="p-2 align-middle font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'total_salary')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'total_salary', e.target.value)}
+                                                            className="h-8 text-xs w-20"
+                                                        />
+                                                    ) : (
+                                                        row.total_salary || 0
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'working_days')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'working_days', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        row.working_days || 0
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'present_days')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'present_days', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        row.present_days || 0
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle text-red-600 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'full_absence_count')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'full_absence_count', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        row.full_absence_count || 0
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle text-blue-600" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'annual_leave_count')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'annual_leave_count', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        row.annual_leave_count || 0
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-amber-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'leaveDays')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'leaveDays', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (row.leaveDays || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'leavePay')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (row.leavePay || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-amber-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'salary_leave_days') || getValue(row, 'salaryLeaveDays')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'salaryLeaveAmount')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'salaryLeaveAmount', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (row.salaryLeaveAmount || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-red-50 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'netDeduction')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'netDeduction', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (row.netDeduction || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-purple-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'deductibleHours')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'deductibleHours', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (row.deductibleHours || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-purple-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'deductibleHoursPay')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'deductibleHoursPay', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (row.deductibleHoursPay || 0).toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className={`p-1 align-middle bg-blue-50 ${adminEditMode && isAdmin ? '' : ''}`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -763,8 +937,20 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-blue-100">{normalOtSalary.toFixed(2)}</td>
-                                                <td className="p-1 align-middle bg-cyan-50">
+                                                <td className="p-2 align-middle bg-blue-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'normalOtSalary')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'normalOtSalary', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        normalOtSalary.toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className={`p-1 align-middle bg-cyan-50 ${adminEditMode && isAdmin ? '' : ''}`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -773,9 +959,33 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-cyan-100">{specialOtSalary.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-cyan-200 font-semibold">{totalOtSalary.toFixed(2)}</td>
-                                                <td className="p-1 align-middle bg-red-50">
+                                                <td className="p-2 align-middle bg-cyan-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'specialOtSalary')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'specialOtSalary', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        specialOtSalary.toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-cyan-200 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'totalOtSalary')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'totalOtSalary', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        totalOtSalary.toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className={`p-1 align-middle bg-red-50 ${adminEditMode && isAdmin ? '' : ''}`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -784,7 +994,7 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-1 align-middle bg-green-50">
+                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -793,7 +1003,7 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-1 align-middle bg-green-50">
+                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -802,7 +1012,7 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-1 align-middle bg-red-50">
+                                                <td className={`p-1 align-middle bg-red-50 ${adminEditMode && isAdmin ? '' : ''}`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"

@@ -48,6 +48,7 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import BusinessDocumentation from './pages/BusinessDocumentation';
+import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
@@ -78,12 +79,12 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "BusinessDocumentation": BusinessDocumentation,
+    "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
     "Dashboard": Dashboard,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
@@ -114,7 +115,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
 }
 
 export const pagesConfig = {
