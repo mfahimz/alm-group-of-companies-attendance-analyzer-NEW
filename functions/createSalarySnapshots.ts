@@ -1054,27 +1054,25 @@ Deno.serve(async (req) => {
                 }
             }
 
-            // Calculate derived salary values
+            // Calculate derived salary values - ALL rounded to 2 decimal places
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
-            const leavePay = leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0;
+            const leavePay = Math.round((leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0) * 100) / 100;
             
             // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
-            // Same formula for all employees regardless of working hours
             const salaryForLeave = basicSalary + allowancesAmount;
-            const salaryLeaveAmount = salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0;
+            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0) * 100) / 100;
             
-            const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
+            const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
 
             // Use finalized deductible_minutes from AnalysisResult
-            // Grace minutes are already applied - do NOT recalculate or reapply
             const deductibleMinutes = calculated.deductibleMinutes;
             const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
             
-            // Current month hourly rate uses salary divisor
-            const hourlyRate = totalSalaryAmount / divisor / workingHours;
+            // Current month hourly rate uses salary divisor (2 decimals)
+            const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
             
-            // Current month deductible hours pay (uses salary divisor)
-            const currentMonthDeductibleHoursPay = hourlyRate * deductibleHours;
+            // Current month deductible hours pay (2 decimals)
+            const currentMonthDeductibleHoursPay = Math.round((hourlyRate * deductibleHours) * 100) / 100;
             
             // ============================================================
             // DISABLED: Previous month deduction logic
@@ -1092,12 +1090,8 @@ Deno.serve(async (req) => {
             
             // Final total calculation (NO previous month deductions)
             // Current month: netDeduction (leave) + currentMonthDeductibleHoursPay (time)
-            // Conditional rounding: Only round if bonus has NO decimal values
-            let finalTotal = totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay;
-            const bonusHasDecimals = (salary?.bonus || 0) % 1 !== 0;
-            if (!bonusHasDecimals) {
-                finalTotal = Math.round(finalTotal);
-            }
+            // ALWAYS round to 2 decimals, then apply whole number rounding for balance
+            let finalTotal = Math.round((totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay) * 100) / 100;
 
             // ============================================================
             // WPS SPLIT LOGIC (Al Maraghi Motors only)
@@ -1121,14 +1115,10 @@ Deno.serve(async (req) => {
                     const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
                     // Calculate raw excess over cap
                     const rawExcess = Math.max(0, finalTotal - cap);
-                    // Round balance DOWN to nearest 100 (only if bonus has no decimals)
-                    if (!bonusHasDecimals) {
-                        balanceAmount = Math.floor(rawExcess / 100) * 100;
-                    } else {
-                        balanceAmount = rawExcess;
-                    }
-                    // WPS gets the rest (total - balance)
-                    wpsAmount = finalTotal - balanceAmount;
+                    // Round balance DOWN to nearest 100, then round to 2 decimals
+                    balanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
+                    // WPS gets the rest (total - balance), rounded to 2 decimals
+                    wpsAmount = Math.round((finalTotal - balanceAmount) * 100) / 100;
                     wpsCapApplied = rawExcess > 0;
                 }
             } else if (finalTotal <= 0) {
