@@ -318,12 +318,22 @@ export default function SalaryReportDetail() {
             if ('full_absence_count' in edits) updated.full_absence_count = edits.full_absence_count;
             if ('annual_leave_count' in edits) updated.annual_leave_count = edits.annual_leave_count;
             if ('leaveDays' in edits) updated.leaveDays = edits.leaveDays;
-            if ('leavePay' in edits) updated.leavePay = edits.leavePay;
             if ('salary_leave_days' in edits) updated.salary_leave_days = edits.salary_leave_days;
-            if ('salaryLeaveAmount' in edits) updated.salaryLeaveAmount = edits.salaryLeaveAmount;
-            if ('netDeduction' in edits) updated.netDeduction = edits.netDeduction;
             if ('deductibleHours' in edits) updated.deductibleHours = edits.deductibleHours;
-            if ('deductibleHoursPay' in edits) updated.deductibleHoursPay = edits.deductibleHoursPay;
+            
+            // Recalculate derived monetary amounts based on current attendance values
+            const currentTotalSalary = updated.total_salary;
+            const currentLeaveDays = updated.leaveDays || ((updated.annual_leave_count || 0) + (updated.full_absence_count || 0));
+            const currentSalaryLeaveDays = updated.salary_leave_days || updated.salaryLeaveDays || 0;
+            const currentDeductibleHours = updated.deductibleHours || 0;
+            const basicSalary = updated.basic_salary || 0;
+            const allowances = updated.allowances || 0;
+            
+            // Recalculate: Leave Pay, Salary Leave Amount, Net Deduction, Deductible Hours Pay
+            updated.leavePay = (currentTotalSalary / divisor) * currentLeaveDays;
+            updated.salaryLeaveAmount = ((basicSalary + allowances) / divisor) * currentSalaryLeaveDays;
+            updated.netDeduction = updated.leavePay - updated.salaryLeaveAmount;
+            updated.deductibleHoursPay = (currentTotalSalary / divisor / workingHours) * currentDeductibleHours;
             
             // Apply edits using DIVISOR_OT for OT calculations
              if ('normalOtHours' in edits) {
