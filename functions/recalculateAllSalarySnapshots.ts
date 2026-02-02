@@ -181,7 +181,8 @@ Deno.serve(async (req) => {
                 // Leave Pay = (Total Salary / Divisor) * Leave Days
                 const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
                 
-                // Salary Leave Amount = (Basic + Allowances) / Divisor * Salary Leave Days
+                // Salary Leave Amount = (Basic Salary + Allowances ONLY) / Divisor * Salary Leave Days
+                // CRITICAL: Use allowances (NOT allowances_with_bonus)
                 const salaryLeaveAmount = salaryLeaveDays > 0 
                     ? ((basicSalary + allowances) / divisor) * salaryLeaveDays 
                     : 0;

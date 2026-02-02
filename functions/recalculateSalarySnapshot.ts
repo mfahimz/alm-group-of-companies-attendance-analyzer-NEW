@@ -239,7 +239,8 @@ Deno.serve(async (req) => {
         // Leave Pay = (Total Salary / Divisor) * Leave Days
         const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
         
-        // Salary Leave Amount = (Basic Salary + Allowances) / Divisor * Salary Leave Days
+        // Salary Leave Amount = (Basic Salary + Allowances ONLY) / Divisor * Salary Leave Days
+        // CRITICAL: Use allowances (NOT allowances_with_bonus)
         // Same formula for all employees regardless of working hours
         let salaryLeaveAmount = 0;
         const salaryLeaveDays = attendanceValues.salary_leave_days || attendanceValues.annual_leave_count;
