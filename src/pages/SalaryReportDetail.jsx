@@ -226,9 +226,11 @@ export default function SalaryReportDetail() {
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
 
         // If admin edited attendance fields, recalculate derived amounts
-        const leaveDays = getValue(row, 'leaveDays') || row.leaveDays || 0;
-        const salaryLeaveDays = getValue(row, 'salary_leave_days') || row.salary_leave_days || row.salaryLeaveDays || 0;
-        const deductibleHours = getValue(row, 'deductibleHours') || row.deductibleHours || 0;
+        const annualLeaveCount = getValue(row, 'annual_leave_count') ?? row.annual_leave_count ?? 0;
+        const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
+        const leaveDays = getValue(row, 'leaveDays') ?? (annualLeaveCount + fullAbsenceCount);
+        const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
+        const deductibleHours = getValue(row, 'deductibleHours') ?? row.deductibleHours ?? 0;
         
         // Recalculate if admin edited, otherwise use stored values
         const leavePay = getValue(row, 'leavePay') ?? ((totalSalary / divisor) * leaveDays);
