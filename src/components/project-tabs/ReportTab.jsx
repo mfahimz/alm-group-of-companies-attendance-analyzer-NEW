@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Trash2, CheckCircle, Star, Save } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, Star, Save, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
@@ -271,11 +271,46 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         enabled: reportRuns.length > 0
     });
 
+    // Find the finalized report
+    const finalizedReport = allReportRuns.find(r => r.is_final === true);
+
     return (
         <div className="space-y-6">
             <Card className="border-0 shadow-sm">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Generated Reports</CardTitle>
+                    {finalizedReport && isAdminOrSupervisor && (
+                        <Button
+                            variant="outline"
+                            onClick={async () => {
+                                if (!confirm('Run data integrity repair? This will:\n1. Audit finalized report data\n2. Fix any mismatches between AnalysisResult → SalarySnapshot → SalaryReport\n3. Show final verification')) return;
+                                
+                                try {
+                                    const { data } = await base44.functions.invoke('repairSalaryReportFromSnapshots', {
+                                        report_run_id: finalizedReport.id
+                                    });
+                                    
+                                    const msg = data.final_verification.status === 'CLEAN'
+                                        ? `✅ REPAIR SUCCESSFUL\n\n${data.message}\n\nFinal Verification: ${data.final_verification.message}`
+                                        : `⚠️ REPAIR INCOMPLETE\n\n${data.message}\n\nFinal Status: ${data.final_verification.message}`;
+                                    
+                                    alert(msg);
+                                    
+                                    if (data.final_verification.status === 'CLEAN') {
+                                        queryClient.invalidateQueries(['reportRuns', project.id]);
+                                        queryClient.invalidateQueries(['results']);
+                                        queryClient.invalidateQueries(['salarySnapshots']);
+                                    }
+                                } catch (err) {
+                                    alert('Repair failed: ' + err.message);
+                                }
+                            }}
+                            className="text-purple-600 border-purple-600"
+                        >
+                            <Settings className="w-4 h-4 mr-2" />
+                            Repair Finalized Data
+                        </Button>
+                    )}
                 </CardHeader>
                 <CardContent>
                     {reportRuns.length === 0 ? (
