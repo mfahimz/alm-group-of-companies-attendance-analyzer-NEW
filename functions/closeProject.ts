@@ -189,14 +189,14 @@ Deno.serve(async (req) => {
                         : 0;
                     const graceMinutesAvailable = baseGrace + carriedGrace;
                     
-                    // CORRECT FORMULA: late + early + other - approved
+                    // UNUSED GRACE CALCULATION: time_issues = late + early (ONLY)
+                    // NO other_minutes, NO approved_minutes
+                    // This is leftover grace pool, not deductible minutes
                     const lateMinutes = result.late_minutes || 0;
                     const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-                    const otherMinutes = result.other_minutes || 0;
-                    const approvedMinutes = result.approved_minutes || 0;
                     
-                    const graceMinutesUsed = lateMinutes + earlyCheckoutMinutes + otherMinutes - approvedMinutes;
-                    const graceMinutesCarried = Math.max(0, graceMinutesAvailable - graceMinutesUsed);
+                    const timeIssues = lateMinutes + earlyCheckoutMinutes;
+                    const graceMinutesCarried = Math.max(0, graceMinutesAvailable - timeIssues);
                     
                     // Create history record
                     graceHistoryRecords.push({
@@ -212,10 +212,8 @@ Deno.serve(async (req) => {
                         grace_minutes_available: graceMinutesAvailable,
                         late_minutes: lateMinutes,
                         early_checkout_minutes: earlyCheckoutMinutes,
-                        other_minutes: otherMinutes,
-                        approved_minutes: approvedMinutes,
-                        grace_minutes_used: graceMinutesUsed,
-                        grace_minutes_carried: graceMinutesCarried,
+                        time_issues: timeIssues,
+                        unused_grace_minutes: graceMinutesCarried,
                         carried_at: nowUAE,
                         carried_by: user.email
                     });

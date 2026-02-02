@@ -1,22 +1,36 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Trash2, Lock } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertTriangle, Trash2, Lock, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function CloseProjectDialog({ open, onClose, project, lastSavedReport }) {
     const [deleteProgress, setDeleteProgress] = useState(null);
     // Default to UNCHECKED - explicit admin decision required
     const [carryForwardGraceMinutes, setCarryForwardGraceMinutes] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
     const queryClient = useQueryClient();
     
-    // Only show grace carry-forward option for Al Maraghi Auto Repairs
-    const showGraceOption = project?.company === 'Al Maraghi Auto Repairs';
+    // Only show grace carry-forward option for Al Maraghi Motors
+    const showGraceOption = project?.company === 'Al Maraghi Motors';
+
+    // Fetch grace carry-forward preview when checkbox is checked
+    const { data: gracePreview, isLoading: loadingPreview } = useQuery({
+        queryKey: ['gracePreview', project?.id],
+        queryFn: async () => {
+            const response = await base44.functions.invoke('previewGraceCarryForward', {
+                project_id: project.id
+            });
+            return response.data;
+        },
+        enabled: open && showGraceOption && carryForwardGraceMinutes && showPreview
+    });
 
     const closeProjectMutation = useMutation({
         mutationFn: async () => {
@@ -125,7 +139,7 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                         </Card>
                     )}
 
-                    {/* Grace Minutes Carry-Forward Option - Al Maraghi Auto Repairs only */}
+                    {/* Grace Minutes Carry-Forward Option - Al Maraghi Motors only */}
                     {showGraceOption && (
                         <Card className="border-amber-200 bg-amber-50">
                             <CardContent className="p-4">
@@ -142,15 +156,78 @@ export default function CloseProjectDialog({ open, onClose, project, lastSavedRe
                                         <p className="text-sm text-amber-800 mt-1">
                                             Calculate remaining grace minutes using the formula:<br/>
                                             <code className="text-xs bg-amber-100 px-1 rounded">
-                                                Carried = Available - (Late + Early + Other - Approved)
+                                                Unused = Grace Available - (Late + Early)
                                             </code>
                                         </p>
                                         <p className="text-xs text-amber-700 mt-2">
                                             This creates an audit record and updates employee profiles for future projects.
                                             This action runs once and cannot be undone.
                                         </p>
+                                        {carryForwardGraceMinutes && (
+                                            <Button
+                                                onClick={() => setShowPreview(!showPreview)}
+                                                variant="outline"
+                                                size="sm"
+                                                className="mt-3"
+                                            >
+                                                <Eye className="w-4 h-4 mr-2" />
+                                                {showPreview ? 'Hide Preview' : 'Show Preview'}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Grace Preview Table */}
+                    {showGraceOption && carryForwardGraceMinutes && showPreview && (
+                        <Card className="border-amber-300 bg-white">
+                            <CardContent className="p-4">
+                                <h3 className="font-semibold text-amber-900 mb-3">
+                                    Unused Grace Minutes Preview ({gracePreview?.employee_count || 0} employees)
+                                </h3>
+                                {loadingPreview ? (
+                                    <p className="text-sm text-slate-600">Loading preview...</p>
+                                ) : gracePreview?.success ? (
+                                    <div className="max-h-64 overflow-y-auto border rounded">
+                                        <Table>
+                                            <TableHeader className="sticky top-0 bg-slate-100">
+                                                <TableRow>
+                                                    <TableHead className="whitespace-nowrap">Att. ID</TableHead>
+                                                    <TableHead className="whitespace-nowrap">Name</TableHead>
+                                                    <TableHead className="whitespace-nowrap text-right">Late Min</TableHead>
+                                                    <TableHead className="whitespace-nowrap text-right">Early Min</TableHead>
+                                                    <TableHead className="whitespace-nowrap text-right">Time Issues</TableHead>
+                                                    <TableHead className="whitespace-nowrap text-right">Grace Available</TableHead>
+                                                    <TableHead className="whitespace-nowrap text-right bg-green-50 font-semibold">Unused Grace</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {gracePreview.preview_data.map((row) => (
+                                                    <TableRow key={row.attendance_id}>
+                                                        <TableCell className="font-mono text-xs">{row.attendance_id}</TableCell>
+                                                        <TableCell className="text-xs">{row.name.split(' ').slice(0, 2).join(' ')}</TableCell>
+                                                        <TableCell className="text-right text-xs">{row.late_minutes}</TableCell>
+                                                        <TableCell className="text-right text-xs">{row.early_checkout_minutes}</TableCell>
+                                                        <TableCell className="text-right text-xs font-semibold">{row.time_issues}</TableCell>
+                                                        <TableCell className="text-right text-xs">{row.grace_minutes_available}</TableCell>
+                                                        <TableCell className="text-right text-xs bg-green-50 font-bold text-green-700">
+                                                            {row.unused_grace_minutes}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-red-600">{gracePreview?.error || 'Failed to load preview'}</p>
+                                )}
+                                {gracePreview?.success && (
+                                    <p className="text-xs text-amber-700 mt-2">
+                                        <strong>Total Unused Grace:</strong> {gracePreview.total_unused_grace} minutes across {gracePreview.employee_count} employees
+                                    </p>
+                                )}
                             </CardContent>
                         </Card>
                     )}
