@@ -338,6 +338,7 @@
  * ==================== LOCKED NOTICE ====================
  * 
  * This architecture is LOCKED as of 2026-01-27.
+ * Updated: 2026-02-02 (added finalization immutability rules)
  * 
  * Changes to:
  * - Calculation logic
@@ -350,6 +351,36 @@
  * ...require explicit approval and versioning of this document.
  * 
  * No partial implementations. No shortcuts. Complete contract.
+ * 
+ * ==================== CRITICAL FINALIZATION RULES ====================
+ * 
+ * RULE: Once ReportRun.is_final = true, attendance data is PERMANENTLY LOCKED.
+ * 
+ * FINALIZED REPORT DATA FLOW (IMMUTABLE):
+ * 
+ *   AnalysisResult (finalized) → createSalarySnapshots.js → SalarySnapshot (1:1 copy)
+ *                                                                    ↓
+ *                                                          SalaryTab.jsx (read-only attendance)
+ *                                                                    ↓
+ *                                                          SalaryReport (frozen attendance + OT adjustments)
+ * 
+ * MANDATORY BEHAVIOR:
+ * 1. createSalarySnapshots.js MUST copy AnalysisResult fields exactly (1:1 copy)
+ * 2. NO attendance recalculation after finalization
+ * 3. NO custom date range filtering for attendance metrics
+ * 4. NO day_overrides processing after finalization
+ * 5. NO fallback to zero/default for finalized fields
+ * 
+ * FORBIDDEN CODE PATTERNS IN SALARY CONTEXT:
+ * - recalculateEmployeeAttendance(emp, dateFrom, dateTo) ❌
+ * - Filtering exceptions by custom date range ❌
+ * - Recomputing working_days or present_days ❌
+ * - Applying grace_minutes logic after finalization ❌
+ * 
+ * ALLOWED: Edit OT hours, bonuses, deductions (post-finalization adjustments)
+ * 
+ * See pages/CRITICAL_FINALIZATION_RULES for complete documentation.
+ * 
  */
 
 export const REPORT_ARCHITECTURE = {

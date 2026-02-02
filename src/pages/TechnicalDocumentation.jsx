@@ -844,30 +844,64 @@ const finalSalary = Math.round((total_salary - netLeaveDeduction) * 100) / 100;`
                         </p>
                     </div>
 
-                    <h3 className="text-xl font-semibold mt-6">Custom Date Range Salary Reports</h3>
-                    <div className="bg-purple-50 border border-purple-300 rounded p-3">
-                        <p className="text-sm text-purple-800 mb-2">
-                            <strong>Feature:</strong> Generate salary reports for custom date ranges within a finalized report period.
+                    <h3 className="text-xl font-semibold mt-6">⚠️ CRITICAL: Finalized Report Immutability</h3>
+                    <div className="bg-red-50 border-2 border-red-600 rounded p-4">
+                        <h4 className="font-semibold text-red-900 mb-3">PERMANENT LOCK RULE</h4>
+                        <p className="text-sm text-red-800 mb-3">
+                            <strong>Once a ReportRun is marked as finalized (is_final = true), attendance data becomes PERMANENTLY IMMUTABLE.</strong>
                         </p>
-                        <p className="text-sm text-purple-800 mb-2"><strong>Implementation:</strong></p>
-                        <ul className="text-sm text-purple-700 mb-3">
-                            <li><strong>Page:</strong> pages/SalaryReportGenerator.jsx</li>
-                            <li><strong>Entity:</strong> SalaryReport (stores saved custom reports)</li>
-                            <li><strong>Access:</strong> From Salary Tab via "Custom Date Report" button</li>
-                        </ul>
-                        <p className="text-sm text-purple-800 mb-2"><strong>How It Works:</strong></p>
-                        <ol className="text-sm text-purple-700">
-                            <li>User selects date range within finalized report period</li>
-                            <li>System validates dates are within report boundaries</li>
-                            <li>System filters AnalysisResult data and exceptions by selected dates</li>
-                            <li>Recalculates attendance metrics (present days, leave days, deductible minutes) for date range</li>
-                            <li>Applies salary calculations using filtered data</li>
-                            <li>User can edit OT hours, bonuses, deductions</li>
-                            <li>Report can be saved with custom name and exported to Excel</li>
-                        </ol>
-                        <p className="text-xs text-purple-600 mt-3">
-                            <strong>Data Source:</strong> Uses finalized SalarySnapshot data combined with Exception filtering 
-                            to recalculate metrics for the custom date range. Does NOT re-run full attendance analysis.
+                        
+                        <div className="bg-white border border-red-300 rounded p-3 mb-3">
+                            <p className="text-sm font-semibold text-red-900 mb-2">Data Pipeline (One-Way Flow):</p>
+                            <ol className="text-xs text-red-800 space-y-1">
+                                <li><strong>1. Analysis:</strong> Punches + Shifts + Exceptions → AnalysisResult (can re-run before finalization)</li>
+                                <li><strong>2. Finalization:</strong> AnalysisResult → SalarySnapshot (1:1 copy, ONE-TIME operation)</li>
+                                <li><strong>3. Salary Generation:</strong> SalarySnapshot → SalaryReport (uses frozen attendance + OT adjustments)</li>
+                            </ol>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-3">
+                            <div className="bg-green-50 border border-green-400 rounded p-3">
+                                <p className="text-xs font-semibold text-green-900 mb-2">✓ ALLOWED AFTER FINALIZATION:</p>
+                                <ul className="text-xs text-green-800 space-y-1">
+                                    <li>• Read finalized AnalysisResult</li>
+                                    <li>• Create SalarySnapshot (1:1 copy only)</li>
+                                    <li>• Generate SalaryReport</li>
+                                    <li>• Edit OT/Bonus/Deductions</li>
+                                    <li>• Recalculate salary totals</li>
+                                </ul>
+                            </div>
+                            <div className="bg-red-50 border border-red-400 rounded p-3">
+                                <p className="text-xs font-semibold text-red-900 mb-2">✗ FORBIDDEN AFTER FINALIZATION:</p>
+                                <ul className="text-xs text-red-800 space-y-1">
+                                    <li>• Recalculate attendance metrics</li>
+                                    <li>• Modify AnalysisResult</li>
+                                    <li>• Apply day_overrides</li>
+                                    <li>• Recompute deductible_minutes</li>
+                                    <li>• Filter by custom date range</li>
+                                    <li>• Use fallback/default values</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div className="bg-amber-50 border border-amber-400 rounded p-3 mt-3">
+                            <p className="text-xs font-semibold text-amber-900 mb-2">📋 SNAPSHOT CREATION RULE (createSalarySnapshots.js):</p>
+                            <p className="text-xs text-amber-800">
+                                When creating SalarySnapshot: Find AnalysisResult by report_run_id, copy ALL fields exactly as stored.
+                                NO recalculation, NO date filtering, NO custom logic. Pure 1:1 copy only.
+                            </p>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-400 rounded p-3 mt-3">
+                            <p className="text-xs font-semibold text-blue-900 mb-2">📊 CUSTOM DATE RANGE RULE (SalaryTab.jsx):</p>
+                            <p className="text-xs text-blue-800">
+                                Custom date_from/date_to in SalaryReport are DISPLAY METADATA ONLY. They do NOT filter attendance data.
+                                Salary ALWAYS uses the FULL finalized attendance period, regardless of custom dates.
+                            </p>
+                        </div>
+
+                        <p className="text-sm text-red-900 font-bold mt-4 text-center">
+                            See pages/CRITICAL_FINALIZATION_RULES for complete details.
                         </p>
                     </div>
 
