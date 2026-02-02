@@ -501,24 +501,24 @@ export default function SalaryReportDetail() {
                 'LOP Days': row.full_absence_count || 0,
                 'Annual Leave Days': row.annual_leave_count || 0,
                 'Leave Days': Math.round(row.leaveDays || 0),
-                'Leave Pay': row.leavePay || 0,
-                'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
-                'Salary Leave Amount': row.salaryLeaveAmount || 0,
-                'Net Deduction': row.netDeduction || 0,
-                'Deductible Hours': row.deductibleHours || 0,
-                'Deductible Hours Pay': row.deductibleHoursPay || 0,
-                'Normal OT Hours': row.normalOtHours || 0,
-                'Normal OT Salary': row.normalOtSalary || 0,
-                'Special OT Hours': row.specialOtHours || 0,
-                'Special OT Salary': row.specialOtSalary || 0,
-                'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
-                'Other Deduction': row.otherDeduction || 0,
-                'Bonus': row.bonus || 0,
-                'Incentive': row.incentive || 0,
-                'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
-                'Total': shouldRound ? Math.round(total) : total,
-                'WPS Pay': shouldRound ? Math.round(wpsPay) : wpsPay,
-                'Balance': shouldRound ? Math.round(balance) : balance,
+                'Leave Pay': parseFloat((row.leavePay || 0).toFixed(2)),
+                'Salary Leave Days': parseFloat((row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)),
+                'Salary Leave Amount': parseFloat((row.salaryLeaveAmount || 0).toFixed(2)),
+                'Net Deduction': parseFloat((row.netDeduction || 0).toFixed(2)),
+                'Deductible Hours': parseFloat((row.deductibleHours || 0).toFixed(2)),
+                'Deductible Hours Pay': parseFloat((row.deductibleHoursPay || 0).toFixed(2)),
+                'Normal OT Hours': parseFloat((row.normalOtHours || 0).toFixed(2)),
+                'Normal OT Salary': parseFloat((row.normalOtSalary || 0).toFixed(2)),
+                'Special OT Hours': parseFloat((row.specialOtHours || 0).toFixed(2)),
+                'Special OT Salary': parseFloat((row.specialOtSalary || 0).toFixed(2)),
+                'Total OT Salary': parseFloat(((row.normalOtSalary || 0) + (row.specialOtSalary || 0)).toFixed(2)),
+                'Other Deduction': parseFloat((row.otherDeduction || 0).toFixed(2)),
+                'Bonus': parseFloat((row.bonus || 0).toFixed(2)),
+                'Incentive': parseFloat((row.incentive || 0).toFixed(2)),
+                'Advance Salary Deduction': parseFloat((row.advanceSalaryDeduction || 0).toFixed(2)),
+                'Total': parseFloat(total.toFixed(2)),
+                'WPS Pay': parseFloat(wpsPay.toFixed(2)),
+                'Balance': parseFloat(balance.toFixed(2)),
                 'WPS Cap Applied': wpsCapApplied ? 'Yes' : 'No',
                 'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
             };
@@ -747,13 +747,13 @@ export default function SalaryReportDetail() {
                                                 <td className="p-2 align-middle">{row.present_days || 0}</td>
                                                 <td className="p-2 align-middle text-red-600 font-semibold">{row.full_absence_count || 0}</td>
                                                 <td className="p-2 align-middle text-blue-600">{row.annual_leave_count || 0}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{row.leaveDays || 0}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{row.leavePay || 0}</td>
-                                                <td className="p-2 align-middle bg-amber-50">{row.salary_leave_days || row.salaryLeaveDays || 0}</td>
-                                                <td className="p-2 align-middle bg-amber-100">{row.salaryLeaveAmount || 0 || '0'}</td>
-                                                <td className="p-2 align-middle bg-red-50 font-semibold">{row.netDeduction || 0 || '0'}</td>
-                                                <td className="p-2 align-middle bg-purple-50">{row.deductibleHours || 0 || '0'}</td>
-                                                <td className="p-2 align-middle bg-purple-100">{row.deductibleHoursPay || 0 || '0'}</td>
+                                                <td className="p-2 align-middle bg-amber-50">{(row.leaveDays || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100">{(row.leavePay || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-50">{(row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100">{(row.salaryLeaveAmount || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-red-50 font-semibold">{(row.netDeduction || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-purple-50">{(row.deductibleHours || 0).toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-purple-100">{(row.deductibleHoursPay || 0).toFixed(2)}</td>
                                                 <td className="p-1 align-middle bg-blue-50">
                                                     <Input
                                                         type="number"
@@ -763,7 +763,7 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-blue-100">{normalOtSalary}</td>
+                                                <td className="p-2 align-middle bg-blue-100">{normalOtSalary.toFixed(2)}</td>
                                                 <td className="p-1 align-middle bg-cyan-50">
                                                     <Input
                                                         type="number"
@@ -773,8 +773,8 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-cyan-100">{specialOtSalary}</td>
-                                                <td className="p-2 align-middle bg-cyan-200 font-semibold">{totalOtSalary}</td>
+                                                <td className="p-2 align-middle bg-cyan-100">{specialOtSalary.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-cyan-200 font-semibold">{totalOtSalary.toFixed(2)}</td>
                                                 <td className="p-1 align-middle bg-red-50">
                                                     <Input
                                                         type="number"
@@ -811,9 +811,9 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{shouldRound ? Math.round(total) : total}</td>
-                                                <td className="p-2 align-middle bg-green-100 font-bold">{shouldRound ? Math.round(wpsPay) : wpsPay}</td>
-                                                <td className="p-2 align-middle bg-amber-100 font-bold">{shouldRound ? Math.round(balance) : balance}</td>
+                                                <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-green-100 font-bold">{wpsPay.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100 font-bold">{balance.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-slate-50 text-center">
                                                     {wpsCapApplied ? (
                                                         <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded text-xs font-medium">
