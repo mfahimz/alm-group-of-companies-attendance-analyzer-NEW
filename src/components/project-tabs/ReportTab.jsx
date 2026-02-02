@@ -399,17 +399,15 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                     const { data } = await base44.functions.invoke('repairSalaryReportFromSnapshots', {
                                         report_run_id: finalizedReport.id
                                     });
-                                    
-                                    const msg = data.final_verification.status === 'CLEAN'
-                                        ? `✅ REPAIR SUCCESSFUL\n\n${data.message}\n\nFinal Verification: ${data.final_verification.message}`
-                                        : `⚠️ REPAIR INCOMPLETE\n\n${data.message}\n\nFinal Status: ${data.final_verification.message}`;
-                                    
-                                    alert(msg);
-                                    
-                                    if (data.final_verification.status === 'CLEAN') {
+
+                                    if (data.success) {
+                                        const msg = `✅ REPAIR SUCCESSFUL\n\n${data.message}\n\nSnapshots recreated: ${data.actions_taken.snapshots_recreated}\nReports regenerated: ${data.actions_taken.reports_regenerated}`;
+                                        alert(msg);
                                         queryClient.invalidateQueries(['reportRuns', project.id]);
                                         queryClient.invalidateQueries(['results']);
                                         queryClient.invalidateQueries(['salarySnapshots']);
+                                    } else {
+                                        alert(`⚠️ REPAIR FAILED\n\n${data.error || 'Unknown error'}`);
                                     }
                                 } catch (err) {
                                     alert('Repair failed: ' + err.message);
