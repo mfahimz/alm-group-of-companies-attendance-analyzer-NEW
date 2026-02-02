@@ -981,6 +981,7 @@ Deno.serve(async (req) => {
             
             // PERMANENT LOCK: For finalized reports, use AnalysisResult values AS-IS (1:1 copy)
             // NO recalculation, NO day_overrides processing - use stored finalized values directly
+            // deductible_minutes formula in runAnalysis: ((late + early) - grace) + other - approved
             if (hasAnalysisResult) {
                 calculated = {
                     workingDays: analysisResult.working_days || 0,
