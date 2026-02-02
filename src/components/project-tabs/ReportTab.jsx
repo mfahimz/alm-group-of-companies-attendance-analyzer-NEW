@@ -9,11 +9,20 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 
 export default function ReportTab({ project, isDepartmentHead = false }) {
     console.log('[ReportTab] Rendering with:', { projectId: project?.id, isDepartmentHead });
     
     const queryClient = useQueryClient();
+    const [progressDialog, setProgressDialog] = React.useState({
+        open: false,
+        current: 0,
+        total: 0,
+        currentEmployee: '',
+        status: 'Processing...'
+    });
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -185,16 +194,79 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const markFinalMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // Call backend function to mark final and create snapshots
-            const result = await base44.functions.invoke('markFinalReport', {
+            // Show progress dialog
+            setProgressDialog({
+                open: true,
+                current: 0,
+                total: 0,
+                currentEmployee: 'Initializing...',
+                status: 'Starting finalization process...'
+            });
+
+            // Call backend to mark as final and get employee count
+            const markResult = await base44.functions.invoke('markFinalReport', {
                 project_id: project.id,
                 report_run_id: reportRunId
             });
-            return { reportRunId, result };
+
+            // If batch mode needed, process in chunks
+            if (markResult.data?.success === false) {
+                throw new Error(markResult.data?.error || 'Finalization failed');
+            }
+
+            // Create snapshots in batches with progress
+            let batchStart = 0;
+            const batchSize = 5; // Process 5 employees at a time
+            let hasMore = true;
+            let totalEmployees = 0;
+
+            while (hasMore) {
+                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
+                    project_id: project.id,
+                    report_run_id: reportRunId,
+                    batch_mode: true,
+                    batch_start: batchStart,
+                    batch_size: batchSize
+                });
+
+                if (batchResult.data?.batch_mode) {
+                    totalEmployees = batchResult.data.total_employees;
+                    const currentPos = batchResult.data.current_position;
+                    const currentBatch = batchResult.data.current_batch || [];
+                    hasMore = batchResult.data.has_more;
+
+                    // Update progress
+                    setProgressDialog({
+                        open: true,
+                        current: currentPos,
+                        total: totalEmployees,
+                        currentEmployee: currentBatch.length > 0 
+                            ? currentBatch.map(e => e.name).join(', ')
+                            : 'Processing...',
+                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees}`
+                    });
+
+                    batchStart = currentPos;
+
+                    // Add delay to avoid rate limiting
+                    if (hasMore) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            return { reportRunId, result: markResult };
         },
         onSuccess: async ({ reportRunId, result }) => {
-            // Force refetch all relevant queries - do NOT rely on staleTime
-            // Use refetchType: 'all' to ensure immediate refetch even if data is "fresh"
+            setProgressDialog(prev => ({
+                ...prev,
+                status: 'Finalizing... Please wait.',
+                currentEmployee: 'Completing finalization...'
+            }));
+
+            // Force refetch all relevant queries
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' }),
                 queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id], refetchType: 'all' }),
@@ -202,11 +274,14 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id, reportRunId], refetchType: 'all' }),
                 queryClient.invalidateQueries({ queryKey: ['projects'], refetchType: 'all' })
             ]);
-            toast.success('Report marked as final. Salary snapshots created.');
+
+            setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
+            toast.success('Report marked as final. Salary snapshots created successfully.');
         },
         onError: async (error) => {
+            setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
+
             // CRITICAL: Invalidate queries on error to reflect backend rollback
-            // Backend may have rolled back is_final=false if validation failed
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id], refetchType: 'all' }),
                 queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id], refetchType: 'all' }),
@@ -276,6 +351,41 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     return (
         <div className="space-y-6">
+            {/* Progress Dialog */}
+            <Dialog open={progressDialog.open} onOpenChange={() => {}}>
+                <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+                    <DialogHeader>
+                        <DialogTitle>Creating Salary Snapshots</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>Progress</span>
+                                <span className="font-medium">{progressDialog.current} / {progressDialog.total}</span>
+                            </div>
+                            <Progress 
+                                value={progressDialog.total > 0 ? (progressDialog.current / progressDialog.total) * 100 : 0} 
+                                className="h-2"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <div className="text-sm font-medium text-slate-700">
+                                {progressDialog.status}
+                            </div>
+                            {progressDialog.currentEmployee && (
+                                <div className="text-xs text-slate-500">
+                                    {progressDialog.currentEmployee}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <div className="animate-spin h-3 w-3 border-2 border-slate-300 border-t-slate-600 rounded-full"></div>
+                            <span>This may take a few minutes. Please do not close this window.</span>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Generated Reports</CardTitle>
