@@ -1292,7 +1292,10 @@ export default function ShiftTimingsTab({ project }) {
                             />
                         </div>
                         <p className="text-sm text-slate-500 mt-2">
-                            CSV format: attendance_id, name, department, morning_start, morning_end, evening_start, evening_end, total_hours, applicable_days
+                            CSV format: Attendance ID, Employee Name, Department, AM Start, AM End, PM Start, PM End, Weekly Off, Shift Type, Applicable Days
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Shift Type: "Regular" or "Single Shift" | Applicable Days: comma-separated (e.g., "Monday, Tuesday, Friday")
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
                             Shifts will be uploaded to {selectedBlock === 'block1' ? 'Block 1' : 'Block 2'} with date range {new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')}
