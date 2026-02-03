@@ -126,9 +126,7 @@ Deno.serve(async (req) => {
         const reportRun = reports[0];
 
         // Fetch core data
-        // IMPORTANT: punches and shifts are needed for recalculation logic even though finalized reports use AnalysisResult
-        // They are used by recalculateEmployeeAttendance() and calculateExtraPrevMonthData()
-        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts] = await Promise.all([
+        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.AnalysisResult.filter({ 
@@ -139,12 +137,11 @@ Deno.serve(async (req) => {
             isAlMaraghi 
                 ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true })
                 : Promise.resolve([]),
-            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
-            base44.asServiceRole.entities.Punch.filter({ project_id: project_id }),
-            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id })
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
         ]);
 
-        console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments, ${punches.length} punches, ${shifts.length} shifts`);
+        console.log(`[createSalarySnapshots] BATCH=${batch_mode}, START=${batch_start}, SIZE=${batch_size}`);
+        console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments`);
 
         // Parse rules
         let rules = null;
@@ -901,15 +898,14 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids`);
         }
         
-        console.log(`[createSalarySnapshots] Total eligible employees: ${eligibleEmployees.length}`);
-        console.log(`[createSalarySnapshots] Batch mode: ${batch_mode}, batch_start: ${batch_start}, batch_size: ${batch_size}`);
+        console.log(`[createSalarySnapshots] ✅ ELIGIBLE EMPLOYEES: ${eligibleEmployees.length} (after custom_employee_ids filter)`);
         
         // BATCH MODE: Process only a subset of employees
         const employeesToProcess = batch_mode 
             ? eligibleEmployees.slice(batch_start, batch_start + batch_size)
             : eligibleEmployees;
         
-        console.log(`[createSalarySnapshots] Processing ${employeesToProcess.length} employees in this batch`);
+        console.log(`[createSalarySnapshots] 📦 BATCH PROCESSING: ${employeesToProcess.length} employees (from index ${batch_start} to ${batch_start + employeesToProcess.length - 1})`);
         
         for (const emp of employeesToProcess) {
             // Find matching salary record (REQUIRED for salary snapshot)
@@ -1084,10 +1080,13 @@ Deno.serve(async (req) => {
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
             const leavePay = Math.round((leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0) * 100) / 100;
             
-            // Salary Leave Amount = (Basic Salary + Allowances ONLY) / Divisor * Salary Leave Days
-            // CRITICAL: Use allowances (NOT allowances_with_bonus)
-            const salaryForLeave = basicSalary + allowancesAmount;
-            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryForLeave / divisor) * salaryLeaveDays : 0) * 100) / 100;
+            // ============================================================
+            // SALARY LEAVE AMOUNT FORMULA (NON-NEGOTIABLE)
+            // Base = Basic Salary + Allowances ONLY (NO BONUS, NO allowances_with_bonus)
+            // Formula: (Basic + Allowances) / salary_divisor × salary_leave_days
+            // ============================================================
+            const salaryBaseForLeave = basicSalary + allowancesAmount;
+            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryBaseForLeave / divisor) * salaryLeaveDays : 0) * 100) / 100;
             
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
 
@@ -1215,17 +1214,17 @@ Deno.serve(async (req) => {
 
         // BATCH MODE: Process in chunks for progress tracking
         if (batch_mode) {
-            console.log(`[createSalarySnapshots] BATCH MODE: Creating ${snapshots.length} snapshots`);
+            console.log(`[createSalarySnapshots] 💾 BATCH MODE: Creating ${snapshots.length} snapshots for this batch`);
             
             if (snapshots.length > 0) {
                 await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
-                console.log(`[createSalarySnapshots] Batch created ${snapshots.length} snapshots`);
+                console.log(`[createSalarySnapshots] ✅ Batch created ${snapshots.length} snapshots successfully`);
             }
             
             const currentPosition = batch_start + snapshots.length;
             const hasMore = currentPosition < eligibleEmployees.length;
             
-            console.log(`[createSalarySnapshots] BATCH RESPONSE: current_position=${currentPosition}, total=${eligibleEmployees.length}, has_more=${hasMore}`);
+            console.log(`[createSalarySnapshots] 📊 BATCH COMPLETE: position=${currentPosition}/${eligibleEmployees.length}, has_more=${hasMore}`);
             
             return Response.json({
                 success: true,
@@ -1240,12 +1239,14 @@ Deno.serve(async (req) => {
         
         // STANDARD MODE: Bulk create all snapshots at once
         if (snapshots.length > 0) {
-            console.log(`[createSalarySnapshots] Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
+            console.log(`[createSalarySnapshots] 💾 STANDARD MODE: Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
             await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
-            console.log(`[createSalarySnapshots] Successfully created ${snapshots.length} snapshots`);
+            console.log(`[createSalarySnapshots] ✅ Successfully created ${snapshots.length} snapshots`);
         } else {
-            console.warn(`[createSalarySnapshots] No snapshots created - no eligible employees found`);
+            console.warn(`[createSalarySnapshots] ⚠️ WARNING: No snapshots created - no eligible employees found`);
         }
+
+        console.log(`[createSalarySnapshots] 🎯 FINAL COUNT CHECK: ${snapshots.length} snapshots created for ${eligibleEmployees.length} eligible employees`);
 
         return Response.json({
             success: true,

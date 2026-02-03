@@ -289,15 +289,17 @@ Deno.serve(async (req) => {
         // Leave Pay = (Total Salary / Divisor) * Leave Days
         const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
         
-        // Salary Leave Amount = (Basic Salary + Allowances ONLY) / Divisor * Salary Leave Days
-        // CRITICAL: Use allowances (NOT allowances_with_bonus)
-        // Same formula for all employees regardless of working hours
+        // ============================================================
+        // SALARY LEAVE AMOUNT FORMULA (NON-NEGOTIABLE)
+        // Base = Basic Salary + Allowances ONLY (NO BONUS, NO allowances_with_bonus)
+        // Formula: (Basic + Allowances) / salary_divisor × salary_leave_days
+        // ============================================================
         let salaryLeaveAmount = 0;
         const salaryLeaveDays = snapshot.override_salary_leave_days ?? snapshot.salary_leave_days ?? snapshot.annual_leave_count ?? 0;
         
         if (salaryLeaveDays > 0) {
-            const salaryForLeave = basicSalary + allowances;
-            salaryLeaveAmount = (salaryForLeave / divisor) * salaryLeaveDays;
+            const salaryBaseForLeave = basicSalary + allowances;
+            salaryLeaveAmount = (salaryBaseForLeave / divisor) * salaryLeaveDays;
         }
         
         // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
