@@ -339,6 +339,7 @@ export default function ShiftTimingsTab({ project }) {
                 attendance_id: String(s.attendance_id),
                 date: s.date,
                 is_friday_shift: s.is_friday_shift,
+                is_single_shift: s.is_single_shift || false,
                 applicable_days: s.applicable_days,
                 am_start: s.am_start,
                 am_end: s.am_end,
