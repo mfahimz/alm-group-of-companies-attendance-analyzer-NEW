@@ -633,6 +633,10 @@ export default function ShiftTimingsTab({ project }) {
                     'Attendance ID': shift.attendance_id,
                     'Employee Name': employee?.name || '-',
                     'Department': employee?.department || '-',
+                    'AM Start': shift.am_start || '-',
+                    'AM End': shift.am_end || '-',
+                    'PM Start': shift.pm_start || '-',
+                    'PM End': shift.pm_end || '-',
                     'Weekly Off': employee?.weekly_off || 'Sunday',
                     'Shift Type': shift.is_single_shift ? 'Single Shift' : 'Regular',
                     'Applicable Days': shift.applicable_days ? 
@@ -642,13 +646,7 @@ export default function ShiftTimingsTab({ project }) {
                                 return Array.isArray(daysArray) ? daysArray.join(', ') : shift.applicable_days;
                             } catch { return shift.applicable_days; }
                         })()) : 
-                        (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'All days'),
-                    'AM Start': shift.am_start || '-',
-                    'AM End': shift.am_end || '-',
-                    'PM Start': shift.pm_start || '-',
-                    'PM End': shift.pm_end || '-',
-                    'Effective From': shift.effective_from ? new Date(shift.effective_from).toLocaleDateString('en-GB') : '-',
-                    'Effective To': shift.effective_to ? new Date(shift.effective_to).toLocaleDateString('en-GB') : '-'
+                        (shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : '')
                 };
             });
 
