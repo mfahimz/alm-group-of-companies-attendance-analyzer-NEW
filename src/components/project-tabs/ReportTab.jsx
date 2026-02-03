@@ -194,22 +194,28 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const markFinalMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // STEP 1: Show progress dialog
+            console.log('[ReportTab] mutationFn started for report:', reportRunId);
+            
+            // STEP 1: Update progress dialog
             setProgressDialog({
                 open: true,
                 current: 0,
                 total: 0,
-                currentEmployee: 'Marking report as final...',
-                status: 'Initializing...'
+                currentEmployee: 'Validating report data...',
+                status: 'Please wait...'
             });
 
             // STEP 2: Mark report as final (backend only marks, doesn't create snapshots)
+            console.log('[ReportTab] Calling markFinalReport backend...');
             const markResult = await base44.functions.invoke('markFinalReport', {
                 project_id: project.id,
                 report_run_id: reportRunId
             });
 
+            console.log('[ReportTab] markFinalReport result:', markResult.data);
+
             if (markResult.data?.success === false) {
+                console.error('[ReportTab] Backend validation failed:', markResult.data?.error);
                 throw new Error(markResult.data?.error || 'Finalization failed');
             }
 
@@ -220,12 +226,21 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             let totalEmployees = 0;
 
             while (hasMore) {
+                console.log(`[ReportTab] Creating snapshot batch starting at ${batchStart}...`);
+                
                 const batchResult = await base44.functions.invoke('createSalarySnapshots', {
                     project_id: project.id,
                     report_run_id: reportRunId,
                     batch_mode: true,
                     batch_start: batchStart,
                     batch_size: BATCH_SIZE
+                });
+
+                console.log('[ReportTab] Batch result:', {
+                    batch_mode: batchResult.data?.batch_mode,
+                    current_position: batchResult.data?.current_position,
+                    total: batchResult.data?.total_employees,
+                    has_more: batchResult.data?.has_more
                 });
 
                 if (batchResult.data?.batch_mode) {
@@ -235,6 +250,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     hasMore = batchResult.data.has_more;
 
                     // Update progress with real data
+                    const percentage = totalEmployees > 0 ? Math.round(currentPos/totalEmployees*100) : 0;
+                    console.log(`[ReportTab] Progress: ${currentPos}/${totalEmployees} (${percentage}%)`);
+                    
                     setProgressDialog({
                         open: true,
                         current: currentPos,
@@ -242,7 +260,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                         currentEmployee: currentBatch.length > 0 
                             ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
                             : 'Processing...',
-                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${Math.round(currentPos/totalEmployees*100)}%)`
+                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
                     });
 
                     batchStart = currentPos;
@@ -252,9 +270,12 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                         await new Promise(resolve => setTimeout(resolve, 100));
                     }
                 } else {
+                    console.log('[ReportTab] No batch_mode in result, stopping');
                     hasMore = false;
                 }
             }
+            
+            console.log('[ReportTab] All snapshots created successfully');
 
             return { reportRunId, result: markResult };
         },
@@ -283,6 +304,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             });
         },
         onError: async (error) => {
+            console.error('[ReportTab] Finalization error:', error);
+            
             setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
 
             // CRITICAL: Invalidate queries on error to reflect backend rollback
@@ -295,6 +318,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             // Show detailed error message
             const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
             const actionRequired = error?.response?.data?.action_required;
+            
+            console.error('[ReportTab] Error details:', { errorMsg, actionRequired });
             
             if (actionRequired) {
                 toast.error(`${errorMsg}\n\nAction required: ${actionRequired}`, {
@@ -316,6 +341,17 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const handleMarkFinal = (reportRunId) => {
         if (window.confirm('Mark this report as final for salary calculation? This will unmark any previously selected final report.')) {
+            console.log('[ReportTab] Starting finalization for report:', reportRunId);
+            
+            // Show dialog IMMEDIATELY
+            setProgressDialog({
+                open: true,
+                current: 0,
+                total: 0,
+                currentEmployee: 'Starting finalization...',
+                status: 'Initializing...'
+            });
+            
             markFinalMutation.mutate(reportRunId);
         }
     };
