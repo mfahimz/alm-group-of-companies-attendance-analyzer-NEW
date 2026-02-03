@@ -65,21 +65,16 @@ Deno.serve(async (req) => {
             last_saved_report_id: report_run_id
         });
 
-        // Return success - frontend will handle snapshot creation in batches
-        console.log(`[markFinalReport] Report marked as final, frontend will create snapshots`);
+        // Validate AnalysisResult count before marking as final
+        console.log(`[markFinalReport] Validating AnalysisResult data before finalization`);
         
-        const snapshotResult = {
-            data: {
-                success: true,
-                ready_for_snapshots: true
-            }
-        };
-
-        // VALIDATION: Verify snapshot count matches eligible employee count
-        // Fetch employees and salaries to count eligible employees
-        const [employees, salaries] = await Promise.all([
+        const [employees, salaries, analysisResults] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
-            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true })
+            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+            base44.asServiceRole.entities.AnalysisResult.filter({
+                project_id: project_id,
+                report_run_id: report_run_id
+            })
         ]);
 
         // Filter to project's custom_employee_ids if specified
@@ -91,41 +86,9 @@ Deno.serve(async (req) => {
             );
         }
 
-        // Count employees with valid salary records
-        const eligibleCount = eligibleEmployees.filter(emp => 
-            salaries.some(s => 
-                String(s.employee_id) === String(emp.hrms_id) || 
-                String(s.attendance_id) === String(emp.attendance_id)
-            )
-        ).length;
-
-        // Get actual snapshot count
-        const createdSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
-            project_id: project_id,
-            report_run_id: report_run_id
-        });
-
-        const snapshotCount = createdSnapshots.length;
-
-        console.log(`[markFinalReport] Validation: ${snapshotCount} snapshots created, ${eligibleCount} eligible employees`);
-
-        // ============================================================================
-        // VALIDATION: Ensure complete data before finalization
-        // ============================================================================
-        const isAlMaraghiAutoRepairs = project.company === 'Al Maraghi Auto Repairs';
-        
-        // STEP 1: Validate AnalysisResult count (ALL COMPANIES)
-        const analysisResults = await base44.asServiceRole.entities.AnalysisResult.filter({
-            project_id: project_id,
-            report_run_id: report_run_id
-        });
-        const analysisCount = analysisResults.length;
+        // Validate AnalysisResult completeness (ALL COMPANIES)
         const analysisAttendanceIds = new Set(analysisResults.map(r => String(r.attendance_id)));
-        
-        // Get ALL active employees for the project
         const allActiveEmployeeIds = eligibleEmployees.map(e => String(e.attendance_id));
-        
-        // Find missing AnalysisResult records
         const missingAnalysisIds = allActiveEmployeeIds.filter(id => !analysisAttendanceIds.has(id));
         
         if (missingAnalysisIds.length > 0) {
@@ -138,7 +101,6 @@ Deno.serve(async (req) => {
                 finalized_date: null
             });
 
-            // Get employee names for better error message
             const missingEmployees = eligibleEmployees
                 .filter(e => missingAnalysisIds.includes(String(e.attendance_id)))
                 .map(e => ({ attendance_id: e.attendance_id, name: e.name }));
@@ -146,42 +108,11 @@ Deno.serve(async (req) => {
             return Response.json({ 
                 success: false,
                 error: `VALIDATION FAILED: ${missingAnalysisIds.length} employees missing from AnalysisResult. Run backfillReportMissingEmployees first.`,
-                analysis_count: analysisCount,
+                analysis_count: analysisResults.length,
                 expected_count: allActiveEmployeeIds.length,
                 missing_attendance_ids: missingAnalysisIds,
-                missing_employees: missingEmployees.slice(0, 10), // Show first 10
+                missing_employees: missingEmployees.slice(0, 10),
                 action_required: `Run backfillReportMissingEmployees with project_id="${project_id}" and report_run_id="${report_run_id}"`
-            }, { status: 400 });
-        }
-        
-        // STEP 2: Validate SalarySnapshot count (AL MARAGHI AUTO REPAIRS ONLY)
-        if (isAlMaraghiAutoRepairs && snapshotCount !== eligibleCount) {
-            console.log(`[markFinalReport] SALARY VALIDATION FAILED: ${snapshotCount} snapshots vs ${eligibleCount} eligible`);
-            
-            // Find missing SalarySnapshot records
-            const snapshotAttendanceIds = new Set(createdSnapshots.map(s => String(s.attendance_id)));
-            const missingSalaryIds = eligibleEmployees
-                .filter(emp => salaries.some(s => 
-                    String(s.employee_id) === String(emp.hrms_id) || 
-                    String(s.attendance_id) === String(emp.attendance_id)
-                ))
-                .filter(emp => !snapshotAttendanceIds.has(String(emp.attendance_id)))
-                .map(e => ({ attendance_id: e.attendance_id, name: e.name }));
-            
-            // Rollback: Unmark as final
-            await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-                is_final: false,
-                finalized_by: null,
-                finalized_date: null
-            });
-
-            return Response.json({ 
-                success: false,
-                error: `VALIDATION FAILED: ${snapshotCount} salary snapshots but expected ${eligibleCount}. Run backfillReportMissingEmployees first.`,
-                snapshots_created: snapshotCount,
-                eligible_employees: eligibleCount,
-                missing_employees: missingSalaryIds.slice(0, 10), // Show first 10
-                action_required: `Run backfillReportMissingEmployees with project_id="${project_id}", report_run_id="${report_run_id}", include_salary_snapshots=true`
             }, { status: 400 });
         }
 
@@ -190,17 +121,15 @@ Deno.serve(async (req) => {
             action: 'MARK_FINAL_REPORT',
             entity_type: 'ReportRun',
             entity_id: report_run_id,
-            details: `Marked report as final for project ${project_id}. Created ${snapshotCount} salary snapshots (${snapshotResult?.data?.analyzed_count || 0} analyzed, ${snapshotResult?.data?.no_attendance_count || 0} no attendance data).`
+            details: `Marked report as final for project ${project_id}. Frontend will create salary snapshots.`
         });
+
+        console.log(`[markFinalReport] Report marked as final successfully. Frontend will create snapshots in batches.`);
 
         return Response.json({ 
             success: true,
-            message: 'Report marked as final successfully. Salary snapshots created.',
-            snapshots_created: snapshotCount,
-            analyzed_count: snapshotResult?.data?.analyzed_count || 0,
-            no_attendance_count: snapshotResult?.data?.no_attendance_count || 0,
-            eligible_employees: eligibleCount,
-            snapshots: snapshotResult?.data || snapshotResult
+            ready_for_snapshots: true,
+            message: 'Report marked as final. Ready for snapshot creation.'
         });
 
     } catch (error) {
