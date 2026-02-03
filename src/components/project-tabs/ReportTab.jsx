@@ -261,8 +261,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         onSuccess: async ({ reportRunId, result }) => {
             setProgressDialog(prev => ({
                 ...prev,
-                status: 'Finalizing... Please wait.',
-                currentEmployee: 'Completing finalization...'
+                status: 'Refreshing data...',
+                currentEmployee: 'Please wait...'
             }));
 
             // Force refetch all relevant queries
@@ -274,8 +274,13 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 queryClient.invalidateQueries({ queryKey: ['projects'], refetchType: 'all' })
             ]);
 
+            // Wait a bit more to ensure snapshots are fully committed
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
             setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
-            toast.success('Report marked as final. Salary snapshots created successfully.');
+            toast.success('✅ Finalization complete! Salary snapshots created. Go to Salary Tab to generate reports.', {
+                duration: 6000
+            });
         },
         onError: async (error) => {
             setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
@@ -350,9 +355,14 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     return (
         <div className="space-y-6">
-            {/* Progress Dialog */}
+            {/* Progress Dialog - Cannot be closed until complete */}
             <Dialog open={progressDialog.open} onOpenChange={() => {}}>
-                <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+                <DialogContent 
+                    className="sm:max-w-md" 
+                    onPointerDownOutside={(e) => e.preventDefault()} 
+                    onEscapeKeyDown={(e) => e.preventDefault()}
+                    onInteractOutside={(e) => e.preventDefault()}
+                >
                     <DialogHeader>
                         <DialogTitle>Creating Salary Snapshots</DialogTitle>
                     </DialogHeader>
@@ -377,9 +387,15 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <div className="animate-spin h-3 w-3 border-2 border-slate-300 border-t-slate-600 rounded-full"></div>
-                            <span>Processing ~2-3 seconds per 20 employees. Do not close.</span>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                            <div className="flex items-start gap-2 text-xs text-amber-800">
+                                <div className="animate-spin h-3 w-3 border-2 border-amber-300 border-t-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                                <div>
+                                    <strong>Creating salary snapshots...</strong> This takes ~2-3 seconds per 20 employees.
+                                    <br />
+                                    <span className="text-amber-700">⚠️ Do NOT navigate away or close this dialog until complete!</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </DialogContent>
