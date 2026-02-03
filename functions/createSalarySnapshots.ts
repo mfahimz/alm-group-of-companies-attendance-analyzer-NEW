@@ -1087,6 +1087,14 @@ Deno.serve(async (req) => {
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || baseSalary?.working_hours || 9;
             
+            console.log(`[createSalarySnapshots] 💰 SALARY DATA for ${emp.name}:`, {
+                basic_salary: basicSalary,
+                allowances: allowancesAmount,
+                allowances_with_bonus: salary?.allowances_with_bonus,
+                total_salary: totalSalaryAmount,
+                raw_allowances_field: salary?.allowances
+            });
+            
             // Previous month salary values (for OT and prev month deductions)
             const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
             
@@ -1125,6 +1133,16 @@ Deno.serve(async (req) => {
             // ============================================================
             const salaryBaseForLeave = basicSalary + allowancesAmount;
             const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryBaseForLeave / divisor) * salaryLeaveDays : 0) * 100) / 100;
+            
+            console.log(`[createSalarySnapshots] 📊 SALARY LEAVE CALCULATION for ${emp.name}:`, {
+                basicSalary,
+                allowancesAmount,
+                salaryBaseForLeave,
+                salaryLeaveDays,
+                divisor,
+                formula: `(${basicSalary} + ${allowancesAmount}) / ${divisor} × ${salaryLeaveDays}`,
+                result: salaryLeaveAmount
+            });
             
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
 
