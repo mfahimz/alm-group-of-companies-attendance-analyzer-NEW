@@ -214,7 +214,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             }
 
             // STEP 3: Create salary snapshots in batches with real progress
-            const BATCH_SIZE = 10;
+            const BATCH_SIZE = 20; // Increased from 10 to 20 for faster processing
             let batchStart = 0;
             let hasMore = true;
             let totalEmployees = 0;
@@ -240,16 +240,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                         current: currentPos,
                         total: totalEmployees,
                         currentEmployee: currentBatch.length > 0 
-                            ? currentBatch.map(e => e.name).join(', ')
+                            ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
                             : 'Processing...',
-                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees}`
+                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${Math.round(currentPos/totalEmployees*100)}%)`
                     });
 
                     batchStart = currentPos;
 
-                    // Add delay between batches
+                    // Minimal delay - only 100ms between batches
                     if (hasMore) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise(resolve => setTimeout(resolve, 100));
                     }
                 } else {
                     hasMore = false;
@@ -379,7 +379,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                             <div className="animate-spin h-3 w-3 border-2 border-slate-300 border-t-slate-600 rounded-full"></div>
-                            <span>This may take a few minutes. Please do not close this window.</span>
+                            <span>Processing ~2-3 seconds per 20 employees. Do not close.</span>
                         </div>
                     </div>
                 </DialogContent>
