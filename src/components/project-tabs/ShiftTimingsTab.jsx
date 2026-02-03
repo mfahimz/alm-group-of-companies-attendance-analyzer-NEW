@@ -252,14 +252,19 @@ export default function ShiftTimingsTab({ project }) {
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
-                if (values.length >= 7) {
+                if (values.length >= 9) {
                     const attendance_id = values[0];
+                    // values[1] = Employee Name (not used)
+                    // values[2] = Department (not used)
                     const am_start = normalizeTime(values[3]);
                     const am_end = normalizeTime(values[4]);
                     const pm_start = normalizeTime(values[5]);
                     const pm_end = normalizeTime(values[6]);
+                    // values[7] = Weekly Off (not used, read from Employee master)
+                    const shiftType = values[8] ? values[8].trim().toLowerCase() : '';
+                    const is_single_shift = shiftType === 'single shift';
 
-                    let applicableDays = values[8] ? values[8].trim() : '';
+                    let applicableDays = values[9] ? values[9].trim() : '';
                     let applicableDaysArray = [];
                     let is_friday_shift = false;
 
