@@ -125,9 +125,10 @@ Deno.serve(async (req) => {
         }
         const reportRun = reports[0];
 
-        // Fetch core data - NO punches/shifts needed since we use finalized AnalysisResult
-        // Punches/shifts/rules are NOT used for finalized reports - only AnalysisResult values
-        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData] = await Promise.all([
+        // Fetch core data
+        // IMPORTANT: punches and shifts are needed for recalculation logic even though finalized reports use AnalysisResult
+        // They are used by recalculateEmployeeAttendance() and calculateExtraPrevMonthData()
+        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.AnalysisResult.filter({ 
@@ -138,14 +139,12 @@ Deno.serve(async (req) => {
             isAlMaraghi 
                 ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true })
                 : Promise.resolve([]),
-            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
+            base44.asServiceRole.entities.Punch.filter({ project_id: project_id }),
+            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id })
         ]);
 
-        console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments`);
-        
-        // CRITICAL: Define empty arrays for legacy code that still references them
-        const punches = [];
-        const shifts = [];
+        console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments, ${punches.length} punches, ${shifts.length} shifts`);
 
         // Parse rules
         let rules = null;
