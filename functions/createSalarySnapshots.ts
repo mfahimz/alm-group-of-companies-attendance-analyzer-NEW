@@ -141,8 +141,11 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000)
         ]);
 
-        console.log(`[createSalarySnapshots] BATCH=${batch_mode}, START=${batch_start}, SIZE=${batch_size}`);
-        console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments`);
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] EXECUTION TRACE START`);
+        console.log(`[createSalarySnapshots] BATCH_MODE=${batch_mode}, BATCH_START=${batch_start}, BATCH_SIZE=${batch_size}`);
+        console.log(`[createSalarySnapshots] RAW DATA FETCHED: ${employees.length} employees, ${salaries.length} salaries, ${analysisResults.length} analysis results`);
+        console.log(`[createSalarySnapshots] ============================================`);
 
         // Parse rules
         let rules = null;
@@ -899,14 +902,18 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids`);
         }
         
-        console.log(`[createSalarySnapshots] ✅ ELIGIBLE EMPLOYEES: ${eligibleEmployees.length} (after custom_employee_ids filter)`);
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] ✅ TOTAL ELIGIBLE EMPLOYEES: ${eligibleEmployees.length}`);
+        console.log(`[createSalarySnapshots] ELIGIBLE EMPLOYEE IDs: [${eligibleEmployees.map(e => e.attendance_id).slice(0, 20).join(', ')}${eligibleEmployees.length > 20 ? '...' : ''}]`);
+        console.log(`[createSalarySnapshots] ============================================`);
         
         // BATCH MODE: Process only a subset of employees
         const employeesToProcess = batch_mode 
             ? eligibleEmployees.slice(batch_start, batch_start + batch_size)
             : eligibleEmployees;
         
-        console.log(`[createSalarySnapshots] 📦 BATCH PROCESSING: ${employeesToProcess.length} employees (from index ${batch_start} to ${batch_start + employeesToProcess.length - 1})`);
+        console.log(`[createSalarySnapshots] 📦 THIS BATCH: ${employeesToProcess.length} employees (indices ${batch_start} to ${batch_start + employeesToProcess.length - 1})`);
+        console.log(`[createSalarySnapshots] THIS BATCH IDs: [${employeesToProcess.map(e => e.attendance_id).join(', ')}]`);
         
         for (const emp of employeesToProcess) {
             // Find matching salary record (REQUIRED for salary snapshot)
@@ -1215,17 +1222,30 @@ Deno.serve(async (req) => {
 
         // BATCH MODE: Process in chunks for progress tracking
         if (batch_mode) {
-            console.log(`[createSalarySnapshots] 💾 BATCH MODE: Creating ${snapshots.length} snapshots for this batch`);
+            console.log(`[createSalarySnapshots] ============================================`);
+            console.log(`[createSalarySnapshots] 💾 BATCH MODE RESPONSE PREPARATION`);
+            console.log(`[createSalarySnapshots] Snapshots created in this batch: ${snapshots.length}`);
+            console.log(`[createSalarySnapshots] Batch start index: ${batch_start}`);
+            console.log(`[createSalarySnapshots] Total eligible employees: ${eligibleEmployees.length}`);
             
             if (snapshots.length > 0) {
+                console.log(`[createSalarySnapshots] 💾 Calling bulkCreate for ${snapshots.length} snapshots...`);
                 await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
-                console.log(`[createSalarySnapshots] ✅ Batch created ${snapshots.length} snapshots successfully`);
+                console.log(`[createSalarySnapshots] ✅ bulkCreate completed successfully`);
+            } else {
+                console.log(`[createSalarySnapshots] ⚠️ WARNING: No snapshots to create in this batch`);
             }
             
             const currentPosition = batch_start + snapshots.length;
             const hasMore = currentPosition < eligibleEmployees.length;
             
-            console.log(`[createSalarySnapshots] 📊 BATCH COMPLETE: position=${currentPosition}/${eligibleEmployees.length}, has_more=${hasMore}`);
+            console.log(`[createSalarySnapshots] ============================================`);
+            console.log(`[createSalarySnapshots] 📊 BATCH COMPLETE SUMMARY:`);
+            console.log(`[createSalarySnapshots]    Current position: ${currentPosition}`);
+            console.log(`[createSalarySnapshots]    Total employees: ${eligibleEmployees.length}`);
+            console.log(`[createSalarySnapshots]    HAS_MORE: ${hasMore}`);
+            console.log(`[createSalarySnapshots]    Remaining: ${eligibleEmployees.length - currentPosition} employees`);
+            console.log(`[createSalarySnapshots] ============================================`);
             
             return Response.json({
                 success: true,

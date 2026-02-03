@@ -220,13 +220,22 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             }
 
             // STEP 3: Create salary snapshots in batches with real progress
-            const BATCH_SIZE = 20; // Increased from 10 to 20 for faster processing
+            const BATCH_SIZE = 20;
             let batchStart = 0;
             let hasMore = true;
             let totalEmployees = 0;
+            let loopIteration = 0;
+
+            console.log(`[ReportTab] ============================================`);
+            console.log(`[ReportTab] STARTING BATCH LOOP`);
+            console.log(`[ReportTab] ============================================`);
 
             while (hasMore) {
-                console.log(`[ReportTab] Creating snapshot batch starting at ${batchStart}...`);
+                loopIteration++;
+                console.log(`[ReportTab] ============================================`);
+                console.log(`[ReportTab] LOOP ITERATION #${loopIteration}`);
+                console.log(`[ReportTab] Batch start: ${batchStart}, Batch size: ${BATCH_SIZE}`);
+                console.log(`[ReportTab] Calling createSalarySnapshots...`);
                 
                 const batchResult = await base44.functions.invoke('createSalarySnapshots', {
                     project_id: project.id,
@@ -236,12 +245,14 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     batch_size: BATCH_SIZE
                 });
 
-                console.log('[ReportTab] Batch result:', {
-                    batch_mode: batchResult.data?.batch_mode,
-                    current_position: batchResult.data?.current_position,
-                    total: batchResult.data?.total_employees,
-                    has_more: batchResult.data?.has_more
-                });
+                console.log('[ReportTab] ============================================');
+                console.log('[ReportTab] BATCH RESULT RECEIVED:');
+                console.log(`[ReportTab]    batch_mode: ${batchResult.data?.batch_mode}`);
+                console.log(`[ReportTab]    batch_completed: ${batchResult.data?.batch_completed}`);
+                console.log(`[ReportTab]    current_position: ${batchResult.data?.current_position}`);
+                console.log(`[ReportTab]    total_employees: ${batchResult.data?.total_employees}`);
+                console.log(`[ReportTab]    has_more: ${batchResult.data?.has_more}`);
+                console.log('[ReportTab] ============================================');
 
                 if (batchResult.data?.batch_mode) {
                     totalEmployees = batchResult.data.total_employees;
@@ -249,9 +260,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     const currentBatch = batchResult.data.current_batch || [];
                     hasMore = batchResult.data.has_more;
 
-                    // Update progress with real data
                     const percentage = totalEmployees > 0 ? Math.round(currentPos/totalEmployees*100) : 0;
-                    console.log(`[ReportTab] Progress: ${currentPos}/${totalEmployees} (${percentage}%)`);
+                    console.log(`[ReportTab] 📊 Progress: ${currentPos}/${totalEmployees} (${percentage}%)`);
+                    console.log(`[ReportTab] 🔄 has_more=${hasMore}, will ${hasMore ? 'CONTINUE' : 'STOP'} looping`);
                     
                     setProgressDialog({
                         open: true,
@@ -265,21 +276,35 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
                     batchStart = currentPos;
 
-                    // Minimal delay - only 100ms between batches
                     if (hasMore) {
+                        console.log(`[ReportTab] ⏳ Waiting 100ms before next batch...`);
                         await new Promise(resolve => setTimeout(resolve, 100));
+                    } else {
+                        console.log(`[ReportTab] ✅ ALL BATCHES COMPLETE - Exiting loop`);
                     }
                 } else {
-                    console.log('[ReportTab] No batch_mode in result, stopping');
+                    console.log('[ReportTab] ❌ ERROR: No batch_mode in result, stopping loop');
+                    console.log('[ReportTab] Full result:', JSON.stringify(batchResult.data, null, 2));
                     hasMore = false;
                 }
             }
+            
+            console.log(`[ReportTab] ============================================`);
+            console.log(`[ReportTab] BATCH LOOP FINISHED`);
+            console.log(`[ReportTab] Total iterations: ${loopIteration}`);
+            console.log(`[ReportTab] Total employees processed: ${batchStart}`);
+            console.log(`[ReportTab] ============================================`);
             
             console.log('[ReportTab] All snapshots created successfully');
 
             return { reportRunId, result: markResult };
         },
         onSuccess: async ({ reportRunId, result }) => {
+            console.log(`[ReportTab] ============================================`);
+            console.log(`[ReportTab] FINALIZATION SUCCESS HANDLER`);
+            console.log(`[ReportTab] Report run ID: ${reportRunId}`);
+            console.log(`[ReportTab] ============================================`);
+            
             setProgressDialog(prev => ({
                 ...prev,
                 status: 'Refreshing data...',
@@ -298,13 +323,17 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             // Wait a bit more to ensure snapshots are fully committed
             await new Promise(resolve => setTimeout(resolve, 1000));
 
+            console.log(`[ReportTab] ✅ Finalization complete - closing progress dialog`);
             setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
             toast.success('✅ Finalization complete! Salary snapshots created. Go to Salary Tab to generate reports.', {
                 duration: 6000
             });
         },
         onError: async (error) => {
-            console.error('[ReportTab] Finalization error:', error);
+            console.error('[ReportTab] ============================================');
+            console.error('[ReportTab] FINALIZATION ERROR HANDLER');
+            console.error('[ReportTab] Error:', error);
+            console.error('[ReportTab] ============================================');
             
             setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
 
