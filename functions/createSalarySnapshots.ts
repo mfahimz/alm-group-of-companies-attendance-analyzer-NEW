@@ -924,8 +924,14 @@ Deno.serve(async (req) => {
         
         console.log(`[createSalarySnapshots] 📦 THIS BATCH: ${employeesToProcess.length} employees (indices ${batch_start} to ${batch_start + employeesToProcess.length - 1})`);
         console.log(`[createSalarySnapshots] THIS BATCH IDs: [${employeesToProcess.map(e => e.attendance_id).join(', ')}]`);
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] 🔄 ENTERING FOR LOOP - Processing ${employeesToProcess.length} employees`);
+        console.log(`[createSalarySnapshots] ============================================`);
         
+        let loopIterationCount = 0;
         for (const emp of employeesToProcess) {
+            loopIterationCount++;
+            console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id}, hrms_id: ${emp.hrms_id})`);
             // Find matching salary record (REQUIRED for salary snapshot)
             const baseSalary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
@@ -934,9 +940,12 @@ Deno.serve(async (req) => {
             
             // Skip if no salary record - employee is not eligible for salary
             if (!baseSalary) {
-                console.log(`[createSalarySnapshots] Skipping ${emp.name} (${emp.attendance_id}) - no salary record`);
+                console.log(`[createSalarySnapshots] ⚠️ SKIP: ${emp.name} (${emp.attendance_id}) - no salary record found`);
+                console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE (skipped - no salary)`);
                 continue;
             }
+            
+            console.log(`[createSalarySnapshots] ✅ Salary record found for ${emp.name}`);
             
             // ============================================================
             // AL MARAGHI MOTORS: SALARY INCREMENT RESOLUTION
@@ -1170,6 +1179,8 @@ Deno.serve(async (req) => {
                 balanceAmount = 0;
             }
 
+            console.log(`[createSalarySnapshots] 💾 Creating snapshot for ${emp.name} - Total: ${finalTotal}, WPS: ${wpsAmount}, Balance: ${balanceAmount}`);
+            
             snapshots.push({
                 project_id: String(project_id),
                 report_run_id: String(report_run_id),
@@ -1228,11 +1239,21 @@ Deno.serve(async (req) => {
                 snapshot_created_at: new Date().toISOString(),
                 attendance_source: attendanceSource
             });
+            
+            console.log(`[createSalarySnapshots] ✅ Snapshot added to array (${snapshots.length} total so far)`);
+            console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE`);
         }
+        
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] 🏁 FOR LOOP EXITED`);
+        console.log(`[createSalarySnapshots]    Total iterations completed: ${loopIterationCount}`);
+        console.log(`[createSalarySnapshots]    Snapshots in array: ${snapshots.length}`);
+        console.log(`[createSalarySnapshots] ============================================`);
 
         // BATCH MODE: Process in chunks for progress tracking
         if (batch_mode) {
             console.log(`[createSalarySnapshots] ============================================`);
+            console.log(`[createSalarySnapshots] 🚨 BATCH MODE DETECTED - RETURN PATH #1`);
             console.log(`[createSalarySnapshots] 💾 BATCH MODE RESPONSE PREPARATION`);
             console.log(`[createSalarySnapshots] Snapshots created in this batch: ${snapshots.length}`);
             console.log(`[createSalarySnapshots] Batch start index: ${batch_start}`);
@@ -1256,6 +1277,7 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots]    HAS_MORE: ${hasMore}`);
             console.log(`[createSalarySnapshots]    Remaining: ${eligibleEmployees.length - currentPosition} employees`);
             console.log(`[createSalarySnapshots] ============================================`);
+            console.log(`[createSalarySnapshots] 📤 RETURNING BATCH RESPONSE`);
             
             return Response.json({
                 success: true,
@@ -1269,6 +1291,10 @@ Deno.serve(async (req) => {
         }
         
         // STANDARD MODE: Bulk create all snapshots at once
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] 🚨 STANDARD MODE - RETURN PATH #2`);
+        console.log(`[createSalarySnapshots] ============================================`);
+        
         if (snapshots.length > 0) {
             console.log(`[createSalarySnapshots] 💾 STANDARD MODE: Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
             await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
@@ -1290,6 +1316,8 @@ Deno.serve(async (req) => {
             throw new Error(errorMsg);
         }
 
+        console.log(`[createSalarySnapshots] 📤 RETURNING STANDARD MODE SUCCESS RESPONSE`);
+        
         return Response.json({
             success: true,
             snapshots_created: snapshots.length,
@@ -1300,7 +1328,10 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('Create salary snapshots error:', error);
+        console.error('[createSalarySnapshots] ❌ ERROR CAUGHT:', error);
+        console.error('[createSalarySnapshots] 🚨 ERROR RETURN PATH #3');
+        console.error('[createSalarySnapshots] Error message:', error.message);
+        console.error('[createSalarySnapshots] Error stack:', error.stack);
         return Response.json({ 
             error: error.message 
         }, { status: 500 });

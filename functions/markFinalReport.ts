@@ -12,6 +12,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
     try {
+        console.log('[markFinalReport] ============================================');
+        console.log('[markFinalReport] FUNCTION ENTRY');
+        console.log('[markFinalReport] ============================================');
+        
         const base44 = createClientFromRequest(req);
         
         const user = await base44.auth.me();
@@ -26,6 +30,12 @@ Deno.serve(async (req) => {
         }
 
         const { report_run_id, project_id } = await req.json();
+        
+        console.log('[markFinalReport] Parameters received:');
+        console.log('[markFinalReport]   project_id:', project_id);
+        console.log('[markFinalReport]   report_run_id:', report_run_id);
+        console.log('[markFinalReport]   user:', user.email);
+        console.log('[markFinalReport]   role:', userRole);
 
         if (!report_run_id || !project_id) {
             return Response.json({ error: 'report_run_id and project_id are required' }, { status: 400 });
