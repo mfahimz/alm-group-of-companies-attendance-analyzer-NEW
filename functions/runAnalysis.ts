@@ -460,12 +460,14 @@ Deno.serve(async (req) => {
                 if (dateException) {
                     if (dateException.type === 'MANUAL_PRESENT') {
                         presentDays++;
+                        continue;  // Skip punch-based counting to prevent double-counting
                     } else if (dateException.type === 'MANUAL_ABSENT') {
                         fullAbsenceCount++;
                         continue;
                     } else if (dateException.type === 'MANUAL_HALF') {
                         presentDays++;
                         halfAbsenceCount++;
+                        continue;  // Skip punch-based counting to prevent double-counting
                     } else if (dateException.type === 'SICK_LEAVE') {
                         // Sick leave counts as WORKING DAY (no deduction from working_days)
                         // Day is tracked separately as sick_leave_count
