@@ -1216,21 +1216,26 @@ Deno.serve(async (req) => {
 
         // BATCH MODE: Process in chunks for progress tracking
         if (batch_mode) {
-            const batchSnapshots = snapshots.slice(batch_start, batch_start + batch_size);
+            console.log(`[createSalarySnapshots] BATCH MODE: Creating ${snapshots.length} snapshots`);
             
-            if (batchSnapshots.length > 0) {
-                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(batchSnapshots);
-                console.log(`[createSalarySnapshots] Batch created ${batchSnapshots.length} snapshots (${batch_start}-${batch_start + batch_size})`);
+            if (snapshots.length > 0) {
+                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
+                console.log(`[createSalarySnapshots] Batch created ${snapshots.length} snapshots`);
             }
+            
+            const currentPosition = batch_start + snapshots.length;
+            const hasMore = currentPosition < eligibleEmployees.length;
+            
+            console.log(`[createSalarySnapshots] BATCH RESPONSE: current_position=${currentPosition}, total=${eligibleEmployees.length}, has_more=${hasMore}`);
             
             return Response.json({
                 success: true,
                 batch_mode: true,
-                batch_completed: batchSnapshots.length,
-                total_employees: snapshots.length,
-                current_position: batch_start + batchSnapshots.length,
-                has_more: (batch_start + batch_size) < snapshots.length,
-                current_batch: batchSnapshots.map(s => ({ attendance_id: s.attendance_id, name: s.name }))
+                batch_completed: snapshots.length,
+                total_employees: eligibleEmployees.length,
+                current_position: currentPosition,
+                has_more: hasMore,
+                current_batch: snapshots.map(s => ({ attendance_id: s.attendance_id, name: s.name }))
             });
         }
         
