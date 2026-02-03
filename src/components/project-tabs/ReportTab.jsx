@@ -340,10 +340,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     };
 
     const handleMarkFinal = (reportRunId) => {
+        console.log('[ReportTab] handleMarkFinal called for report:', reportRunId);
+        console.log('[ReportTab] Mutation state:', { 
+            isPending: markFinalMutation.isPending, 
+            isIdle: markFinalMutation.isIdle 
+        });
+        
         if (window.confirm('Mark this report as final for salary calculation? This will unmark any previously selected final report.')) {
-            console.log('[ReportTab] Starting finalization for report:', reportRunId);
+            console.log('[ReportTab] ✅ User confirmed finalization');
             
-            // Show dialog IMMEDIATELY
+            // Show dialog IMMEDIATELY BEFORE mutation
             setProgressDialog({
                 open: true,
                 current: 0,
@@ -352,7 +358,10 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 status: 'Initializing...'
             });
             
+            console.log('[ReportTab] 🚀 Calling mutate()...');
             markFinalMutation.mutate(reportRunId);
+        } else {
+            console.log('[ReportTab] ❌ User cancelled finalization');
         }
     };
 
