@@ -65,45 +65,13 @@ Deno.serve(async (req) => {
             last_saved_report_id: report_run_id
         });
 
-        // Create salary snapshots in batches to avoid rate limits
-        console.log(`[markFinalReport] Creating salary snapshots in batches for project ${project_id}, report ${report_run_id}`);
-        
-        const BATCH_SIZE = 10; // Process 10 employees at a time
-        let currentPosition = 0;
-        let totalCreated = 0;
-        let hasMore = true;
-        let analyzedCount = 0;
-        let noAttendanceCount = 0;
-        
-        while (hasMore) {
-            const batchResult = await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
-                project_id: project_id,
-                report_run_id: report_run_id,
-                batch_mode: true,
-                batch_start: currentPosition,
-                batch_size: BATCH_SIZE
-            });
-            
-            console.log(`[markFinalReport] Batch completed: ${batchResult.data?.batch_completed || 0} snapshots`);
-            
-            totalCreated += batchResult.data?.batch_completed || 0;
-            currentPosition = batchResult.data?.current_position || currentPosition + BATCH_SIZE;
-            hasMore = batchResult.data?.has_more || false;
-            
-            // Add small delay between batches to avoid rate limiting
-            if (hasMore) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-        
-        console.log(`[markFinalReport] All batches completed: ${totalCreated} total snapshots created`);
+        // Return success - frontend will handle snapshot creation in batches
+        console.log(`[markFinalReport] Report marked as final, frontend will create snapshots`);
         
         const snapshotResult = {
             data: {
                 success: true,
-                snapshots_created: totalCreated,
-                analyzed_count: analyzedCount,
-                no_attendance_count: noAttendanceCount
+                ready_for_snapshots: true
             }
         };
 
