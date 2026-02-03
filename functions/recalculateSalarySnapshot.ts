@@ -140,6 +140,44 @@ Deno.serve(async (req) => {
         }
 
         // ============================================================
+        // AL MARAGHI MOTORS: SALARY INCREMENT RESOLUTION FOR OT
+        // OT must use PREVIOUS month salary (the month before salary month)
+        // ============================================================
+        const isAlMaraghi = project.company === 'Al Maraghi Motors';
+        let prevMonthSalaryForOT = salaryRecord.total_salary || 0;
+        
+        if (isAlMaraghi) {
+            // Fetch salary increments
+            const salaryIncrements = await base44.asServiceRole.entities.SalaryIncrement.filter({ 
+                company: 'Al Maraghi Motors', 
+                active: true 
+            });
+            
+            // Get increments for this employee
+            const empIncrements = salaryIncrements.filter(inc => 
+                String(inc.employee_id) === String(snapshot.hrms_id) ||
+                String(inc.attendance_id) === String(attendance_id)
+            );
+            
+            if (empIncrements.length > 0 && snapshot.salary_month_start) {
+                // Previous month = month before salary month start
+                const salaryMonthDate = new Date(snapshot.salary_month_start);
+                const prevMonthDate = new Date(salaryMonthDate.getFullYear(), salaryMonthDate.getMonth() - 1, 1);
+                const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
+                
+                // Find the increment effective for previous month (latest increment on or before prev month)
+                const applicablePrevIncrements = empIncrements
+                    .filter(inc => inc.effective_month <= prevMonthStr)
+                    .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
+                
+                if (applicablePrevIncrements.length > 0) {
+                    const prevInc = applicablePrevIncrements[0];
+                    prevMonthSalaryForOT = prevInc.new_total_salary || salaryRecord.total_salary;
+                }
+            }
+        }
+
+        // ============================================================
         // VALIDATE WORKING HOURS
         // ============================================================
         const workingHours = snapshot.working_hours || salaryRecord.working_hours || 9;
