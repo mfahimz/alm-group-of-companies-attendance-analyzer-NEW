@@ -194,63 +194,69 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const markFinalMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // Show progress dialog immediately
+            // STEP 1: Show progress dialog
             setProgressDialog({
                 open: true,
                 current: 0,
-                total: 100,
-                currentEmployee: 'Initializing finalization process...',
-                status: 'Preparing salary snapshots...'
+                total: 0,
+                currentEmployee: 'Marking report as final...',
+                status: 'Initializing...'
             });
 
-            // Simulate progress updates while backend processes
-            const progressInterval = setInterval(() => {
-                setProgressDialog(prev => {
-                    if (prev.current < 90) {
-                        return {
-                            ...prev,
-                            current: Math.min(prev.current + 5, 90),
-                            status: prev.current < 30 
-                                ? 'Marking report as final...' 
-                                : prev.current < 60
-                                ? 'Creating salary snapshots...'
-                                : 'Finalizing salary data...'
-                        };
-                    }
-                    return prev;
-                });
-            }, 800);
+            // STEP 2: Mark report as final (backend only marks, doesn't create snapshots)
+            const markResult = await base44.functions.invoke('markFinalReport', {
+                project_id: project.id,
+                report_run_id: reportRunId
+            });
 
-            try {
-                // Backend now handles all batching internally
-                const markResult = await base44.functions.invoke('markFinalReport', {
-                    project_id: project.id,
-                    report_run_id: reportRunId
-                });
-
-                clearInterval(progressInterval);
-
-                if (markResult.data?.success === false) {
-                    throw new Error(markResult.data?.error || 'Finalization failed');
-                }
-
-                // Set to 100% on success
-                setProgressDialog(prev => ({
-                    ...prev,
-                    current: 100,
-                    total: 100,
-                    status: `Successfully created ${markResult.data?.snapshots_created || 0} salary snapshots`,
-                    currentEmployee: 'Finalization complete!'
-                }));
-
-                // Small delay to show 100% before closing
-                await new Promise(resolve => setTimeout(resolve, 800));
-
-                return { reportRunId, result: markResult };
-            } catch (error) {
-                clearInterval(progressInterval);
-                throw error;
+            if (markResult.data?.success === false) {
+                throw new Error(markResult.data?.error || 'Finalization failed');
             }
+
+            // STEP 3: Create salary snapshots in batches with real progress
+            const BATCH_SIZE = 10;
+            let batchStart = 0;
+            let hasMore = true;
+            let totalEmployees = 0;
+
+            while (hasMore) {
+                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
+                    project_id: project.id,
+                    report_run_id: reportRunId,
+                    batch_mode: true,
+                    batch_start: batchStart,
+                    batch_size: BATCH_SIZE
+                });
+
+                if (batchResult.data?.batch_mode) {
+                    totalEmployees = batchResult.data.total_employees;
+                    const currentPos = batchResult.data.current_position;
+                    const currentBatch = batchResult.data.current_batch || [];
+                    hasMore = batchResult.data.has_more;
+
+                    // Update progress with real data
+                    setProgressDialog({
+                        open: true,
+                        current: currentPos,
+                        total: totalEmployees,
+                        currentEmployee: currentBatch.length > 0 
+                            ? currentBatch.map(e => e.name).join(', ')
+                            : 'Processing...',
+                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees}`
+                    });
+
+                    batchStart = currentPos;
+
+                    // Add delay between batches
+                    if (hasMore) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            return { reportRunId, result: markResult };
         },
         onSuccess: async ({ reportRunId, result }) => {
             setProgressDialog(prev => ({
