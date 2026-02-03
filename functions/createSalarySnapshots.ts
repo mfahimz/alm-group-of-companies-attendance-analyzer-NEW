@@ -65,6 +65,26 @@ Deno.serve(async (req) => {
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
 
         // ============================================================
+        // CRITICAL FIX: Delete existing snapshots ONLY on first batch
+        // This prevents each batch from destroying previous batches' work
+        // ============================================================
+        if (batch_mode && batch_start === 0) {
+            const existingSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
+                project_id: project_id,
+                report_run_id: report_run_id
+            }, null, 5000);
+
+            if (existingSnapshots.length > 0) {
+                console.log(`[createSalarySnapshots] 🗑️ BATCH 1: Deleting ${existingSnapshots.length} existing snapshots`);
+                await Promise.all(existingSnapshots.map(s => base44.asServiceRole.entities.SalarySnapshot.delete(s.id)));
+            } else {
+                console.log(`[createSalarySnapshots] ✅ BATCH 1: No existing snapshots to delete`);
+            }
+        } else if (batch_mode) {
+            console.log(`[createSalarySnapshots] ⏭️ BATCH ${Math.floor(batch_start / batch_size) + 1}: Skipping deletion (not first batch)`);
+        }
+
+        // ============================================================
         // AL MARAGHI MOTORS: Calculate salary month ranges
         // ============================================================
         let salaryMonthStartStr = null;
@@ -167,16 +187,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Delete existing snapshots for this report (if re-finalizing)
-        const existingSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
-            project_id: project_id,
-            report_run_id: report_run_id
-        }, null, 5000);
-
-        if (existingSnapshots.length > 0) {
-            console.log(`[createSalarySnapshots] Deleting ${existingSnapshots.length} existing snapshots`);
-            await Promise.all(existingSnapshots.map(s => base44.asServiceRole.entities.SalarySnapshot.delete(s.id)));
-        }
+        // DELETION MOVED: Now handled earlier in function, only for batch_start === 0
 
         // Helper: Parse time string to Date object
         const parseTime = (timeStr, includeSeconds = false) => {
