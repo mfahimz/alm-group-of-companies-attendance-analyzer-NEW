@@ -79,6 +79,7 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import systemVerificationAudit from './pages/SYSTEM_VERIFICATION_AUDIT';
 import __Layout from './Layout.jsx';
 
 
@@ -115,6 +116,7 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
+    "SYSTEM_VERIFICATION_AUDIT": systemVerificationAudit,
 }
 
 export const pagesConfig = {

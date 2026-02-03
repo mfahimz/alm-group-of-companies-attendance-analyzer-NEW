@@ -1279,6 +1279,17 @@ Deno.serve(async (req) => {
 
         console.log(`[createSalarySnapshots] 🎯 FINAL COUNT CHECK: ${snapshots.length} snapshots created for ${eligibleEmployees.length} eligible employees`);
 
+        // ============================================================
+        // INVARIANT CHECK: Verify ALL snapshots were created in STANDARD mode
+        // This prevents silent partial completion
+        // ============================================================
+        if (!batch_mode && snapshots.length !== eligibleEmployees.length) {
+            const missingCount = eligibleEmployees.length - snapshots.length;
+            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} snapshots, but only ${snapshots.length} were created (${missingCount} missing)`;
+            console.error(`[createSalarySnapshots] ❌ ${errorMsg}`);
+            throw new Error(errorMsg);
+        }
+
         return Response.json({
             success: true,
             snapshots_created: snapshots.length,

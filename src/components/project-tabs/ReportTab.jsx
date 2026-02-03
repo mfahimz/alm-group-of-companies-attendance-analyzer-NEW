@@ -295,6 +295,29 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             console.log(`[ReportTab] Total employees processed: ${batchStart}`);
             console.log(`[ReportTab] ============================================`);
             
+            // ============================================================
+            // POST-FINALIZATION INVARIANT CHECK
+            // Verify that snapshots count matches total employees
+            // ============================================================
+            console.log('[ReportTab] 🔍 Running post-finalization snapshot count verification...');
+            const finalSnapshots = await base44.entities.SalarySnapshot.filter({
+                project_id: project.id,
+                report_run_id: reportRunId
+            }, null, 5000);
+            
+            console.log(`[ReportTab] ============================================`);
+            console.log(`[ReportTab] POST-FINALIZATION VERIFICATION:`);
+            console.log(`[ReportTab]    Expected employees: ${totalEmployees}`);
+            console.log(`[ReportTab]    Actual snapshots: ${finalSnapshots.length}`);
+            console.log(`[ReportTab] ============================================`);
+            
+            if (finalSnapshots.length !== totalEmployees) {
+                const errorMsg = `INVARIANT VIOLATION: Expected ${totalEmployees} snapshots, but found ${finalSnapshots.length} in database`;
+                console.error(`[ReportTab] ❌ ${errorMsg}`);
+                throw new Error(errorMsg);
+            }
+            
+            console.log('[ReportTab] ✅ Snapshot count matches expected employee count');
             console.log('[ReportTab] All snapshots created successfully');
 
             return { reportRunId, result: markResult };
