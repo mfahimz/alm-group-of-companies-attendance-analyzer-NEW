@@ -1,6 +1,16 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
+ * DATA ACCESS LAYER - EXPLICIT LIMITS ENFORCED
+ * 
+ * CRITICAL RULE: All .filter() calls MUST include explicit limit parameter.
+ * Base44 SDK default limit causes silent data truncation.
+ * 
+ * Pattern: entitySDK.filter(filterObj, sortKey, EXPLICIT_LIMIT)
+ * Example: Employee.filter({ active: true }, null, 5000)
+ */
+
+/**
  * CREATE SALARY SNAPSHOTS
  * 
  * CORE RULE: Every active employee MUST have a SalarySnapshot when a report is finalized.
