@@ -207,15 +207,6 @@ export default function SalaryTab({ project }) {
             // [MERGE_NOTE: If merging divisors, change otDivisor to use divisor (salary_calculation_days) instead]
             const otDivisor = project.ot_calculation_days || 30;
             
-            // Fetch salary increments for Al Maraghi Motors (for OT calculation with previous month salary)
-            let salaryIncrements = [];
-            if (isAlMaraghi) {
-                salaryIncrements = await base44.entities.SalaryIncrement.filter({ 
-                    company: 'Al Maraghi Motors', 
-                    active: true 
-                });
-            }
-            
             const finalCalculatedData = calculatedData.map(row => {
                 const otRecord = overtimeData.find(ot => 
                     String(ot.attendance_id) === String(row.attendance_id)
@@ -233,33 +224,10 @@ export default function SalaryTab({ project }) {
                 const totalSalary = row.total_salary || salary?.total_salary || 0;
                 const workingHours = row.working_hours || salary?.working_hours || 9;
                 
-                // AL MARAGHI MOTORS: OT uses PREVIOUS MONTH SALARY (month before salary month)
-                let prevMonthSalaryForOT = totalSalary;
-                if (isAlMaraghi && row.salary_month_start) {
-                    const empIncrements = salaryIncrements.filter(inc => 
-                        String(inc.employee_id) === String(row.hrms_id) ||
-                        String(inc.attendance_id) === String(row.attendance_id)
-                    );
-                    
-                    if (empIncrements.length > 0) {
-                        const salaryMonthDate = new Date(row.salary_month_start);
-                        const prevMonthDate = new Date(salaryMonthDate.getFullYear(), salaryMonthDate.getMonth() - 1, 1);
-                        const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
-                        
-                        const applicablePrevIncrements = empIncrements
-                            .filter(inc => inc.effective_month <= prevMonthStr)
-                            .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
-                        
-                        if (applicablePrevIncrements.length > 0) {
-                            const prevInc = applicablePrevIncrements[0];
-                            prevMonthSalaryForOT = prevInc.new_total_salary || totalSalary;
-                        }
-                    }
-                }
-                
-                // DIVISOR_OT: OT hourly rate uses otDivisor and PREVIOUS MONTH SALARY
+                // DIVISOR_OT: OT hourly rate uses snapshot's stored OT values (already calculated with correct logic)
+                // The snapshot was created with the correct previous month salary resolution
                 // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
-                const otHourlyRate = prevMonthSalaryForOT / otDivisor / workingHours;
+                const otHourlyRate = totalSalary / otDivisor / workingHours;
 
                 // OT hours from OvertimeData (pre-finalization entry)
                 const normalOtHours = otRecord?.normalOtHours || 0;
