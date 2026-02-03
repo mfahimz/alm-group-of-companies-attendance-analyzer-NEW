@@ -28,6 +28,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
+    const [finalizationProgress, setFinalizationProgress] = useState({
+        open: false,
+        current: 0,
+        total: 0,
+        currentEmployee: '',
+        status: 'Processing...'
+    });
 
 
     const queryClient = useQueryClient();
@@ -999,19 +1006,132 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const finalizeReportMutation = useMutation({
         mutationFn: async () => {
-            const response = await base44.functions.invoke('adminFinalizeReport', {
-                report_run_id: reportRun.id,
-                project_id: project.id
+            console.log('[ReportDetailView] Starting finalization...');
+            
+            // Show progress dialog
+            setFinalizationProgress({
+                open: true,
+                current: 0,
+                total: 0,
+                currentEmployee: 'Validating report data...',
+                status: 'Please wait...'
             });
-            return response.data;
+
+            // STEP 1: Mark report as final
+            console.log('[ReportDetailView] Calling markFinalReport...');
+            const markResult = await base44.functions.invoke('markFinalReport', {
+                project_id: project.id,
+                report_run_id: reportRun.id
+            });
+
+            console.log('[ReportDetailView] markFinalReport result:', markResult.data);
+
+            if (markResult.data?.success === false) {
+                console.error('[ReportDetailView] Backend validation failed:', markResult.data?.error);
+                throw new Error(markResult.data?.error || 'Finalization failed');
+            }
+
+            // STEP 2: Create salary snapshots in batches
+            const BATCH_SIZE = 20;
+            let batchStart = 0;
+            let hasMore = true;
+            let totalEmployees = 0;
+
+            while (hasMore) {
+                console.log(`[ReportDetailView] Creating snapshot batch starting at ${batchStart}...`);
+                
+                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
+                    project_id: project.id,
+                    report_run_id: reportRun.id,
+                    batch_mode: true,
+                    batch_start: batchStart,
+                    batch_size: BATCH_SIZE
+                });
+
+                console.log('[ReportDetailView] Batch result:', {
+                    batch_mode: batchResult.data?.batch_mode,
+                    current_position: batchResult.data?.current_position,
+                    total: batchResult.data?.total_employees,
+                    has_more: batchResult.data?.has_more
+                });
+
+                if (batchResult.data?.batch_mode) {
+                    totalEmployees = batchResult.data.total_employees;
+                    const currentPos = batchResult.data.current_position;
+                    const currentBatch = batchResult.data.current_batch || [];
+                    hasMore = batchResult.data.has_more;
+
+                    const percentage = totalEmployees > 0 ? Math.round(currentPos/totalEmployees*100) : 0;
+                    console.log(`[ReportDetailView] Progress: ${currentPos}/${totalEmployees} (${percentage}%)`);
+                    
+                    setFinalizationProgress({
+                        open: true,
+                        current: currentPos,
+                        total: totalEmployees,
+                        currentEmployee: currentBatch.length > 0 
+                            ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
+                            : 'Processing...',
+                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
+                    });
+
+                    batchStart = currentPos;
+
+                    if (hasMore) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                } else {
+                    console.log('[ReportDetailView] No batch_mode in result, stopping');
+                    hasMore = false;
+                }
+            }
+            
+            console.log('[ReportDetailView] All snapshots created successfully');
+            return markResult.data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['reportRun', reportRun.id]);
-            queryClient.invalidateQueries(['project', project.id]);
-            toast.success('Report finalized successfully - Ready for salary calculation');
+        onSuccess: async () => {
+            setFinalizationProgress(prev => ({
+                ...prev,
+                status: 'Refreshing data...',
+                currentEmployee: 'Please wait...'
+            }));
+
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id], refetchType: 'all' })
+            ]);
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            setFinalizationProgress({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
+            toast.success('✅ Finalization complete! Salary snapshots created. Go to Salary Tab to generate reports.', {
+                duration: 6000
+            });
         },
-        onError: (error) => {
-            toast.error('Failed to finalize report: ' + error.message);
+        onError: async (error) => {
+            console.error('[ReportDetailView] Finalization error:', error);
+            
+            setFinalizationProgress({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
+
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' })
+            ]);
+            
+            const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
+            const actionRequired = error?.response?.data?.action_required;
+            
+            console.error('[ReportDetailView] Error details:', { errorMsg, actionRequired });
+            
+            if (actionRequired) {
+                toast.error(`${errorMsg}\n\nAction required: ${actionRequired}`, {
+                    duration: 10000
+                });
+            } else {
+                toast.error('Failed to finalize report: ' + errorMsg, {
+                    duration: 5000
+                });
+            }
         }
     });
 
@@ -1818,6 +1938,54 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     return (
         <div className="space-y-6">
+            {/* Finalization Progress Dialog */}
+            <Dialog open={finalizationProgress.open} onOpenChange={() => {}}>
+                <DialogContent 
+                    className="sm:max-w-md" 
+                    onPointerDownOutside={(e) => e.preventDefault()} 
+                    onEscapeKeyDown={(e) => e.preventDefault()}
+                    onInteractOutside={(e) => e.preventDefault()}
+                >
+                    <DialogHeader>
+                        <DialogTitle>Creating Salary Snapshots</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>Progress</span>
+                                <span className="font-medium">{finalizationProgress.current} / {finalizationProgress.total}</span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-2">
+                                <div 
+                                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${finalizationProgress.total > 0 ? (finalizationProgress.current / finalizationProgress.total) * 100 : 0}%` }}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <div className="text-sm font-medium text-slate-700">
+                                {finalizationProgress.status}
+                            </div>
+                            {finalizationProgress.currentEmployee && (
+                                <div className="text-xs text-slate-500">
+                                    {finalizationProgress.currentEmployee}
+                                </div>
+                            )}
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                            <div className="flex items-start gap-2 text-xs text-amber-800">
+                                <div className="animate-spin h-3 w-3 border-2 border-amber-300 border-t-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                                <div>
+                                    <strong>Creating salary snapshots...</strong> This takes ~2-3 seconds per 20 employees.
+                                    <br />
+                                    <span className="text-amber-700">⚠️ Do NOT navigate away or close this dialog until complete!</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {saveProgress && (
                 <Card className="border-0 shadow-sm bg-green-50 border-green-200">
                     <CardContent className="p-4">
