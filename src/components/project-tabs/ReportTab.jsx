@@ -194,70 +194,63 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const markFinalMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // Show progress dialog
+            // Show progress dialog immediately
             setProgressDialog({
                 open: true,
                 current: 0,
-                total: 0,
-                currentEmployee: 'Initializing...',
-                status: 'Starting finalization process...'
+                total: 100,
+                currentEmployee: 'Initializing finalization process...',
+                status: 'Preparing salary snapshots...'
             });
 
-            // Call backend to mark as final and get employee count
-            const markResult = await base44.functions.invoke('markFinalReport', {
-                project_id: project.id,
-                report_run_id: reportRunId
-            });
+            // Simulate progress updates while backend processes
+            const progressInterval = setInterval(() => {
+                setProgressDialog(prev => {
+                    if (prev.current < 90) {
+                        return {
+                            ...prev,
+                            current: Math.min(prev.current + 5, 90),
+                            status: prev.current < 30 
+                                ? 'Marking report as final...' 
+                                : prev.current < 60
+                                ? 'Creating salary snapshots...'
+                                : 'Finalizing salary data...'
+                        };
+                    }
+                    return prev;
+                });
+            }, 800);
 
-            // If batch mode needed, process in chunks
-            if (markResult.data?.success === false) {
-                throw new Error(markResult.data?.error || 'Finalization failed');
-            }
-
-            // Create snapshots in batches with progress
-            let batchStart = 0;
-            const batchSize = 5; // Process 5 employees at a time
-            let hasMore = true;
-            let totalEmployees = 0;
-
-            while (hasMore) {
-                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
+            try {
+                // Backend now handles all batching internally
+                const markResult = await base44.functions.invoke('markFinalReport', {
                     project_id: project.id,
-                    report_run_id: reportRunId,
-                    batch_mode: true,
-                    batch_start: batchStart,
-                    batch_size: batchSize
+                    report_run_id: reportRunId
                 });
 
-                if (batchResult.data?.batch_mode) {
-                    totalEmployees = batchResult.data.total_employees;
-                    const currentPos = batchResult.data.current_position;
-                    const currentBatch = batchResult.data.current_batch || [];
-                    hasMore = batchResult.data.has_more;
+                clearInterval(progressInterval);
 
-                    // Update progress
-                    setProgressDialog({
-                        open: true,
-                        current: currentPos,
-                        total: totalEmployees,
-                        currentEmployee: currentBatch.length > 0 
-                            ? currentBatch.map(e => e.name).join(', ')
-                            : 'Processing...',
-                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees}`
-                    });
-
-                    batchStart = currentPos;
-
-                    // Add delay to avoid rate limiting
-                    if (hasMore) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                } else {
-                    hasMore = false;
+                if (markResult.data?.success === false) {
+                    throw new Error(markResult.data?.error || 'Finalization failed');
                 }
-            }
 
-            return { reportRunId, result: markResult };
+                // Set to 100% on success
+                setProgressDialog(prev => ({
+                    ...prev,
+                    current: 100,
+                    total: 100,
+                    status: `Successfully created ${markResult.data?.snapshots_created || 0} salary snapshots`,
+                    currentEmployee: 'Finalization complete!'
+                }));
+
+                // Small delay to show 100% before closing
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                return { reportRunId, result: markResult };
+            } catch (error) {
+                clearInterval(progressInterval);
+                throw error;
+            }
         },
         onSuccess: async ({ reportRunId, result }) => {
             setProgressDialog(prev => ({
