@@ -312,8 +312,8 @@ Deno.serve(async (req) => {
         // Current month Deductible Hours Pay = Hourly Rate * Deductible Hours
         const currentMonthDeductibleHoursPay = hourlyRateDeduction * deductibleHours;
 
-        // OT Hourly Rate (uses OT Divisor)
-        const otHourlyRate = totalSalary / otDivisor / workingHours;
+        // OT Hourly Rate (uses OT Divisor and PREVIOUS MONTH SALARY for Al Maraghi)
+        const otHourlyRate = prevMonthSalaryForOT / otDivisor / workingHours;
         
         // ============================================================
         // DISABLED: Previous month deduction logic
