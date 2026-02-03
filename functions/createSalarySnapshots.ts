@@ -902,7 +902,17 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids`);
         }
         
-        for (const emp of eligibleEmployees) {
+        console.log(`[createSalarySnapshots] Total eligible employees: ${eligibleEmployees.length}`);
+        console.log(`[createSalarySnapshots] Batch mode: ${batch_mode}, batch_start: ${batch_start}, batch_size: ${batch_size}`);
+        
+        // BATCH MODE: Process only a subset of employees
+        const employeesToProcess = batch_mode 
+            ? eligibleEmployees.slice(batch_start, batch_start + batch_size)
+            : eligibleEmployees;
+        
+        console.log(`[createSalarySnapshots] Processing ${employeesToProcess.length} employees in this batch`);
+        
+        for (const emp of employeesToProcess) {
             // Find matching salary record (REQUIRED for salary snapshot)
             const baseSalary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
