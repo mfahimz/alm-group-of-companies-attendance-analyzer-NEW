@@ -125,7 +125,8 @@ Deno.serve(async (req) => {
         }
         const reportRun = reports[0];
 
-        // Fetch core data - NO punches/shifts/rules since we use finalized AnalysisResult
+        // Fetch core data - NO punches/shifts needed since we use finalized AnalysisResult
+        // Punches/shifts/rules are NOT used for finalized reports - only AnalysisResult values
         const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
@@ -141,6 +142,10 @@ Deno.serve(async (req) => {
         ]);
 
         console.log(`[createSalarySnapshots] Found ${employees.length} active employees, ${salaries.length} salary records, ${analysisResults.length} analysis results, ${salaryIncrements.length} salary increments`);
+        
+        // CRITICAL: Define empty arrays for legacy code that still references them
+        const punches = [];
+        const shifts = [];
 
         // Parse rules
         let rules = null;
