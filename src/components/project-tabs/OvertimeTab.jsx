@@ -661,7 +661,6 @@ export default function OvertimeTab({ project }) {
                 </CardContent>
             </Card>
             </div>
-        )}
         </>
     );
 }
