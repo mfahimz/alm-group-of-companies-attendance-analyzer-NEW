@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         // ============================================================
         // FETCH PROJECT
         // ============================================================
-        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id });
+        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 1);
         if (projects.length === 0) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
             project_id: project_id,
             report_run_id: report_run_id,
             attendance_id: String(attendance_id)
-        });
+        }, null, 1);
         
         if (snapshots.length === 0) {
             return Response.json({ 
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
                 employee_id: snapshot.hrms_id,
                 company: project.company,
                 active: true
-            });
+            }, null, 1);
             if (salariesByHrms.length > 0) {
                 salaryRecord = salariesByHrms[0];
             }
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
                 attendance_id: String(attendance_id),
                 company: project.company,
                 active: true
-            });
+            }, null, 1);
             if (salariesByAttendance.length > 0) {
                 salaryRecord = salariesByAttendance[0];
             }
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
             const salaryIncrements = await base44.asServiceRole.entities.SalaryIncrement.filter({ 
                 company: 'Al Maraghi Motors', 
                 active: true 
-            });
+            }, null, 5000);
             
             // Get increments for this employee
             const empIncrements = salaryIncrements.filter(inc => 

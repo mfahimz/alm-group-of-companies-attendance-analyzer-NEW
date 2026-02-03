@@ -126,18 +126,19 @@ Deno.serve(async (req) => {
         const reportRun = reports[0];
 
         // Fetch core data
+        // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()
         const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData] = await Promise.all([
-            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
-            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
+            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.AnalysisResult.filter({ 
                 project_id: project_id,
                 report_run_id: report_run_id
-            }),
-            base44.asServiceRole.entities.Exception.filter({ project_id: project_id }),
+            }, null, 5000),
+            base44.asServiceRole.entities.Exception.filter({ project_id: project_id }, null, 5000),
             isAlMaraghi 
-                ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true })
+                ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true }, null, 5000)
                 : Promise.resolve([]),
-            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000)
         ]);
 
         console.log(`[createSalarySnapshots] BATCH=${batch_mode}, START=${batch_start}, SIZE=${batch_size}`);
@@ -157,7 +158,7 @@ Deno.serve(async (req) => {
         const existingSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
             project_id: project_id,
             report_run_id: report_run_id
-        });
+        }, null, 5000);
 
         if (existingSnapshots.length > 0) {
             console.log(`[createSalarySnapshots] Deleting ${existingSnapshots.length} existing snapshots`);

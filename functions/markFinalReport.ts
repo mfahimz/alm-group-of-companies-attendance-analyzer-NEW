@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
         // First, unmark all reports for this project
         const allReports = await base44.asServiceRole.entities.ReportRun.filter({
             project_id: project_id
-        });
+        }, null, 5000);
 
         for (const report of allReports) {
             if (report.is_final) {
@@ -69,12 +69,12 @@ Deno.serve(async (req) => {
         console.log(`[markFinalReport] Validating AnalysisResult data before finalization`);
         
         const [employees, salaries, analysisResults] = await Promise.all([
-            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
-            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
+            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.AnalysisResult.filter({
                 project_id: project_id,
                 report_run_id: report_run_id
-            })
+            }, null, 5000)
         ]);
 
         // Filter to project's custom_employee_ids if specified

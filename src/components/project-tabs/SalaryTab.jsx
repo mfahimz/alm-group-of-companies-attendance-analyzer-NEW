@@ -40,7 +40,7 @@ export default function SalaryTab({ project }) {
     // staleTime: 0 to ensure we always see the latest is_final status after marking final
     const { data: reportRuns = [], isLoading: loadingReports } = useQuery({
         queryKey: ['reportRuns', project?.id],
-        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, null, 5000),
         enabled: !!project?.id,
         staleTime: 0,
         gcTime: 5 * 60 * 1000
@@ -54,7 +54,7 @@ export default function SalaryTab({ project }) {
     // Fetch saved salary reports
     const { data: savedSalaryReports = [], isLoading: loadingSavedReports, refetch: refetchSavedReports } = useQuery({
         queryKey: ['salaryReports', project?.id],
-        queryFn: () => base44.entities.SalaryReport.filter({ project_id: project.id }, '-created_date'),
+        queryFn: () => base44.entities.SalaryReport.filter({ project_id: project.id }, '-created_date', 5000),
         enabled: !!project?.id,
         staleTime: 5 * 60 * 1000
     });
@@ -62,13 +62,15 @@ export default function SalaryTab({ project }) {
     // Fetch salary snapshots for generating reports
     // CRITICAL: Do NOT wait for loadingReports - snapshots can load in parallel while reports load
     // This prevents UI deadlock when there are many historical reports
+    // CRITICAL FIX: .filter() defaults to 50 records - must specify limit
     const { data: salarySnapshots = [], isLoading: loadingSnapshots } = useQuery({
         queryKey: ['salarySnapshots', project?.id, finalReport?.id],
         queryFn: async () => {
             const snapshots = await base44.entities.SalarySnapshot.filter({
                 project_id: project.id,
                 report_run_id: finalReport.id
-            });
+            }, null, 5000);
+            console.log(`[SalaryTab] 📊 FETCHED ${snapshots.length} salary snapshots for report ${finalReport.id}`);
             return snapshots;
         },
         enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,
@@ -79,7 +81,7 @@ export default function SalaryTab({ project }) {
     // Fetch exceptions for date range filtering
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project?.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }, null, 5000),
         enabled: !!project?.id,
         staleTime: 5 * 60 * 1000
     });
@@ -87,7 +89,7 @@ export default function SalaryTab({ project }) {
     // Fetch overtime data from OvertimeData entity
     const { data: overtimeData = [] } = useQuery({
         queryKey: ['overtimeData', project?.id],
-        queryFn: () => base44.entities.OvertimeData.filter({ project_id: project.id }),
+        queryFn: () => base44.entities.OvertimeData.filter({ project_id: project.id }, null, 5000),
         enabled: !!project?.id,
         staleTime: 0
     });
@@ -95,7 +97,7 @@ export default function SalaryTab({ project }) {
     // Fetch employee salaries for OT calculation
     const { data: employeeSalaries = [] } = useQuery({
         queryKey: ['employeeSalaries', project?.company],
-        queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+        queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
         enabled: !!project?.company,
         staleTime: 5 * 60 * 1000
     });

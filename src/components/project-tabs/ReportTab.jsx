@@ -65,7 +65,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         queryKey: ['reportRuns', project.id],
         queryFn: async () => {
             console.log('[ReportTab] Fetching report runs for project:', project.id);
-            const runs = await base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date');
+            const runs = await base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date', 5000);
             console.log('[ReportTab] Fetched', runs.length, 'report runs');
             return runs;
         }
@@ -116,7 +116,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             const allEmployees = await base44.entities.Employee.filter({
                 company: deptHeadVerification.assignment.company,
                 active: true
-            });
+            }, null, 5000);
 
             console.log('[ReportTab] Fetched', allEmployees.length, 'total employees in company');
 
@@ -146,11 +146,11 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 base44.entities.AnalysisResult.filter({ 
                     project_id: project.id, 
                     report_run_id: reportRunId 
-                }),
+                }, null, 5000),
                 base44.entities.SalarySnapshot.filter({
                     project_id: project.id,
                     report_run_id: reportRunId
-                })
+                }, null, 5000)
             ]);
             
             // Delete in batches of 5 with delays to avoid rate limiting
@@ -378,7 +378,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 const results = await base44.entities.AnalysisResult.filter({ 
                     project_id: project.id,
                     report_run_id: run.id 
-                });
+                }, null, 5000);
                 
                 // Filter for department heads
                 const filteredForDeptHead = isDepartmentHead && deptHeadVerification?.verified
