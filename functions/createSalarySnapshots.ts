@@ -148,28 +148,27 @@ Deno.serve(async (req) => {
             });
         }
 
+        // ============================================================
+        // PAYROLL MODE GUARD - Entry point check only
+        // ============================================================
+        const guardCheck = await base44.asServiceRole.functions.invoke('assertProjectPayrollAllowed', {
+            company: project.company
+        });
+
+        if (!guardCheck.allowed) {
+            return Response.json({ 
+                error: guardCheck.error,
+                payroll_mode: guardCheck.payroll_mode,
+                company: project.company
+            }, { status: guardCheck.status || 403 });
+        }
+
         // Verify report exists
         const reports = await base44.asServiceRole.entities.ReportRun.filter({ id: report_run_id, project_id: project_id });
         if (reports.length === 0) {
             return Response.json({ error: 'Report not found for this project' }, { status: 404 });
         }
         const reportRun = reports[0];
-
-        // ============================================================
-        // PAYROLL MODE ROUTING CHECK
-        // Prevents creating legacy salary snapshots when company uses calendar mode
-        // ============================================================
-        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({ 
-            company: project.company 
-        }, null, 1);
-
-        if (companySettings.length > 0 && companySettings[0].payroll_mode === 'CALENDAR') {
-            return Response.json({ 
-                error: `This company uses Calendar-based Payroll. Project-based salary snapshots are disabled. Please use the Calendar module instead.`,
-                payroll_mode: 'CALENDAR',
-                company: project.company
-            }, { status: 403 });
-        }
 
         // Fetch core data
         // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()

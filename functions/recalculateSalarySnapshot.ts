@@ -74,19 +74,18 @@ Deno.serve(async (req) => {
         }
 
         // ============================================================
-        // PAYROLL MODE ROUTING CHECK
-        // Prevents recalculating legacy salary snapshots when company uses calendar mode
+        // PAYROLL MODE GUARD - Entry point check only
         // ============================================================
-        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({ 
-            company: project.company 
-        }, null, 1);
+        const guardCheck = await base44.asServiceRole.functions.invoke('assertProjectPayrollAllowed', {
+            company: project.company
+        });
         
-        if (companySettings.length > 0 && companySettings[0].payroll_mode === 'CALENDAR') {
+        if (!guardCheck.allowed) {
             return Response.json({ 
-                error: `This company uses Calendar-based Payroll. Project-based salary recalculation is disabled. Please use the Calendar module instead.`,
-                payroll_mode: 'CALENDAR',
+                error: guardCheck.error,
+                payroll_mode: guardCheck.payroll_mode,
                 company: project.company
-            }, { status: 403 });
+            }, { status: guardCheck.status || 403 });
         }
 
         // ============================================================
