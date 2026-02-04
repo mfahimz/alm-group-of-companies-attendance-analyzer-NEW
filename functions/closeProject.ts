@@ -5,7 +5,6 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
-        // SECURITY: Only admin can close projects
         const userRole = user?.extended_role || user?.role || 'user';
         if (userRole !== 'admin') {
             return Response.json({ error: 'Access denied: Admin role required' }, { status: 403 });
@@ -17,42 +16,30 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Missing project_id' }, { status: 400 });
         }
 
-        // Get project
         const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 10);
         if (projects.length === 0) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
         const project = projects[0];
 
-        // Get the last saved report
         if (!project.last_saved_report_id) {
             return Response.json({ error: 'No report to finalize' }, { status: 400 });
         }
 
-        // Get all analysis results for this report
         const results = await base44.asServiceRole.entities.AnalysisResult.filter({
             report_run_id: project.last_saved_report_id
         }, null, 5000);
 
-        // Get all employees
         const employees = await base44.asServiceRole.entities.Employee.filter({
             company: project.company
         }, null, 5000);
 
-        // CRITICAL FIX: Convert all employee IDs to strings immediately
         employees.forEach(emp => {
-            if (typeof emp.hrms_id !== 'string') {
-                emp.hrms_id = String(emp.hrms_id);
-            }
-            if (typeof emp.attendance_id !== 'string') {
-                emp.attendance_id = String(emp.attendance_id);
-            }
+            if (typeof emp.hrms_id !== 'string') emp.hrms_id = String(emp.hrms_id);
+            if (typeof emp.attendance_id !== 'string') emp.attendance_id = String(emp.attendance_id);
         });
 
-        // FOUNDATION: Currently only applies to Al Maraghi Auto Repairs
         const enableAllowedMinutesDeduction = project.company === 'Al Maraghi Auto Repairs';
-
-        // Deduct allowed minutes exceptions from quarterly allowances
         const updates = [];
         
         if (enableAllowedMinutesDeduction) {
@@ -128,12 +115,10 @@ Deno.serve(async (req) => {
         if (carry_forward_grace_minutes === true && (project.company === 'Al Maraghi Auto Repairs' || project.company === 'Al Maraghi Motors')) {
             console.log('[closeProject] Grace carry-forward requested');
 
-            // IDEMPOTENCY: Check if already carried for this project
             if (project.grace_carried_forward === true) {
-                console.log('[closeProject] Grace carry-forward already completed for this project, skipping');
+                console.log('[closeProject] Grace carry-forward already completed, skipping');
                 graceCarryForwardResults.already_exists = 1;
             } else {
-                // Get report run and rules
                 const reportRuns = await base44.asServiceRole.entities.ReportRun.filter({
                     id: project.last_saved_report_id
                 }, null, 10);
@@ -155,7 +140,6 @@ Deno.serve(async (req) => {
                 const periodFrom = reportRun?.date_from || project?.date_from || '2025-01-01';
                 const periodTo = reportRun?.date_to || project?.date_to || '2025-01-31';
 
-                // Process each employee
                 for (const result of results) {
                     const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
@@ -165,7 +149,6 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
-                    // Calculate unused grace
                     const dept = employee.department || 'Admin';
                     const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
                     const carriedGrace = project.use_carried_grace_minutes ? (employee.carried_grace_minutes || 0) : 0;
@@ -182,21 +165,21 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
-                    // IDEMPOTENCY CHECK: Ensure not already carried for this employee in this project
+                    // IDEMPOTENCY: Check if already carried
                     const existingRecord = await base44.asServiceRole.entities.EmployeeGraceHistory.filter({
                         employee_id: String(employee.hrms_id),
                         source_project_id: String(project_id)
                     }, null, 10);
 
                     if (existingRecord.length > 0) {
-                        console.log(`[closeProject] Grace already carried for ${employee.name} in project ${project.name}, skipping`);
+                        console.log(`[closeProject] Already carried for ${employee.name}, skipping`);
                         graceCarryForwardResults.already_exists++;
                         continue;
                     }
 
                     try {
-                        // ===== WRITE 1: Create EmployeeGraceHistory (audit log) =====
-                        const historyRecord = {
+                        // WRITE 1: Create EmployeeGraceHistory (audit-only)
+                        await base44.asServiceRole.entities.EmployeeGraceHistory.create({
                             employee_id: String(employee.hrms_id).trim(),
                             attendance_id: String(employee.attendance_id).trim(),
                             employee_name: String(employee.name || 'Unknown').trim(),
@@ -213,47 +196,16 @@ Deno.serve(async (req) => {
                             unused_grace_minutes: Math.max(0, Number(unusedGraceMinutes)),
                             carried_at: String(nowUAE).trim(),
                             carried_by: 'system@closeProject'
-                        };
+                        });
 
-                        await base44.asServiceRole.entities.EmployeeGraceHistory.create(historyRecord);
-                        console.log(`[closeProject] Created history: ${employee.name} (${unusedGraceMinutes}m)`);
-
-                        // ===== WRITE 2: Update GraceMinutesBalance (operational record) =====
-                        const balanceRecords = await base44.asServiceRole.entities.GraceMinutesBalance.filter({
-                            employee_id: String(employee.hrms_id),
-                            company: String(project.company)
-                        }, null, 10);
-
-                        if (balanceRecords.length > 0) {
-                            // Update existing record
-                            const balanceRecord = balanceRecords[0];
-                            const newTotal = (balanceRecord.total_carried_minutes || 0) + unusedGraceMinutes;
-                            await base44.asServiceRole.entities.GraceMinutesBalance.update(balanceRecord.id, {
-                                total_carried_minutes: newTotal,
-                                last_project_id: String(project_id),
-                                last_carried_at: String(nowUAE)
-                            });
-                            console.log(`[closeProject] Updated balance: ${employee.name} → ${newTotal}m`);
-                        } else {
-                            // Create new balance record
-                            await base44.asServiceRole.entities.GraceMinutesBalance.create({
-                                employee_id: String(employee.hrms_id).trim(),
-                                company: String(project.company).trim(),
-                                total_carried_minutes: Math.max(0, Number(unusedGraceMinutes)),
-                                last_project_id: String(project_id).trim(),
-                                last_carried_at: String(nowUAE).trim()
-                            });
-                            console.log(`[closeProject] Created balance: ${employee.name} → ${unusedGraceMinutes}m`);
-                        }
-
-                        // ===== WRITE 3: Update Employee.carried_grace_minutes (cache) =====
+                        // WRITE 2: Update Employee.carried_grace_minutes (operational field)
                         const currentCarried = employee.carried_grace_minutes || 0;
                         const newCarried = currentCarried + unusedGraceMinutes;
                         await base44.asServiceRole.entities.Employee.update(employee.id, {
                             carried_grace_minutes: newCarried
                         });
-                        console.log(`[closeProject] Synced Employee: ${employee.name} → ${newCarried}m`);
 
+                        console.log(`[closeProject] Synced: ${employee.name} → ${newCarried}m`);
                         graceCarryForwardResults.processed++;
 
                     } catch (err) {
@@ -262,12 +214,11 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Set project flag ONLY after ALL employees processed successfully
+                // Set flag only after all processed
                 if (graceCarryForwardResults.processed > 0) {
                     await base44.asServiceRole.entities.Project.update(project_id, {
                         grace_carried_forward: true
                     });
-                    console.log(`[closeProject] Set grace_carried_forward flag`);
                 }
             }
         }
@@ -277,14 +228,13 @@ Deno.serve(async (req) => {
             status: 'closed'
         });
 
-        // Log audit for project close
         await base44.asServiceRole.functions.invoke('logAudit', {
             action: 'CLOSE_PROJECT',
             entity_type: 'Project',
             entity_id: project_id,
             entity_name: project.name,
             company: project.company,
-            details: `Project closed. Quarterly minutes updated: ${updates.length}. Grace carry-forward: ${carry_forward_grace_minutes ? 'Yes' : 'No'}. Processed: ${graceCarryForwardResults.processed}`
+            details: `Project closed. Quarterly minutes: ${updates.length}. Grace carry-forward: ${carry_forward_grace_minutes ? 'Yes' : 'No'}. Processed: ${graceCarryForwardResults.processed}`
         });
 
         return Response.json({
