@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
             // Process each employee's exceptions
             for (const attendanceId in exceptionsByEmployee) {
-                const employee = employees.find(e => e.attendance_id === parseInt(attendanceId));
+                const employee = employees.find(e => String(e.attendance_id) === String(attendanceId));
                 if (!employee) continue;
 
                 const employeeExceptions = exceptionsByEmployee[attendanceId];
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
                 // For each exception, calculate actual minutes used on that day
                 for (const exc of employeeExceptions) {
                     // Find analysis result for this employee
-                    const empResult = results.find(r => r.attendance_id === parseInt(attendanceId));
+                    const empResult = results.find(r => String(r.attendance_id) === String(attendanceId));
                     if (!empResult) continue;
 
                     // Parse exception_offsets to find what was actually used on this date
