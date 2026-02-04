@@ -110,14 +110,6 @@ export default function Projects() {
             const skip = (page - 1) * pageSize;
             
             try {
-                // Admin, Supervisor, CEO can see all projects
-                if (isAdminRole) {
-                    console.log('[Projects] Fetching all projects (admin/supervisor/ceo)');
-                    const items = await base44.entities.Project.list('-created_date', pageSize, skip);
-                    console.log('[Projects] Fetched', items.length, 'projects');
-                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
-                }
-                
                 // Department heads see only CLOSED projects from their company
                 if (isDeptHead) {
                     console.log('[Projects] Fetching CLOSED projects for department head, company:', currentUser.company);
@@ -129,12 +121,23 @@ export default function Projects() {
                     return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
                 }
                 
-                // Regular users see all projects from their company
-                console.log('[Projects] Fetching projects for regular user, company:', currentUser.company);
+                // Admin, Supervisor, CEO see all projects EXCEPT closed (unless specifically filtered)
+                if (isAdminRole) {
+                    console.log('[Projects] Fetching all non-closed projects (admin/supervisor/ceo)');
+                    const items = await base44.entities.Project.filter({
+                        status: { $ne: 'closed' }
+                    }, '-created_date', pageSize);
+                    console.log('[Projects] Fetched', items.length, 'non-closed projects');
+                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+                }
+                
+                // Regular users see all non-closed projects from their company
+                console.log('[Projects] Fetching non-closed projects for regular user, company:', currentUser.company);
                 const items = await base44.entities.Project.filter({
-                    company: currentUser.company
+                    company: currentUser.company,
+                    status: { $ne: 'closed' }
                 }, '-created_date', pageSize);
-                console.log('[Projects] Fetched', items.length, 'projects for user');
+                console.log('[Projects] Fetched', items.length, 'non-closed projects for user');
                 return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
             } catch (error) {
                 console.error('[Projects] Error fetching projects:', error);
