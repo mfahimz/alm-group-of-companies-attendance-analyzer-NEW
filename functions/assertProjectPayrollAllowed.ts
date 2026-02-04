@@ -38,9 +38,22 @@ Deno.serve(async (req) => {
             });
         }
 
-        const payrollMode = companySettings[0].payroll_mode;
+        const settings = companySettings[0];
+        const payrollMode = settings.payroll_mode || 'PROJECT';
+        const calendarDualRunEnabled = settings.calendar_dual_run_enabled || false;
 
-        // Block if CALENDAR mode
+        // PHASE 4 FIX: If calendar_dual_run_enabled = true, ALLOW legacy payroll
+        // Both systems run in parallel (legacy for payment, calendar for preview)
+        if (calendarDualRunEnabled) {
+            return Response.json({ 
+                allowed: true,
+                payroll_mode: payrollMode,
+                calendar_dual_run_enabled: true,
+                message: 'Dual-run mode: Both systems active (PROJECT for payment, CALENDAR for preview)'
+            });
+        }
+
+        // Block if CALENDAR mode (and dual-run NOT enabled)
         if (payrollMode === 'CALENDAR') {
             return Response.json({ 
                 allowed: false,
