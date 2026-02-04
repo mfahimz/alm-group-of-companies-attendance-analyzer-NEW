@@ -1101,20 +1101,9 @@ Deno.serve(async (req) => {
                 prevMonthDivisor: otDivisor
             };
 
-            // Get salary leave days from ANNUAL_LEAVE exceptions
+            // Salary leave days always equals finalized annual leave count
+            // No exception overrides - use the value from finalized AnalysisResult
             let salaryLeaveDays = calculated.annualLeaveCount;
-            const empAnnualLeaveExceptions = allExceptions.filter(exc => 
-                String(exc.attendance_id) === String(emp.attendance_id) &&
-                exc.type === 'ANNUAL_LEAVE'
-            );
-            if (empAnnualLeaveExceptions.length > 0) {
-                const totalSalaryLeaveDaysOverride = empAnnualLeaveExceptions.reduce((sum, exc) => {
-                    return sum + (exc.salary_leave_days ?? 0);
-                }, 0);
-                if (totalSalaryLeaveDaysOverride > 0) {
-                    salaryLeaveDays = totalSalaryLeaveDaysOverride;
-                }
-            }
 
             // Calculate derived salary values - ALL rounded to 2 decimal places
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
