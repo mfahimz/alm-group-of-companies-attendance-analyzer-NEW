@@ -216,24 +216,24 @@ Deno.serve(async (req) => {
                     const timeIssues = lateMinutes + earlyCheckoutMinutes;
                     const graceMinutesCarried = Math.max(0, graceMinutesAvailable - timeIssues);
                     
-                    // Create history record - store raw for now, sanitize during bulk create
+                    // Create history record - CONVERT ALL IDs TO STRINGS IMMEDIATELY
                     graceHistoryRecords.push({
-                        employee_id: employee.hrms_id,
-                        attendance_id: employee.attendance_id,
-                        employee_name: employee.name || '',
-                        company: project.company,
-                        source_project_id: project_id,
-                        source_project_name: project.name || '',
-                        report_run_id: project.last_saved_report_id,
-                        period_from: reportRun?.date_from || project.date_from,
-                        period_to: reportRun?.date_to || project.date_to,
-                        grace_minutes_available: graceMinutesAvailable,
-                        late_minutes: lateMinutes,
-                        early_checkout_minutes: earlyCheckoutMinutes,
-                        time_issues: timeIssues,
-                        unused_grace_minutes: graceMinutesCarried,
-                        carried_at: nowUAE,
-                        carried_by: user.email
+                        employee_id: String(employee.hrms_id),
+                        attendance_id: String(employee.attendance_id),
+                        employee_name: String(employee.name || ''),
+                        company: String(project.company),
+                        source_project_id: String(project_id),
+                        source_project_name: String(project.name || ''),
+                        report_run_id: String(project.last_saved_report_id),
+                        period_from: String(reportRun?.date_from || project.date_from),
+                        period_to: String(reportRun?.date_to || project.date_to),
+                        grace_minutes_available: Number(graceMinutesAvailable),
+                        late_minutes: Number(lateMinutes),
+                        early_checkout_minutes: Number(earlyCheckoutMinutes),
+                        time_issues: Number(timeIssues),
+                        unused_grace_minutes: Number(graceMinutesCarried),
+                        carried_at: String(nowUAE),
+                        carried_by: String(user.email)
                     });
                     
                     // Also update Employee.carried_grace_minutes as derived current value
