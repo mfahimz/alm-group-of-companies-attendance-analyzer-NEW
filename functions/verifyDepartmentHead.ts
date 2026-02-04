@@ -62,12 +62,22 @@ Deno.serve(async (req) => {
 
         const assignment = assignments[0];
 
-        // Verify user's company and department match assignment
-        if (!user.company || !user.department || user.company !== assignment.company || user.department !== assignment.department) {
-            return Response.json({ 
-                error: 'User assignment mismatch with department head record. Admin must assign company and department.',
-                verified: false 
-            }, { status: 403 });
+        // Verify user's company and department match assignment (auto-sync if needed)
+        if (user.company !== assignment.company || user.department !== assignment.department) {
+            // Auto-sync company and department from DepartmentHead assignment
+            try {
+                await base44.auth.updateMe({
+                    company: assignment.company,
+                    department: assignment.department
+                });
+                console.log('Auto-synced user company and department from DepartmentHead assignment');
+            } catch (syncError) {
+                console.error('Failed to auto-sync company/department:', syncError);
+                return Response.json({ 
+                    error: 'Could not sync department assignment. Please contact admin.',
+                    verified: false 
+                }, { status: 403 });
+            }
         }
 
         // Verify that managed_employee_ids is set
