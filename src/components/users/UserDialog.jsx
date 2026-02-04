@@ -99,10 +99,21 @@ export default function UserDialog({ open, onClose, user }) {
             // If setting as department_head, create/update DepartmentHead record
             if (data.extended_role === 'department_head' && data.hrms_id && data.company && data.department) {
                 try {
-                    // Check if DepartmentHead record exists for this employee
-                    const existingDeptHeads = await base44.entities.DepartmentHead.filter({
-                        employee_id: data.hrms_id
-                    });
+                    // First, fetch the Employee record to get its database ID
+                             const empRecords = await base44.entities.Employee.filter({
+                                 hrms_id: data.hrms_id
+                             });
+
+                             if (empRecords.length === 0) {
+                                 throw new Error('Employee record not found for this HRMS ID');
+                             }
+
+                             const employeeId = empRecords[0].id;
+
+                             // Check if DepartmentHead record exists for this employee
+                             const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                                 employee_id: employeeId
+                             });
                     
                     const existingRecord = existingDeptHeads.find(dh => 
                         dh.company === data.company && dh.department === data.department
@@ -118,7 +129,7 @@ export default function UserDialog({ open, onClose, user }) {
                         await base44.entities.DepartmentHead.create({
                             company: data.company,
                             department: data.department,
-                            employee_id: data.hrms_id,
+                            employee_id: employeeId,
                             active: true
                         });
                     }
@@ -131,13 +142,21 @@ export default function UserDialog({ open, onClose, user }) {
             // If removing department_head role, deactivate DepartmentHead record
             if (data.extended_role !== 'department_head' && previousUser?.hrms_id) {
                 try {
-                    const existingDeptHeads = await base44.entities.DepartmentHead.filter({
-                        employee_id: previousUser.hrms_id,
-                        active: true
+                    // Fetch the Employee record to get its database ID
+                    const empRecords = await base44.entities.Employee.filter({
+                        hrms_id: previousUser.hrms_id
                     });
                     
-                    for (const dh of existingDeptHeads) {
-                        await base44.entities.DepartmentHead.update(dh.id, { active: false });
+                    if (empRecords.length > 0) {
+                        const employeeId = empRecords[0].id;
+                        const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                            employee_id: employeeId,
+                            active: true
+                        });
+                    
+                        for (const dh of existingDeptHeads) {
+                            await base44.entities.DepartmentHead.update(dh.id, { active: false });
+                        }
                     }
                 } catch (err) {
                     console.error('Failed to deactivate DepartmentHead record:', err);
