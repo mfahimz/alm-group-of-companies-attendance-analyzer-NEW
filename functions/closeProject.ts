@@ -247,31 +247,12 @@ Deno.serve(async (req) => {
                 // Bulk create history records - create one at a time to avoid bulk type issues
                 if (graceHistoryRecords.length > 0) {
                     console.log(`[closeProject] Creating ${graceHistoryRecords.length} grace history records one-by-one`);
-                    
+
                     for (const rec of graceHistoryRecords) {
-                        // ABSOLUTE string conversion using concatenation (most reliable)
-                        const sanitized = {
-                            employee_id: '' + rec.employee_id,
-                            attendance_id: '' + rec.attendance_id,
-                            employee_name: '' + (rec.employee_name || ''),
-                            company: '' + rec.company,
-                            source_project_id: '' + rec.source_project_id,
-                            source_project_name: '' + (rec.source_project_name || ''),
-                            report_run_id: '' + rec.report_run_id,
-                            period_from: '' + rec.period_from,
-                            period_to: '' + rec.period_to,
-                            grace_minutes_available: Number(rec.grace_minutes_available) || 0,
-                            late_minutes: Number(rec.late_minutes) || 0,
-                            early_checkout_minutes: Number(rec.early_checkout_minutes) || 0,
-                            time_issues: Number(rec.time_issues) || 0,
-                            unused_grace_minutes: Number(rec.unused_grace_minutes) || 0,
-                            carried_at: '' + rec.carried_at,
-                            carried_by: '' + rec.carried_by
-                        };
-                        
-                        await base44.asServiceRole.entities.EmployeeGraceHistory.create(sanitized);
+                        // Records already have strings from above, just pass directly
+                        await base44.asServiceRole.entities.EmployeeGraceHistory.create(rec);
                     }
-                    
+
                     console.log(`[closeProject] Successfully created ${graceHistoryRecords.length} grace history records`);
                 }
             }
