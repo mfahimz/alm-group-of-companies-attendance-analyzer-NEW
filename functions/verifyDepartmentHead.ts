@@ -31,10 +31,9 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
-        // Find the employee record using hrms_id (convert to number to ensure match)
-        const hrmsIdNumber = Number(user.hrms_id);
+        // Find the employee record using hrms_id (keep as string to match database)
         const employees = await base44.asServiceRole.entities.Employee.filter({
-            hrms_id: hrmsIdNumber,
+            hrms_id: user.hrms_id,
             active: true
         });
 
@@ -56,7 +55,7 @@ Deno.serve(async (req) => {
         // Fallback: also try searching by HRMS ID if no results found (for older records)
         if (assignments.length === 0) {
             assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
-                employee_id: hrmsIdNumber.toString(),
+                employee_id: user.hrms_id,
                 active: true
             });
         }
