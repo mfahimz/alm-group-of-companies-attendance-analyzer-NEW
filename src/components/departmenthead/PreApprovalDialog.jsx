@@ -29,12 +29,15 @@ export default function PreApprovalDialog({
 
     const queryClient = useQueryClient();
 
+    // Check if company supports quarterly minutes
+    const supportsQuarterlyMinutes = currentProject?.company === 'Al Maraghi Automotive' || currentProject?.company === 'Al Maraghi Motors';
+
     // Fetch quarterly minutes for selected employee based on date
     const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);
     const { data: quarterlyMinutes } = useQuery({
         queryKey: ['employeeQuarterlyMinutes', selectedEmployee?.hrms_id, formData.date_from],
         queryFn: async () => {
-            if (!selectedEmployee || !formData.date_from) return null;
+            if (!selectedEmployee || !formData.date_from || !supportsQuarterlyMinutes) return null;
             
             // Get or create quarterly minutes for this employee and date
             const response = await base44.functions.invoke('getOrCreateQuarterlyMinutes', {
@@ -45,23 +48,25 @@ export default function PreApprovalDialog({
             
             return response.data.success ? response.data : null;
         },
-        enabled: !!selectedEmployee && !!formData.date_from
+        enabled: !!selectedEmployee && !!formData.date_from && supportsQuarterlyMinutes
     });
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
             const minutesToApprove = parseInt(data.allowed_minutes);
             
-            // Update quarterly minutes usage first
-            const updateResponse = await base44.functions.invoke('updateQuarterlyMinutes', {
-                employee_id: String(selectedEmployee.hrms_id),
-                company: selectedEmployee.company,
-                date: data.date_from,
-                minutes_to_add: minutesToApprove
-            });
+            // Update quarterly minutes usage first (only for companies that support it)
+            if (supportsQuarterlyMinutes) {
+                const updateResponse = await base44.functions.invoke('updateQuarterlyMinutes', {
+                    employee_id: String(selectedEmployee.hrms_id),
+                    company: selectedEmployee.company,
+                    date: data.date_from,
+                    minutes_to_add: minutesToApprove
+                });
 
-            if (!updateResponse.data.success) {
-                throw new Error(updateResponse.data.error || 'Failed to update quarterly minutes');
+                if (!updateResponse.data.success) {
+                    throw new Error(updateResponse.data.error || 'Failed to update quarterly minutes');
+                }
             }
 
             // Check if approval already exists for this date
@@ -125,10 +130,13 @@ export default function PreApprovalDialog({
             return;
         }
 
-        const availableMinutes = quarterlyMinutes?.remaining_minutes || 0;
-        if (minutes > availableMinutes) {
-            toast.error(`Allowed minutes cannot exceed available balance of ${availableMinutes} minutes`);
-            return;
+        // Only check quarterly minutes balance for companies that support it
+        if (supportsQuarterlyMinutes) {
+            const availableMinutes = quarterlyMinutes?.remaining_minutes || 0;
+            if (minutes > availableMinutes) {
+                toast.error(`Allowed minutes cannot exceed available balance of ${availableMinutes} minutes`);
+                return;
+            }
         }
 
         // SINGLE-DAY VALIDATION: date_to must be same as date_from for allowed minutes

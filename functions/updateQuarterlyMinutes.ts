@@ -31,6 +31,15 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
+        // Check if company supports quarterly minutes
+        const supportedCompanies = ['Al Maraghi Automotive', 'Al Maraghi Motors'];
+        if (!supportedCompanies.includes(company)) {
+            return Response.json({
+                success: false,
+                error: `Quarterly minutes feature is only available for: ${supportedCompanies.join(', ')}`
+            }, { status: 400 });
+        }
+
         // Parse date and determine quarter
         const targetDate = new Date(date);
         const year = targetDate.getFullYear();
