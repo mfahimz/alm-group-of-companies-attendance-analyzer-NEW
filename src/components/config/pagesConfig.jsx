@@ -129,6 +129,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
+    GraceMinutesManagement: {
+        name: 'GraceMinutesManagement',
+        title: 'Grace Minutes',
+        icon: Clock,
+        category: 'HRManagement',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo']
+    },
     Reports: {
         name: 'Reports',
         title: 'Reports & Analytics',
