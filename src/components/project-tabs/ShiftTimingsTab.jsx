@@ -19,26 +19,31 @@ import { Checkbox } from '@/components/ui/checkbox';
 import TimePicker from '../ui/TimePicker';
 
 export default function ShiftTimingsTab({ project }) {
-    const [file, setFile] = useState(null);
-    const [parsedData, setParsedData] = useState([]);
-    const [warnings, setWarnings] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [editingShift, setEditingShift] = useState(null);
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
-    const [isSingleShift, setIsSingleShift] = useState(false);
-    const [departmentFilter, setDepartmentFilter] = useState('all');
-    const [applicableDayFilter, setApplicableDayFilter] = useState('all');
-    const [shiftTypeFilter, setShiftTypeFilter] = useState('all');
-    const [selectedBlock, setSelectedBlock] = useState('block1');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [editingBlockRange, setEditingBlockRange] = useState(null);
-    const [showPreviewDialog, setShowPreviewDialog] = useState(false);
-    const [blockDateRanges, setBlockDateRanges] = useState({
-        block1: { from: project.date_from, to: project.date_to },
-        block2: { from: project.date_from, to: project.date_to }
-    });
+     const [file, setFile] = useState(null);
+     const [parsedData, setParsedData] = useState([]);
+     const [warnings, setWarnings] = useState([]);
+     const [searchTerm, setSearchTerm] = useState('');
+     const [editingShift, setEditingShift] = useState(null);
+     const [showAddForm, setShowAddForm] = useState(false);
+     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+     const [isSingleShift, setIsSingleShift] = useState(false);
+     const [departmentFilter, setDepartmentFilter] = useState('all');
+     const [applicableDayFilter, setApplicableDayFilter] = useState('all');
+     const [shiftTypeFilter, setShiftTypeFilter] = useState('all');
+     const [selectedBlock, setSelectedBlock] = useState('block1');
+     const [currentPage, setCurrentPage] = useState(1);
+     const [rowsPerPage, setRowsPerPage] = useState(10);
+     const [editingBlockRange, setEditingBlockRange] = useState(null);
+     const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+     const [blockDateRanges, setBlockDateRanges] = useState(() => {
+         if (!project?.date_from || !project?.date_to) {
+             return { block1: { from: '', to: '' }, block2: { from: '', to: '' } };
+         }
+         return {
+             block1: { from: project.date_from, to: project.date_to },
+             block2: { from: project.date_from, to: project.date_to }
+         };
+     });
     const [selectedShifts, setSelectedShifts] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
