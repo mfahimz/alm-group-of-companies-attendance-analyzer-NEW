@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
         // ============================================================================
         let graceCarryForwardResults = { processed: 0, skipped: 0, already_exists: false };
         
-        if (carry_forward_grace_minutes === true && project.company === 'Al Maraghi Auto Repairs') {
+        if (carry_forward_grace_minutes === true && (project.company === 'Al Maraghi Auto Repairs' || project.company === 'Al Maraghi Motors')) {
             console.log('[closeProject] Grace carry-forward requested for Al Maraghi Auto Repairs');
             
             // IDEMPOTENCY CHECK: Verify carry-forward hasn't already been done for this project
@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
                     : `Grace carry-forward executed. Processed: ${graceCarryForwardResults.processed}, Skipped: ${graceCarryForwardResults.skipped}. Project: ${project.name}`,
                 new_data: JSON.stringify(graceCarryForwardResults)
             });
-        } else if (carry_forward_grace_minutes === true && project.company !== 'Al Maraghi Auto Repairs') {
+        } else if (carry_forward_grace_minutes === true && project.company !== 'Al Maraghi Auto Repairs' && project.company !== 'Al Maraghi Motors') {
             console.log('[closeProject] Grace carry-forward requested but not enabled for this company');
         }
 
