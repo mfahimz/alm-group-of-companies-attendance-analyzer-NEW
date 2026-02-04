@@ -73,20 +73,7 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
-        // ============================================================
-        // PAYROLL MODE GUARD - Entry point check only
-        // ============================================================
-        const guardCheck = await base44.asServiceRole.functions.invoke('assertProjectPayrollAllowed', {
-            company: project.company
-        });
-        
-        if (!guardCheck.allowed) {
-            return Response.json({ 
-                error: guardCheck.error,
-                payroll_mode: guardCheck.payroll_mode,
-                company: project.company
-            }, { status: guardCheck.status || 403 });
-        }
+
 
         // ============================================================
         // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS NOTE

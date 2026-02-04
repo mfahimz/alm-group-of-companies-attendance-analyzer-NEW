@@ -30,20 +30,7 @@ Deno.serve(async (req) => {
         }
         const project = projects[0];
 
-        // ============================================================
-        // PAYROLL MODE GUARD - Entry point check only
-        // ============================================================
-        const guardCheck = await base44.asServiceRole.functions.invoke('assertProjectPayrollAllowed', {
-            company: project.company
-        });
-        
-        if (!guardCheck.allowed) {
-            return Response.json({ 
-                error: guardCheck.error,
-                payroll_mode: guardCheck.payroll_mode,
-                company: project.company
-            }, { status: guardCheck.status || 403 });
-        }
+
 
         // Fetch current snapshots
         const snapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
