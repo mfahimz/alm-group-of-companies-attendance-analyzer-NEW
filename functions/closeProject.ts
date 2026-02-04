@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
         }
 
         // Get project
-        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id });
+        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 10);
         if (projects.length === 0) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
@@ -32,12 +32,12 @@ Deno.serve(async (req) => {
         // Get all analysis results for this report
         const results = await base44.asServiceRole.entities.AnalysisResult.filter({
             report_run_id: project.last_saved_report_id
-        });
+        }, null, 5000);
 
         // Get all employees
         const employees = await base44.asServiceRole.entities.Employee.filter({
             company: project.company
-        });
+        }, null, 5000);
 
         // FOUNDATION: Currently only applies to Al Maraghi Auto Repairs
         // Design allows for per-company toggle via system settings in future
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
             const allowedMinutesExceptions = await base44.asServiceRole.entities.Exception.filter({
                 project_id: project_id,
                 type: 'ALLOWED_MINUTES'
-            });
+            }, null, 5000);
 
             // Group exceptions by attendance_id
             const exceptionsByEmployee = {};
@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
                         employee_id: String(employee.hrms_id),
                         project_id: project_id,
                         allocation_type: 'project_period'
-                    });
+                    }, null, 10);
 
                     if (quarterlyRecords.length > 0) {
                         const record = quarterlyRecords[0];
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
             // IDEMPOTENCY CHECK: Verify carry-forward hasn't already been done for this project
             const existingCarryForward = await base44.asServiceRole.entities.EmployeeGraceHistory.filter({
                 source_project_id: project_id
-            });
+            }, null, 10);
             
             if (existingCarryForward.length > 0) {
                 console.log('[closeProject] Grace carry-forward already exists for this project, skipping');
@@ -150,13 +150,13 @@ Deno.serve(async (req) => {
                 // Get the report run for date range
                 const reportRuns = await base44.asServiceRole.entities.ReportRun.filter({
                     id: project.last_saved_report_id
-                });
+                }, null, 10);
                 const reportRun = reportRuns.length > 0 ? reportRuns[0] : null;
                 
                 // Get attendance rules for grace minutes configuration
                 const rulesData = await base44.asServiceRole.entities.AttendanceRules.filter({
                     company: project.company
-                });
+                }, null, 10);
                 let rules = null;
                 if (rulesData.length > 0) {
                     try {
