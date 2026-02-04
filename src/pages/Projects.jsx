@@ -24,7 +24,7 @@ export default function Projects() {
     const [duplicateProject, setDuplicateProject] = useState(null);
     const [selectedProjects, setSelectedProjects] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('draft-analyzed');
     const [sortBy, setSortBy] = useState('status-closed-last');
     const [page, setPage] = useState(1);
     const [pageSize] = useState(50);
@@ -209,7 +209,11 @@ export default function Projects() {
         );
 
         // Apply status filter
-        if (statusFilter !== 'all') {
+        if (statusFilter === 'all') {
+            // No filter
+        } else if (statusFilter === 'draft-analyzed') {
+            filtered = filtered.filter(p => p.status === 'draft' || p.status === 'analyzed');
+        } else {
             filtered = filtered.filter(p => p.status === statusFilter);
         }
 
@@ -302,9 +306,10 @@ export default function Projects() {
                                 <SelectValue placeholder="Filter by status" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="draft-analyzed">Draft & Analyzed</SelectItem>
                                 <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="draft">Draft</SelectItem>
-                                <SelectItem value="analyzed">Analyzed</SelectItem>
+                                <SelectItem value="draft">Draft Only</SelectItem>
+                                <SelectItem value="analyzed">Analyzed Only</SelectItem>
                                 <SelectItem value="locked">Locked</SelectItem>
                                 <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
