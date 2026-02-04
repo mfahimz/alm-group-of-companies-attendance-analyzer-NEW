@@ -74,6 +74,22 @@ Deno.serve(async (req) => {
         }
 
         // ============================================================
+        // PAYROLL MODE ROUTING CHECK
+        // Prevents recalculating legacy salary snapshots when company uses calendar mode
+        // ============================================================
+        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({ 
+            company: project.company 
+        }, null, 1);
+        
+        if (companySettings.length > 0 && companySettings[0].payroll_mode === 'CALENDAR') {
+            return Response.json({ 
+                error: `This company uses Calendar-based Payroll. Project-based salary recalculation is disabled. Please use the Calendar module instead.`,
+                payroll_mode: 'CALENDAR',
+                company: project.company
+            }, { status: 403 });
+        }
+
+        // ============================================================
         // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS NOTE
         // The last 2 days of the salary month are treated as fully present
         // for salary calculation. This is handled in createSalarySnapshots.js

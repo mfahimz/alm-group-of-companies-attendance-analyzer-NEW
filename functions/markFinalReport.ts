@@ -48,6 +48,22 @@ Deno.serve(async (req) => {
         }
         const project = projects[0];
 
+        // ============================================================
+        // PAYROLL MODE ROUTING CHECK
+        // Prevents finalizing legacy project-based reports when company uses calendar mode
+        // ============================================================
+        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({ 
+            company: project.company 
+        }, null, 1);
+        
+        if (companySettings.length > 0 && companySettings[0].payroll_mode === 'CALENDAR') {
+            return Response.json({ 
+                error: `This company uses Calendar-based Payroll. Project-based finalization is disabled. Please use the Calendar module instead.`,
+                payroll_mode: 'CALENDAR',
+                company: project.company
+            }, { status: 403 });
+        }
+
         // First, unmark all reports for this project
         const allReports = await base44.asServiceRole.entities.ReportRun.filter({
             project_id: project_id

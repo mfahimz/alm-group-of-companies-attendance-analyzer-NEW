@@ -23,6 +23,29 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
+        // Fetch project to check payroll mode
+        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 1);
+        if (projects.length === 0) {
+            return Response.json({ error: 'Project not found' }, { status: 404 });
+        }
+        const project = projects[0];
+
+        // ============================================================
+        // PAYROLL MODE ROUTING CHECK
+        // Prevents editing legacy salary snapshots when company uses calendar mode
+        // ============================================================
+        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({ 
+            company: project.company 
+        }, null, 1);
+        
+        if (companySettings.length > 0 && companySettings[0].payroll_mode === 'CALENDAR') {
+            return Response.json({ 
+                error: `This company uses Calendar-based Payroll. Project-based salary editing is disabled. Please use the Calendar module instead.`,
+                payroll_mode: 'CALENDAR',
+                company: project.company
+            }, { status: 403 });
+        }
+
         // Fetch current snapshots
         const snapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
             project_id: project_id,

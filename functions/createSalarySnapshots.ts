@@ -155,6 +155,22 @@ Deno.serve(async (req) => {
         }
         const reportRun = reports[0];
 
+        // ============================================================
+        // PAYROLL MODE ROUTING CHECK
+        // Prevents creating legacy salary snapshots when company uses calendar mode
+        // ============================================================
+        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({ 
+            company: project.company 
+        }, null, 1);
+
+        if (companySettings.length > 0 && companySettings[0].payroll_mode === 'CALENDAR') {
+            return Response.json({ 
+                error: `This company uses Calendar-based Payroll. Project-based salary snapshots are disabled. Please use the Calendar module instead.`,
+                payroll_mode: 'CALENDAR',
+                company: project.company
+            }, { status: 403 });
+        }
+
         // Fetch core data
         // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()
         const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData] = await Promise.all([
