@@ -7,13 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Pencil, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function CompanyManagement() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState(null);
     const [formData, setFormData] = useState({ name: '', departments: '', active: true });
+    const [syncing, setSyncing] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: companies = [], isLoading } = useQuery({
@@ -21,19 +23,21 @@ export default function CompanyManagement() {
         queryFn: () => base44.entities.Company.list('-company_id')
     });
 
-    const createMutation = useMutation({
-        mutationFn: async (data) => {
-            // Get next company_id
-            const maxId = companies.length > 0 ? Math.max(...companies.map(c => c.company_id || 0)) : 0;
-            return base44.entities.Company.create({ ...data, company_id: maxId + 1 });
+    const syncMutation = useMutation({
+        mutationFn: async () => {
+            setSyncing(true);
+            const response = await base44.functions.invoke('syncExistingCompanies', {});
+            return response.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries(['companies']);
-            setDialogOpen(false);
-            setFormData({ name: '', departments: '', active: true });
-            toast.success('Company created');
+            toast.success(`Synced ${data.created} companies`);
+            setSyncing(false);
         },
-        onError: (error) => toast.error(error.message)
+        onError: (error) => {
+            toast.error(error.message);
+            setSyncing(false);
+        }
     });
 
     const updateMutation = useMutation({
@@ -49,16 +53,15 @@ export default function CompanyManagement() {
     });
 
     const handleSubmit = () => {
-        if (!formData.name.trim()) {
-            toast.error('Company name is required');
-            return;
-        }
+        if (!editingCompany) return;
 
-        if (editingCompany) {
-            updateMutation.mutate({ id: editingCompany.id, data: formData });
-        } else {
-            createMutation.mutate(formData);
-        }
+        updateMutation.mutate({ 
+            id: editingCompany.id, 
+            data: { 
+                departments: formData.departments,
+                active: formData.active
+            } 
+        });
     };
 
     const handleEdit = (company) => {
@@ -71,24 +74,27 @@ export default function CompanyManagement() {
         setDialogOpen(true);
     };
 
-    const handleAdd = () => {
-        setEditingCompany(null);
-        setFormData({ name: '', departments: '', active: true });
-        setDialogOpen(true);
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-[#1F2937]">Company Management</h1>
-                    <p className="text-[#6B7280] mt-1">Manage companies with stable IDs across name changes</p>
+                    <p className="text-[#6B7280] mt-1">Manage companies with stable IDs - connected to existing app data</p>
                 </div>
-                <Button onClick={handleAdd}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Company
+                <Button onClick={() => syncMutation.mutate()} disabled={syncing}>
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                    Sync Companies
                 </Button>
             </div>
+
+            {companies.length === 0 && !isLoading && (
+                <Alert>
+                    <AlertCircle className="w-4 h-4" />
+                    <AlertDescription>
+                        No companies found. Click "Sync Companies" to import existing companies from your employee data.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <Card>
                 <CardHeader>
@@ -150,16 +156,17 @@ export default function CompanyManagement() {
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{editingCompany ? 'Edit Company' : 'Add Company'}</DialogTitle>
+                        <DialogTitle>Edit Company</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div>
-                            <label className="text-sm font-medium">Company Name *</label>
+                            <label className="text-sm font-medium">Company Name</label>
                             <Input
                                 value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="Enter company name"
+                                disabled
+                                className="bg-gray-50"
                             />
+                            <p className="text-xs text-[#6B7280] mt-1">Company name cannot be changed (linked to existing data)</p>
                         </div>
                         <div>
                             <label className="text-sm font-medium">Departments</label>
@@ -181,9 +188,7 @@ export default function CompanyManagement() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSubmit}>
-                            {editingCompany ? 'Update' : 'Create'}
-                        </Button>
+                        <Button onClick={handleSubmit}>Update</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
