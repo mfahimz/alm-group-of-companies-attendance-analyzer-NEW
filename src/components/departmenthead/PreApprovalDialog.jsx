@@ -30,7 +30,7 @@ export default function PreApprovalDialog({
     const queryClient = useQueryClient();
 
     // Check if company supports quarterly minutes
-    const supportsQuarterlyMinutes = currentProject?.company === 'Al Maraghi Auto Repairs' || currentProject?.company === 'Al Maraghi Motors';
+    const supportsQuarterlyMinutes = currentProject?.company === 'Al Maraghi Motors';
 
     // Fetch quarterly minutes for selected employee based on date
     const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);

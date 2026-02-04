@@ -37,11 +37,10 @@ Deno.serve(async (req) => {
         }
 
         // Check if company supports quarterly minutes
-        const supportedCompanies = ['Al Maraghi Auto Repairs', 'Al Maraghi Motors'];
-        if (!supportedCompanies.includes(company)) {
+        if (company !== 'Al Maraghi Motors') {
             return Response.json({
                 success: false,
-                error: `Quarterly minutes feature is only available for: ${supportedCompanies.join(', ')}`
+                error: 'Quarterly minutes feature is only available for Al Maraghi Motors'
             }, { status: 400 });
         }
 

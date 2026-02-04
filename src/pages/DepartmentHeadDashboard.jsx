@@ -160,7 +160,7 @@ export default function DepartmentHeadDashboard() {
             
             return reports[0] || null;
         },
-        enabled: !!deptHeadAssignment && supportedCompanies.includes(deptHeadAssignment.company),
+        enabled: !!deptHeadAssignment && deptHeadAssignment.company === 'Al Maraghi Motors',
         staleTime: 10 * 60 * 1000, // Cache for 10 minutes
         gcTime: 15 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -264,7 +264,7 @@ export default function DepartmentHeadDashboard() {
 
             return allMinutes;
         },
-        enabled: !!currentProject && supportedCompanies.includes(currentProject.company),
+        enabled: !!currentProject && currentProject.company === 'Al Maraghi Motors',
         staleTime: 2 * 60 * 1000,
         gcTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -313,9 +313,8 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    // Check if not Al Maraghi Auto Repairs or Al Maraghi Motors (after all data is loaded)
-    const supportedCompanies = ['Al Maraghi Auto Repairs', 'Al Maraghi Motors'];
-    if (deptHeadAssignment && !supportedCompanies.includes(deptHeadAssignment.company)) {
+    // Check if not Al Maraghi Motors (after all data is loaded)
+    if (deptHeadAssignment && deptHeadAssignment.company !== 'Al Maraghi Motors') {
         return (
             <div className="max-w-4xl mx-auto p-6">
                 <Card className="border-amber-200 bg-amber-50">
@@ -323,7 +322,7 @@ export default function DepartmentHeadDashboard() {
                         <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                         <h2 className="text-xl font-semibold mb-2">Feature Not Available</h2>
                         <p className="text-slate-600">
-                            This feature is currently only available for: {supportedCompanies.join(', ')}.
+                            This feature is currently only available for Al Maraghi Motors.
                         </p>
                     </CardContent>
                 </Card>
