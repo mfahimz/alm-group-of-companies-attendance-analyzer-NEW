@@ -234,42 +234,35 @@ Deno.serve(async (req) => {
                     graceCarryForwardResults.processed++;
                 }
                 
-                // Bulk create history records with FORCED string conversion
+                // Bulk create history records - create one at a time to avoid bulk type issues
                 if (graceHistoryRecords.length > 0) {
-                    // CRITICAL: Use .toString() method to ensure type conversion
-                    const sanitizedRecords = graceHistoryRecords.map(rec => {
-                        // Force conversion using .toString() which is more reliable than String() or template literals
-                        const empId = (rec.employee_id != null && rec.employee_id !== '') 
-                            ? rec.employee_id.toString() 
-                            : '';
-                        const attId = (rec.attendance_id != null && rec.attendance_id !== '') 
-                            ? rec.attendance_id.toString() 
-                            : '';
-                        
-                        return {
-                            employee_id: empId,
-                            attendance_id: attId,
-                            employee_name: rec.employee_name ? rec.employee_name.toString() : '',
-                            company: rec.company ? rec.company.toString() : '',
-                            source_project_id: rec.source_project_id ? rec.source_project_id.toString() : '',
-                            source_project_name: rec.source_project_name ? rec.source_project_name.toString() : '',
-                            report_run_id: rec.report_run_id ? rec.report_run_id.toString() : '',
-                            period_from: rec.period_from ? rec.period_from.toString() : '',
-                            period_to: rec.period_to ? rec.period_to.toString() : '',
+                    console.log(`[closeProject] Creating ${graceHistoryRecords.length} grace history records one-by-one`);
+                    
+                    for (const rec of graceHistoryRecords) {
+                        // ABSOLUTE string conversion using concatenation (most reliable)
+                        const sanitized = {
+                            employee_id: '' + rec.employee_id,
+                            attendance_id: '' + rec.attendance_id,
+                            employee_name: '' + (rec.employee_name || ''),
+                            company: '' + rec.company,
+                            source_project_id: '' + rec.source_project_id,
+                            source_project_name: '' + (rec.source_project_name || ''),
+                            report_run_id: '' + rec.report_run_id,
+                            period_from: '' + rec.period_from,
+                            period_to: '' + rec.period_to,
                             grace_minutes_available: Number(rec.grace_minutes_available) || 0,
                             late_minutes: Number(rec.late_minutes) || 0,
                             early_checkout_minutes: Number(rec.early_checkout_minutes) || 0,
                             time_issues: Number(rec.time_issues) || 0,
                             unused_grace_minutes: Number(rec.unused_grace_minutes) || 0,
-                            carried_at: rec.carried_at ? rec.carried_at.toString() : '',
-                            carried_by: rec.carried_by ? rec.carried_by.toString() : ''
+                            carried_at: '' + rec.carried_at,
+                            carried_by: '' + rec.carried_by
                         };
-                    });
+                        
+                        await base44.asServiceRole.entities.EmployeeGraceHistory.create(sanitized);
+                    }
                     
-                    console.log(`[closeProject] Bulk creating ${sanitizedRecords.length} grace history records`);
-                    console.log(`[closeProject] Sample record types: employee_id=${typeof sanitizedRecords[0].employee_id}, attendance_id=${typeof sanitizedRecords[0].attendance_id}`);
-                    await base44.asServiceRole.entities.EmployeeGraceHistory.bulkCreate(sanitizedRecords);
-                    console.log(`[closeProject] Successfully created ${sanitizedRecords.length} grace history records`);
+                    console.log(`[closeProject] Successfully created ${graceHistoryRecords.length} grace history records`);
                 }
             }
             
