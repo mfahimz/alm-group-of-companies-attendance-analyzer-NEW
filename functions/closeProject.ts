@@ -237,10 +237,31 @@ Deno.serve(async (req) => {
                     graceCarryForwardResults.processed++;
                 }
                 
-                // Bulk create history records
+                // Bulk create history records with sanitized data
                 if (graceHistoryRecords.length > 0) {
-                    await base44.asServiceRole.entities.EmployeeGraceHistory.bulkCreate(graceHistoryRecords);
-                    console.log(`[closeProject] Created ${graceHistoryRecords.length} grace history records`);
+                    // Deep sanitize to ensure all types are correct
+                    const sanitizedRecords = graceHistoryRecords.map(rec => ({
+                        employee_id: `${rec.employee_id}`,
+                        attendance_id: `${rec.attendance_id}`,
+                        employee_name: `${rec.employee_name}`,
+                        company: `${rec.company}`,
+                        source_project_id: `${rec.source_project_id}`,
+                        source_project_name: `${rec.source_project_name}`,
+                        report_run_id: `${rec.report_run_id}`,
+                        period_from: `${rec.period_from}`,
+                        period_to: `${rec.period_to}`,
+                        grace_minutes_available: Number(rec.grace_minutes_available),
+                        late_minutes: Number(rec.late_minutes),
+                        early_checkout_minutes: Number(rec.early_checkout_minutes),
+                        time_issues: Number(rec.time_issues),
+                        unused_grace_minutes: Number(rec.unused_grace_minutes),
+                        carried_at: `${rec.carried_at}`,
+                        carried_by: `${rec.carried_by}`
+                    }));
+                    
+                    console.log(`[closeProject] Bulk creating ${sanitizedRecords.length} grace history records`);
+                    await base44.asServiceRole.entities.EmployeeGraceHistory.bulkCreate(sanitizedRecords);
+                    console.log(`[closeProject] Successfully created ${sanitizedRecords.length} grace history records`);
                 }
             }
             
