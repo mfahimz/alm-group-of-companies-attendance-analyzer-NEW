@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, FileSpreadsheet, Download, Trash2, Eye, Plus, Calendar } from 'lucide-react';
+import { DollarSign, FileSpreadsheet, Download, Trash2, Eye, Plus, Calendar, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import * as XLSX from 'xlsx';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import { Label } from '@/components/ui/label';
+import PayrollModeAlert from '@/components/ui/PayrollModeAlert';
 
 export default function SalaryTab({ project }) {
     const queryClient = useQueryClient();
@@ -27,6 +28,36 @@ export default function SalaryTab({ project }) {
     const [newReportName, setNewReportName] = useState('');
     const [newReportDateFrom, setNewReportDateFrom] = useState('');
     const [newReportDateTo, setNewReportDateTo] = useState('');
+
+    const [payrollMode, setPayrollMode] = useState('PROJECT');
+    const [loadingPayrollMode, setLoadingPayrollMode] = useState(true);
+
+    // Check company payroll mode
+    useEffect(() => {
+        const checkPayrollMode = async () => {
+            try {
+                setLoadingPayrollMode(true);
+                const settings = await base44.entities.CompanySettings.filter({ 
+                    company: project.company 
+                }, null, 1);
+                
+                if (settings.length > 0 && settings[0].payroll_mode) {
+                    setPayrollMode(settings[0].payroll_mode);
+                } else {
+                    setPayrollMode('PROJECT'); // Default
+                }
+            } catch (error) {
+                console.error('Failed to fetch payroll mode:', error);
+                setPayrollMode('PROJECT'); // Default on error
+            } finally {
+                setLoadingPayrollMode(false);
+            }
+        };
+
+        if (project?.company) {
+            checkPayrollMode();
+        }
+    }, [project?.company]);
 
     // ============================================
     // QUERIES
@@ -451,7 +482,7 @@ export default function SalaryTab({ project }) {
     // ============================================
 
     // Show loading state while fetching user or reports
-    if (loadingUser || loadingReports) {
+    if (loadingUser || loadingReports || loadingPayrollMode) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
@@ -469,6 +500,26 @@ export default function SalaryTab({ project }) {
                     <p className="text-slate-600">Access restricted to Admin and CEO only</p>
                 </CardContent>
             </Card>
+        );
+    }
+
+    // Block UI if company uses calendar mode
+    if (payrollMode === 'CALENDAR') {
+        return (
+            <div className="space-y-6">
+                <PayrollModeAlert company={project.company} />
+                <Card className="border-0 shadow-lg">
+                    <CardContent className="p-12 text-center">
+                        <AlertCircle className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                            Project-Based Salary Disabled
+                        </h3>
+                        <p className="text-slate-600">
+                            This company uses Calendar-based Payroll. Please use the Calendar module for salary operations.
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
         );
     }
 
