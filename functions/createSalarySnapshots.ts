@@ -1029,26 +1029,27 @@ Deno.serve(async (req) => {
             let attendanceSource;
             
             // PERMANENT LOCK: For finalized reports, use AnalysisResult values AS-IS (1:1 copy)
-            // NO recalculation, NO day_overrides processing - use stored finalized values directly
+            // CRITICAL: Check manual override fields FIRST, fallback to regular fields
+            // Manual overrides are set when user edits report before finalization
             // deductible_minutes formula in runAnalysis: ((late + early) - grace) + other - approved
             if (hasAnalysisResult) {
                 calculated = {
                     workingDays: analysisResult.working_days || 0,
-                    presentDays: analysisResult.present_days || 0,
-                    fullAbsenceCount: analysisResult.full_absence_count || 0,
+                    presentDays: analysisResult.manual_present_days ?? analysisResult.present_days ?? 0,
+                    fullAbsenceCount: analysisResult.manual_full_absence_count ?? analysisResult.full_absence_count ?? 0,
                     halfAbsenceCount: analysisResult.half_absence_count || 0,
-                    sickLeaveCount: analysisResult.sick_leave_count || 0,
-                    annualLeaveCount: analysisResult.annual_leave_count || 0,
+                    sickLeaveCount: analysisResult.manual_sick_leave_count ?? analysisResult.sick_leave_count ?? 0,
+                    annualLeaveCount: analysisResult.manual_annual_leave_count ?? analysisResult.annual_leave_count ?? 0,
                     lateMinutes: analysisResult.late_minutes || 0,
                     earlyCheckoutMinutes: analysisResult.early_checkout_minutes || 0,
                     otherMinutes: analysisResult.other_minutes || 0,
                     approvedMinutes: analysisResult.approved_minutes || 0,
-                    deductibleMinutes: analysisResult.deductible_minutes || 0,
+                    deductibleMinutes: analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0,
                     graceMinutes: analysisResult.grace_minutes ?? 15
                 };
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
-                console.log(`[createSalarySnapshots] 1:1 copy from AnalysisResult for ${emp.name} (${emp.attendance_id}): deductible=${calculated.deductibleMinutes}`);
+                console.log(`[createSalarySnapshots] 1:1 copy from AnalysisResult for ${emp.name} (${emp.attendance_id}): deductible=${calculated.deductibleMinutes}, fullAbsence=${calculated.fullAbsenceCount} (manual override: ${analysisResult.manual_full_absence_count !== null ? 'YES' : 'NO'})`);
             } else {
                 // NO_ATTENDANCE_DATA: Employee missing from analysis
                 // Use zero attendance for salary safety
