@@ -177,7 +177,9 @@ Deno.serve(async (req) => {
                 }
                 
                 const nowUAE = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString();
-                const graceHistoryRecords = [];
+                const carriedByEmail = user?.email || 'system@app.local';
+                const periodFrom = reportRun?.date_from || project?.date_from || '2025-01-01';
+                const periodTo = reportRun?.date_to || project?.date_to || '2025-01-31';
                 
                 for (const result of results) {
                     const employee = employees.find(e => 
@@ -208,53 +210,48 @@ Deno.serve(async (req) => {
                     const graceMinutesAvailable = baseGrace + carriedGrace;
                     
                     // UNUSED GRACE CALCULATION: time_issues = late + early (ONLY)
-                    // NO other_minutes, NO approved_minutes
-                    // This is leftover grace pool, not deductible minutes
                     const lateMinutes = result.late_minutes || 0;
                     const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-                    
                     const timeIssues = lateMinutes + earlyCheckoutMinutes;
                     const graceMinutesCarried = Math.max(0, graceMinutesAvailable - timeIssues);
                     
-                    // Create history record - CONVERT ALL IDs TO STRINGS IMMEDIATELY
-                    graceHistoryRecords.push({
-                        employee_id: String(employee.hrms_id),
-                        attendance_id: String(employee.attendance_id),
-                        employee_name: String(employee.name || ''),
-                        company: String(project.company),
-                        source_project_id: String(project_id),
-                        source_project_name: String(project.name || ''),
-                        report_run_id: String(project.last_saved_report_id),
-                        period_from: String(reportRun?.date_from || project.date_from),
-                        period_to: String(reportRun?.date_to || project.date_to),
-                        grace_minutes_available: Number(graceMinutesAvailable),
-                        late_minutes: Number(lateMinutes),
-                        early_checkout_minutes: Number(earlyCheckoutMinutes),
-                        time_issues: Number(timeIssues),
-                        unused_grace_minutes: Number(graceMinutesCarried),
-                        carried_at: String(nowUAE),
-                        carried_by: String(user.email)
-                    });
-                    
-                    // Also update Employee.carried_grace_minutes as derived current value
-                    await base44.asServiceRole.entities.Employee.update(employee.id, {
-                        carried_grace_minutes: graceMinutesCarried
-                    });
-                    
-                    graceCarryForwardResults.processed++;
-                }
-                
-                // Bulk create history records - create one at a time to avoid bulk type issues
-                if (graceHistoryRecords.length > 0) {
-                    console.log(`[closeProject] Creating ${graceHistoryRecords.length} grace history records one-by-one`);
+                    try {
+                        // Create ONE record at a time with explicit validation
+                        const historyRecord = {
+                            employee_id: String(employee.hrms_id).trim(),
+                            attendance_id: String(employee.attendance_id).trim(),
+                            employee_name: String(employee.name || 'Unknown').trim(),
+                            company: String(project.company).trim(),
+                            source_project_id: String(project_id).trim(),
+                            source_project_name: String(project.name || '').trim(),
+                            report_run_id: String(project.last_saved_report_id).trim(),
+                            period_from: String(periodFrom).trim(),
+                            period_to: String(periodTo).trim(),
+                            grace_minutes_available: Math.max(0, Number(graceMinutesAvailable)),
+                            late_minutes: Math.max(0, Number(lateMinutes)),
+                            early_checkout_minutes: Math.max(0, Number(earlyCheckoutMinutes)),
+                            time_issues: Math.max(0, Number(timeIssues)),
+                            unused_grace_minutes: Math.max(0, Number(graceMinutesCarried)),
+                            carried_at: String(nowUAE).trim(),
+                            carried_by: String(carriedByEmail).trim()
+                        };
 
-                    for (const rec of graceHistoryRecords) {
-                        // Records already have strings from above, just pass directly
-                        await base44.asServiceRole.entities.EmployeeGraceHistory.create(rec);
+                        console.log(`[closeProject] Creating record for ${employee.name} (${employee.hrms_id})`);
+                        await base44.asServiceRole.entities.EmployeeGraceHistory.create(historyRecord);
+                        
+                        // Also update Employee.carried_grace_minutes
+                        await base44.asServiceRole.entities.Employee.update(employee.id, {
+                            carried_grace_minutes: graceMinutesCarried
+                        });
+                        
+                        graceCarryForwardResults.processed++;
+                    } catch (err) {
+                        console.error(`[closeProject] Failed to create grace history for ${employee.name}:`, err.message);
+                        graceCarryForwardResults.skipped++;
                     }
-
-                    console.log(`[closeProject] Successfully created ${graceHistoryRecords.length} grace history records`);
                 }
+
+                console.log(`[closeProject] Grace carry-forward completed: ${graceCarryForwardResults.processed} processed, ${graceCarryForwardResults.skipped} skipped`);
             }
             
             // Log audit for grace carry-forward decision
