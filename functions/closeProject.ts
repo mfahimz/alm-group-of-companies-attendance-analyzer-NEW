@@ -39,6 +39,16 @@ Deno.serve(async (req) => {
             company: project.company
         }, null, 5000);
 
+        // CRITICAL FIX: Employee records have numeric IDs in database - convert immediately
+        employees.forEach(emp => {
+            if (typeof emp.hrms_id !== 'string') {
+                emp.hrms_id = String(emp.hrms_id);
+            }
+            if (typeof emp.attendance_id !== 'string') {
+                emp.attendance_id = String(emp.attendance_id);
+            }
+        });
+
         // FOUNDATION: Currently only applies to Al Maraghi Auto Repairs
         // Design allows for per-company toggle via system settings in future
         const enableAllowedMinutesDeduction = project.company === 'Al Maraghi Auto Repairs';
