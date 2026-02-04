@@ -6,14 +6,7 @@ export default function SortableTableHead({ children, label, sortKey, currentSor
     const displayLabel = label || children;
     const handleClick = () => {
         if (!sortKey || !onSort) return;
-        
-        if (currentSort?.key === sortKey) {
-            // Toggle direction
-            onSort({ key: sortKey, direction: currentSort.direction === 'asc' ? 'desc' : 'asc' });
-        } else {
-            // New sort
-            onSort({ key: sortKey, direction: 'asc' });
-        }
+        onSort(sortKey);
     };
 
     const isActive = currentSort?.key === sortKey;
