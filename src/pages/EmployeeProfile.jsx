@@ -265,7 +265,8 @@ export default function EmployeeProfile() {
                         </div>
                         <div className="mt-4 p-3 bg-white/60 rounded-lg">
                             <p className="text-xs text-slate-600">
-                                <strong>Note:</strong> Grace minutes are carried forward from closed projects and can be used in future analysis runs.
+                                <strong>Note:</strong> Grace minutes are carried forward from closed projects and can be used in future analysis runs. 
+                                Managed via <a href={createPageUrl('GraceMinutesManagement')} className="text-indigo-600 underline">Grace Minutes Management</a>.
                             </p>
                         </div>
                     </CardContent>
