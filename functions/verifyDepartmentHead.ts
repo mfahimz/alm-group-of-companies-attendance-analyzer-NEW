@@ -48,10 +48,18 @@ Deno.serve(async (req) => {
         const employee = employees[0];
 
         // Find department head assignment using the Employee's ID
-        const assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
+        let assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
             employee_id: employee.id,
             active: true
         });
+
+        // Fallback: also try searching by HRMS ID if no results found (for older records)
+        if (assignments.length === 0) {
+            assignments = await base44.asServiceRole.entities.DepartmentHead.filter({
+                employee_id: hrmsIdNumber.toString(),
+                active: true
+            });
+        }
 
         if (assignments.length === 0) {
             return Response.json({ 
