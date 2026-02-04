@@ -79,7 +79,6 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import CalendarPayrollPreview from './pages/CalendarPayrollPreview';
 import __Layout from './Layout.jsx';
 
 
@@ -116,7 +115,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "CalendarPayrollPreview": CalendarPayrollPreview,
 }
 
 export const pagesConfig = {
