@@ -158,16 +158,26 @@ export default function GraceMinutesManagement() {
                         Manage unused grace minutes carried forward from closed projects
                     </p>
                 </div>
-                <Button
-                    variant="outline"
-                    onClick={() => {
-                        queryClient.invalidateQueries({ queryKey: ['employees'] });
-                        toast.success('Data refreshed');
-                    }}
-                >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={handleSyncFromHistory}
+                        disabled={syncHistoryMutation.isPending}
+                    >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${syncHistoryMutation.isPending ? 'animate-spin' : ''}`} />
+                        Sync from History
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            queryClient.invalidateQueries({ queryKey: ['employees'] });
+                            toast.success('Data refreshed');
+                        }}
+                    >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
