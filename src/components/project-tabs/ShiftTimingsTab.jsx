@@ -661,6 +661,7 @@ export default function ShiftTimingsTab({ project }) {
 
     const renderShiftBlock = (blockId, blockShifts, blockLabel) => {
         const blockRange = blockDateRanges[blockId];
+        if (!blockRange) return null;
         
         const filteredShifts = blockShifts
             .filter(shift => {
