@@ -139,6 +139,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
+    CompanyManagement: {
+        name: 'CompanyManagement',
+        title: 'Companies',
+        icon: Settings,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo']
+    },
     Reports: {
         name: 'Reports',
         title: 'Reports & Analytics',

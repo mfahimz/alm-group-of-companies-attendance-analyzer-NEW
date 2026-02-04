@@ -55,6 +55,7 @@ import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
 import Documentation from './pages/Documentation';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
+import GraceMinutesManagement from './pages/GraceMinutesManagement';
 import Home from './pages/Home';
 import Maintenance from './pages/Maintenance';
 import MaintenanceSettings from './pages/MaintenanceSettings';
@@ -79,7 +80,7 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import GraceMinutesManagement from './pages/GraceMinutesManagement';
+import CompanyManagement from './pages/CompanyManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -92,6 +93,7 @@ export const PAGES = {
     "Documentation": Documentation,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
+    "GraceMinutesManagement": GraceMinutesManagement,
     "Home": Home,
     "Maintenance": Maintenance,
     "MaintenanceSettings": MaintenanceSettings,
@@ -116,7 +118,7 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "GraceMinutesManagement": GraceMinutesManagement,
+    "CompanyManagement": CompanyManagement,
 }
 
 export const pagesConfig = {
