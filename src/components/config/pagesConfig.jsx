@@ -251,16 +251,6 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
-    CalendarPayrollPreview: {
-        name: 'CalendarPayrollPreview',
-        title: 'Calendar Payroll (Preview)',
-        icon: Calendar,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
-    },
 
     // Hidden Pages (No navigation)
     ProjectDetail: {
