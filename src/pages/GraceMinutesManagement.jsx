@@ -98,6 +98,20 @@ export default function GraceMinutesManagement() {
         }));
     };
 
+    const syncHistoryMutation = useMutation({
+        mutationFn: async ({ project_id }) => {
+            const response = await base44.functions.invoke('syncHistoryToEmployeeCarriedGrace', { project_id });
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            toast.success(`Synced ${data.synced} employees from grace history`);
+        },
+        onError: (error) => {
+            toast.error('Sync failed: ' + error.message);
+        }
+    });
+
     const handleSave = (employee) => {
         const editedValue = editingValues[employee.id];
         if (editedValue === undefined) return;
@@ -115,6 +129,13 @@ export default function GraceMinutesManagement() {
             delete newState[employee.id];
             return newState;
         });
+    };
+
+    const handleSyncFromHistory = async () => {
+        const projectId = prompt('Enter Project ID to sync grace minutes from:');
+        if (projectId) {
+            syncHistoryMutation.mutate({ project_id: projectId });
+        }
     };
 
     const availableCompanies = [...new Set(employees.map(e => e.company))].filter(Boolean);
