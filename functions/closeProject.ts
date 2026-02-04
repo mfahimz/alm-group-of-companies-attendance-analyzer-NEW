@@ -198,22 +198,31 @@ Deno.serve(async (req) => {
                     const timeIssues = lateMinutes + earlyCheckoutMinutes;
                     const graceMinutesCarried = Math.max(0, graceMinutesAvailable - timeIssues);
                     
-                    // Create history record
+                    // Create history record with forced string conversion
+                    const empId = employee.hrms_id != null ? String(employee.hrms_id) : '';
+                    const attId = employee.attendance_id != null ? String(employee.attendance_id) : '';
+                    
+                    if (!empId || !attId) {
+                        console.warn(`[closeProject] Skipping employee ${employee.name} - missing IDs (hrms_id: ${empId}, attendance_id: ${attId})`);
+                        graceCarryForwardResults.skipped++;
+                        continue;
+                    }
+                    
                     graceHistoryRecords.push({
-                        employee_id: String(employee.hrms_id),
-                        attendance_id: String(employee.attendance_id),
+                        employee_id: empId,
+                        attendance_id: attId,
                         employee_name: employee.name,
                         company: project.company,
-                        source_project_id: project_id,
+                        source_project_id: String(project_id),
                         source_project_name: project.name,
-                        report_run_id: project.last_saved_report_id,
+                        report_run_id: String(project.last_saved_report_id),
                         period_from: reportRun?.date_from || project.date_from,
                         period_to: reportRun?.date_to || project.date_to,
-                        grace_minutes_available: graceMinutesAvailable,
-                        late_minutes: lateMinutes,
-                        early_checkout_minutes: earlyCheckoutMinutes,
-                        time_issues: timeIssues,
-                        unused_grace_minutes: graceMinutesCarried,
+                        grace_minutes_available: Number(graceMinutesAvailable) || 0,
+                        late_minutes: Number(lateMinutes) || 0,
+                        early_checkout_minutes: Number(earlyCheckoutMinutes) || 0,
+                        time_issues: Number(timeIssues) || 0,
+                        unused_grace_minutes: Number(graceMinutesCarried) || 0,
                         carried_at: nowUAE,
                         carried_by: user.email
                     });
