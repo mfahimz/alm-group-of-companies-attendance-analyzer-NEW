@@ -202,6 +202,8 @@ Deno.serve(async (req) => {
                         const currentCarried = employee.carried_grace_minutes || 0;
                         const newCarried = currentCarried + unusedGraceMinutes;
                         await base44.asServiceRole.entities.Employee.update(employee.id, {
+                            hrms_id: String(employee.hrms_id).trim(),
+                            attendance_id: String(employee.attendance_id).trim(),
                             carried_grace_minutes: newCarried
                         });
 
