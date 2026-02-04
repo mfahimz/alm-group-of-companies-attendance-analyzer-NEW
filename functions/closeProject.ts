@@ -175,6 +175,14 @@ Deno.serve(async (req) => {
                     );
                     
                     if (!employee) {
+                        console.warn(`[closeProject] No employee found for attendance_id: ${result.attendance_id}`);
+                        graceCarryForwardResults.skipped++;
+                        continue;
+                    }
+                    
+                    // CRITICAL: Validate employee has valid IDs before processing
+                    if (!employee.hrms_id || !employee.attendance_id) {
+                        console.warn(`[closeProject] Employee ${employee.name} missing required IDs - skipping`);
                         graceCarryForwardResults.skipped++;
                         continue;
                     }
@@ -198,34 +206,28 @@ Deno.serve(async (req) => {
                     const timeIssues = lateMinutes + earlyCheckoutMinutes;
                     const graceMinutesCarried = Math.max(0, graceMinutesAvailable - timeIssues);
                     
-                    // Create history record with forced string conversion
-                    const empId = employee.hrms_id != null ? String(employee.hrms_id) : '';
-                    const attId = employee.attendance_id != null ? String(employee.attendance_id) : '';
-                    
-                    if (!empId || !attId) {
-                        console.warn(`[closeProject] Skipping employee ${employee.name} - missing IDs (hrms_id: ${empId}, attendance_id: ${attId})`);
-                        graceCarryForwardResults.skipped++;
-                        continue;
-                    }
-                    
-                    graceHistoryRecords.push({
-                        employee_id: empId,
-                        attendance_id: attId,
-                        employee_name: employee.name,
-                        company: project.company,
+                    // Create history record with explicit type conversion
+                    const historyRecord = {
+                        employee_id: String(employee.hrms_id),
+                        attendance_id: String(employee.attendance_id),
+                        employee_name: String(employee.name || ''),
+                        company: String(project.company),
                         source_project_id: String(project_id),
-                        source_project_name: project.name,
+                        source_project_name: String(project.name || ''),
                         report_run_id: String(project.last_saved_report_id),
-                        period_from: reportRun?.date_from || project.date_from,
-                        period_to: reportRun?.date_to || project.date_to,
+                        period_from: String(reportRun?.date_from || project.date_from),
+                        period_to: String(reportRun?.date_to || project.date_to),
                         grace_minutes_available: Number(graceMinutesAvailable) || 0,
                         late_minutes: Number(lateMinutes) || 0,
                         early_checkout_minutes: Number(earlyCheckoutMinutes) || 0,
                         time_issues: Number(timeIssues) || 0,
                         unused_grace_minutes: Number(graceMinutesCarried) || 0,
-                        carried_at: nowUAE,
-                        carried_by: user.email
-                    });
+                        carried_at: String(nowUAE),
+                        carried_by: String(user.email)
+                    };
+                    
+                    console.log(`[closeProject] Adding grace history for ${employee.name} (hrms: ${historyRecord.employee_id}, att: ${historyRecord.attendance_id})`);
+                    graceHistoryRecords.push(historyRecord);
                     
                     // Also update Employee.carried_grace_minutes as derived current value
                     await base44.asServiceRole.entities.Employee.update(employee.id, {
