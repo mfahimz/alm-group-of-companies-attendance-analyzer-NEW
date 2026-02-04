@@ -53,8 +53,10 @@ Deno.serve(async (req) => {
                 const currentCarried = emp.carried_grace_minutes || 0;
                 const newCarried = currentCarried + data.unused;
 
-                // Update with correct employee DB ID
+                // Update with correct employee DB ID (preserve existing string fields)
                 await base44.asServiceRole.entities.Employee.update(emp.id, {
+                    hrms_id: String(emp.hrms_id).trim(),
+                    attendance_id: String(emp.attendance_id).trim(),
                     carried_grace_minutes: newCarried
                 });
 
