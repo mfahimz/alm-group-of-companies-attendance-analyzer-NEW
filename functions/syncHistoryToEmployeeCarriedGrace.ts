@@ -20,39 +20,40 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'No grace history found for this project' }, { status: 400 });
         }
 
+        // Fetch all employees for quick lookup
+        const allEmployees = await base44.asServiceRole.entities.Employee.filter({}, null, 5000);
+
         // Group by employee_id to sum unused grace if multiple records
         const graceByEmployee = {};
         for (const record of history) {
-            const empId = String(record.employee_id).trim();
+            const empHrmsId = String(record.employee_id).trim();
             const unused = Number(record.unused_grace_minutes) || 0;
             
-            if (!graceByEmployee[empId]) {
-                graceByEmployee[empId] = { unused: 0, record };
+            if (!graceByEmployee[empHrmsId]) {
+                graceByEmployee[empHrmsId] = { unused: 0, record };
             }
-            graceByEmployee[empId].unused += unused;
+            graceByEmployee[empHrmsId].unused += unused;
         }
 
         let synced = 0;
         let failed = 0;
 
         // Update each employee
-        for (const [empId, data] of Object.entries(graceByEmployee)) {
+        for (const [empHrmsId, data] of Object.entries(graceByEmployee)) {
             try {
-                // Fetch employee
-                const emps = await base44.asServiceRole.entities.Employee.filter({
-                    hrms_id: empId
-                }, null, 10);
+                // Find employee by hrms_id in the fetched list
+                const emp = allEmployees.find(e => String(e.hrms_id) === String(empHrmsId));
 
-                if (emps.length === 0) {
+                if (!emp || !emp.id) {
+                    console.warn(`Employee not found for hrms_id: ${empHrmsId}`);
                     failed++;
                     continue;
                 }
 
-                const emp = emps[0];
                 const currentCarried = emp.carried_grace_minutes || 0;
                 const newCarried = currentCarried + data.unused;
 
-                // Update
+                // Update with correct employee DB ID
                 await base44.asServiceRole.entities.Employee.update(emp.id, {
                     carried_grace_minutes: newCarried
                 });
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
                 synced++;
 
             } catch (err) {
-                console.error(`Failed to sync ${empId}:`, err.message);
+                console.error(`Failed to sync ${empHrmsId}:`, err.message);
                 failed++;
             }
         }
