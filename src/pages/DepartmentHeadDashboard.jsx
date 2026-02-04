@@ -314,7 +314,7 @@ export default function DepartmentHeadDashboard() {
     }
 
     // Check if not Al Maraghi Auto Repairs or Al Maraghi Motors (after all data is loaded)
-    const supportedCompanies = ['Al Maraghi Auto Repairs', 'Al Maraghi Automotive', 'Al Maraghi Motors'];
+    const supportedCompanies = ['Al Maraghi Auto Repairs', 'Al Maraghi Motors'];
     if (deptHeadAssignment && !supportedCompanies.includes(deptHeadAssignment.company)) {
         return (
             <div className="max-w-4xl mx-auto p-6">

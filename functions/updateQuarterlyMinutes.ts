@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
         }
 
         // Check if company supports quarterly minutes
-        const supportedCompanies = ['Al Maraghi Automotive', 'Al Maraghi Motors'];
+        const supportedCompanies = ['Al Maraghi Auto Repairs', 'Al Maraghi Motors'];
         if (!supportedCompanies.includes(company)) {
             return Response.json({
                 success: false,
