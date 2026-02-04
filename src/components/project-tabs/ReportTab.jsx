@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import PayrollModeAlert from '@/components/ui/PayrollModeAlert';
 
 export default function ReportTab({ project, isDepartmentHead = false }) {
     console.log('[ReportTab] Rendering with:', { projectId: project?.id, isDepartmentHead });
@@ -25,35 +24,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         status: 'Processing...'
     });
 
-    const [payrollMode, setPayrollMode] = React.useState('PROJECT');
-    const [loadingPayrollMode, setLoadingPayrollMode] = React.useState(true);
 
-    // Check company payroll mode
-    React.useEffect(() => {
-        const checkPayrollMode = async () => {
-            try {
-                setLoadingPayrollMode(true);
-                const settings = await base44.entities.CompanySettings.filter({ 
-                    company: project.company 
-                }, null, 1);
-                
-                if (settings.length > 0 && settings[0].payroll_mode) {
-                    setPayrollMode(settings[0].payroll_mode);
-                } else {
-                    setPayrollMode('PROJECT'); // Default
-                }
-            } catch (error) {
-                console.error('Failed to fetch payroll mode:', error);
-                setPayrollMode('PROJECT'); // Default on error
-            } finally {
-                setLoadingPayrollMode(false);
-            }
-        };
-
-        if (project?.company) {
-            checkPayrollMode();
-        }
-    }, [project?.company]);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -480,37 +451,6 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     // Find the finalized report
     const finalizedReport = allReportRuns.find(r => r.is_final === true);
-
-    // Show loading state while checking payroll mode
-    if (loadingPayrollMode) {
-        return (
-            <Card className="border-0 shadow-lg">
-                <CardContent className="p-12 text-center">
-                    <p className="text-slate-500">Loading...</p>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // Block UI if company uses calendar mode
-    if (payrollMode === 'CALENDAR') {
-        return (
-            <div className="space-y-6">
-                <PayrollModeAlert company={project.company} />
-                <Card className="border-0 shadow-lg">
-                    <CardContent className="p-12 text-center">
-                        <AlertCircle className="w-16 h-16 text-amber-400 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                            Project-Based Reports Disabled
-                        </h3>
-                        <p className="text-slate-600">
-                            This company uses Calendar-based Payroll. Please use the Calendar module to finalize attendance and generate salary reports.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-6">
