@@ -121,13 +121,11 @@ export default function Projects() {
                     return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
                 }
                 
-                // Admin, Supervisor, CEO see all projects EXCEPT closed (unless specifically filtered)
+                // Admin, Supervisor, CEO can see all projects
                 if (isAdminRole) {
-                    console.log('[Projects] Fetching all non-closed projects (admin/supervisor/ceo)');
-                    const items = await base44.entities.Project.filter({
-                        status: { $ne: 'closed' }
-                    }, '-created_date', pageSize);
-                    console.log('[Projects] Fetched', items.length, 'non-closed projects');
+                    console.log('[Projects] Fetching all projects (admin/supervisor/ceo)');
+                    const items = await base44.entities.Project.list('-created_date', pageSize, skip);
+                    console.log('[Projects] Fetched', items.length, 'projects');
                     return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
                 }
                 
