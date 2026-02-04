@@ -206,28 +206,25 @@ Deno.serve(async (req) => {
                     const timeIssues = lateMinutes + earlyCheckoutMinutes;
                     const graceMinutesCarried = Math.max(0, graceMinutesAvailable - timeIssues);
                     
-                    // Create history record with explicit type conversion
-                    const historyRecord = {
-                        employee_id: String(employee.hrms_id),
-                        attendance_id: String(employee.attendance_id),
-                        employee_name: String(employee.name || ''),
-                        company: String(project.company),
-                        source_project_id: String(project_id),
-                        source_project_name: String(project.name || ''),
-                        report_run_id: String(project.last_saved_report_id),
-                        period_from: String(reportRun?.date_from || project.date_from),
-                        period_to: String(reportRun?.date_to || project.date_to),
-                        grace_minutes_available: Number(graceMinutesAvailable) || 0,
-                        late_minutes: Number(lateMinutes) || 0,
-                        early_checkout_minutes: Number(earlyCheckoutMinutes) || 0,
-                        time_issues: Number(timeIssues) || 0,
-                        unused_grace_minutes: Number(graceMinutesCarried) || 0,
-                        carried_at: String(nowUAE),
-                        carried_by: String(user.email)
-                    };
-                    
-                    console.log(`[closeProject] Adding grace history for ${employee.name} (hrms: ${historyRecord.employee_id}, att: ${historyRecord.attendance_id})`);
-                    graceHistoryRecords.push(historyRecord);
+                    // Create history record - store raw for now, sanitize during bulk create
+                    graceHistoryRecords.push({
+                        employee_id: employee.hrms_id,
+                        attendance_id: employee.attendance_id,
+                        employee_name: employee.name || '',
+                        company: project.company,
+                        source_project_id: project_id,
+                        source_project_name: project.name || '',
+                        report_run_id: project.last_saved_report_id,
+                        period_from: reportRun?.date_from || project.date_from,
+                        period_to: reportRun?.date_to || project.date_to,
+                        grace_minutes_available: graceMinutesAvailable,
+                        late_minutes: lateMinutes,
+                        early_checkout_minutes: earlyCheckoutMinutes,
+                        time_issues: timeIssues,
+                        unused_grace_minutes: graceMinutesCarried,
+                        carried_at: nowUAE,
+                        carried_by: user.email
+                    });
                     
                     // Also update Employee.carried_grace_minutes as derived current value
                     await base44.asServiceRole.entities.Employee.update(employee.id, {
@@ -237,29 +234,40 @@ Deno.serve(async (req) => {
                     graceCarryForwardResults.processed++;
                 }
                 
-                // Bulk create history records with sanitized data
+                // Bulk create history records with FORCED string conversion
                 if (graceHistoryRecords.length > 0) {
-                    // Deep sanitize to ensure all types are correct
-                    const sanitizedRecords = graceHistoryRecords.map(rec => ({
-                        employee_id: `${rec.employee_id}`,
-                        attendance_id: `${rec.attendance_id}`,
-                        employee_name: `${rec.employee_name}`,
-                        company: `${rec.company}`,
-                        source_project_id: `${rec.source_project_id}`,
-                        source_project_name: `${rec.source_project_name}`,
-                        report_run_id: `${rec.report_run_id}`,
-                        period_from: `${rec.period_from}`,
-                        period_to: `${rec.period_to}`,
-                        grace_minutes_available: Number(rec.grace_minutes_available),
-                        late_minutes: Number(rec.late_minutes),
-                        early_checkout_minutes: Number(rec.early_checkout_minutes),
-                        time_issues: Number(rec.time_issues),
-                        unused_grace_minutes: Number(rec.unused_grace_minutes),
-                        carried_at: `${rec.carried_at}`,
-                        carried_by: `${rec.carried_by}`
-                    }));
+                    // CRITICAL: Use .toString() method to ensure type conversion
+                    const sanitizedRecords = graceHistoryRecords.map(rec => {
+                        // Force conversion using .toString() which is more reliable than String() or template literals
+                        const empId = (rec.employee_id != null && rec.employee_id !== '') 
+                            ? rec.employee_id.toString() 
+                            : '';
+                        const attId = (rec.attendance_id != null && rec.attendance_id !== '') 
+                            ? rec.attendance_id.toString() 
+                            : '';
+                        
+                        return {
+                            employee_id: empId,
+                            attendance_id: attId,
+                            employee_name: rec.employee_name ? rec.employee_name.toString() : '',
+                            company: rec.company ? rec.company.toString() : '',
+                            source_project_id: rec.source_project_id ? rec.source_project_id.toString() : '',
+                            source_project_name: rec.source_project_name ? rec.source_project_name.toString() : '',
+                            report_run_id: rec.report_run_id ? rec.report_run_id.toString() : '',
+                            period_from: rec.period_from ? rec.period_from.toString() : '',
+                            period_to: rec.period_to ? rec.period_to.toString() : '',
+                            grace_minutes_available: Number(rec.grace_minutes_available) || 0,
+                            late_minutes: Number(rec.late_minutes) || 0,
+                            early_checkout_minutes: Number(rec.early_checkout_minutes) || 0,
+                            time_issues: Number(rec.time_issues) || 0,
+                            unused_grace_minutes: Number(rec.unused_grace_minutes) || 0,
+                            carried_at: rec.carried_at ? rec.carried_at.toString() : '',
+                            carried_by: rec.carried_by ? rec.carried_by.toString() : ''
+                        };
+                    });
                     
                     console.log(`[closeProject] Bulk creating ${sanitizedRecords.length} grace history records`);
+                    console.log(`[closeProject] Sample record types: employee_id=${typeof sanitizedRecords[0].employee_id}, attendance_id=${typeof sanitizedRecords[0].attendance_id}`);
                     await base44.asServiceRole.entities.EmployeeGraceHistory.bulkCreate(sanitizedRecords);
                     console.log(`[closeProject] Successfully created ${sanitizedRecords.length} grace history records`);
                 }
