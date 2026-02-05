@@ -116,9 +116,9 @@ export default function Projects() {
                     const items = await base44.entities.Project.filter({
                         company: currentUser.company,
                         status: 'closed'
-                    }, '-created_date', pageSize);
+                    }, '-created_date', pageSize, skip);
                     console.log('[Projects] Fetched', items.length, 'closed projects for department head');
-                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
+                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
                 }
                 
                 // Admin, Supervisor, CEO can see all projects
