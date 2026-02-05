@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Download, Save } from 'lucide-react';
+import { Upload, Download, Save, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function RamadanShiftDesigner({ schedule, onClose }) {
@@ -290,6 +290,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             <TableHead>Day Shift End</TableHead>
                             <TableHead>Night Start</TableHead>
                             <TableHead>Night End</TableHead>
+                            {weekNum === 2 && <TableHead className="w-20">Copy</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
