@@ -101,12 +101,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         );
     }, [allResults, isDepartmentHead, deptHeadVerification, employees]);
 
-    // Only fetch punches and shifts if project is NOT closed (data is deleted on close)
+    // Fetch punches and shifts for daily breakdown (needed even for closed projects)
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
-        enabled: project.status !== 'closed',
-        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        staleTime: 15 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -116,8 +115,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
-        enabled: project.status !== 'closed',
-        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        staleTime: 15 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -2312,19 +2310,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             {result.notes || '-'}
                                         </td>
                                         <td className="p-2 align-middle text-right">
-                                           {project.status === 'closed' ? (
-                                               <span className="text-xs text-slate-400">—</span>
-                                           ) : (
-                                               <Button
-                                                   size="sm"
-                                                   variant="ghost"
-                                                   onClick={() => showDailyBreakdown(result)}
-                                                   title="View daily breakdown"
-                                               >
-                                                   <Eye className="w-4 h-4" />
-                                               </Button>
-                                           )}
-                                           </td>
+                                              <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => showDailyBreakdown(result)}
+                                                  title="View daily breakdown"
+                                              >
+                                                  <Eye className="w-4 h-4" />
+                                              </Button>
+                                          </td>
                                            </tr>
                                 ))}
                             </tbody>
@@ -2463,13 +2457,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => setEditingDay(day)}
-                                            >
-                                                <Edit className="w-4 h-4 text-indigo-600" />
-                                            </Button>
+                                           {project.status !== 'closed' && (
+                                               <Button
+                                                   size="sm"
+                                                   variant="ghost"
+                                                   onClick={() => setEditingDay(day)}
+                                               >
+                                                   <Edit className="w-4 h-4 text-indigo-600" />
+                                               </Button>
+                                           )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
