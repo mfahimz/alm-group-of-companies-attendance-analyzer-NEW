@@ -49,6 +49,10 @@ export default function ShiftTimingsTab({ project }) {
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showCopyDialog, setShowCopyDialog] = useState(false);
     const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '' });
+    const [selectedRamadanSchedule, setSelectedRamadanSchedule] = useState(null);
+    const [showRamadanPreview, setShowRamadanPreview] = useState(false);
+    const [ramadanPreviewData, setRamadanPreviewData] = useState([]);
+    const [ramadanApplying, setRamadanApplying] = useState(false);
 
     const [formData, setFormData] = useState({
         attendance_id: '',
@@ -80,6 +84,102 @@ export default function ShiftTimingsTab({ project }) {
         if (hours > 12) hours -= 12;
         if (hours === 0) hours = 12;
         return `${hours}:${minutes} ${period}`;
+    };
+
+    // Calculate Ramadan overlap
+    const ramadanOverlap = React.useMemo(() => {
+        if (ramadanSchedules.length === 0) return null;
+        
+        const schedule = ramadanSchedules[0]; // Use first active schedule
+        const projectStart = new Date(project.date_from);
+        const projectEnd = new Date(project.date_to);
+        const ramadanStart = new Date(schedule.ramadan_start_date);
+        const ramadanEnd = new Date(schedule.ramadan_end_date);
+
+        const overlapStart = new Date(Math.max(projectStart, ramadanStart));
+        const overlapEnd = new Date(Math.min(projectEnd, ramadanEnd));
+
+        if (overlapStart > overlapEnd) return null; // No overlap
+
+        return {
+            schedule,
+            from: overlapStart.toISOString().split('T')[0],
+            to: overlapEnd.toISOString().split('T')[0],
+            ramadanStart: schedule.ramadan_start_date
+        };
+    }, [ramadanSchedules, project.date_from, project.date_to]);
+
+    // Check if Ramadan shifts already applied
+    const ramadanShiftsApplied = React.useMemo(() => {
+        if (!ramadanOverlap) return false;
+        
+        return shifts.some(s => 
+            s.applicable_days?.includes('Ramadan') && 
+            s.date >= ramadanOverlap.from && 
+            s.date <= ramadanOverlap.to
+        );
+    }, [shifts, ramadanOverlap]);
+
+    // Auto-select Ramadan schedule if only one exists
+    React.useEffect(() => {
+        if (ramadanSchedules.length === 1 && !selectedRamadanSchedule) {
+            setSelectedRamadanSchedule(ramadanSchedules[0]);
+        }
+    }, [ramadanSchedules]);
+
+    const handlePreviewRamadan = () => {
+        if (!ramadanOverlap || !selectedRamadanSchedule) return;
+
+        const preview = [];
+        const startDate = new Date(ramadanOverlap.from);
+        const endDate = new Date(ramadanOverlap.to);
+        const ramadanStart = new Date(ramadanOverlap.ramadanStart);
+
+        for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay();
+            
+            // Calculate week number from Ramadan start
+            const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
+            const weekIndex = Math.floor(daysSinceRamadanStart / 7) % 2;
+            const weekLabel = weekIndex === 0 ? 'Week 1' : 'Week 2';
+
+            preview.push({
+                date: dateStr,
+                dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'long' }),
+                isSunday: dayOfWeek === 0,
+                weekLabel
+            });
+        }
+
+        setRamadanPreviewData(preview);
+        setShowRamadanPreview(true);
+    };
+
+    const handleApplyRamadan = async () => {
+        if (!ramadanOverlap || !selectedRamadanSchedule) return;
+
+        setRamadanApplying(true);
+        try {
+            const result = await base44.functions.invoke('applyRamadanShifts', {
+                projectId: project.id,
+                ramadanScheduleId: selectedRamadanSchedule.id,
+                ramadanFrom: ramadanOverlap.from,
+                ramadanTo: ramadanOverlap.to
+            });
+
+            if (result.data.success) {
+                queryClient.invalidateQueries(['shifts', project.id]);
+                toast.success(result.data.message);
+                setShowRamadanPreview(false);
+            } else {
+                toast.error('Failed to apply Ramadan shifts');
+            }
+        } catch (error) {
+            toast.error('Error applying Ramadan shifts: ' + error.message);
+        } finally {
+            setRamadanApplying(false);
+        }
     };
 
     const { data: masterEmployees = [] } = useQuery({
@@ -121,6 +221,11 @@ export default function ShiftTimingsTab({ project }) {
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list(),
         enabled: showCopyDialog
+    });
+
+    const { data: ramadanSchedules = [] } = useQuery({
+        queryKey: ['ramadanSchedules', project.company],
+        queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true })
     });
 
     const { data: companySettings = [] } = useQuery({
@@ -1091,6 +1196,95 @@ export default function ShiftTimingsTab({ project }) {
 
     return (
         <div className="space-y-6">
+            {/* Ramadan Shift Override Section */}
+            {ramadanOverlap && (
+                <Card className="border-0 shadow-sm bg-purple-50 border-purple-200">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center text-white text-xl">
+                                    🌙
+                                </div>
+                                <div>
+                                    <CardTitle className="text-lg">Ramadan Shift Override</CardTitle>
+                                    <p className="text-sm text-purple-700 mt-1">
+                                        Ramadan period: {new Date(ramadanOverlap.schedule.ramadan_start_date).toLocaleDateString('en-GB')} - {new Date(ramadanOverlap.schedule.ramadan_end_date).toLocaleDateString('en-GB')}
+                                    </p>
+                                </div>
+                            </div>
+                            {ramadanShiftsApplied && (
+                                <div className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium text-sm flex items-center gap-2">
+                                    ✓ Ramadan Shifts Active
+                                </div>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label>Ramadan Schedule</Label>
+                            <Select
+                                value={selectedRamadanSchedule?.id || ''}
+                                onValueChange={(value) => {
+                                    const schedule = ramadanSchedules.find(s => s.id === value);
+                                    setSelectedRamadanSchedule(schedule);
+                                }}
+                                disabled={ramadanSchedules.length === 1 || ramadanShiftsApplied}
+                            >
+                                <SelectTrigger className="mt-2 bg-white">
+                                    <SelectValue placeholder="Select Ramadan schedule" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {ramadanSchedules.map(schedule => (
+                                        <SelectItem key={schedule.id} value={schedule.id}>
+                                            {schedule.company} {schedule.year}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {ramadanSchedules.length === 1 && (
+                                <p className="text-xs text-purple-600 mt-1">Only one schedule available - auto-selected</p>
+                            )}
+                        </div>
+
+                        <div className="bg-white border border-purple-200 rounded-lg p-4">
+                            <p className="text-sm font-medium text-purple-900 mb-2">Overlap with Project</p>
+                            <p className="text-sm text-purple-700">
+                                Ramadan shifts will apply from <strong>{new Date(ramadanOverlap.from).toLocaleDateString('en-GB')}</strong> to <strong>{new Date(ramadanOverlap.to).toLocaleDateString('en-GB')}</strong> for this project.
+                            </p>
+                            <p className="text-xs text-purple-600 mt-2">
+                                Sundays are excluded as weekly holidays. Attendance will use Ramadan shifts for these dates only.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={handlePreviewRamadan}
+                                variant="outline"
+                                disabled={!selectedRamadanSchedule}
+                            >
+                                <Eye className="w-4 h-4 mr-2" />
+                                Preview Ramadan Shifts
+                            </Button>
+                            <Button
+                                onClick={handleApplyRamadan}
+                                disabled={!selectedRamadanSchedule || ramadanShiftsApplied || ramadanApplying}
+                                className="bg-purple-600 hover:bg-purple-700"
+                            >
+                                {ramadanApplying ? 'Applying...' : ramadanShiftsApplied ? 'Already Applied' : 'Apply Ramadan Shifts'}
+                            </Button>
+                        </div>
+
+                        {ramadanShiftsApplied && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                <p className="text-sm text-green-800">
+                                    ✓ Ramadan shifts have been applied to this project. Attendance analysis will automatically use Ramadan shift timings for the overlap period.
+                                </p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Upload Progress */}
             {uploadProgress && (
                 <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
@@ -1498,6 +1692,74 @@ export default function ShiftTimingsTab({ project }) {
             </Dialog>
 
 
+
+            {/* Ramadan Preview Dialog */}
+            <Dialog open={showRamadanPreview} onOpenChange={setShowRamadanPreview}>
+                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Preview Ramadan Shifts</DialogTitle>
+                        <p className="text-sm text-slate-500 mt-1">
+                            {ramadanPreviewData.length} days from {ramadanOverlap?.from && new Date(ramadanOverlap.from).toLocaleDateString('en-GB')} to {ramadanOverlap?.to && new Date(ramadanOverlap.to).toLocaleDateString('en-GB')}
+                        </p>
+                    </DialogHeader>
+                    <div className="mt-4">
+                        <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Day</TableHead>
+                                        <TableHead>Week Pattern</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {ramadanPreviewData.map((day, idx) => (
+                                        <TableRow key={idx} className={day.isSunday ? 'bg-slate-50' : ''}>
+                                            <TableCell className="font-medium">
+                                                {new Date(day.date).toLocaleDateString('en-GB')}
+                                            </TableCell>
+                                            <TableCell>{day.dayOfWeek}</TableCell>
+                                            <TableCell>
+                                                {day.isSunday ? (
+                                                    <span className="text-slate-500">—</span>
+                                                ) : (
+                                                    <span className={day.weekLabel === 'Week 1' ? 'text-purple-700 font-medium' : 'text-indigo-700 font-medium'}>
+                                                        {day.weekLabel}
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {day.isSunday ? (
+                                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">
+                                                        Weekly Holiday
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
+                                                        Ramadan Shift
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <div className="flex gap-3 pt-4 border-t mt-4">
+                            <Button variant="outline" onClick={() => setShowRamadanPreview(false)}>
+                                Close Preview
+                            </Button>
+                            <Button
+                                onClick={handleApplyRamadan}
+                                disabled={ramadanShiftsApplied || ramadanApplying}
+                                className="bg-purple-600 hover:bg-purple-700"
+                            >
+                                {ramadanApplying ? 'Applying...' : ramadanShiftsApplied ? 'Already Applied' : 'Apply Ramadan Shifts'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Copy Shifts Dialog */}
             <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
