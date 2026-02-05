@@ -84,6 +84,24 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         setWeek2Shifts(prev => applyDefaults(prev));
     }, [employees, schedule.company]);
 
+    // Copy week 1 shifts to week 2 (all employees)
+    const copyWeek1ToWeek2 = () => {
+        setWeek2Shifts({ ...week1Shifts });
+        toast.success('Week 1 shifts copied to Week 2');
+    };
+
+    // Copy individual employee shift from week 1 to week 2
+    const copyEmployeeShift = (attendanceId) => {
+        const week1Data = week1Shifts[attendanceId];
+        if (week1Data) {
+            setWeek2Shifts(prev => ({
+                ...prev,
+                [attendanceId]: { ...week1Data }
+            }));
+            toast.success('Shift copied to Week 2');
+        }
+    };
+
     const updateMutation = useMutation({
         mutationFn: (data) => base44.entities.RamadanSchedule.update(schedule.id, data),
         onSuccess: () => {
@@ -237,6 +255,12 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                     ))}
                 </select>
                 <div className="ml-auto flex gap-2">
+                    {weekNum === 2 && (
+                        <Button size="sm" variant="outline" onClick={copyWeek1ToWeek2}>
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copy from Week 1
+                        </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => handleExport(weekNum)}>
                         <Download className="w-4 h-4 mr-2" />
                         Export Template
@@ -329,6 +353,18 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                             className="w-28"
                                         />
                                     </TableCell>
+                                    {weekNum === 2 && (
+                                        <TableCell>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => copyEmployeeShift(emp.attendance_id)}
+                                                title="Copy Week 1 shifts for this employee"
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                            </Button>
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                             );
                         })}
