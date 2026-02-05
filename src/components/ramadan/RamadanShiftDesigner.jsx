@@ -26,12 +26,31 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             return {};
         }
     });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedDepartment, setSelectedDepartment] = useState('all');
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', schedule.company],
         queryFn: () => base44.entities.Employee.filter({ company: schedule.company, active: true })
     });
+
+    // Get unique departments
+    const departments = React.useMemo(() => {
+        const depts = [...new Set(employees.map(e => e.department).filter(Boolean))];
+        return depts.sort();
+    }, [employees]);
+
+    // Filter employees based on search and department
+    const filteredEmployees = React.useMemo(() => {
+        return employees.filter(emp => {
+            const matchesSearch = !searchTerm || 
+                emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                emp.attendance_id?.toString().includes(searchTerm);
+            const matchesDepartment = selectedDepartment === 'all' || emp.department === selectedDepartment;
+            return matchesSearch && matchesDepartment;
+        });
+    }, [employees, searchTerm, selectedDepartment]);
 
     // Apply default night shift times for Al Maraghi Motors and Naser Mohsin Auto Parts
     React.useEffect(() => {
@@ -200,22 +219,40 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
 
     const renderShiftTable = (weekNum, shifts, handleChange) => (
         <div className="space-y-4">
-            <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleExport(weekNum)}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Template
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => document.getElementById(`import-week${weekNum}`).click()}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Import CSV
-                </Button>
-                <input
-                    id={`import-week${weekNum}`}
-                    type="file"
-                    accept=".csv"
-                    className="hidden"
-                    onChange={(e) => handleImport(weekNum, e)}
+            <div className="flex gap-2 items-center flex-wrap">
+                <Input
+                    placeholder="Search by name or ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-64"
                 />
+                <select
+                    value={selectedDepartment}
+                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                    className="h-9 px-3 border rounded-md text-sm"
+                >
+                    <option value="all">All Departments</option>
+                    {departments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                </select>
+                <div className="ml-auto flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleExport(weekNum)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Export Template
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => document.getElementById(`import-week${weekNum}`).click()}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import CSV
+                    </Button>
+                    <input
+                        id={`import-week${weekNum}`}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={(e) => handleImport(weekNum, e)}
+                    />
+                </div>
             </div>
 
             <div className="overflow-x-auto max-h-[500px] overflow-y-auto border rounded-lg">
@@ -232,7 +269,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {employees.map(emp => {
+                        {filteredEmployees.map(emp => {
                             const shift = shifts[emp.attendance_id] || {};
                             return (
                                 <TableRow key={emp.id}>
