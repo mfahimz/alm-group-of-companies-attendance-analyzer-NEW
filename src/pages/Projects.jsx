@@ -248,6 +248,7 @@ export default function Projects() {
     const projectsByCompany = React.useMemo(() => {
         const grouped = {};
         filteredProjects.forEach(project => {
+            if (!project || !project.company) return;
             if (!grouped[project.company]) {
                 grouped[project.company] = [];
             }
@@ -437,7 +438,10 @@ export default function Projects() {
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs text-slate-600 font-medium mb-0.5">Period</p>
                                                 <p className="font-bold text-slate-900 text-xs">
-                                                    {new Date(project.date_from).toLocaleDateString('en-GB')} → {new Date(project.date_to).toLocaleDateString('en-GB')}
+                                                   {project.date_from && project.date_to 
+                                                       ? `${new Date(project.date_from).toLocaleDateString('en-GB')} → ${new Date(project.date_to).toLocaleDateString('en-GB')}`
+                                                       : 'No dates set'
+                                                   }
                                                 </p>
                                             </div>
                                         </div>
