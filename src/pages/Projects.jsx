@@ -45,14 +45,20 @@ export default function Projects() {
         queryFn: () => base44.auth.me()
     });
 
+    const [statusFilter, setStatusFilter] = useState('draft-analyzed');
+    
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
     
-    // Department heads only see closed projects, so default filter should be 'closed'
-    const [statusFilter, setStatusFilter] = useState(isDepartmentHead ? 'closed' : 'draft-analyzed');
+    // Set default filter for department heads
+    useEffect(() => {
+        if (isDepartmentHead) {
+            setStatusFilter('closed');
+        }
+    }, [isDepartmentHead]);
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
