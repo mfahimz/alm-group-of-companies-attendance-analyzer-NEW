@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, Database, RefreshCw, AlertCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Database, RefreshCw, AlertCircle, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
@@ -406,6 +406,78 @@ export default function SystemHealth() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Fix Prompt */}
+                    {(healthReport.issues.length > 0 || healthReport.warnings.length > 0) && (
+                        <Card className="border-2 border-indigo-300 bg-indigo-50">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-indigo-900">🔧 Fix Prompt - Copy & Paste</CardTitle>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const prompt = `System Health Issues Found - ${new Date().toLocaleDateString()}
+
+${healthReport.issues.length > 0 ? `🚨 CRITICAL ISSUES (${healthReport.issues.length}):
+${healthReport.issues.map((issue, idx) => `${idx + 1}. [${issue.entity}] ${issue.issue}
+   - Count: ${issue.count}
+   - Impact: ${issue.impact}
+   - Fix: ${issue.fix}`).join('\n\n')}` : ''}
+
+${healthReport.warnings.length > 0 ? `${healthReport.issues.length > 0 ? '\n' : ''}⚠️ WARNINGS (${healthReport.warnings.length}):
+${healthReport.warnings.map((warning, idx) => `${idx + 1}. [${warning.entity}] ${warning.issue}
+   - Count: ${warning.count}
+   - Impact: ${warning.impact}
+   - Fix: ${warning.fix}`).join('\n\n')}` : ''}
+
+System Statistics:
+- Employees: ${healthReport.stats.employees} (Active: ${healthReport.stats.activeEmployees})
+- Projects: ${healthReport.stats.projects}
+- Analysis Results: ${healthReport.stats.analysisResults}
+- Punch Records: ${healthReport.stats.punches}
+- Exceptions: ${healthReport.stats.exceptions}
+- Salary Records: ${healthReport.stats.salaries}
+- Shift Timings: ${healthReport.stats.shifts}`;
+
+                                            navigator.clipboard.writeText(prompt);
+                                            toast.success('Fix prompt copied to clipboard!');
+                                        }}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    >
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Copy All Issues
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <pre className="bg-white p-4 rounded-lg text-xs overflow-x-auto border border-indigo-200 text-slate-800 font-mono max-h-96 overflow-y-auto">
+{`System Health Issues Found - ${new Date().toLocaleDateString()}
+
+${healthReport.issues.length > 0 ? `🚨 CRITICAL ISSUES (${healthReport.issues.length}):
+${healthReport.issues.map((issue, idx) => `${idx + 1}. [${issue.entity}] ${issue.issue}
+   - Count: ${issue.count}
+   - Impact: ${issue.impact}
+   - Fix: ${issue.fix}`).join('\n\n')}` : ''}
+
+${healthReport.warnings.length > 0 ? `${healthReport.issues.length > 0 ? '\n' : ''}⚠️ WARNINGS (${healthReport.warnings.length}):
+${healthReport.warnings.map((warning, idx) => `${idx + 1}. [${warning.entity}] ${warning.issue}
+   - Count: ${warning.count}
+   - Impact: ${warning.impact}
+   - Fix: ${warning.fix}`).join('\n\n')}` : ''}
+
+System Statistics:
+- Employees: ${healthReport.stats.employees} (Active: ${healthReport.stats.activeEmployees})
+- Projects: ${healthReport.stats.projects}
+- Analysis Results: ${healthReport.stats.analysisResults}
+- Punch Records: ${healthReport.stats.punches}
+- Exceptions: ${healthReport.stats.exceptions}
+- Salary Records: ${healthReport.stats.salaries}
+- Shift Timings: ${healthReport.stats.shifts}`}
+                                </pre>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Pre-Publish Checklist */}
                     <Card className="border-2 border-slate-300">
