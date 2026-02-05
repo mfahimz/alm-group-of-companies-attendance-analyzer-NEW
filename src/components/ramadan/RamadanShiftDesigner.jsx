@@ -33,6 +33,38 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         queryFn: () => base44.entities.Employee.filter({ company: schedule.company, active: true })
     });
 
+    // Apply default night shift times for Al Maraghi Motors and Naser Mohsin Auto Parts
+    React.useEffect(() => {
+        if (employees.length === 0) return;
+        if (schedule.company !== 'Al Maraghi Motors' && schedule.company !== 'Naser Mohsin Auto Parts') return;
+
+        const applyDefaults = (shifts) => {
+            const updated = { ...shifts };
+            employees.forEach(emp => {
+                const attendanceId = emp.attendance_id;
+                if (!updated[attendanceId]) {
+                    updated[attendanceId] = {
+                        active_shifts: [],
+                        night_start: '8:00 PM',
+                        night_end: '12:00 AM',
+                        day_start: '',
+                        day_end: ''
+                    };
+                } else if (!updated[attendanceId].night_start) {
+                    updated[attendanceId] = {
+                        ...updated[attendanceId],
+                        night_start: '8:00 PM',
+                        night_end: '12:00 AM'
+                    };
+                }
+            });
+            return updated;
+        };
+
+        setWeek1Shifts(prev => applyDefaults(prev));
+        setWeek2Shifts(prev => applyDefaults(prev));
+    }, [employees, schedule.company]);
+
     const updateMutation = useMutation({
         mutationFn: (data) => base44.entities.RamadanSchedule.update(schedule.id, data),
         onSuccess: () => {
@@ -247,7 +279,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     <TableCell>
                                         <Input
                                             placeholder="8:00 PM"
-                                            value={shift.night_start || '8:00 PM'}
+                                            value={shift.night_start || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'night_start', e.target.value)}
                                             className="w-28"
                                         />
@@ -255,7 +287,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     <TableCell>
                                         <Input
                                             placeholder="12:00 AM"
-                                            value={shift.night_end || '12:00 AM'}
+                                            value={shift.night_end || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'night_end', e.target.value)}
                                             className="w-28"
                                         />
