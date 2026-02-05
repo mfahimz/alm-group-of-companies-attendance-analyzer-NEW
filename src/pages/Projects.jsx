@@ -45,20 +45,13 @@ export default function Projects() {
         queryFn: () => base44.auth.me()
     });
 
-    const [statusFilter, setStatusFilter] = useState('draft-analyzed');
-    
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
     
-    // Set default filter for department heads
-    useEffect(() => {
-        if (isDepartmentHead) {
-            setStatusFilter('closed');
-        }
-    }, [isDepartmentHead]);
+    const [statusFilter, setStatusFilter] = useState(isDepartmentHead ? 'all' : 'draft-analyzed');
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
@@ -211,18 +204,22 @@ export default function Projects() {
     });
 
     const filteredProjects = React.useMemo(() => {
+        if (!projects || projects.length === 0) return [];
+        
         let filtered = projects.filter(project =>
-            project.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-            project.department?.toLowerCase().includes(debouncedSearch.toLowerCase())
+            project && project.name && (
+                project.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                project.department?.toLowerCase().includes(debouncedSearch.toLowerCase())
+            )
         );
 
         // Apply status filter
         if (statusFilter === 'all') {
             // No filter
         } else if (statusFilter === 'draft-analyzed') {
-            filtered = filtered.filter(p => p.status === 'draft' || p.status === 'analyzed');
+            filtered = filtered.filter(p => p && (p.status === 'draft' || p.status === 'analyzed'));
         } else {
-            filtered = filtered.filter(p => p.status === statusFilter);
+            filtered = filtered.filter(p => p && p.status === statusFilter);
         }
 
         // Apply sorting
