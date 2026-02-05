@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
 
         const { projectId, ramadanScheduleId, ramadanFrom, ramadanTo } = await req.json();
 
-        if (!projectId || !ramadanScheduleId || !ramadanFrom || !ramadanTo) {
+        if (!projectId || !ramadanScheduleId) {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
         }
 
@@ -23,24 +23,66 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Project or schedule not found' }, { status: 404 });
         }
 
+        // Calculate date overlap: Ramadan shifts apply ONLY to overlap dates
+        const projectStart = new Date(project.date_from);
+        const projectEnd = new Date(project.date_to);
+        const ramadanStart = new Date(schedule.ramadan_start_date);
+        const ramadanEnd = new Date(schedule.ramadan_end_date);
+
+        // Overlap dates
+        const overlapStart = new Date(Math.max(projectStart, ramadanStart));
+        const overlapEnd = new Date(Math.min(projectEnd, ramadanEnd));
+
+        // If no overlap, nothing to do
+        if (overlapStart > overlapEnd) {
+            return Response.json({
+                success: true,
+                shiftsCreated: 0,
+                message: 'No overlap between project and Ramadan dates'
+            });
+        }
+
+        // Use provided ramadanFrom/ramadanTo if given, otherwise use calculated overlap
+        const startDate = ramadanFrom ? new Date(ramadanFrom) : overlapStart;
+        const endDate = ramadanTo ? new Date(ramadanTo) : overlapEnd;
+
         // Parse week shifts
         const week1Shifts = JSON.parse(schedule.week1_shifts || '{}');
         const week2Shifts = JSON.parse(schedule.week2_shifts || '{}');
 
-        // Get all employees for this project
-        const employees = await base44.asServiceRole.entities.Employee.filter({ 
-            company: project.company,
-            active: true 
+        // Get all employees for this project (respect custom employee selection)
+        let employees;
+        if (project.custom_employee_ids) {
+            const employeeIds = project.custom_employee_ids.split(',').map(id => id.trim());
+            employees = await base44.asServiceRole.entities.Employee.filter({ 
+                company: project.company,
+                active: true
+            });
+            employees = employees.filter(e => employeeIds.includes(e.hrms_id));
+        } else {
+            employees = await base44.asServiceRole.entities.Employee.filter({ 
+                company: project.company,
+                active: true 
+            });
+        }
+
+        // Idempotency check: fetch existing Ramadan shifts for this project
+        const existingShifts = await base44.asServiceRole.entities.ShiftTiming.filter({ 
+            project_id: projectId 
+        });
+        const existingShiftMap = new Set();
+        existingShifts.forEach(shift => {
+            if (shift.applicable_days?.includes('Ramadan')) {
+                existingShiftMap.add(`${shift.attendance_id}|${shift.date}`);
+            }
         });
 
         // Generate shift timings for Ramadan period
         const shiftsToCreate = [];
-        const startDate = new Date(ramadanFrom);
-        const endDate = new Date(ramadanTo);
-        const ramadanStartDate = new Date(schedule.ramadan_start_date);
+        const skippedDuplicates = [];
 
         for (const employee of employees) {
-            const attendanceId = employee.attendance_id;
+            const attendanceId = String(employee.attendance_id);
             const week1 = week1Shifts[attendanceId];
             const week2 = week2Shifts[attendanceId];
 
@@ -49,14 +91,34 @@ Deno.serve(async (req) => {
             for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
                 const dateStr = currentDate.toISOString().split('T')[0];
                 
-                // Calculate week number from Ramadan start
-                const daysSinceRamadanStart = Math.floor((currentDate - ramadanStartDate) / (1000 * 60 * 60 * 24));
-                const weekNum = Math.floor(daysSinceRamadanStart / 7) % 2; // Alternates 0, 1, 0, 1...
+                // Sunday is weekly holiday - skip shift generation but count for week rotation
+                const dayOfWeek = currentDate.getDay();
+                if (dayOfWeek === 0) {
+                    continue; // Skip Sunday
+                }
+
+                // Idempotency: check if shift already exists
+                const shiftKey = `${attendanceId}|${dateStr}`;
+                if (existingShiftMap.has(shiftKey)) {
+                    skippedDuplicates.push(shiftKey);
+                    continue; // Skip duplicate
+                }
                 
-                const weekShifts = weekNum === 0 ? week1 : week2;
+                // Calculate week number from Ramadan start (anchored to ramadan_start_date)
+                // Weekly rotation never resets per project
+                const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
+                const weekIndex = Math.floor(daysSinceRamadanStart / 7) % 2; // Alternates 0, 1, 0, 1...
                 
-                if (weekShifts) {
-                    // Create shift timing for this date
+                const weekShifts = weekIndex === 0 ? week1 : week2;
+                
+                if (!weekShifts) continue;
+
+                // Determine active shifts based on shift_option and active_shifts
+                const activeShifts = weekShifts.active_shifts || [];
+                const shiftOption = weekShifts.shift_option || 'two_shift';
+
+                // Create shift timing based on active shifts
+                if (activeShifts.includes('shift1') || activeShifts.includes('shift2')) {
                     shiftsToCreate.push({
                         project_id: projectId,
                         attendance_id: attendanceId,
@@ -65,45 +127,52 @@ Deno.serve(async (req) => {
                         effective_to: dateStr,
                         is_friday_shift: false,
                         applicable_days: 'Ramadan Schedule',
-                        am_start: weekShifts.shift1_start || '—',
-                        am_end: weekShifts.shift1_end || '—',
-                        pm_start: weekShifts.shift2_start || '—',
-                        pm_end: weekShifts.shift2_end || '—'
+                        am_start: activeShifts.includes('shift1') ? (weekShifts.shift1_start || '—') : '—',
+                        am_end: activeShifts.includes('shift1') ? (weekShifts.shift1_end || '—') : '—',
+                        pm_start: activeShifts.includes('shift2') ? (weekShifts.shift2_start || '—') : '—',
+                        pm_end: activeShifts.includes('shift2') ? (weekShifts.shift2_end || '—') : '—'
                     });
+                }
 
-                    // Add night shift as separate timing if exists
-                    if (weekShifts.night_start && weekShifts.night_end) {
-                        shiftsToCreate.push({
-                            project_id: projectId,
-                            attendance_id: attendanceId,
-                            date: dateStr,
-                            effective_from: dateStr,
-                            effective_to: dateStr,
-                            is_friday_shift: false,
-                            applicable_days: 'Ramadan Night Shift',
-                            am_start: weekShifts.night_start || '—',
-                            am_end: weekShifts.night_end || '—',
-                            pm_start: '—',
-                            pm_end: '—'
-                        });
-                    }
+                // Add night shift as separate timing if active
+                if (activeShifts.includes('night') && weekShifts.night_start && weekShifts.night_end) {
+                    shiftsToCreate.push({
+                        project_id: projectId,
+                        attendance_id: attendanceId,
+                        date: dateStr,
+                        effective_from: dateStr,
+                        effective_to: dateStr,
+                        is_friday_shift: false,
+                        applicable_days: 'Ramadan Night Shift',
+                        am_start: weekShifts.night_start || '—',
+                        am_end: weekShifts.night_end || '—',
+                        pm_start: '—',
+                        pm_end: '—'
+                    });
                 }
             }
         }
 
         // Bulk create shifts
+        let createdCount = 0;
         if (shiftsToCreate.length > 0) {
             const batchSize = 50;
             for (let i = 0; i < shiftsToCreate.length; i += batchSize) {
                 const batch = shiftsToCreate.slice(i, i + batchSize);
                 await base44.asServiceRole.entities.ShiftTiming.bulkCreate(batch);
+                createdCount += batch.length;
             }
         }
 
         return Response.json({
             success: true,
-            shiftsCreated: shiftsToCreate.length,
-            message: `Applied Ramadan shifts for ${employees.length} employees`
+            shiftsCreated: createdCount,
+            skippedDuplicates: skippedDuplicates.length,
+            dateRange: {
+                from: startDate.toISOString().split('T')[0],
+                to: endDate.toISOString().split('T')[0]
+            },
+            message: `Applied Ramadan shifts for ${employees.length} employees (${createdCount} shifts created, ${skippedDuplicates.length} duplicates skipped)`
         });
 
     } catch (error) {
