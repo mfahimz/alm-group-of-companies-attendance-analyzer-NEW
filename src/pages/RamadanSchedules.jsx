@@ -16,6 +16,7 @@ import RamadanShiftDesigner from '../components/ramadan/RamadanShiftDesigner';
 export default function RamadanSchedules() {
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState(null);
+    const [editingDates, setEditingDates] = useState(null);
     const [formData, setFormData] = useState({
         company: '',
         year: new Date().getFullYear(),
@@ -49,6 +50,15 @@ export default function RamadanSchedules() {
         }
     });
 
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }) => base44.entities.RamadanSchedule.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['ramadanSchedules']);
+            setEditingDates(null);
+            toast.success('Ramadan dates updated');
+        }
+    });
+
     const deleteMutation = useMutation({
         mutationFn: (id) => base44.entities.RamadanSchedule.delete(id),
         onSuccess: () => {
@@ -75,6 +85,31 @@ export default function RamadanSchedules() {
         if (window.confirm('Delete this Ramadan schedule?')) {
             deleteMutation.mutate(id);
         }
+    };
+
+    const handleEditDates = (schedule) => {
+        setEditingDates({
+            id: schedule.id,
+            ramadan_start_date: schedule.ramadan_start_date,
+            ramadan_end_date: schedule.ramadan_end_date,
+            company: schedule.company,
+            year: schedule.year
+        });
+    };
+
+    const handleUpdateDates = (e) => {
+        e.preventDefault();
+        if (!editingDates.ramadan_start_date || !editingDates.ramadan_end_date) {
+            toast.error('Please fill all required fields');
+            return;
+        }
+        updateMutation.mutate({
+            id: editingDates.id,
+            data: {
+                ramadan_start_date: editingDates.ramadan_start_date,
+                ramadan_end_date: editingDates.ramadan_end_date
+            }
+        });
     };
 
     const isAdmin = currentUser?.role === 'admin';
@@ -131,10 +166,21 @@ export default function RamadanSchedules() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex gap-2 justify-end">
+                                                {isAdmin && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => handleEditDates(schedule)}
+                                                        title="Edit Ramadan dates"
+                                                    >
+                                                        <Edit className="w-4 h-4 text-blue-600" />
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
                                                     onClick={() => setEditingSchedule(schedule)}
+                                                    title="Manage shifts"
                                                 >
                                                     <Calendar className="w-4 h-4 text-indigo-600" />
                                                 </Button>
@@ -143,6 +189,7 @@ export default function RamadanSchedules() {
                                                         size="sm"
                                                         variant="ghost"
                                                         onClick={() => handleDelete(schedule.id)}
+                                                        title="Delete schedule"
                                                     >
                                                         <Trash2 className="w-4 h-4 text-red-600" />
                                                     </Button>
@@ -210,6 +257,52 @@ export default function RamadanSchedules() {
                             </Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Dates Dialog */}
+            <Dialog open={!!editingDates} onOpenChange={() => setEditingDates(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Ramadan Period</DialogTitle>
+                    </DialogHeader>
+                    {editingDates && (
+                        <form onSubmit={handleUpdateDates} className="space-y-4 mt-4">
+                            <div className="bg-slate-50 p-3 rounded-lg">
+                                <p className="text-sm text-slate-600">Company: <span className="font-medium text-slate-900">{editingDates.company}</span></p>
+                                <p className="text-sm text-slate-600">Year: <span className="font-medium text-slate-900">{editingDates.year}</span></p>
+                            </div>
+                            <div>
+                                <Label>Ramadan Start Date *</Label>
+                                <Input
+                                    type="date"
+                                    value={editingDates.ramadan_start_date}
+                                    onChange={(e) => setEditingDates({ ...editingDates, ramadan_start_date: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <Label>Ramadan End Date *</Label>
+                                <Input
+                                    type="date"
+                                    value={editingDates.ramadan_end_date}
+                                    onChange={(e) => setEditingDates({ ...editingDates, ramadan_end_date: e.target.value })}
+                                />
+                            </div>
+                            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+                                <p className="text-sm text-amber-800">
+                                    ⚠️ These dates will be updated everywhere they are used, including existing shift timings and project configurations.
+                                </p>
+                            </div>
+                            <div className="flex gap-2 pt-4">
+                                <Button type="submit" disabled={updateMutation.isPending}>
+                                    Update Dates
+                                </Button>
+                                <Button type="button" variant="outline" onClick={() => setEditingDates(null)}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </form>
+                    )}
                 </DialogContent>
             </Dialog>
 
