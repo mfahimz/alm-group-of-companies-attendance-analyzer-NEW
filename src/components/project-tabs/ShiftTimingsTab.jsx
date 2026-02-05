@@ -223,14 +223,14 @@ export default function ShiftTimingsTab({ project }) {
         enabled: showCopyDialog
     });
 
-    const { data: ramadanSchedules = [] } = useQuery({
-        queryKey: ['ramadanSchedules', project.company],
-        queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true })
-    });
-
     const { data: companySettings = [] } = useQuery({
         queryKey: ['companySettings', project.company],
         queryFn: () => base44.entities.CompanySettings.filter({ company: project.company })
+    });
+
+    const { data: ramadanSchedules = [] } = useQuery({
+        queryKey: ['ramadanSchedules', project.company],
+        queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true })
     });
 
     // Load date ranges from project configuration
