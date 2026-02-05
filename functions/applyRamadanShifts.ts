@@ -114,12 +114,11 @@ Deno.serve(async (req) => {
                 
                 if (!weekShifts) continue;
 
-                // Determine active shifts based on shift_option and active_shifts
+                // Determine active shifts
                 const activeShifts = weekShifts.active_shifts || [];
-                const shiftOption = weekShifts.shift_option || 'two_shift';
 
-                // Create shift timing based on active shifts
-                if (activeShifts.includes('shift1') || activeShifts.includes('shift2')) {
+                // Create day shift if active
+                if (activeShifts.includes('day') && weekShifts.day_start && weekShifts.day_end) {
                     shiftsToCreate.push({
                         project_id: projectId,
                         attendance_id: attendanceId,
@@ -127,15 +126,16 @@ Deno.serve(async (req) => {
                         effective_from: dateStr,
                         effective_to: dateStr,
                         is_friday_shift: false,
-                        applicable_days: 'Ramadan Schedule',
-                        am_start: activeShifts.includes('shift1') ? (weekShifts.shift1_start || '—') : '—',
-                        am_end: activeShifts.includes('shift1') ? (weekShifts.shift1_end || '—') : '—',
-                        pm_start: activeShifts.includes('shift2') ? (weekShifts.shift2_start || '—') : '—',
-                        pm_end: activeShifts.includes('shift2') ? (weekShifts.shift2_end || '—') : '—'
+                        is_single_shift: true,
+                        applicable_days: 'Ramadan Day Shift',
+                        am_start: weekShifts.day_start,
+                        am_end: '—',
+                        pm_start: '—',
+                        pm_end: weekShifts.day_end
                     });
                 }
 
-                // Add night shift as separate timing if active
+                // Create night shift if active
                 if (activeShifts.includes('night') && weekShifts.night_start && weekShifts.night_end) {
                     shiftsToCreate.push({
                         project_id: projectId,
@@ -144,11 +144,12 @@ Deno.serve(async (req) => {
                         effective_from: dateStr,
                         effective_to: dateStr,
                         is_friday_shift: false,
+                        is_single_shift: true,
                         applicable_days: 'Ramadan Night Shift',
-                        am_start: weekShifts.night_start || '—',
-                        am_end: weekShifts.night_end || '—',
+                        am_start: weekShifts.night_start,
+                        am_end: '—',
                         pm_start: '—',
-                        pm_end: '—'
+                        pm_end: weekShifts.night_end
                     });
                 }
             }
