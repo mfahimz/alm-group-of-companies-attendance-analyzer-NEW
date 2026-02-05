@@ -47,21 +47,32 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true })
         ]);
 
-        // Parse Ramadan schedules for shift lookup
+        // Parse Ramadan schedules for shift lookup - only include schedules that overlap with project date range
+        const projectStart = new Date(date_from);
+        const projectEnd = new Date(date_to);
         let ramadanShiftsLookup = {};
+        
         for (const schedule of ramadanSchedules) {
             try {
                 const ramadanStart = new Date(schedule.ramadan_start_date);
                 const ramadanEnd = new Date(schedule.ramadan_end_date);
-                const week1Data = schedule.week1_shifts ? JSON.parse(schedule.week1_shifts) : {};
-                const week2Data = schedule.week2_shifts ? JSON.parse(schedule.week2_shifts) : {};
                 
-                ramadanShiftsLookup[schedule.id] = {
-                    start: ramadanStart,
-                    end: ramadanEnd,
-                    week1: week1Data,
-                    week2: week2Data
-                };
+                // Check if Ramadan period overlaps with project date range
+                const hasOverlap = ramadanStart <= projectEnd && ramadanEnd >= projectStart;
+                
+                if (hasOverlap) {
+                    const week1Data = schedule.week1_shifts ? JSON.parse(schedule.week1_shifts) : {};
+                    const week2Data = schedule.week2_shifts ? JSON.parse(schedule.week2_shifts) : {};
+                    
+                    ramadanShiftsLookup[schedule.id] = {
+                        start: ramadanStart,
+                        end: ramadanEnd,
+                        week1: week1Data,
+                        week2: week2Data
+                    };
+                    
+                    console.log(`[runAnalysis] Ramadan schedule ${schedule.id} overlaps with project (${ramadanStart.toISOString().split('T')[0]} to ${ramadanEnd.toISOString().split('T')[0]})`);
+                }
             } catch (e) {
                 console.warn('[runAnalysis] Failed to parse Ramadan schedule:', schedule.id, e.message);
             }
