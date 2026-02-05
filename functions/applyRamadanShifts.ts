@@ -88,13 +88,18 @@ Deno.serve(async (req) => {
 
             if (!week1 && !week2) continue; // Skip if no Ramadan shifts configured
 
+            let currentWeekIndex = 0; // Start with Week 1 (index 0)
+
             for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
                 const dateStr = currentDate.toISOString().split('T')[0];
                 
-                // Sunday is weekly holiday - skip shift generation but count for week rotation
                 const dayOfWeek = currentDate.getDay();
-                if (dayOfWeek === 0) {
-                    continue; // Skip Sunday
+                const isSunday = dayOfWeek === 0;
+                
+                // Sunday is weekly holiday - skip shift generation but toggle week pattern
+                if (isSunday) {
+                    currentWeekIndex = (currentWeekIndex + 1) % 2; // Toggle week after Sunday
+                    continue;
                 }
 
                 // Idempotency: check if shift already exists
@@ -104,12 +109,8 @@ Deno.serve(async (req) => {
                     continue; // Skip duplicate
                 }
                 
-                // Calculate week number from Ramadan start (anchored to ramadan_start_date)
-                // Weekly rotation never resets per project
-                const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
-                const weekIndex = Math.floor(daysSinceRamadanStart / 7) % 2; // Alternates 0, 1, 0, 1...
-                
-                const weekShifts = weekIndex === 0 ? week1 : week2;
+                // Use current week index (resets after each Sunday)
+                const weekShifts = currentWeekIndex === 0 ? week1 : week2;
                 
                 if (!weekShifts) continue;
 
