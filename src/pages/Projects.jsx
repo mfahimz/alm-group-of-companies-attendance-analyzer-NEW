@@ -24,7 +24,6 @@ export default function Projects() {
     const [duplicateProject, setDuplicateProject] = useState(null);
     const [selectedProjects, setSelectedProjects] = useState([]);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
-    const [statusFilter, setStatusFilter] = useState('draft-analyzed');
     const [sortBy, setSortBy] = useState('status-closed-last');
     const [page, setPage] = useState(1);
     const [pageSize] = useState(50);
@@ -51,6 +50,9 @@ export default function Projects() {
     const isSupervisor = userRole === 'supervisor';
     const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
+    
+    // Department heads only see closed projects, so default filter should be 'closed'
+    const [statusFilter, setStatusFilter] = useState(isDepartmentHead ? 'closed' : 'draft-analyzed');
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
