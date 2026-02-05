@@ -70,6 +70,11 @@ export default function ShiftTimingsTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
+    const { data: ramadanSchedules = [] } = useQuery({
+        queryKey: ['ramadanSchedules', project.company],
+        queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true })
+    });
+
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = false; // Removed - all users can now create/edit shifts
 
@@ -226,11 +231,6 @@ export default function ShiftTimingsTab({ project }) {
     const { data: companySettings = [] } = useQuery({
         queryKey: ['companySettings', project.company],
         queryFn: () => base44.entities.CompanySettings.filter({ company: project.company })
-    });
-
-    const { data: ramadanSchedules = [] } = useQuery({
-        queryKey: ['ramadanSchedules', project.company],
-        queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true })
     });
 
     // Load date ranges from project configuration
