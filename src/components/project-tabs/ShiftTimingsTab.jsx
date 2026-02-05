@@ -143,23 +143,28 @@ export default function ShiftTimingsTab({ project }) {
         const preview = [];
         const startDate = new Date(ramadanOverlap.from);
         const endDate = new Date(ramadanOverlap.to);
-        const ramadanStart = new Date(ramadanOverlap.ramadanStart);
+        
+        let currentWeekIndex = 0; // Start with Week 1 (index 0)
 
         for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
+            const isSunday = dayOfWeek === 0;
             
-            // Calculate week number from Ramadan start
-            const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
-            const weekIndex = Math.floor(daysSinceRamadanStart / 7) % 2;
-            const weekLabel = weekIndex === 0 ? 'Week 1' : 'Week 2';
+            // Determine week label (Week 1 or Week 2)
+            const weekLabel = currentWeekIndex === 0 ? 'Week 1' : 'Week 2';
 
             preview.push({
                 date: dateStr,
                 dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'long' }),
-                isSunday: dayOfWeek === 0,
+                isSunday,
                 weekLabel
             });
+
+            // After Sunday, toggle to the next week pattern
+            if (isSunday) {
+                currentWeekIndex = (currentWeekIndex + 1) % 2;
+            }
         }
 
         setRamadanPreviewData(preview);
