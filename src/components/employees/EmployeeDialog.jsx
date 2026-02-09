@@ -109,11 +109,11 @@ export default function EmployeeDialog({ open, onClose, employee }) {
 
     const selectedCompanySettings = companySettings.find(cs => cs.company === formData.company);
     let departments = selectedCompanySettings 
-        ? selectedCompanySettings.departments.split(',').map(d => d.trim()).filter(Boolean)
+        ? selectedCompanySettings.departments.split(',').map(d => d.trim()).filter(d => d.length > 0)
         : ['Admin'];
     
     // Ensure current department is in the list (in case it was saved but not in settings)
-    if (formData.department && !departments.includes(formData.department)) {
+    if (formData.department && formData.department.trim() && !departments.includes(formData.department)) {
         departments = [...departments, formData.department];
     }
 
