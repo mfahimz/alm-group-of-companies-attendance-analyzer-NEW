@@ -371,7 +371,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                     <div>
                         <Label htmlFor="company">Company *</Label>
                         <Select
-                            value={formData.company}
+                            value={formData.company || undefined}
                             onValueChange={(value) => setFormData({ ...formData, company: value, department: '' })}
                         >
                             <SelectTrigger>
@@ -432,7 +432,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                     <div>
                         <Label htmlFor="weekly_off">Weekly Off *</Label>
                         <Select
-                            value={formData.weekly_off}
+                            value={formData.weekly_off || undefined}
                             onValueChange={(value) => setFormData({ ...formData, weekly_off: value })}
                         >
                             <SelectTrigger>
