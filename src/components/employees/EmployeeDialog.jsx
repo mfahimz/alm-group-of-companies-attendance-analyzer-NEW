@@ -14,6 +14,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         hrms_id: '',
         has_attendance_tracking: true,
         attendance_id: '',
+        assumed_present_daily: false,
+        exclude_from_attendance_deductions: false,
         name: '',
         company: '',
         department: '',
@@ -44,6 +46,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 hrms_id: employee.hrms_id || '',
                 has_attendance_tracking: employee.has_attendance_tracking ?? true,
                 attendance_id: employee.attendance_id || '',
+                assumed_present_daily: employee.assumed_present_daily ?? false,
+                exclude_from_attendance_deductions: employee.exclude_from_attendance_deductions ?? false,
                 name: employee.name || '',
                 company: employee.company || '',
                 department: employee.department || '',
@@ -61,6 +65,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         hrms_id: data.hrms_id,
                         has_attendance_tracking: true,
                         attendance_id: '',
+                        assumed_present_daily: false,
+                        exclude_from_attendance_deductions: false,
                         name: '',
                         company: '',
                         department: '',
@@ -74,6 +80,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         hrms_id: '',
                         has_attendance_tracking: true,
                         attendance_id: '',
+                        assumed_present_daily: false,
+                        exclude_from_attendance_deductions: false,
                         name: '',
                         company: '',
                         department: '',
@@ -313,10 +321,40 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                     )}
 
                     {!formData.has_attendance_tracking && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                            <p className="text-sm text-amber-800">
-                                <strong>Salary-only employee:</strong> Will not appear in attendance reports, only in salary calculations.
-                            </p>
+                        <div className="space-y-3">
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                <p className="text-sm text-amber-800">
+                                    <strong>Salary-only employee:</strong> Will not appear in attendance reports, only in salary calculations.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 border-b border-slate-200">
+                                <div>
+                                    <Label>Assumed Present Daily</Label>
+                                    <p className="text-xs text-slate-500">Auto-mark present every working day</p>
+                                </div>
+                                <Switch
+                                    checked={formData.assumed_present_daily}
+                                    onCheckedChange={(checked) => setFormData({ 
+                                        ...formData, 
+                                        assumed_present_daily: checked
+                                    })}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 border-b border-slate-200">
+                                <div>
+                                    <Label>Exclude from Deductions</Label>
+                                    <p className="text-xs text-slate-500">No late/early/LOP deductions</p>
+                                </div>
+                                <Switch
+                                    checked={formData.exclude_from_attendance_deductions}
+                                    onCheckedChange={(checked) => setFormData({ 
+                                        ...formData, 
+                                        exclude_from_attendance_deductions: checked
+                                    })}
+                                />
+                            </div>
                         </div>
                     )}
 
