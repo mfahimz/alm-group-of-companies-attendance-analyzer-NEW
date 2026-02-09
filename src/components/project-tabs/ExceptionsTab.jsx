@@ -1151,7 +1151,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">All departments</SelectItem>
-                                            {departments.map(dept => (
+                                            {departments.filter(dept => dept && dept.trim()).map(dept => (
                                                 <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                                             ))}
                                         </SelectContent>
