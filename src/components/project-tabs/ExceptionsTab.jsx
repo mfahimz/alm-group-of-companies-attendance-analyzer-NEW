@@ -86,7 +86,7 @@ export default function ExceptionsTab({ project }) {
     const [viewingException, setViewingException] = useState(null);
     const [editingException, setEditingException] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [importPreview, setImportPreview] = useState(null);
     const [showImportPreview, setShowImportPreview] = useState(false);
