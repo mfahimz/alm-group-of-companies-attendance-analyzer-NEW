@@ -127,7 +127,8 @@ export default function ExceptionsTab({ project }) {
                 });
             }
         }
-        return combined;
+        // Filter out employees with empty attendance_id
+        return combined.filter(emp => emp.attendance_id && String(emp.attendance_id).trim());
     }, [masterEmployees, projectEmployees]);
 
     const { data: currentUser } = useQuery({
