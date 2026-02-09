@@ -406,9 +406,9 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                                     <SelectValue placeholder="Select department" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {departments.map(dept => (
-                                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                                    ))}
+                                   {departments.filter(dept => dept && dept.trim()).map(dept => (
+                                       <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                   ))}
                                     {isAdminOrSupervisor && (
                                         <>
                                             <SelectItem value="__create_new__" className="text-indigo-600 font-medium">
