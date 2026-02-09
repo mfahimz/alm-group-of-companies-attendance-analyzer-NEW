@@ -271,6 +271,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
+    Calendar: {
+        name: 'Calendar',
+        title: 'Calendar Payroll',
+        icon: Calendar,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
 
     // Hidden Pages (No navigation)
     ProjectDetail: {
