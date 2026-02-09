@@ -275,7 +275,7 @@ export const PAGES_CONFIG = {
         name: 'Calendar',
         title: 'Calendar Payroll',
         icon: Calendar,
-        category: 'Admin',
+        category: 'CalendarPayroll',
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
@@ -374,10 +374,16 @@ export const NAV_CATEGORIES = {
         order: 4,
         renderAs: 'dropdown'
     },
+    CalendarPayroll: {
+        label: 'Calendar Payroll',
+        icon: Calendar,
+        order: 5,
+        renderAs: 'dropdown'
+    },
     Admin: {
         label: 'Admin',
         icon: Settings,
-        order: 5,
+        order: 6,
         renderAs: 'dropdown'
     }
 };
