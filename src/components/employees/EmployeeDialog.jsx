@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 export default function EmployeeDialog({ open, onClose, employee }) {
     const [formData, setFormData] = useState({
         hrms_id: '',
+        has_attendance_tracking: true,
         attendance_id: '',
         name: '',
         company: '',
@@ -41,6 +42,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         if (employee && open) {
             setFormData({
                 hrms_id: employee.hrms_id || '',
+                has_attendance_tracking: employee.has_attendance_tracking ?? true,
                 attendance_id: employee.attendance_id || '',
                 name: employee.name || '',
                 company: employee.company || '',
@@ -57,6 +59,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                     const { data } = await base44.functions.invoke('generateHrmsId', {});
                     setFormData({
                         hrms_id: data.hrms_id,
+                        has_attendance_tracking: true,
                         attendance_id: '',
                         name: '',
                         company: '',
@@ -69,6 +72,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                     toast.error('Failed to generate HRMS ID');
                     setFormData({
                         hrms_id: '',
+                        has_attendance_tracking: true,
                         attendance_id: '',
                         name: '',
                         company: '',
@@ -224,8 +228,14 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        if (!formData.hrms_id || !formData.attendance_id || !formData.name || !formData.company) {
+        if (!formData.hrms_id || !formData.name || !formData.company) {
             toast.error('Please fill in all required fields');
+            return;
+        }
+
+        // Validate attendance_id only if attendance tracking is enabled
+        if (formData.has_attendance_tracking && !formData.attendance_id) {
+            toast.error('Attendance ID is required for employees with attendance tracking');
             return;
         }
 
@@ -242,7 +252,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         const cleanedData = {
             ...formData,
             hrms_id: String(formData.hrms_id).trim(),
-            attendance_id: String(formData.attendance_id).trim()
+            attendance_id: formData.attendance_id ? String(formData.attendance_id).trim() : ''
         };
 
         if (employee) {
@@ -273,17 +283,42 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         {!employee && <p className="text-xs text-slate-500 mt-1">Auto-generated unique ID</p>}
                     </div>
 
-                    <div>
-                        <Label htmlFor="attendance_id">Attendance ID *</Label>
-                        <Input
-                            id="attendance_id"
-                            type="text"
-                            value={formData.attendance_id}
-                            onChange={(e) => setFormData({ ...formData, attendance_id: e.target.value })}
-                            placeholder="e.g. EMP001"
+                    <div className="flex items-center justify-between py-2 border-b border-slate-200">
+                        <div>
+                            <Label>Attendance Tracking</Label>
+                            <p className="text-xs text-slate-500">Enable if employee has punch data</p>
+                        </div>
+                        <Switch
+                            checked={formData.has_attendance_tracking}
+                            onCheckedChange={(checked) => setFormData({ 
+                                ...formData, 
+                                has_attendance_tracking: checked,
+                                attendance_id: checked ? formData.attendance_id : ''
+                            })}
                         />
-                        <p className="text-xs text-slate-500 mt-1">Used for matching punch data</p>
                     </div>
+
+                    {formData.has_attendance_tracking && (
+                        <div>
+                            <Label htmlFor="attendance_id">Attendance ID *</Label>
+                            <Input
+                                id="attendance_id"
+                                type="text"
+                                value={formData.attendance_id}
+                                onChange={(e) => setFormData({ ...formData, attendance_id: e.target.value })}
+                                placeholder="e.g. EMP001"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Used for matching punch data</p>
+                        </div>
+                    )}
+
+                    {!formData.has_attendance_tracking && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p className="text-sm text-amber-800">
+                                <strong>Salary-only employee:</strong> Will not appear in attendance reports, only in salary calculations.
+                            </p>
+                        </div>
+                    )}
 
                     <div>
                         <Label htmlFor="name">Name *</Label>
