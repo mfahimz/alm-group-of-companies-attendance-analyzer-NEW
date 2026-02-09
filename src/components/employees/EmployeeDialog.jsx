@@ -390,7 +390,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         <Label htmlFor="department">Department</Label>
                         <div className="flex gap-2">
                             <Select
-                                value={formData.department}
+                                value={formData.department || undefined}
                                 onValueChange={(value) => {
                                     if (value === '__create_new__') {
                                         setShowNewDeptDialog(true);
