@@ -18,7 +18,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         department: '',
         weekly_off: 'Sunday',
         active: true,
-        carried_grace_minutes: 0
+        carried_grace_minutes: 0,
+        has_attendance_tracking: true
     });
     const [showNewDeptDialog, setShowNewDeptDialog] = useState(false);
     const [showNewSubDeptDialog, setShowNewSubDeptDialog] = useState(false);
@@ -47,7 +48,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 department: employee.department || '',
                 weekly_off: employee.weekly_off || 'Sunday',
                 active: employee.active ?? true,
-                carried_grace_minutes: employee.carried_grace_minutes || 0
+                carried_grace_minutes: employee.carried_grace_minutes || 0,
+                has_attendance_tracking: employee.has_attendance_tracking ?? true
             });
         } else if (open && !employee) {
             // Auto-generate HRMS ID for new employees
@@ -63,7 +65,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         department: '',
                         weekly_off: 'Sunday',
                         active: true,
-                        carried_grace_minutes: 0
+                        carried_grace_minutes: 0,
+                        has_attendance_tracking: true
                     });
                 } catch (error) {
                     toast.error('Failed to generate HRMS ID');
@@ -75,7 +78,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         department: '',
                         weekly_off: 'Sunday',
                         active: true,
-                        carried_grace_minutes: 0
+                        carried_grace_minutes: 0,
+                        has_attendance_tracking: true
                     });
                 } finally {
                     setGeneratingHrmsId(false);
@@ -224,8 +228,15 @@ export default function EmployeeDialog({ open, onClose, employee }) {
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        if (!formData.hrms_id || !formData.attendance_id || !formData.name || !formData.company) {
+        // Validate required fields
+        if (!formData.hrms_id || !formData.name || !formData.company) {
             toast.error('Please fill in all required fields');
+            return;
+        }
+
+        // If has_attendance_tracking is true, attendance_id is required
+        if (formData.has_attendance_tracking && !formData.attendance_id) {
+            toast.error('Attendance ID is required for employees with attendance tracking');
             return;
         }
 
@@ -238,11 +249,11 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             return;
         }
 
-        // Ensure hrms_id and attendance_id are strings
+        // Ensure hrms_id and attendance_id are strings (or empty if no attendance tracking)
         const cleanedData = {
             ...formData,
             hrms_id: String(formData.hrms_id).trim(),
-            attendance_id: String(formData.attendance_id).trim()
+            attendance_id: formData.has_attendance_tracking ? String(formData.attendance_id).trim() : ''
         };
 
         if (employee) {
@@ -273,17 +284,35 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         {!employee && <p className="text-xs text-slate-500 mt-1">Auto-generated unique ID</p>}
                     </div>
 
-                    <div>
-                        <Label htmlFor="attendance_id">Attendance ID *</Label>
-                        <Input
-                            id="attendance_id"
-                            type="text"
-                            value={formData.attendance_id}
-                            onChange={(e) => setFormData({ ...formData, attendance_id: e.target.value })}
-                            placeholder="e.g. EMP001"
+                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <div>
+                            <Label htmlFor="has_attendance">Has Attendance Tracking?</Label>
+                            <p className="text-xs text-slate-500">Enable for employees who punch in/out. Disable for salary-only employees.</p>
+                        </div>
+                        <Switch
+                            id="has_attendance"
+                            checked={formData.has_attendance_tracking}
+                            onCheckedChange={(checked) => setFormData({ 
+                                ...formData, 
+                                has_attendance_tracking: checked,
+                                attendance_id: checked ? formData.attendance_id : ''
+                            })}
                         />
-                        <p className="text-xs text-slate-500 mt-1">Used for matching punch data</p>
                     </div>
+
+                    {formData.has_attendance_tracking && (
+                        <div>
+                            <Label htmlFor="attendance_id">Attendance ID *</Label>
+                            <Input
+                                id="attendance_id"
+                                type="text"
+                                value={formData.attendance_id}
+                                onChange={(e) => setFormData({ ...formData, attendance_id: e.target.value })}
+                                placeholder="e.g. EMP001"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Used for matching punch data</p>
+                        </div>
+                    )}
 
                     <div>
                         <Label htmlFor="name">Name *</Label>
