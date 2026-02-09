@@ -450,7 +450,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         try {
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
             
-            const exportData = filteredExceptions.map(ex => {
+            const exportData = sortedExceptions.map(ex => {
                 const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
                 return {
                     'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
