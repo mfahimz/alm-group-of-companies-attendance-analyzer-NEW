@@ -49,7 +49,6 @@ const TYPE_MAP = {
 
 export default function ExceptionsTab({ project }) {
     const [showForm, setShowForm] = useState(false);
-    const [showNlpInput, setShowNlpInput] = useState(false);
     const [nlpText, setNlpText] = useState('');
     const [nlpParsing, setNlpParsing] = useState(false);
     const [employeeSearch, setEmployeeSearch] = useState('');
@@ -604,10 +603,8 @@ Only include fields that are relevant. Ensure dates are within the project range
                 allowed_minutes_type: parsed.allowed_minutes_type || 'both'
             });
 
-            setShowForm(true);
-            setShowNlpInput(false);
             setNlpText('');
-            toast.success('Parsed successfully! Review and submit the form.');
+            toast.success('Form filled from your description! Review and submit.');
         } catch (error) {
             console.error('NLP parsing error:', error);
             toast.error('Failed to parse: ' + (error.message || 'Unknown error'));
@@ -830,66 +827,6 @@ Only include fields that are relevant. Ensure dates are within the project range
                 </Card>
             )}
 
-            {/* NLP Exception Input */}
-            {showNlpInput && (
-                <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-purple-50">
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-indigo-600" />
-                            <CardTitle>Quick Exception Entry</CardTitle>
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1">
-                            Describe the exception in natural language (e.g., "Mark Ahmed as annual leave from Jan 15-20")
-                        </p>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <Label>Describe the exception</Label>
-                            <Input
-                                placeholder="e.g., Public holiday on Feb 15, or Sarah on sick leave from Jan 10-12"
-                                value={nlpText}
-                                onChange={(e) => setNlpText(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !nlpParsing) {
-                                        handleNlpParse();
-                                    }
-                                }}
-                                disabled={nlpParsing}
-                            />
-                        </div>
-                        <div className="flex gap-3">
-                            <Button
-                                onClick={handleNlpParse}
-                                disabled={nlpParsing || !nlpText.trim()}
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                            >
-                                {nlpParsing ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                                        Parsing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles className="w-4 h-4 mr-2" />
-                                        Parse & Fill Form
-                                    </>
-                                )}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    setShowNlpInput(false);
-                                    setNlpText('');
-                                }}
-                                disabled={nlpParsing}
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
             {/* Add Exception Form */}
             {showForm && (
                 <Card className="border-0 shadow-sm">
@@ -898,6 +835,50 @@ Only include fields that are relevant. Ensure dates are within the project range
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Quick Entry with NLP */}
+                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                                    <Label className="font-medium text-indigo-900">Quick Entry (Optional)</Label>
+                                </div>
+                                <p className="text-xs text-slate-600 mb-3">
+                                    Describe in natural language and we'll fill the form below
+                                </p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="e.g., Mark Ahmed as annual leave from Jan 15-20"
+                                        value={nlpText}
+                                        onChange={(e) => setNlpText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !nlpParsing) {
+                                                e.preventDefault();
+                                                handleNlpParse();
+                                            }
+                                        }}
+                                        disabled={nlpParsing}
+                                        className="flex-1"
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={handleNlpParse}
+                                        disabled={nlpParsing || !nlpText.trim()}
+                                        size="sm"
+                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        {nlpParsing ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                                                Parsing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-4 h-4 mr-2" />
+                                                Fill Form
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'CUSTOM' && '*'}</Label>
@@ -1219,26 +1200,15 @@ Only include fields that are relevant. Ensure dates are within the project range
                             <Download className="w-4 h-4 mr-2" />
                             Export
                         </Button>
-                        {!showForm && !showNlpInput && (
-                            <>
-                                <Button 
-                                    onClick={() => setShowNlpInput(true)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                                >
-                                    <Sparkles className="w-4 h-4 mr-2" />
-                                    Quick Entry
-                                </Button>
-                                <Button 
-                                    onClick={() => setShowForm(true)}
-                                    size="sm"
-                                    className="bg-indigo-600 hover:bg-indigo-700"
-                                >
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Exception
-                                </Button>
-                            </>
+                        {!showForm && (
+                            <Button 
+                                onClick={() => setShowForm(true)}
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Exception
+                            </Button>
                         )}
                         </div>
                     </div>
