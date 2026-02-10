@@ -26,6 +26,13 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             return {};
         }
     });
+    const [fridayShifts, setFridayShifts] = useState(() => {
+        try {
+            return schedule.friday_shifts ? JSON.parse(schedule.friday_shifts) : {};
+        } catch {
+            return {};
+        }
+    });
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedDepartment, setSelectedDepartment] = useState('all');
     const queryClient = useQueryClient();
@@ -151,7 +158,8 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
     const handleSave = () => {
         updateMutation.mutate({
             week1_shifts: JSON.stringify(week1Shifts),
-            week2_shifts: JSON.stringify(week2Shifts)
+            week2_shifts: JSON.stringify(week2Shifts),
+            friday_shifts: JSON.stringify(fridayShifts)
         });
     };
 
@@ -167,6 +175,16 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
 
     const handleWeek2Change = (attendanceId, field, value) => {
         setWeek2Shifts(prev => ({
+            ...prev,
+            [attendanceId]: {
+                ...prev[attendanceId],
+                [field]: value
+            }
+        }));
+    };
+
+    const handleFridayChange = (attendanceId, field, value) => {
+        setFridayShifts(prev => ({
             ...prev,
             [attendanceId]: {
                 ...prev[attendanceId],
@@ -335,14 +353,16 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             Copy from Week 1
                         </Button>
                     )}
-                    <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => clearAllNightShifts(weekNum)}
-                        className="text-red-600 hover:text-red-700"
-                    >
-                        Clear All Night Times
-                    </Button>
+                    {weekNum !== 'friday' && (
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => clearAllNightShifts(weekNum)}
+                            className="text-red-600 hover:text-red-700"
+                        >
+                            Clear All Night Times
+                        </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => handleExport(weekNum)}>
                         <Download className="w-4 h-4 mr-2" />
                         Export Template
@@ -436,17 +456,17 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                             className="w-28"
                                         />
                                     </TableCell>
-                                    {weekNum === 2 && (
-                                        <TableCell>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => copyEmployeeShift(emp.attendance_id)}
-                                                title="Copy Week 1 shifts for this employee"
-                                            >
-                                                <Copy className="w-4 h-4" />
-                                            </Button>
-                                        </TableCell>
+                                    {(weekNum === 2 || weekNum === 'friday') && (
+                                    <TableCell>
+                                    <Button
+                                       size="sm"
+                                       variant="ghost"
+                                       onClick={() => copyEmployeeShift(emp.attendance_id)}
+                                       title="Copy Week 1 shifts for this employee"
+                                    >
+                                       <Copy className="w-4 h-4" />
+                                    </Button>
+                                    </TableCell>
                                     )}
                                 </TableRow>
                             );
@@ -480,15 +500,19 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                     </Card>
 
                     <Tabs defaultValue="week1" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
+                        <TabsList className="grid w-full grid-cols-3">
                             <TabsTrigger value="week1">Week 1 Pattern</TabsTrigger>
                             <TabsTrigger value="week2">Week 2 Pattern</TabsTrigger>
+                            <TabsTrigger value="friday">Friday Shifts</TabsTrigger>
                         </TabsList>
                         <TabsContent value="week1" className="mt-4">
                             {renderShiftTable(1, week1Shifts, handleWeek1Change)}
                         </TabsContent>
                         <TabsContent value="week2" className="mt-4">
                             {renderShiftTable(2, week2Shifts, handleWeek2Change)}
+                        </TabsContent>
+                        <TabsContent value="friday" className="mt-4">
+                            {renderShiftTable('friday', fridayShifts, handleFridayChange)}
                         </TabsContent>
                     </Tabs>
 

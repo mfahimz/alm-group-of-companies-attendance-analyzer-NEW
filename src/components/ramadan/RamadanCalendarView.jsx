@@ -13,13 +13,14 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
     const itemsPerPage = 10; // Safe limit for rendering
 
     // Parse shift data once
-    const { week1Shifts, week2Shifts } = useMemo(() => {
+    const { week1Shifts, week2Shifts, fridayShifts } = useMemo(() => {
         try {
             const week1 = schedule.week1_shifts ? JSON.parse(schedule.week1_shifts) : {};
             const week2 = schedule.week2_shifts ? JSON.parse(schedule.week2_shifts) : {};
-            return { week1Shifts: week1, week2Shifts: week2 };
+            const friday = schedule.friday_shifts ? JSON.parse(schedule.friday_shifts) : {};
+            return { week1Shifts: week1, week2Shifts: week2, fridayShifts: friday };
         } catch {
-            return { week1Shifts: {}, week2Shifts: {} };
+            return { week1Shifts: {}, week2Shifts: {}, fridayShifts: {} };
         }
     }, [schedule]);
 
@@ -32,9 +33,9 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
     // Filter employees with shift data
     const employeesWithShifts = useMemo(() => {
         return employees.filter(emp => 
-            week1Shifts[emp.attendance_id] || week2Shifts[emp.attendance_id]
+            week1Shifts[emp.attendance_id] || week2Shifts[emp.attendance_id] || fridayShifts[emp.attendance_id]
         );
-    }, [employees, week1Shifts, week2Shifts]);
+    }, [employees, week1Shifts, week2Shifts, fridayShifts]);
 
     // Apply search and filter
     const filteredEmployees = useMemo(() => {
@@ -66,6 +67,7 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dayOfWeek = d.getDay();
             const isSunday = dayOfWeek === 0;
+            const isFriday = dayOfWeek === 5;
             
             days.push({
                 date: new Date(d),
@@ -73,7 +75,8 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
                 day: d.getDate(),
                 month: d.getMonth(),
                 weekLabel: weekIndex === 0 ? 'W1' : 'W2',
-                isSunday
+                isSunday,
+                isFriday
             });
             
             if (isSunday) {
@@ -99,7 +102,12 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
         return parts.length > 0 ? parts.join(' | ') : '—';
     };
 
-    const getShiftForDay = (attendanceId, weekLabel) => {
+    const getShiftForDay = (attendanceId, weekLabel, isFriday) => {
+        // Friday has priority - use Friday shifts if available
+        if (isFriday && fridayShifts[attendanceId]) {
+            return fridayShifts[attendanceId];
+        }
+        // Otherwise use week pattern
         const shifts = weekLabel === 'W1' ? week1Shifts : week2Shifts;
         return shifts[attendanceId];
     };
@@ -195,7 +203,7 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
                                                     <p className="text-xs font-medium text-slate-700 mb-1.5">{monthGroup.monthName}</p>
                                                     <div className="grid grid-cols-7 gap-1">
                                                         {monthGroup.days.map((day, dayIdx) => {
-                                                            const shift = getShiftForDay(emp.attendance_id, day.weekLabel);
+                                                            const shift = getShiftForDay(emp.attendance_id, day.weekLabel, day.isFriday);
                                                             const shiftText = formatShift(shift);
                                                             
                                                             return (
@@ -204,14 +212,22 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
                                                                     className={`p-1.5 text-center rounded border text-xs ${
                                                                         day.isSunday 
                                                                             ? 'bg-slate-100 text-slate-500 border-slate-300' 
+                                                                            : day.isFriday 
+                                                                            ? 'bg-green-50 border-green-300'
                                                                             : 'bg-white border-slate-200'
                                                                     }`}
                                                                 >
                                                                     <div className="font-medium text-slate-700">{day.day}</div>
                                                                     <div className={`text-[10px] mt-0.5 ${
-                                                                        day.weekLabel === 'W1' ? 'text-purple-600' : 'text-indigo-600'
+                                                                        day.isSunday 
+                                                                            ? 'text-slate-500'
+                                                                            : day.isFriday 
+                                                                            ? 'text-green-700 font-medium'
+                                                                            : day.weekLabel === 'W1' 
+                                                                            ? 'text-purple-600' 
+                                                                            : 'text-indigo-600'
                                                                     }`}>
-                                                                        {day.isSunday ? 'Holiday' : day.weekLabel}
+                                                                        {day.isSunday ? 'Holiday' : day.isFriday ? 'Friday' : day.weekLabel}
                                                                     </div>
                                                                     {!day.isSunday && (
                                                                         <div className="text-[10px] text-slate-600 mt-1 leading-tight break-words">
