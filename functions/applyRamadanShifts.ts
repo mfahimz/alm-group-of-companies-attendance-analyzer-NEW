@@ -46,9 +46,10 @@ Deno.serve(async (req) => {
         const startDate = ramadanFrom ? new Date(ramadanFrom) : overlapStart;
         const endDate = ramadanTo ? new Date(ramadanTo) : overlapEnd;
 
-        // Parse week shifts
+        // Parse week shifts and Friday shifts
         const week1Shifts = JSON.parse(schedule.week1_shifts || '{}');
         const week2Shifts = JSON.parse(schedule.week2_shifts || '{}');
+        const fridayShifts = JSON.parse(schedule.friday_shifts || '{}');
 
         // Get all employees for this project (respect custom employee selection)
         let employees;
@@ -95,6 +96,7 @@ Deno.serve(async (req) => {
                 
                 const dayOfWeek = currentDate.getDay();
                 const isSunday = dayOfWeek === 0;
+                const isFriday = dayOfWeek === 5;
                 
                 // Sunday is weekly holiday - skip shift generation but toggle week pattern
                 if (isSunday) {
@@ -109,8 +111,9 @@ Deno.serve(async (req) => {
                     continue; // Skip duplicate
                 }
                 
-                // Use current week index (resets after each Sunday)
-                const weekShifts = currentWeekIndex === 0 ? week1 : week2;
+                // Check if Friday has specific shifts configured - prioritize Friday shifts
+                const fridayShift = fridayShifts[attendanceId];
+                const weekShifts = isFriday && fridayShift ? fridayShift : (currentWeekIndex === 0 ? week1 : week2);
                 
                 if (!weekShifts) continue;
 
@@ -125,9 +128,9 @@ Deno.serve(async (req) => {
                         date: dateStr,
                         effective_from: dateStr,
                         effective_to: dateStr,
-                        is_friday_shift: false,
+                        is_friday_shift: isFriday,
                         is_single_shift: true,
-                        applicable_days: 'Ramadan Day Shift',
+                        applicable_days: isFriday ? 'Ramadan Friday Day Shift' : 'Ramadan Day Shift',
                         am_start: weekShifts.day_start,
                         am_end: '—',
                         pm_start: '—',
@@ -143,9 +146,9 @@ Deno.serve(async (req) => {
                         date: dateStr,
                         effective_from: dateStr,
                         effective_to: dateStr,
-                        is_friday_shift: false,
+                        is_friday_shift: isFriday,
                         is_single_shift: true,
-                        applicable_days: 'Ramadan Night Shift',
+                        applicable_days: isFriday ? 'Ramadan Friday Night Shift' : 'Ramadan Night Shift',
                         am_start: weekShifts.night_start,
                         am_end: '—',
                         pm_start: '—',
