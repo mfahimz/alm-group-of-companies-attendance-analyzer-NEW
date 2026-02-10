@@ -342,7 +342,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     </TableCell>
                                     <TableCell>
                                         <Input
-                                            placeholder="8:00 PM"
+                                            placeholder=""
                                             value={shift.night_start || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'night_start', e.target.value)}
                                             className="w-28"
@@ -350,7 +350,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     </TableCell>
                                     <TableCell>
                                         <Input
-                                            placeholder="12:00 AM"
+                                            placeholder=""
                                             value={shift.night_end || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'night_end', e.target.value)}
                                             className="w-28"
