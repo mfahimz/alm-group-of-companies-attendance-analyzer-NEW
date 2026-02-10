@@ -1079,14 +1079,14 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                                                 className="pl-9"
                                             />
                                         </div>
-                                        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                                        <Select value={departmentFilter || undefined} onValueChange={setDepartmentFilter}>
                                             <SelectTrigger className="w-[160px]">
                                                 <SelectValue placeholder="Department" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">All Departments</SelectItem>
-                                                {companySettings[0]?.departments?.split(',').map(dept => dept.trim()).filter(Boolean).map(dept => (
-                                                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                                {companySettings[0]?.departments?.split(',').map(dept => dept.trim()).filter(dept => dept !== '').map(dept => (
+                                                    <SelectItem key={dept} value={dept || 'unknown'}>{dept}</SelectItem>
                                                 )) || [
                                                     <SelectItem key="Admin" value="Admin">Admin</SelectItem>,
                                                     <SelectItem key="Operations" value="Operations">Operations</SelectItem>,
@@ -1094,7 +1094,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                                                 ]}
                                             </SelectContent>
                                         </Select>
-                                        <Select value={shiftTypeFilter} onValueChange={setShiftTypeFilter}>
+                                        <Select value={shiftTypeFilter || undefined} onValueChange={setShiftTypeFilter}>
                                             <SelectTrigger className="w-[140px]">
                                                 <SelectValue placeholder="Shift Type" />
                                             </SelectTrigger>
@@ -1104,7 +1104,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                                                 <SelectItem value="single">Single Shift</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <Select value={applicableDayFilter} onValueChange={setApplicableDayFilter}>
+                                        <Select value={applicableDayFilter || undefined} onValueChange={setApplicableDayFilter}>
                                             <SelectTrigger className="w-[130px]">
                                                 <SelectValue placeholder="Day" />
                                             </SelectTrigger>
@@ -1296,7 +1296,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                         <div>
                             <Label>Ramadan Schedule</Label>
                             <Select
-                                value={selectedRamadanSchedule?.id || ''}
+                                value={selectedRamadanSchedule?.id || undefined}
                                 onValueChange={(value) => {
                                     const schedule = ramadanSchedules.find(s => s.id === value);
                                     setSelectedRamadanSchedule(schedule);
@@ -1443,11 +1443,13 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                                         <SelectValue placeholder="Select employee" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {employees.map(emp => (
-                                            <SelectItem key={emp.id} value={String(emp.attendance_id)}>
-                                                {emp.attendance_id} - {emp.name}
-                                            </SelectItem>
-                                        ))}
+                                        {employees
+                                            .filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '')
+                                            .map(emp => (
+                                                <SelectItem key={emp.id} value={String(emp.attendance_id)}>
+                                                    {emp.attendance_id} - {emp.name}
+                                                </SelectItem>
+                                            ))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -1576,7 +1578,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                 <CardContent className="space-y-4">
                     <div>
                         <Label>Select Block to Upload To *</Label>
-                        <Select value={selectedBlock} onValueChange={setSelectedBlock}>
+                        <Select value={selectedBlock || undefined} onValueChange={setSelectedBlock}>
                             <SelectTrigger className="mt-2">
                                 <SelectValue />
                             </SelectTrigger>
@@ -1889,7 +1891,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                         <div>
                             <Label>Copy From</Label>
                             <Select
-                                value={copySource.type}
+                                value={copySource.type || undefined}
                                 onValueChange={(value) => setCopySource({ ...copySource, type: value })}
                             >
                                 <SelectTrigger className="mt-2">
@@ -1906,7 +1908,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                             <div>
                                 <Label>Source Block</Label>
                                 <Select
-                                    value={copySource.blockId}
+                                    value={copySource.blockId || undefined}
                                     onValueChange={(value) => setCopySource({ ...copySource, blockId: value })}
                                 >
                                     <SelectTrigger className="mt-2">
@@ -1932,7 +1934,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                             <div>
                                 <Label>Source Project</Label>
                                 <Select
-                                    value={copySource.projectId}
+                                    value={copySource.projectId || undefined}
                                     onValueChange={(value) => setCopySource({ ...copySource, projectId: value })}
                                 >
                                     <SelectTrigger className="mt-2">
