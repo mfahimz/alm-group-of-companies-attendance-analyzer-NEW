@@ -166,10 +166,14 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                         }
                     }
                 } else if (shiftName === 'night') {
-                    // If day is also selected, adjust day shift to 1pm-4pm
-                    if (newActiveShifts.includes('day')) {
-                        updatedShift.day_start = '1:00 PM';
-                        updatedShift.day_end = '4:00 PM';
+                    // Night shift selected: set day shift to 1pm-4pm and night to 8pm-12am for Operations
+                    if (isOperations) {
+                        if (newActiveShifts.includes('day')) {
+                            updatedShift.day_start = '1:00 PM';
+                            updatedShift.day_end = '4:00 PM';
+                        }
+                        updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                        updatedShift.night_end = updatedShift.night_end || '12:00 AM';
                     }
                 }
             }
