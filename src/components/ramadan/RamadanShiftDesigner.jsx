@@ -139,24 +139,62 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
 
     const handleActiveShiftToggle = (attendanceId, weekNum, shiftName) => {
         const setter = weekNum === 1 ? setWeek1Shifts : setWeek2Shifts;
+        const employee = employees.find(e => e.attendance_id === attendanceId);
+        const isOperations = employee?.department === 'Operations';
         
         setter(prev => {
             const current = prev[attendanceId] || {};
             const activeShifts = current.active_shifts || [];
             
             let newActiveShifts;
+            let updatedShift = { ...current };
+            
             if (activeShifts.includes(shiftName)) {
                 // Remove shift
                 newActiveShifts = activeShifts.filter(s => s !== shiftName);
             } else {
                 // Add shift - 'day' and 'night' can both be selected
                 newActiveShifts = [...activeShifts, shiftName];
+                
+                // Apply default times based on selection
+                if (shiftName === 'day') {
+                    // Check if night is also selected
+                    const willHaveBoth = newActiveShifts.includes('night');
+                    
+                    if (willHaveBoth) {
+                        // Day + Night: Day shift 1pm to 4pm
+                        updatedShift.day_start = updatedShift.day_start || '1:00 PM';
+                        updatedShift.day_end = updatedShift.day_end || '4:00 PM';
+                        updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                        updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                    } else {
+                        // Day only: 9am to 4pm for Operations department
+                        if (isOperations) {
+                            updatedShift.day_start = updatedShift.day_start || '9:00 AM';
+                            updatedShift.day_end = updatedShift.day_end || '4:00 PM';
+                        } else {
+                            // Other departments - no default
+                            updatedShift.day_start = updatedShift.day_start || '';
+                            updatedShift.day_end = updatedShift.day_end || '';
+                        }
+                    }
+                } else if (shiftName === 'night') {
+                    // Night shift added
+                    updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                    updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                    
+                    // If day is also selected, adjust day shift to 1pm-4pm
+                    if (newActiveShifts.includes('day')) {
+                        updatedShift.day_start = '1:00 PM';
+                        updatedShift.day_end = '4:00 PM';
+                    }
+                }
             }
             
             return {
                 ...prev,
                 [attendanceId]: {
-                    ...current,
+                    ...updatedShift,
                     active_shifts: newActiveShifts
                 }
             };
