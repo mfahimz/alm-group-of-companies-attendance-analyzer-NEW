@@ -230,6 +230,19 @@ export default function ShiftTimingsTab({ project }) {
         return combined.filter(emp => emp.attendance_id);
     }, [masterEmployees, projectEmployees]);
 
+    // Parse Ramadan shifts from the schedule
+    const parsedRamadanShifts = React.useMemo(() => {
+        if (!ramadanOverlap?.schedule) return { week1: {}, week2: {} };
+        
+        try {
+            const week1 = ramadanOverlap.schedule.week1_shifts ? JSON.parse(ramadanOverlap.schedule.week1_shifts) : {};
+            const week2 = ramadanOverlap.schedule.week2_shifts ? JSON.parse(ramadanOverlap.schedule.week2_shifts) : {};
+            return { week1, week2 };
+        } catch {
+            return { week1: {}, week2: {} };
+        }
+    }, [ramadanOverlap]);
+
     const { data: allProjects = [] } = useQuery({
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list(),
