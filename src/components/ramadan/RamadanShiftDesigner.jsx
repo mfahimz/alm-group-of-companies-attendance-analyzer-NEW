@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Download, Save, Copy } from 'lucide-react';
+import { Upload, Download, Save, Copy, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function RamadanShiftDesigner({ schedule, onClose }) {
@@ -89,6 +89,22 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             return updated;
         });
         toast.success(`Week ${weekNum} night shift times cleared`);
+    };
+
+    // Apply default Friday shifts to all employees
+    const applyDefaultFridayShifts = () => {
+        const defaultFridayShifts = {};
+        employees.forEach(emp => {
+            defaultFridayShifts[emp.attendance_id] = {
+                active_shifts: ['day', 'night'],
+                day_start: '9:00 AM',
+                day_end: '12:00 PM',
+                night_start: '8:00 PM',
+                night_end: '12:00 AM'
+            };
+        });
+        setFridayShifts(defaultFridayShifts);
+        toast.success(`Default Friday shifts applied to all ${employees.length} employees`);
     };
 
     // Copy individual employee shift from week 1 to week 2
@@ -359,6 +375,17 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                         <Button size="sm" variant="outline" onClick={copyWeek1ToWeek2}>
                             <Copy className="w-4 h-4 mr-2" />
                             Copy from Week 1
+                        </Button>
+                    )}
+                    {weekNum === 'friday' && (
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={applyDefaultFridayShifts}
+                            className="bg-green-50 text-green-700 hover:bg-green-100 border-green-300"
+                        >
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Apply Default to All (9AM-12PM & 8PM-12AM)
                         </Button>
                     )}
                     {weekNum !== 'friday' && (
