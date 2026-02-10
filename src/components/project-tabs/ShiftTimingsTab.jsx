@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye, Copy } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye, Copy, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SortableTableHead from '../ui/SortableTableHead';
@@ -25,6 +25,8 @@ export default function ShiftTimingsTab({ project }) {
      const [searchTerm, setSearchTerm] = useState('');
      const [editingShift, setEditingShift] = useState(null);
      const [showAddForm, setShowAddForm] = useState(false);
+     const [nlpText, setNlpText] = useState('');
+     const [nlpParsing, setNlpParsing] = useState(false);
      const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
      const [isSingleShift, setIsSingleShift] = useState(false);
      const [departmentFilter, setDepartmentFilter] = useState('all');
@@ -643,6 +645,71 @@ export default function ShiftTimingsTab({ project }) {
         }
     });
 
+    const handleNlpParse = async () => {
+        if (!nlpText.trim()) {
+            toast.error('Please enter some text to parse');
+            return;
+        }
+
+        setNlpParsing(true);
+        try {
+            const response = await base44.integrations.Core.InvokeLLM({
+                prompt: `Parse this shift request into structured data. Return ONLY valid JSON, no other text.
+
+Available employees: ${employees.map(e => `${e.attendance_id} (${e.name})`).join(', ')}
+
+User request: "${nlpText}"
+
+Return JSON:
+{
+    "attendance_id": "employee ID from list",
+    "am_start": "HH:MM AM/PM (e.g., 8:00 AM)",
+    "am_end": "HH:MM AM/PM (e.g., 12:00 PM)",
+    "pm_start": "HH:MM AM/PM (e.g., 1:00 PM)",
+    "pm_end": "HH:MM AM/PM (e.g., 5:00 PM)",
+    "is_single_shift": boolean (true if single shift/punch in-out only),
+    "is_friday_shift": boolean (true if Friday shift)
+}
+
+Match employee names/IDs intelligently. If single shift, only fill am_start and pm_end.`,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        attendance_id: { type: "string" },
+                        am_start: { type: "string" },
+                        am_end: { type: "string" },
+                        pm_start: { type: "string" },
+                        pm_end: { type: "string" },
+                        is_single_shift: { type: "boolean" },
+                        is_friday_shift: { type: "boolean" }
+                    },
+                    required: ["attendance_id"]
+                }
+            });
+
+            const parsed = response;
+            
+            // Pre-fill the form
+            setFormData({
+                attendance_id: parsed.attendance_id || '',
+                am_start: parsed.am_start || '',
+                am_end: parsed.am_end || '',
+                pm_start: parsed.pm_start || '',
+                pm_end: parsed.pm_end || '',
+                is_single_shift: parsed.is_single_shift || false,
+                is_friday_shift: parsed.is_friday_shift || false
+            });
+
+            setNlpText('');
+            toast.success('Form filled from your description! Review and submit.');
+        } catch (error) {
+            console.error('NLP parsing error:', error);
+            toast.error('Failed to parse: ' + (error.message || 'Unknown error'));
+        } finally {
+            setNlpParsing(false);
+        }
+    };
+
     const createShiftMutation = useMutation({
         mutationFn: (data) => base44.entities.ShiftTiming.create({
             ...data,
@@ -665,6 +732,7 @@ export default function ShiftTimingsTab({ project }) {
                 is_single_shift: false,
                 is_friday_shift: false
             });
+            setNlpText('');
         },
         onError: () => {
             toast.error('Failed to add shift timing');
@@ -1320,6 +1388,51 @@ export default function ShiftTimingsTab({ project }) {
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmitShift} className="space-y-4">
+                            {/* Quick Entry with NLP */}
+                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                                    <Label className="font-medium text-indigo-900">Quick Entry (Optional)</Label>
+                                </div>
+                                <p className="text-xs text-slate-600 mb-3">
+                                    Describe in natural language and we'll fill the form below
+                                </p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="e.g., Ali 8am to 5pm single shift"
+                                        value={nlpText}
+                                        onChange={(e) => setNlpText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !nlpParsing) {
+                                                e.preventDefault();
+                                                handleNlpParse();
+                                            }
+                                        }}
+                                        disabled={nlpParsing}
+                                        className="flex-1"
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={handleNlpParse}
+                                        disabled={nlpParsing || !nlpText.trim()}
+                                        size="sm"
+                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        {nlpParsing ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                                                Parsing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-4 h-4 mr-2" />
+                                                Fill Form
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+
                             <div>
                                 <Label>Employee *</Label>
                                 <Select
