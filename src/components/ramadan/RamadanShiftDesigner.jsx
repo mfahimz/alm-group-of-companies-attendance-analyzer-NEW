@@ -52,37 +52,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         });
     }, [employees, searchTerm, selectedDepartment]);
 
-    // Apply default night shift times for Al Maraghi Motors and Naser Mohsin Auto Parts
-    React.useEffect(() => {
-        if (employees.length === 0) return;
-        if (schedule.company !== 'Al Maraghi Motors' && schedule.company !== 'Naser Mohsin Auto Parts') return;
 
-        const applyDefaults = (shifts) => {
-            const updated = { ...shifts };
-            employees.forEach(emp => {
-                const attendanceId = emp.attendance_id;
-                if (!updated[attendanceId]) {
-                    updated[attendanceId] = {
-                        active_shifts: [],
-                        night_start: '8:00 PM',
-                        night_end: '12:00 AM',
-                        day_start: '',
-                        day_end: ''
-                    };
-                } else if (!updated[attendanceId].night_start) {
-                    updated[attendanceId] = {
-                        ...updated[attendanceId],
-                        night_start: '8:00 PM',
-                        night_end: '12:00 AM'
-                    };
-                }
-            });
-            return updated;
-        };
-
-        setWeek1Shifts(prev => applyDefaults(prev));
-        setWeek2Shifts(prev => applyDefaults(prev));
-    }, [employees, schedule.company]);
 
     // Copy week 1 shifts to week 2 (all employees)
     const copyWeek1ToWeek2 = () => {
