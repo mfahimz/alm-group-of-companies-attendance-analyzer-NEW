@@ -532,36 +532,38 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 Project date range: ${project.date_from} to ${project.date_to}
 Available employees: ${employees.map(e => `${e.attendance_id} (${e.name})`).join(', ')}
 
-Exception types available:
-- PUBLIC_HOLIDAY (for all employees)
-- SHIFT_OVERRIDE (change shift times)
-- MANUAL_PRESENT (mark as present)
-- MANUAL_ABSENT (mark as absent)
-- MANUAL_HALF (mark as half day)
-- SICK_LEAVE
-- ANNUAL_LEAVE (vacation)
-- ALLOWED_MINUTES (excused late/early)
-- CUSTOM (custom type, not used in analysis)
+Exception types:
+- PUBLIC_HOLIDAY: National/religious holidays affecting all employees
+- SHIFT_OVERRIDE: Temporary change to work hours/shift timings
+- MANUAL_PRESENT: Mark someone as present when they have no punches
+- MANUAL_ABSENT: Mark someone as absent (LOP)
+- MANUAL_HALF: Mark someone as half day present
+- SICK_LEAVE: Medical leave
+- ANNUAL_LEAVE: Vacation/paid leave
+- ALLOWED_MINUTES: Excuse late arrival or early checkout (natural calamity, personal reasons)
+- CUSTOM: Use this for ANY other reason not in the above list (training, site visit, business trip, meeting, etc.)
+
+IMPORTANT: If the user describes something that doesn't match the standard types above, automatically use type="CUSTOM" and extract a meaningful custom_type_name from their description (e.g., "Training", "Site Visit", "Business Trip", "Off-site Meeting").
 
 User request: "${nlpText}"
 
-Return JSON with these fields:
+Return JSON:
 {
-    "attendance_id": "employee attendance ID or 'ALL' for public holidays",
-    "date_from": "YYYY-MM-DD format",
-    "date_to": "YYYY-MM-DD format",
-    "type": "exception type from the list above",
-    "details": "brief description of the exception",
-    "custom_type_name": "if type is CUSTOM, provide a name",
-    "new_am_start": "if SHIFT_OVERRIDE, time like 08:00",
-    "new_am_end": "if SHIFT_OVERRIDE, time like 12:00",
-    "new_pm_start": "if SHIFT_OVERRIDE, time like 13:00",
-    "new_pm_end": "if SHIFT_OVERRIDE, time like 17:00",
-    "allowed_minutes": "if ALLOWED_MINUTES, number of minutes",
-    "allowed_minutes_type": "if ALLOWED_MINUTES: 'late', 'early', or 'both'"
+    "attendance_id": "employee ID or 'ALL' for company-wide",
+    "date_from": "YYYY-MM-DD",
+    "date_to": "YYYY-MM-DD",
+    "type": "one of the types above - use CUSTOM if it doesn't fit",
+    "custom_type_name": "if type=CUSTOM, extract a clean name like 'Training' or 'Site Visit'",
+    "details": "brief description",
+    "new_am_start": "if SHIFT_OVERRIDE: HH:MM",
+    "new_am_end": "if SHIFT_OVERRIDE: HH:MM",
+    "new_pm_start": "if SHIFT_OVERRIDE: HH:MM",
+    "new_pm_end": "if SHIFT_OVERRIDE: HH:MM",
+    "allowed_minutes": "if ALLOWED_MINUTES: number",
+    "allowed_minutes_type": "if ALLOWED_MINUTES: 'late'/'early'/'both'"
 }
 
-Only include fields that are relevant. Ensure dates are within the project range.`,
+Only include relevant fields. Match employee names/IDs intelligently.`,
                 response_json_schema: {
                     type: "object",
                     properties: {
