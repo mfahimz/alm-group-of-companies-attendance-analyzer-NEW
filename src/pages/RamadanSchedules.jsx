@@ -8,15 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Calendar, Upload, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Upload, Download, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import RamadanShiftDesigner from '../components/ramadan/RamadanShiftDesigner';
+import RamadanCalendarView from '../components/ramadan/RamadanCalendarView';
 
 export default function RamadanSchedules() {
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState(null);
     const [editingDates, setEditingDates] = useState(null);
+    const [calendarViewSchedule, setCalendarViewSchedule] = useState(null);
     const [formData, setFormData] = useState({
         company: '',
         year: new Date().getFullYear(),
@@ -38,6 +40,17 @@ export default function RamadanSchedules() {
     const { data: companies = [] } = useQuery({
         queryKey: ['companySettings'],
         queryFn: () => base44.entities.CompanySettings.list()
+    });
+
+    // Fetch employees only when calendar view is open (to avoid rate limits)
+    const { data: employees = [] } = useQuery({
+        queryKey: ['employees', calendarViewSchedule?.company],
+        queryFn: () => base44.entities.Employee.filter({ 
+            company: calendarViewSchedule.company, 
+            active: true 
+        }),
+        enabled: !!calendarViewSchedule,
+        staleTime: 5 * 60 * 1000
     });
 
     const createMutation = useMutation({
@@ -184,6 +197,14 @@ export default function RamadanSchedules() {
                                                 >
                                                     <Calendar className="w-4 h-4 text-indigo-600" />
                                                 </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => setCalendarViewSchedule(schedule)}
+                                                    title="View calendar"
+                                                >
+                                                    <CalendarDays className="w-4 h-4 text-purple-600" />
+                                                </Button>
                                                 {isAdmin && (
                                                     <Button
                                                         size="sm"
@@ -311,6 +332,15 @@ export default function RamadanSchedules() {
                 <RamadanShiftDesigner
                     schedule={editingSchedule}
                     onClose={() => setEditingSchedule(null)}
+                />
+            )}
+
+            {/* Calendar View Dialog */}
+            {calendarViewSchedule && (
+                <RamadanCalendarView
+                    schedule={calendarViewSchedule}
+                    employees={employees.filter(emp => emp.attendance_id)}
+                    onClose={() => setCalendarViewSchedule(null)}
                 />
             )}
         </div>
