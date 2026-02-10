@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
@@ -49,6 +49,9 @@ const TYPE_MAP = {
 
 export default function ExceptionsTab({ project }) {
     const [showForm, setShowForm] = useState(false);
+    const [showNlpInput, setShowNlpInput] = useState(false);
+    const [nlpText, setNlpText] = useState('');
+    const [nlpParsing, setNlpParsing] = useState(false);
     const [employeeSearch, setEmployeeSearch] = useState('');
     const [formData, setFormData] = useState({
         attendance_id: '',
@@ -516,6 +519,103 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
         setEmployeeSearch('');
     };
 
+    const handleNlpParse = async () => {
+        if (!nlpText.trim()) {
+            toast.error('Please enter some text to parse');
+            return;
+        }
+
+        setNlpParsing(true);
+        try {
+            const response = await base44.integrations.Core.InvokeLLM({
+                prompt: `Parse this exception request into structured data. Return ONLY valid JSON, no other text.
+
+Project date range: ${project.date_from} to ${project.date_to}
+Available employees: ${employees.map(e => `${e.attendance_id} (${e.name})`).join(', ')}
+
+Exception types available:
+- PUBLIC_HOLIDAY (for all employees)
+- SHIFT_OVERRIDE (change shift times)
+- MANUAL_PRESENT (mark as present)
+- MANUAL_ABSENT (mark as absent)
+- MANUAL_HALF (mark as half day)
+- SICK_LEAVE
+- ANNUAL_LEAVE (vacation)
+- ALLOWED_MINUTES (excused late/early)
+- CUSTOM (custom type, not used in analysis)
+
+User request: "${nlpText}"
+
+Return JSON with these fields:
+{
+    "attendance_id": "employee attendance ID or 'ALL' for public holidays",
+    "date_from": "YYYY-MM-DD format",
+    "date_to": "YYYY-MM-DD format",
+    "type": "exception type from the list above",
+    "details": "brief description of the exception",
+    "custom_type_name": "if type is CUSTOM, provide a name",
+    "new_am_start": "if SHIFT_OVERRIDE, time like 08:00",
+    "new_am_end": "if SHIFT_OVERRIDE, time like 12:00",
+    "new_pm_start": "if SHIFT_OVERRIDE, time like 13:00",
+    "new_pm_end": "if SHIFT_OVERRIDE, time like 17:00",
+    "allowed_minutes": "if ALLOWED_MINUTES, number of minutes",
+    "allowed_minutes_type": "if ALLOWED_MINUTES: 'late', 'early', or 'both'"
+}
+
+Only include fields that are relevant. Ensure dates are within the project range.`,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        attendance_id: { type: "string" },
+                        date_from: { type: "string" },
+                        date_to: { type: "string" },
+                        type: { type: "string" },
+                        details: { type: "string" },
+                        custom_type_name: { type: "string" },
+                        new_am_start: { type: "string" },
+                        new_am_end: { type: "string" },
+                        new_pm_start: { type: "string" },
+                        new_pm_end: { type: "string" },
+                        allowed_minutes: { type: "number" },
+                        allowed_minutes_type: { type: "string" }
+                    },
+                    required: ["type"]
+                }
+            });
+
+            const parsed = response;
+            
+            // Pre-fill the form
+            setFormData({
+                attendance_id: parsed.attendance_id || '',
+                date_from: parsed.date_from || '',
+                date_to: parsed.date_to || parsed.date_from || '',
+                type: parsed.type || 'PUBLIC_HOLIDAY',
+                custom_type_name: parsed.custom_type_name || '',
+                new_am_start: parsed.new_am_start || '',
+                new_am_end: parsed.new_am_end || '',
+                new_pm_start: parsed.new_pm_start || '',
+                new_pm_end: parsed.new_pm_end || '',
+                early_checkout_minutes: '',
+                details: parsed.details || nlpText,
+                include_friday: false,
+                other_minutes: '',
+                allowed_minutes: parsed.allowed_minutes || '',
+                allowed_minutes_type: parsed.allowed_minutes_type || 'both'
+            });
+
+            setShowForm(true);
+            setShowNlpInput(false);
+            setNlpText('');
+            toast.success('Parsed successfully! Review and submit the form.');
+        } catch (error) {
+            console.error('NLP parsing error:', error);
+            toast.error('Failed to parse: ' + (error.message || 'Unknown error'));
+        } finally {
+            setNlpParsing(false);
+        }
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
 
@@ -725,6 +825,66 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                 className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
                                 style={{ width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%` }}
                             />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* NLP Exception Input */}
+            {showNlpInput && (
+                <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-purple-50">
+                    <CardHeader>
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-indigo-600" />
+                            <CardTitle>Quick Exception Entry</CardTitle>
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1">
+                            Describe the exception in natural language (e.g., "Mark Ahmed as annual leave from Jan 15-20")
+                        </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label>Describe the exception</Label>
+                            <Input
+                                placeholder="e.g., Public holiday on Feb 15, or Sarah on sick leave from Jan 10-12"
+                                value={nlpText}
+                                onChange={(e) => setNlpText(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !nlpParsing) {
+                                        handleNlpParse();
+                                    }
+                                }}
+                                disabled={nlpParsing}
+                            />
+                        </div>
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={handleNlpParse}
+                                disabled={nlpParsing || !nlpText.trim()}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                {nlpParsing ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                                        Parsing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-4 h-4 mr-2" />
+                                        Parse & Fill Form
+                                    </>
+                                )}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setShowNlpInput(false);
+                                    setNlpText('');
+                                }}
+                                disabled={nlpParsing}
+                            >
+                                Cancel
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -1059,15 +1219,26 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             <Download className="w-4 h-4 mr-2" />
                             Export
                         </Button>
-                        {!showForm && (
-                            <Button 
-                                onClick={() => setShowForm(true)}
-                                size="sm"
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                            >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add Exception
-                            </Button>
+                        {!showForm && !showNlpInput && (
+                            <>
+                                <Button 
+                                    onClick={() => setShowNlpInput(true)}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                                >
+                                    <Sparkles className="w-4 h-4 mr-2" />
+                                    Quick Entry
+                                </Button>
+                                <Button 
+                                    onClick={() => setShowForm(true)}
+                                    size="sm"
+                                    className="bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Exception
+                                </Button>
+                            </>
                         )}
                         </div>
                     </div>
