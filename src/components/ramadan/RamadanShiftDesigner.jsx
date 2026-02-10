@@ -129,7 +129,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
     const handleActiveShiftToggle = (attendanceId, weekNum, shiftName) => {
         const setter = weekNum === 1 ? setWeek1Shifts : setWeek2Shifts;
         const employee = employees.find(e => e.attendance_id === attendanceId);
-        const isOperations = employee?.department === 'Operations';
+        const isOperationsOrFrontOffice = employee?.department === 'Operations' || employee?.department === 'Front Office';
         
         setter(prev => {
             const current = prev[attendanceId] || {};
@@ -155,8 +155,8 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                         updatedShift.day_start = updatedShift.day_start || '1:00 PM';
                         updatedShift.day_end = updatedShift.day_end || '4:00 PM';
                     } else {
-                        // Day only: 9am to 4pm for Operations department
-                        if (isOperations) {
+                        // Day only: 9am to 4pm for Operations and Front Office departments
+                        if (isOperationsOrFrontOffice) {
                             updatedShift.day_start = updatedShift.day_start || '9:00 AM';
                             updatedShift.day_end = updatedShift.day_end || '4:00 PM';
                         } else {
@@ -166,8 +166,8 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                         }
                     }
                 } else if (shiftName === 'night') {
-                    // Night shift selected: set day shift to 1pm-4pm and night to 8pm-12am for Operations
-                    if (isOperations) {
+                    // Night shift selected: set day shift to 1pm-4pm and night to 8pm-12am for Operations and Front Office
+                    if (isOperationsOrFrontOffice) {
                         if (newActiveShifts.includes('day')) {
                             updatedShift.day_start = '1:00 PM';
                             updatedShift.day_end = '4:00 PM';
