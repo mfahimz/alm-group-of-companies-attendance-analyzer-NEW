@@ -1436,7 +1436,7 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                             <div>
                                 <Label>Employee *</Label>
                                 <Select
-                                    value={formData.attendance_id}
+                                    value={formData.attendance_id || undefined}
                                     onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                 >
                                     <SelectTrigger>

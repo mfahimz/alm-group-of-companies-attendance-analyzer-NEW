@@ -892,7 +892,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         />
                                     ) : (formData.type === 'ALLOWED_MINUTES' || formData.type === 'CUSTOM') ? (
                                         <Select
-                                            value={formData.attendance_id || 'ALL'}
+                                            value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                         >
                                             <SelectTrigger>
@@ -928,7 +928,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                         </Select>
                                                         ) : (
                                                         <Select
-                                                        value={formData.attendance_id}
+                                                        value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                         >
                                             <SelectTrigger>
