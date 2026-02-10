@@ -134,7 +134,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
     const handleActiveShiftToggle = (attendanceId, weekNum, shiftName) => {
         const setter = weekNum === 1 ? setWeek1Shifts : setWeek2Shifts;
         const employee = employees.find(e => e.attendance_id === attendanceId);
-        const hasDefaultShifts = ['Operations', 'Front Office', 'Bodyshop'].includes(employee?.department);
+        const hasDefaultShifts = ['Operations', 'Front Office', 'Bodyshop', 'Housekeeping'].includes(employee?.department);
         
         setter(prev => {
             const current = prev[attendanceId] || {};
