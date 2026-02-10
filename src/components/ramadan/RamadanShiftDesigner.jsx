@@ -194,9 +194,10 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
     };
 
     const handleActiveShiftToggle = (attendanceId, weekNum, shiftName) => {
-        const setter = weekNum === 1 ? setWeek1Shifts : setWeek2Shifts;
+        const setter = weekNum === 1 ? setWeek1Shifts : weekNum === 2 ? setWeek2Shifts : setFridayShifts;
         const employee = employees.find(e => e.attendance_id === attendanceId);
         const hasDefaultShifts = ['Operations', 'Front Office', 'Bodyshop', 'Housekeeping'].includes(employee?.department);
+        const isFriday = weekNum === 'friday';
         
         setter(prev => {
             const current = prev[attendanceId] || {};
@@ -213,34 +214,41 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                 newActiveShifts = [...activeShifts, shiftName];
                 
                 // Apply default times based on selection
-                if (shiftName === 'day') {
-                    // Check if night is also selected
-                    const willHaveBoth = newActiveShifts.includes('night');
-                    
-                    if (willHaveBoth) {
-                        // Day + Night: Day shift 1pm to 4pm
-                        updatedShift.day_start = updatedShift.day_start || '1:00 PM';
-                        updatedShift.day_end = updatedShift.day_end || '4:00 PM';
-                    } else {
-                        // Day only: 9am to 4pm for Operations, Front Office, and Bodyshop departments
-                        if (hasDefaultShifts) {
-                            updatedShift.day_start = updatedShift.day_start || '9:00 AM';
-                            updatedShift.day_end = updatedShift.day_end || '4:00 PM';
-                        } else {
-                            // Other departments - no default
-                            updatedShift.day_start = updatedShift.day_start || '';
-                            updatedShift.day_end = updatedShift.day_end || '';
-                        }
-                    }
-                } else if (shiftName === 'night') {
-                    // Night shift selected: set day shift to 1pm-4pm and night to 8pm-12am for Operations, Front Office, and Bodyshop
-                    if (hasDefaultShifts) {
-                        if (newActiveShifts.includes('day')) {
-                            updatedShift.day_start = '1:00 PM';
-                            updatedShift.day_end = '4:00 PM';
-                        }
+                if (isFriday) {
+                    // Friday defaults: 9am-12pm day, 8pm-12am night
+                    if (shiftName === 'day') {
+                        updatedShift.day_start = updatedShift.day_start || '9:00 AM';
+                        updatedShift.day_end = updatedShift.day_end || '12:00 PM';
+                    } else if (shiftName === 'night') {
                         updatedShift.night_start = updatedShift.night_start || '8:00 PM';
                         updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                    }
+                } else {
+                    // Week 1 & 2 defaults
+                    if (shiftName === 'day') {
+                        const willHaveBoth = newActiveShifts.includes('night');
+                        
+                        if (willHaveBoth) {
+                            updatedShift.day_start = updatedShift.day_start || '1:00 PM';
+                            updatedShift.day_end = updatedShift.day_end || '4:00 PM';
+                        } else {
+                            if (hasDefaultShifts) {
+                                updatedShift.day_start = updatedShift.day_start || '9:00 AM';
+                                updatedShift.day_end = updatedShift.day_end || '4:00 PM';
+                            } else {
+                                updatedShift.day_start = updatedShift.day_start || '';
+                                updatedShift.day_end = updatedShift.day_end || '';
+                            }
+                        }
+                    } else if (shiftName === 'night') {
+                        if (hasDefaultShifts) {
+                            if (newActiveShifts.includes('day')) {
+                                updatedShift.day_start = '1:00 PM';
+                                updatedShift.day_end = '4:00 PM';
+                            }
+                            updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                            updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                        }
                     }
                 }
             }
