@@ -1319,8 +1319,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">All departments</SelectItem>
-                                            {departments.filter(dept => dept && dept.trim()).map(dept => (
-                                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                            {departments.filter(dept => dept && dept.trim() !== '').map(dept => (
+                                                <SelectItem key={dept} value={dept || 'unknown'}>{dept}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
