@@ -30,10 +30,15 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
     const [selectedDepartment, setSelectedDepartment] = useState('all');
     const queryClient = useQueryClient();
 
-    const { data: employees = [] } = useQuery({
+    const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees', schedule.company],
         queryFn: () => base44.entities.Employee.filter({ company: schedule.company, active: true })
     });
+
+    // Filter out employees without attendance_id (salary-only employees)
+    const employees = React.useMemo(() => {
+        return allEmployees.filter(emp => emp.attendance_id);
+    }, [allEmployees]);
 
     // Get unique departments
     const departments = React.useMemo(() => {
