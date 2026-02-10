@@ -326,7 +326,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     </TableCell>
                                     <TableCell>
                                         <Input
-                                            placeholder="--:-- --"
+                                            placeholder="8:00 AM"
                                             value={shift.day_start || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'day_start', e.target.value)}
                                             className="w-28"
@@ -334,7 +334,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     </TableCell>
                                     <TableCell>
                                         <Input
-                                            placeholder="--:-- --"
+                                            placeholder="5:00 PM"
                                             value={shift.day_end || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'day_end', e.target.value)}
                                             className="w-28"
@@ -342,7 +342,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     </TableCell>
                                     <TableCell>
                                         <Input
-                                            placeholder="--:-- --"
+                                            placeholder="8:00 PM"
                                             value={shift.night_start || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'night_start', e.target.value)}
                                             className="w-28"
@@ -350,7 +350,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     </TableCell>
                                     <TableCell>
                                         <Input
-                                            placeholder="--:-- --"
+                                            placeholder="12:00 AM"
                                             value={shift.night_end || ''}
                                             onChange={(e) => handleChange(emp.attendance_id, 'night_end', e.target.value)}
                                             className="w-28"
