@@ -60,6 +60,25 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         toast.success('Week 1 shifts copied to Week 2');
     };
 
+    // Clear all night shift times
+    const clearAllNightShifts = (weekNum) => {
+        const setter = weekNum === 1 ? setWeek1Shifts : setWeek2Shifts;
+        setter(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(attendanceId => {
+                if (updated[attendanceId]) {
+                    updated[attendanceId] = {
+                        ...updated[attendanceId],
+                        night_start: '',
+                        night_end: ''
+                    };
+                }
+            });
+            return updated;
+        });
+        toast.success(`Week ${weekNum} night shift times cleared`);
+    };
+
     // Copy individual employee shift from week 1 to week 2
     const copyEmployeeShift = (attendanceId) => {
         const week1Data = week1Shifts[attendanceId];
@@ -263,6 +282,14 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             Copy from Week 1
                         </Button>
                     )}
+                    <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => clearAllNightShifts(weekNum)}
+                        className="text-red-600 hover:text-red-700"
+                    >
+                        Clear All Night Times
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => handleExport(weekNum)}>
                         <Download className="w-4 h-4 mr-2" />
                         Export Template
