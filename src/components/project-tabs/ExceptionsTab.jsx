@@ -918,6 +918,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                             return emp.name.toLowerCase().includes(search) || 
                                                                    String(emp.attendance_id).toLowerCase().includes(search);
                                                         })
+                                                        .filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '')
                                                         .map(emp => (
                                                            <SelectItem key={emp.id} value={String(emp.attendance_id)}>
                                                                {emp.attendance_id} - {emp.name}
