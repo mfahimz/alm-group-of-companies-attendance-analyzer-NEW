@@ -211,6 +211,7 @@ export default function ShiftTimingsTab({ project }) {
     });
 
     // Combine master employees with project overrides for lookups
+    // Filter out employees without attendance_id (salary-only employees)
     const employees = React.useMemo(() => {
         const combined = [...masterEmployees];
         for (const pe of projectEmployees) {
@@ -226,7 +227,7 @@ export default function ShiftTimingsTab({ project }) {
                 });
             }
         }
-        return combined;
+        return combined.filter(emp => emp.attendance_id);
     }, [masterEmployees, projectEmployees]);
 
     const { data: allProjects = [] } = useQuery({
