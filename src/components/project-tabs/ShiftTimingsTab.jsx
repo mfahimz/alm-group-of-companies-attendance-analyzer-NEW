@@ -1348,15 +1348,64 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                         </div>
 
                         {ramadanShiftsApplied && (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                                <p className="text-sm text-green-800">
-                                    ✓ Ramadan shifts have been applied to this project. Attendance analysis will automatically use Ramadan shift timings for the overlap period.
-                                </p>
-                            </div>
+                           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                               <p className="text-sm text-green-800">
+                                   ✓ Ramadan shifts have been applied to this project. Attendance analysis will automatically use Ramadan shift timings for the overlap period.
+                               </p>
+                           </div>
                         )}
-                    </CardContent>
-                </Card>
-            )}
+
+                        {/* Ramadan Shifts View */}
+                        {ramadanShiftsApplied && Object.keys(parsedRamadanShifts.week1).length > 0 && (
+                           <div className="mt-4 space-y-3">
+                               <p className="text-sm font-medium text-purple-900">Ramadan Shift Schedule</p>
+                               <div className="grid gap-3">
+                                   <div className="border border-purple-200 rounded-lg p-3 bg-white">
+                                       <p className="text-xs font-semibold text-purple-800 mb-2">Week 1 Pattern</p>
+                                       <div className="space-y-1 max-h-40 overflow-auto">
+                                           {employees.filter(emp => parsedRamadanShifts.week1[emp.attendance_id]).map(emp => {
+                                               const shift = parsedRamadanShifts.week1[emp.attendance_id];
+                                               const activeShifts = shift.active_shifts || [];
+                                               return (
+                                                   <div key={emp.id} className="text-xs text-slate-700 flex justify-between items-center py-1 border-b border-purple-100">
+                                                       <span className="font-medium">{emp.name} ({emp.attendance_id})</span>
+                                                       <span className="text-purple-700">
+                                                           {activeShifts.includes('day') && shift.day_start && shift.day_end && `Day: ${shift.day_start}-${shift.day_end}`}
+                                                           {activeShifts.includes('day') && activeShifts.includes('night') && ' | '}
+                                                           {activeShifts.includes('night') && shift.night_start && shift.night_end && `Night: ${shift.night_start}-${shift.night_end}`}
+                                                           {activeShifts.length === 0 && '—'}
+                                                       </span>
+                                                   </div>
+                                               );
+                                           })}
+                                       </div>
+                                   </div>
+                                   <div className="border border-purple-200 rounded-lg p-3 bg-white">
+                                       <p className="text-xs font-semibold text-purple-800 mb-2">Week 2 Pattern</p>
+                                       <div className="space-y-1 max-h-40 overflow-auto">
+                                           {employees.filter(emp => parsedRamadanShifts.week2[emp.attendance_id]).map(emp => {
+                                               const shift = parsedRamadanShifts.week2[emp.attendance_id];
+                                               const activeShifts = shift.active_shifts || [];
+                                               return (
+                                                   <div key={emp.id} className="text-xs text-slate-700 flex justify-between items-center py-1 border-b border-purple-100">
+                                                       <span className="font-medium">{emp.name} ({emp.attendance_id})</span>
+                                                       <span className="text-purple-700">
+                                                           {activeShifts.includes('day') && shift.day_start && shift.day_end && `Day: ${shift.day_start}-${shift.day_end}`}
+                                                           {activeShifts.includes('day') && activeShifts.includes('night') && ' | '}
+                                                           {activeShifts.includes('night') && shift.night_start && shift.night_end && `Night: ${shift.night_start}-${shift.night_end}`}
+                                                           {activeShifts.length === 0 && '—'}
+                                                       </span>
+                                                   </div>
+                                               );
+                                           })}
+                                       </div>
+                                   </div>
+                               </div>
+                           </div>
+                        )}
+                        </CardContent>
+                        </Card>
+                        )}
 
             {/* Upload Progress */}
             {uploadProgress && (
