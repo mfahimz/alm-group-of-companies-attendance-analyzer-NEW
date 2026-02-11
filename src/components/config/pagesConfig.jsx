@@ -139,6 +139,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
+    AnnualLeaveManagement: {
+        name: 'AnnualLeaveManagement',
+        title: 'Annual Leave Calendar',
+        icon: Calendar,
+        category: 'HRManagement',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo', 'hr_manager']
+    },
     CompanyManagement: {
         name: 'CompanyManagement',
         title: 'Companies',
