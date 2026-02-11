@@ -1198,6 +1198,27 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                         <Button
                             variant="outline"
                             size="sm"
+                            onClick={async () => {
+                                try {
+                                    const response = await base44.functions.invoke('importAnnualLeavesToProject', {
+                                        projectId: project.id
+                                    });
+                                    if (response.data.success) {
+                                        toast.success(response.data.message);
+                                        queryClient.invalidateQueries(['exceptions', project.id]);
+                                    }
+                                } catch (error) {
+                                    toast.error('Failed to import: ' + error.message);
+                                }
+                            }}
+                            className="text-green-600 border-green-300 hover:bg-green-50"
+                        >
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Import Annual Leaves
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
                             onClick={handleExport}
                             disabled={filteredExceptions.length === 0}
                         >
