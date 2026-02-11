@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
