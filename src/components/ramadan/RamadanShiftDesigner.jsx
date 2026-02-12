@@ -42,6 +42,15 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         queryFn: () => base44.entities.Employee.filter({ company: schedule.company, active: true })
     });
 
+    // Get company_id for the current company
+    const { data: companyData } = useQuery({
+        queryKey: ['company', schedule.company],
+        queryFn: async () => {
+            const companies = await base44.entities.Company.filter({ name: schedule.company });
+            return companies[0] || null;
+        }
+    });
+
     // Filter out employees without attendance_id (salary-only employees)
     const employees = React.useMemo(() => {
         return allEmployees.filter(emp => emp.attendance_id);
@@ -214,6 +223,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         const employee = employees.find(e => e.attendance_id === attendanceId);
         const hasDefaultShifts = ['Operations', 'Front Office', 'Bodyshop', 'Housekeeping'].includes(employee?.department);
         const isFriday = weekNum === 'friday';
+        const isAlMaraghiAutomotive = companyData?.company_id === 3;
         
         setter(prev => {
             const current = prev[attendanceId] || {};
@@ -248,7 +258,12 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             updatedShift.day_start = updatedShift.day_start || '1:00 PM';
                             updatedShift.day_end = updatedShift.day_end || '4:00 PM';
                         } else {
-                            if (hasDefaultShifts) {
+                            if (isAlMaraghiAutomotive) {
+                                // Al Maraghi Automotive: Two shift types
+                                // Default to first shift type: 8AM-3PM
+                                updatedShift.day_start = updatedShift.day_start || '8:00 AM';
+                                updatedShift.day_end = updatedShift.day_end || '3:00 PM';
+                            } else if (hasDefaultShifts) {
                                 updatedShift.day_start = updatedShift.day_start || '9:00 AM';
                                 updatedShift.day_end = updatedShift.day_end || '4:00 PM';
                             } else {
@@ -530,6 +545,12 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             <p className="text-sm text-blue-900">
                                 <strong>Shift Structure:</strong> Week 1 and Week 2 patterns alternate throughout Ramadan, resetting after each Sunday.<br />
                                 <strong>Available Shifts:</strong> Day Shift and Night Shift - An employee can work day shift only, or day shift + night shift
+                                {companyData?.company_id === 3 && (
+                                    <>
+                                        <br />
+                                        <strong className="text-green-700">Al Maraghi Automotive:</strong> Default shift times are 8:00 AM - 3:00 PM (Shift Type 1) or 10:30 AM - 5:30 PM (Shift Type 2)
+                                    </>
+                                )}
                             </p>
                         </CardContent>
                     </Card>
