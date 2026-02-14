@@ -497,7 +497,7 @@ export default function Users() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {[...pagePermissions]
+                                        {Array.from(new Map(pagePermissions.map(p => [p.page_name, p])).values())
                                             .sort((a, b) => a.page_name.localeCompare(b.page_name))
                                             .map((permission) => (
                                                 <TableRow key={permission.id} className="hover:bg-slate-50">
