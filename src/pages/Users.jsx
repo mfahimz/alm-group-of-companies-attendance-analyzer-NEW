@@ -19,26 +19,33 @@ const PAGE_DISPLAY_NAMES = {
     'Home': 'Home (Smart Dashboard)',
     'Dashboard': 'Main Dashboard',
     'DepartmentHeadDashboard': 'Department Head Dashboard',
-    'CompanyDashboard': 'Company Dashboard',
+    'HRManagerDashboard': 'HR Manager Dashboard',
     'Projects': 'Projects List',
     'ProjectDetail': 'Project Details',
+    'Reports': 'Reports & Analytics',
+    'ReportDetail': 'Report Details View',
     'Employees': 'Employees Management',
     'Salaries': 'Salary Management',
+    'SalaryIncrements': 'Salary Increments',
     'QuarterlyMinutesManagement': 'Quarterly Minutes Management',
-    'Users': 'Users & Permissions',
-    'RulesSettings': 'Attendance Rules Settings',
+    'GraceMinutesManagement': 'Grace Minutes Management',
+    'AnnualLeaveManagement': 'Annual Leave Calendar',
     'RamadanSchedules': 'Ramadan Schedules',
+    'CompanyManagement': 'Company Settings',
+    'Users': 'Users & Permissions',
+    'DepartmentHeadSettings': 'Department Heads Settings',
+    'RulesSettings': 'Attendance Rules Settings',
+    'MaintenanceSettings': 'Maintenance Mode Settings',
+    'SecurityAudit': 'Security Audit',
+    'SystemHealth': 'System Health',
+    'SalaryDataIntegrityRepair': 'Salary Data Repair',
+    'MigrationTools': 'Migration Tools',
     'Documentation': 'System Documentation',
     'Training': 'Training Guides',
-    'UserProfile': 'User Profile',
+    'Calendar': 'Calendar Payroll',
     'EmployeeProfile': 'Employee Profile',
-    'ReportDetail': 'Report Details View',
-    'Reports': 'Reports & Analytics',
-    'DepartmentHeadSettings': 'Department Heads Settings',
-    'Recruitment': 'Recruitment Hub',
-    'JobPositions': 'Job Positions',
-    'CandidateScreening': 'Candidate Screening',
-    'MaintenanceSettings': 'Maintenance Mode Settings'
+    'UserProfile': 'User Profile',
+    'Maintenance': 'Maintenance Page'
 };
 
 const DEFAULT_PAGES = [
@@ -476,395 +483,63 @@ export default function Users() {
                             {pagePermissions.length === 0 ? (
                                 <div className="text-center py-8 text-slate-500">No permissions configured</div>
                             ) : (
-                                <div className="space-y-6">
-                                    {/* Dashboard Pages */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <HomeIcon className="w-4 h-4" />
-                                            Dashboard & Overview
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Page Name</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-center">Admin</TableHead>
-                                                    <TableHead className="text-center">Supervisor</TableHead>
-                                                    <TableHead className="text-center">Dept Head</TableHead>
-                                                    <TableHead className="text-center">User</TableHead>
+                                {/* Single unified table - All pages alphabetically */}
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-slate-100">
+                                            <TableHead className="font-semibold">Page Name</TableHead>
+                                            <TableHead className="font-semibold">Description</TableHead>
+                                            <TableHead className="text-center font-semibold">Admin</TableHead>
+                                            <TableHead className="text-center font-semibold">Supervisor</TableHead>
+                                            <TableHead className="text-center font-semibold">CEO</TableHead>
+                                            <TableHead className="text-center font-semibold">Dept Head</TableHead>
+                                            <TableHead className="text-center font-semibold">HR Manager</TableHead>
+                                            <TableHead className="text-center font-semibold">User</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {[...pagePermissions]
+                                            .sort((a, b) => a.page_name.localeCompare(b.page_name))
+                                            .map((permission) => (
+                                                <TableRow key={permission.id} className="hover:bg-slate-50">
+                                                    <TableCell className="font-medium">
+                                                        {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
+                                                    </TableCell>
+                                                    <TableCell className="text-slate-600 text-sm">{permission.description || '-'}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
+                                                            {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
+                                                            {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button size="sm" variant={hasPageRole(permission, 'ceo') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'ceo')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'ceo') ? 'bg-indigo-600 hover:bg-indigo-700' : ''}>
+                                                            {hasPageRole(permission, 'ceo') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
+                                                            {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button size="sm" variant={hasPageRole(permission, 'hr_manager') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'hr_manager')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'hr_manager') ? 'bg-teal-600 hover:bg-teal-700' : ''}>
+                                                            {hasPageRole(permission, 'hr_manager') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
+                                                            {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                        </Button>
+                                                    </TableCell>
                                                 </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {pagePermissions
-                                                    .filter(p => ['Home', 'Dashboard', 'DepartmentHeadDashboard', 'CompanyDashboard'].includes(p.page_name))
-                                                    .map((permission) => (
-                                                        <TableRow key={permission.id}>
-                                                            <TableCell className="font-medium">
-                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
-                                                            </TableCell>
-                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'}
-                                                                    onClick={() => togglePageRole(permission, 'admin')}
-                                                                    disabled={updatePermissionMutation.isPending}
-                                                                    className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}
-                                                                >
-                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'}
-                                                                    onClick={() => togglePageRole(permission, 'supervisor')}
-                                                                    disabled={updatePermissionMutation.isPending}
-                                                                    className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                                                                >
-                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'}
-                                                                    onClick={() => togglePageRole(permission, 'department_head')}
-                                                                    disabled={updatePermissionMutation.isPending}
-                                                                    className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}
-                                                                >
-                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant={hasPageRole(permission, 'user') ? 'default' : 'outline'}
-                                                                    onClick={() => togglePageRole(permission, 'user')}
-                                                                    disabled={updatePermissionMutation.isPending}
-                                                                    className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}
-                                                                >
-                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-
-                                    {/* Project Management */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <FolderKanban className="w-4 h-4" />
-                                            Project Management
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Page Name</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-center">Admin</TableHead>
-                                                    <TableHead className="text-center">Supervisor</TableHead>
-                                                    <TableHead className="text-center">Dept Head</TableHead>
-                                                    <TableHead className="text-center">User</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {pagePermissions
-                                                    .filter(p => ['Projects', 'ProjectDetail', 'Reports', 'ReportDetail'].includes(p.page_name))
-                                                    .map((permission) => (
-                                                        <TableRow key={permission.id}>
-                                                            <TableCell className="font-medium">
-                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
-                                                            </TableCell>
-                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
-                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
-                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
-                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
-                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-
-                                    {/* HR Management */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <UsersIcon className="w-4 h-4" />
-                                            HR Management
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Page Name</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-center">Admin</TableHead>
-                                                    <TableHead className="text-center">Supervisor</TableHead>
-                                                    <TableHead className="text-center">Dept Head</TableHead>
-                                                    <TableHead className="text-center">User</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {pagePermissions
-                                                    .filter(p => ['Employees', 'Salaries', 'QuarterlyMinutesManagement'].includes(p.page_name))
-                                                    .map((permission) => (
-                                                        <TableRow key={permission.id}>
-                                                            <TableCell className="font-medium">
-                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
-                                                            </TableCell>
-                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
-                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
-                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
-                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
-                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-
-                                    {/* Recruitment */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <Briefcase className="w-4 h-4" />
-                                            Recruitment
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Page Name</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-center">Admin</TableHead>
-                                                    <TableHead className="text-center">Supervisor</TableHead>
-                                                    <TableHead className="text-center">Dept Head</TableHead>
-                                                    <TableHead className="text-center">User</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {pagePermissions
-                                                    .filter(p => ['Recruitment', 'JobPositions', 'CandidateScreening'].includes(p.page_name))
-                                                    .map((permission) => (
-                                                        <TableRow key={permission.id}>
-                                                            <TableCell className="font-medium">
-                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
-                                                            </TableCell>
-                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
-                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
-                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
-                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
-                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-
-                                    {/* System Settings */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <Settings className="w-4 h-4" />
-                                            System Settings
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Page Name</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-center">Admin</TableHead>
-                                                    <TableHead className="text-center">Supervisor</TableHead>
-                                                    <TableHead className="text-center">Dept Head</TableHead>
-                                                    <TableHead className="text-center">User</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {pagePermissions
-                                                    .filter(p => ['Users', 'DepartmentHeadSettings', 'RulesSettings', 'RamadanSchedules', 'MaintenanceSettings'].includes(p.page_name))
-                                                    .map((permission) => (
-                                                        <TableRow key={permission.id}>
-                                                            <TableCell className="font-medium">
-                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
-                                                            </TableCell>
-                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
-                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
-                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
-                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
-                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-
-                                    {/* Documentation & Training */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <Book className="w-4 h-4" />
-                                            Documentation & Training
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Page Name</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-center">Admin</TableHead>
-                                                    <TableHead className="text-center">Supervisor</TableHead>
-                                                    <TableHead className="text-center">Dept Head</TableHead>
-                                                    <TableHead className="text-center">User</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {pagePermissions
-                                                    .filter(p => ['Documentation', 'Training'].includes(p.page_name))
-                                                    .map((permission) => (
-                                                        <TableRow key={permission.id}>
-                                                            <TableCell className="font-medium">
-                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
-                                                            </TableCell>
-                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
-                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
-                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
-                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
-                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-
-                                    {/* User Profile Pages */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                                            <UserIcon className="w-4 h-4" />
-                                            User & Employee Profiles
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Page Name</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-center">Admin</TableHead>
-                                                    <TableHead className="text-center">Supervisor</TableHead>
-                                                    <TableHead className="text-center">Dept Head</TableHead>
-                                                    <TableHead className="text-center">User</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {pagePermissions
-                                                    .filter(p => ['UserProfile', 'EmployeeProfile'].includes(p.page_name))
-                                                    .map((permission) => (
-                                                        <TableRow key={permission.id}>
-                                                            <TableCell className="font-medium">
-                                                                {PAGE_DISPLAY_NAMES[permission.page_name] || permission.page_name}
-                                                            </TableCell>
-                                                            <TableCell className="text-slate-600">{permission.description || '-'}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'admin') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'admin')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'admin') ? 'bg-purple-600 hover:bg-purple-700' : ''}>
-                                                                    {hasPageRole(permission, 'admin') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'supervisor') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'supervisor')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'supervisor') ? 'bg-blue-600 hover:bg-blue-700' : ''}>
-                                                                    {hasPageRole(permission, 'supervisor') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'department_head') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'department_head')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'department_head') ? 'bg-green-600 hover:bg-green-700' : ''}>
-                                                                    {hasPageRole(permission, 'department_head') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Button size="sm" variant={hasPageRole(permission, 'user') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'user')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'user') ? 'bg-slate-600 hover:bg-slate-700' : ''}>
-                                                                    {hasPageRole(permission, 'user') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </div>
+                                            ))}
+                                    </TableBody>
+                                </Table>
                             )}
                         </CardContent>
                     </Card>
@@ -876,9 +551,9 @@ export default function Users() {
                             </p>
                             <ul className="text-sm text-blue-900 space-y-1 list-disc list-inside">
                                 <li>Click a button to toggle access for that role</li>
-                                <li>Purple = Admin, Blue = Supervisor, Green = User access</li>
+                                <li>Purple = Admin, Blue = Supervisor, Indigo = CEO, Green = Dept Head, Teal = HR Manager, Gray = User</li>
                                 <li>Each page must have at least one role with access</li>
-                                <li>Changes take effect immediately</li>
+                                <li>Changes take effect immediately for all users</li>
                             </ul>
                         </CardContent>
                     </Card>
