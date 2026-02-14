@@ -205,7 +205,7 @@ export const PAGES_CONFIG = {
         name: 'RamadanSchedules',
         title: 'Ramadan Schedules',
         icon: Calendar,
-        category: 'Admin',
+        category: 'HRManagement',
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
