@@ -64,8 +64,8 @@ export default function DepartmentHeadSettings() {
     const departments = React.useMemo(() => {
         if (!selectedCompany) return [];
         const setting = companySettings.find(s => s.company === selectedCompany);
-        if (!setting) return ['Admin', 'CEO'];
-        return ['Admin', 'CEO', ...setting.departments.split(',').map(d => d.trim()).filter(Boolean)];
+        if (!setting) return ['Admin', 'Executive'];
+        return ['Admin', 'Executive', ...setting.departments.split(',').map(d => d.trim()).filter(Boolean)];
     }, [selectedCompany, companySettings]);
 
     // Get all employee IDs that are already assigned as department heads
@@ -130,6 +130,19 @@ export default function DepartmentHeadSettings() {
                 reports_to: selectedReportsTo || null,
                 active: true
             });
+
+            // If department is "Executive", update linked user to CEO role
+            if (selectedDepartment === 'Executive') {
+                const selectedEmp = employees.find(e => e.id === selectedEmployee);
+                if (selectedEmp?.hrms_id) {
+                    const linkedUser = users.find(u => u.hrms_id === selectedEmp.hrms_id);
+                    if (linkedUser) {
+                        await base44.entities.User.update(linkedUser.id, {
+                            extended_role: 'ceo'
+                        });
+                    }
+                }
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['deptHeads']);
