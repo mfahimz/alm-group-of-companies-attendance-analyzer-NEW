@@ -5,87 +5,121 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
-        if (!user || user.role !== 'admin') {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        if (!user || (user.role !== 'admin' && user.extended_role !== 'admin')) {
+            return Response.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
         }
 
-        // Define all pages in the application
+        // CRITICAL: Import all pages from PAGES_CONFIG to ensure accuracy
+        // This list MUST match your actual pages in components/config/pagesConfig.js
         const allPages = [
-            { name: 'Dashboard', description: 'Main dashboard with project overview' },
-            { name: 'Projects', description: 'Project management and listing' },
-            { name: 'ProjectDetail', description: 'Individual project details and management' },
-            { name: 'Employees', description: 'Employee master data management' },
-            { name: 'Salaries', description: 'Employee salary management' },
-            { name: 'Users', description: 'User management and permissions' },
-            { name: 'RulesSettings', description: 'Attendance rules configuration' },
-            { name: 'RamadanSchedules', description: 'Ramadan shift schedule management' },
-            { name: 'Documentation', description: 'User guides and documentation' },
-            { name: 'Training', description: 'Training guides and videos' },
-            { name: 'UserProfile', description: 'User profile settings' },
-            { name: 'EmployeeProfile', description: 'Employee profile details' },
-            { name: 'ReportDetail', description: 'Detailed attendance report view' },
-            { name: 'Reports', description: 'Reports and analytics' },
-            { name: 'DepartmentHeadSettings', description: 'Department head configuration' },
-            { name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports' },
-            { name: 'QuarterlyMinutesManagement', description: 'Quarterly minutes management' },
-            { name: 'Recruitment', description: 'Recruitment hub' },
-            { name: 'JobPositions', description: 'Job position management' },
-            { name: 'CandidateScreening', description: 'Candidate screening and resume analysis' },
-            { name: 'MaintenanceSettings', description: 'System maintenance mode settings' },
-            { name: 'Maintenance', description: 'Maintenance page' }
+            // Main Navigation
+            { name: 'Home', description: 'Smart dashboard router', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+            { name: 'Dashboard', description: 'Main dashboard with project overview', defaultRoles: 'admin,supervisor,user,ceo' },
+            
+            // Leadership Dashboards
+            { name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', defaultRoles: 'department_head,ceo' },
+            { name: 'HRManagerDashboard', description: 'HR Manager dashboard', defaultRoles: 'hr_manager' },
+            
+            // Projects
+            { name: 'Projects', description: 'Project management and listing', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+            { name: 'ProjectDetail', description: 'Individual project details and management', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+            { name: 'Reports', description: 'Reports and analytics', defaultRoles: 'admin,supervisor,ceo' },
+            { name: 'ReportDetail', description: 'Detailed attendance report view', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+            
+            // HR Management
+            { name: 'Employees', description: 'Employee master data management', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+            { name: 'Salaries', description: 'Employee salary management', defaultRoles: 'admin,supervisor,ceo' },
+            { name: 'SalaryIncrements', description: 'Salary increment management', defaultRoles: 'admin,supervisor' },
+            { name: 'QuarterlyMinutesManagement', description: 'Quarterly minutes management', defaultRoles: 'admin,ceo' },
+            { name: 'GraceMinutesManagement', description: 'Grace minutes management', defaultRoles: 'admin,ceo' },
+            { name: 'AnnualLeaveManagement', description: 'Annual leave calendar management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
+            { name: 'RamadanSchedules', description: 'Ramadan shift schedule management', defaultRoles: 'admin,ceo' },
+            
+            // Admin
+            { name: 'CompanyManagement', description: 'Company settings and management', defaultRoles: 'admin,ceo' },
+            { name: 'Users', description: 'User management and permissions', defaultRoles: 'admin,ceo' },
+            { name: 'DepartmentHeadSettings', description: 'Department head configuration', defaultRoles: 'admin,ceo' },
+            { name: 'RulesSettings', description: 'Attendance rules configuration', defaultRoles: 'admin,ceo' },
+            { name: 'MaintenanceSettings', description: 'System maintenance mode settings', defaultRoles: 'admin,ceo' },
+            { name: 'SecurityAudit', description: 'Security and audit logs', defaultRoles: 'admin' },
+            { name: 'SystemHealth', description: 'System health monitoring', defaultRoles: 'admin' },
+            { name: 'SalaryDataIntegrityRepair', description: 'Salary data repair tools', defaultRoles: 'admin' },
+            { name: 'MigrationTools', description: 'Data migration utilities', defaultRoles: 'admin' },
+            { name: 'Documentation', description: 'System documentation', defaultRoles: 'admin,ceo' },
+            { name: 'Training', description: 'Training guides and videos', defaultRoles: 'admin,ceo' },
+            
+            // Calendar Payroll
+            { name: 'Calendar', description: 'Calendar payroll system', defaultRoles: 'admin' },
+            
+            // Hidden Pages (No navigation but need permissions)
+            { name: 'EmployeeProfile', description: 'Employee profile details', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+            { name: 'UserProfile', description: 'User profile settings', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+            { name: 'Maintenance', description: 'System maintenance page', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' }
         ];
 
         // Fetch existing permissions
         const existingPermissions = await base44.asServiceRole.entities.PagePermission.list();
-        const existingPageNames = existingPermissions.map(p => p.page_name);
+        const existingMap = new Map(existingPermissions.map(p => [p.page_name, p]));
         const validPageNames = allPages.map(p => p.name);
 
-        // Delete permissions for pages that no longer exist
-        const deleted = [];
-        for (const existingPerm of existingPermissions) {
-            if (!validPageNames.includes(existingPerm.page_name)) {
-                await base44.asServiceRole.entities.PagePermission.delete(existingPerm.id);
-                deleted.push(existingPerm.page_name);
+        let created = 0;
+        let updated = 0;
+        let deleted = 0;
+        const newPageNames = [];
+        const deletedPageNames = [];
+        const updatedPageNames = [];
+
+        // Step 1: Create missing pages with default roles
+        for (const page of allPages) {
+            if (!existingMap.has(page.name)) {
+                await base44.asServiceRole.entities.PagePermission.create({
+                    page_name: page.name,
+                    allowed_roles: page.defaultRoles || 'admin',
+                    description: page.description
+                });
+                created++;
+                newPageNames.push(page.name);
             }
         }
 
-        // Find pages that don't have permissions yet
-        const newPages = allPages.filter(page => !existingPageNames.includes(page.name));
-
-        // Create permissions for new pages with default access (admin only)
-        const created = [];
-        for (const page of newPages) {
-            const permission = await base44.asServiceRole.entities.PagePermission.create({
-                page_name: page.name,
-                allowed_roles: 'admin',
-                description: page.description
-            });
-            created.push(permission);
+        // Step 2: Update descriptions ONLY (preserve allowed_roles)
+        for (const page of allPages) {
+            const existing = existingMap.get(page.name);
+            if (existing && existing.description !== page.description) {
+                await base44.asServiceRole.entities.PagePermission.update(existing.id, {
+                    description: page.description
+                    // CRITICAL: Do NOT update allowed_roles here - preserve user's custom permissions
+                });
+                updated++;
+                updatedPageNames.push(page.name);
+            }
         }
 
-        // Update descriptions for existing pages
-        const updated = [];
+        // Step 3: Delete permissions for removed pages (ONLY if they don't exist in config)
         for (const existingPerm of existingPermissions) {
-            if (!validPageNames.includes(existingPerm.page_name)) continue; // Skip deleted pages
-            const pageInfo = allPages.find(p => p.name === existingPerm.page_name);
-            if (pageInfo && existingPerm.description !== pageInfo.description) {
-                const updatedPerm = await base44.asServiceRole.entities.PagePermission.update(existingPerm.id, {
-                    description: pageInfo.description
-                });
-                updated.push(updatedPerm);
+            if (!validPageNames.includes(existingPerm.page_name)) {
+                await base44.asServiceRole.entities.PagePermission.delete(existingPerm.id);
+                deleted++;
+                deletedPageNames.push(existingPerm.page_name);
             }
         }
 
         return Response.json({
             success: true,
-            created: created.length,
-            updated: updated.length,
-            deleted: deleted.length,
+            message: `Sync completed: ${created} created, ${updated} updated, ${deleted} deleted`,
+            created,
+            updated,
+            deleted,
             total: allPages.length,
-            newPages: created.map(p => p.page_name),
-            deletedPages: deleted
+            newPages: newPageNames,
+            updatedPages: updatedPageNames,
+            deletedPages: deletedPageNames
         });
     } catch (error) {
-        return Response.json({ error: error.message }, { status: 500 });
+        console.error('[syncPagePermissions] Error:', error);
+        return Response.json({ 
+            error: error.message,
+            stack: error.stack 
+        }, { status: 500 });
     }
 });
