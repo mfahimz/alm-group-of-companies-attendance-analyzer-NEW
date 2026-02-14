@@ -54,7 +54,12 @@ export default function DepartmentHeadSettings() {
         queryFn: () => base44.entities.Exception.list()
     });
 
-    const companies = ['Al Maraghi Auto Repairs', 'Al Maraghi Automotive', 'Naser Mohsin Auto Parts', 'Astra Auto Parts'];
+    const { data: companiesData = [] } = useQuery({
+        queryKey: ['companies'],
+        queryFn: () => base44.entities.Company.list()
+    });
+
+    const companies = companiesData.filter(c => c.active).map(c => c.name);
 
     const departments = React.useMemo(() => {
         if (!selectedCompany) return [];

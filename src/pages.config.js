@@ -47,6 +47,7 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import BusinessDocumentation from './pages/BusinessDocumentation';
 import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
 import Calendar from './pages/Calendar';
@@ -82,11 +83,11 @@ import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import Training from './pages/Training';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "AnnualLeaveManagement": AnnualLeaveManagement,
     "BusinessDocumentation": BusinessDocumentation,
     "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
     "Calendar": Calendar,
@@ -122,7 +123,6 @@ export const PAGES = {
     "Training": Training,
     "UserProfile": UserProfile,
     "Users": Users,
-    "AnnualLeaveManagement": AnnualLeaveManagement,
 }
 
 export const pagesConfig = {
