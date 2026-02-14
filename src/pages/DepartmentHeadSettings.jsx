@@ -17,6 +17,7 @@ export default function DepartmentHeadSettings() {
     const [selectedCompany, setSelectedCompany] = useState('');
     const [selectedDepartment, setSelectedDepartment] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState('');
+    const [selectedCEOUser, setSelectedCEOUser] = useState('');
     const [selectedManagedEmployees, setSelectedManagedEmployees] = useState([]);
     const [selectedReportsTo, setSelectedReportsTo] = useState('');
     const [editingHead, setEditingHead] = useState(null);
@@ -104,62 +105,104 @@ export default function DepartmentHeadSettings() {
 
     const createMutation = useMutation({
         mutationFn: async () => {
-            if (!selectedCompany || !selectedDepartment || !selectedEmployee) {
-                throw new Error('Please select company, department, and employee');
-            }
-
-            // Check if this employee is already assigned as a department head anywhere
-            const existingAssignment = deptHeads.find(dh => 
-                dh.active && 
-                dh.employee_id === selectedEmployee
-            );
-            
-            if (existingAssignment) {
-                const empName = getDeptHeadName(selectedEmployee);
-                throw new Error(`${empName} is already assigned as department head for ${existingAssignment.department} in ${existingAssignment.company}`);
-            }
-
-            // Check if this company+department combination already has a department head
-            const duplicateDept = deptHeads.find(dh => 
-                dh.active && 
-                dh.company === selectedCompany && 
-                dh.department === selectedDepartment
-            );
-            
-            if (duplicateDept) {
-                throw new Error(`${selectedDepartment} in ${selectedCompany} already has a department head: ${getDeptHeadName(duplicateDept.employee_id)}`);
-            }
-
-            await base44.entities.DepartmentHead.create({
-                company: selectedCompany,
-                department: selectedDepartment,
-                employee_id: selectedEmployee,
-                managed_employee_ids: selectedManagedEmployees.join(','),
-                reports_to: selectedReportsTo || null,
-                active: true
-            });
-
-            // If department is "Executive", update linked user to CEO role
+            // For Executive (CEO) department - require user selection instead of employee
             if (selectedDepartment === 'Executive') {
-                const selectedEmp = employees.find(e => e.id === selectedEmployee);
-                if (selectedEmp?.hrms_id) {
-                    const linkedUser = users.find(u => u.hrms_id === selectedEmp.hrms_id);
-                    if (linkedUser) {
-                        await base44.entities.User.update(linkedUser.id, {
-                            extended_role: 'ceo'
-                        });
-                    }
+                if (!selectedCompany || !selectedCEOUser) {
+                    throw new Error('Please select company and CEO user');
                 }
+
+                // Check if this user is already assigned as CEO
+                const existingCEO = deptHeads.find(dh => 
+                    dh.active && 
+                    dh.department === 'Executive' &&
+                    dh.user_email === selectedCEOUser
+                );
+                
+                if (existingCEO) {
+                    const ceoUser = users.find(u => u.email === selectedCEOUser);
+                    throw new Error(`${ceoUser?.full_name || selectedCEOUser} is already assigned as CEO for ${existingCEO.company}`);
+                }
+
+                // Check if this company already has a CEO
+                const duplicateCEO = deptHeads.find(dh => 
+                    dh.active && 
+                    dh.company === selectedCompany && 
+                    dh.department === 'Executive'
+                );
+                
+                if (duplicateCEO) {
+                    const ceoUser = users.find(u => u.email === duplicateCEO.user_email);
+                    throw new Error(`${selectedCompany} already has a CEO: ${ceoUser?.full_name || 'Unknown'}`);
+                }
+
+                // Create CEO department head assignment
+                await base44.entities.DepartmentHead.create({
+                    company: selectedCompany,
+                    department: 'Executive',
+                    employee_id: null,
+                    user_email: selectedCEOUser,
+                    managed_employee_ids: selectedManagedEmployees.join(','),
+                    reports_to: selectedReportsTo || null,
+                    active: true
+                });
+
+                // Update user role to CEO
+                const ceoUser = users.find(u => u.email === selectedCEOUser);
+                if (ceoUser) {
+                    await base44.entities.User.update(ceoUser.id, {
+                        extended_role: 'ceo',
+                        company: selectedCompany
+                    });
+                }
+            } else {
+                // Regular department head - require employee selection
+                if (!selectedCompany || !selectedDepartment || !selectedEmployee) {
+                    throw new Error('Please select company, department, and employee');
+                }
+
+                // Check if this employee is already assigned as a department head anywhere
+                const existingAssignment = deptHeads.find(dh => 
+                    dh.active && 
+                    dh.employee_id === selectedEmployee
+                );
+                
+                if (existingAssignment) {
+                    const empName = getDeptHeadName(selectedEmployee);
+                    throw new Error(`${empName} is already assigned as department head for ${existingAssignment.department} in ${existingAssignment.company}`);
+                }
+
+                // Check if this company+department combination already has a department head
+                const duplicateDept = deptHeads.find(dh => 
+                    dh.active && 
+                    dh.company === selectedCompany && 
+                    dh.department === selectedDepartment
+                );
+                
+                if (duplicateDept) {
+                    throw new Error(`${selectedDepartment} in ${selectedCompany} already has a department head: ${getDeptHeadName(duplicateDept.employee_id)}`);
+                }
+
+                await base44.entities.DepartmentHead.create({
+                    company: selectedCompany,
+                    department: selectedDepartment,
+                    employee_id: selectedEmployee,
+                    user_email: null,
+                    managed_employee_ids: selectedManagedEmployees.join(','),
+                    reports_to: selectedReportsTo || null,
+                    active: true
+                });
             }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['deptHeads']);
+            queryClient.invalidateQueries(['users']);
             setSelectedCompany('');
             setSelectedDepartment('');
             setSelectedEmployee('');
+            setSelectedCEOUser('');
             setSelectedManagedEmployees([]);
             setSelectedReportsTo('');
-            toast.success('Department head assigned successfully');
+            toast.success(selectedDepartment === 'Executive' ? 'CEO assigned successfully' : 'Department head assigned successfully');
         },
         onError: (error) => {
             toast.error(error.message);
@@ -192,8 +235,14 @@ export default function DepartmentHeadSettings() {
         }
     });
 
-    const getDeptHeadName = (employeeId) => {
-        const emp = employees.find(e => e.id === employeeId);
+    const getDeptHeadName = (deptHead) => {
+        // For CEO (Executive department), return user's full name
+        if (deptHead.department === 'Executive' && deptHead.user_email) {
+            const user = users.find(u => u.email === deptHead.user_email);
+            return user?.full_name || deptHead.user_email;
+        }
+        // For regular department heads, return employee name
+        const emp = employees.find(e => e.id === deptHead.employee_id);
         return emp?.name || 'Unknown';
     };
 
@@ -210,7 +259,7 @@ export default function DepartmentHeadSettings() {
         // Check if it's a department head
         const dh = deptHeads.find(d => d.id === reportsToValue);
         if (!dh) return '—';
-        const name = getDeptHeadName(dh.employee_id);
+        const name = getDeptHeadName(dh);
         // If reports to Executive department head (CEO), show as CEO
         if (dh.department === 'Executive') {
             return `👑 CEO - ${name}`;
@@ -408,36 +457,61 @@ export default function DepartmentHeadSettings() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        {selectedDepartment === 'Executive' ? (
                         <div>
-                            <Label>Employee (Department Head)</Label>
-                            <Select 
-                                value={selectedEmployee} 
-                                onValueChange={(val) => {
-                                    setSelectedEmployee(val);
-                                    // Auto-uncheck the selected employee from managed employees
-                                    setSelectedManagedEmployees(prev => prev.filter(id => id !== val));
-                                }}
-                                disabled={!selectedCompany}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select employee" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availableEmployees.length === 0 ? (
-                                        <div className="p-2 text-sm text-slate-500">
-                                            No available employees (all assigned as dept heads)
-                                        </div>
-                                    ) : (
-                                        availableEmployees.map(e => (
-                                            <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                                        ))
-                                    )}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-slate-500 mt-1">
-                                Only employees not assigned as department heads are shown
-                            </p>
+                        <Label>CEO User</Label>
+                        <Select 
+                        value={selectedCEOUser} 
+                        onValueChange={setSelectedCEOUser}
+                        disabled={!selectedCompany}
+                        >
+                        <SelectTrigger>
+                        <SelectValue placeholder="Select user for CEO role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {users.filter(u => (u.extended_role || u.role) === 'admin' || (u.extended_role || u.role) === 'ceo').map(u => (
+                            <SelectItem key={u.id} value={u.email}>
+                                👑 {u.full_name} ({u.email})
+                            </SelectItem>
+                        ))}
+                        </SelectContent>
+                        </Select>
+                        <p className="text-xs text-slate-500 mt-1">
+                        CEO does not require an employee profile - select admin/CEO user
+                        </p>
                         </div>
+                        ) : (
+                        <div>
+                        <Label>Employee (Department Head)</Label>
+                        <Select 
+                        value={selectedEmployee} 
+                        onValueChange={(val) => {
+                        setSelectedEmployee(val);
+                        // Auto-uncheck the selected employee from managed employees
+                        setSelectedManagedEmployees(prev => prev.filter(id => id !== val));
+                        }}
+                        disabled={!selectedCompany}
+                        >
+                        <SelectTrigger>
+                        <SelectValue placeholder="Select employee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {availableEmployees.length === 0 ? (
+                            <div className="p-2 text-sm text-slate-500">
+                                No available employees (all assigned as dept heads)
+                            </div>
+                        ) : (
+                            availableEmployees.map(e => (
+                                <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                            ))
+                        )}
+                        </SelectContent>
+                        </Select>
+                        <p className="text-xs text-slate-500 mt-1">
+                        Only employees not assigned as department heads are shown
+                        </p>
+                        </div>
+                        )}
                     </div>
 
                     {selectedCompany && (
@@ -523,7 +597,7 @@ export default function DepartmentHeadSettings() {
                                         <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
                                         {availableReportsTo.map(dh => (
                                            <SelectItem key={dh.id} value={dh.id}>
-                                               {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh.employee_id)} ({dh.department})
+                                               {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh)} ({dh.department})
                                            </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -537,11 +611,16 @@ export default function DepartmentHeadSettings() {
 
                     <Button
                         onClick={() => createMutation.mutate()}
-                        disabled={!selectedCompany || !selectedDepartment || !selectedEmployee || createMutation.isPending}
+                        disabled={
+                            !selectedCompany || 
+                            !selectedDepartment || 
+                            (selectedDepartment === 'Executive' ? !selectedCEOUser : !selectedEmployee) ||
+                            createMutation.isPending
+                        }
                         className="bg-indigo-600 hover:bg-indigo-700"
                     >
                         <Plus className="w-4 h-4 mr-2" />
-                        Assign Department Head
+                        {selectedDepartment === 'Executive' ? 'Assign CEO' : 'Assign Department Head'}
                     </Button>
                 </CardContent>
             </Card>
@@ -612,9 +691,14 @@ export default function DepartmentHeadSettings() {
                                     return (
                                         <TableRow key={dh.id}>
                                             <TableCell className="text-sm">{dh.company}</TableCell>
-                                            <TableCell className="font-medium">{dh.department}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {dh.department === 'Executive' ? '👑 ' : ''}{dh.department}
+                                            </TableCell>
                                             <TableCell className="font-medium text-slate-900">
-                                                {getDeptHeadName(dh.employee_id)}
+                                                {getDeptHeadName(dh)}
+                                                {dh.department === 'Executive' && (
+                                                    <span className="ml-2 text-xs text-indigo-600 font-normal">(CEO - No employee profile)</span>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
@@ -697,7 +781,7 @@ export default function DepartmentHeadSettings() {
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Edit Department Head: {editingHead && getDeptHeadName(editingHead.employee_id)}</DialogTitle>
+                        <DialogTitle>Edit Department Head: {editingHead && getDeptHeadName(editingHead)}</DialogTitle>
                     </DialogHeader>
                     
                     {editingHead && (
@@ -820,7 +904,7 @@ export default function DepartmentHeadSettings() {
                                             return 0;
                                         }).map(dh => (
                                             <SelectItem key={dh.id} value={dh.id}>
-                                                {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh.employee_id)} ({dh.department})
+                                                {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh)} ({dh.department})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
