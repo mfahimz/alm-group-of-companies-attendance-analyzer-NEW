@@ -64,8 +64,8 @@ export default function DepartmentHeadSettings() {
     const departments = React.useMemo(() => {
         if (!selectedCompany) return [];
         const setting = companySettings.find(s => s.company === selectedCompany);
-        if (!setting) return ['Admin'];
-        return ['Admin', ...setting.departments.split(',').map(d => d.trim()).filter(Boolean)];
+        if (!setting) return ['Admin', 'CEO'];
+        return ['Admin', 'CEO', ...setting.departments.split(',').map(d => d.trim()).filter(Boolean)];
     }, [selectedCompany, companySettings]);
 
     // Get all employee IDs that are already assigned as department heads
