@@ -23,12 +23,12 @@ export default function AnnualLeaveManagement() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterCompany, setFilterCompany] = useState('all');
     const [formData, setFormData] = useState({
+        company: '',
         employee_id: '',
         date_from: '',
         date_to: '',
         leave_type: 'annual',
-        reason: '',
-        notes: ''
+        reason: ''
     });
 
     const queryClient = useQueryClient();
@@ -132,30 +132,30 @@ export default function AnnualLeaveManagement() {
 
     const resetForm = () => {
         setFormData({
+            company: '',
             employee_id: '',
             date_from: '',
             date_to: '',
             leave_type: 'annual',
-            reason: '',
-            notes: ''
+            reason: ''
         });
     };
 
     const handleEdit = (leave) => {
         setEditingLeave(leave);
         setFormData({
+            company: leave.company,
             employee_id: leave.employee_id,
             date_from: leave.date_from,
             date_to: leave.date_to,
-            leave_type: leave.leave_type,
-            reason: leave.reason || '',
-            notes: leave.notes || ''
+            leave_type: 'annual',
+            reason: leave.reason || ''
         });
         setShowDialog(true);
     };
 
     const handleSubmit = () => {
-        if (!formData.employee_id || !formData.date_from || !formData.date_to) {
+        if (!formData.company || !formData.employee_id || !formData.date_from || !formData.date_to) {
             toast.error('Please fill all required fields');
             return;
         }
@@ -364,29 +364,42 @@ export default function AnnualLeaveManagement() {
                     </DialogHeader>
                     <div className="space-y-4">
                         <div>
-                            <Label>Employee *</Label>
-                            <Select value={formData.employee_id} onValueChange={(value) => setFormData({ ...formData, employee_id: value })}>
+                            <Label>Company *</Label>
+                            <Select 
+                                value={formData.company} 
+                                onValueChange={(value) => setFormData({ ...formData, company: value, employee_id: '' })}
+                            >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select employee" />
+                                    <SelectValue placeholder="Select company" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {employees.map(emp => (
-                                        <SelectItem key={emp.id} value={emp.hrms_id}>
-                                            {emp.name} - {emp.attendance_id}
+                                    {companies.map(company => (
+                                        <SelectItem key={company} value={company}>
+                                            {company}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label>Leave Type</Label>
-                            <Select value={formData.leave_type} onValueChange={(value) => setFormData({ ...formData, leave_type: value })}>
+                            <Label>Employee *</Label>
+                            <Select 
+                                value={formData.employee_id} 
+                                onValueChange={(value) => setFormData({ ...formData, employee_id: value })}
+                                disabled={!formData.company}
+                            >
                                 <SelectTrigger>
-                                    <SelectValue />
+                                    <SelectValue placeholder={formData.company ? "Select employee" : "Select company first"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="annual">Annual</SelectItem>
-                                    <SelectItem value="emergency">Emergency</SelectItem>
+                                    {employees
+                                        .filter(emp => emp.company === formData.company)
+                                        .map(emp => (
+                                            <SelectItem key={emp.id} value={emp.hrms_id}>
+                                                {emp.name} - {emp.attendance_id}
+                                            </SelectItem>
+                                        ))
+                                    }
                                 </SelectContent>
                             </Select>
                         </div>
@@ -418,15 +431,8 @@ export default function AnnualLeaveManagement() {
                             <Textarea
                                 value={formData.reason}
                                 onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                                rows={2}
-                            />
-                        </div>
-                        <div>
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                rows={2}
+                                rows={3}
+                                placeholder="Enter reason for leave..."
                             />
                         </div>
                     </div>
