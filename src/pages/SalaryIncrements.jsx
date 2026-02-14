@@ -278,7 +278,7 @@ export default function SalaryIncrements() {
         return `AED ${Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    if (!isAdmin) {
+    if (!canAccess) {
         return (
             <div className="space-y-6">
                 <Breadcrumb items={[{ label: 'Salary Increments' }]} />
