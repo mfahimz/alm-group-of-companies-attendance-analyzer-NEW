@@ -43,6 +43,7 @@ export default function SalaryIncrements() {
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
+    const canAccess = ['admin', 'supervisor', 'ceo', 'hr_manager'].includes(userRole);
 
     // Only fetch Al Maraghi Motors employees
     const { data: employees = [] } = useQuery({
