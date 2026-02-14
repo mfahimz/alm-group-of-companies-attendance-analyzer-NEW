@@ -117,7 +117,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin']
+        defaultRoles: ['admin', 'supervisor']
     },
     QuarterlyMinutesManagement: {
         name: 'QuarterlyMinutesManagement',
@@ -147,7 +147,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
     },
     CompanyManagement: {
         name: 'CompanyManagement',
