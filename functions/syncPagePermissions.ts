@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
             // HR Management
             { name: 'Employees', description: 'Employee master data management', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
             { name: 'Salaries', description: 'Employee salary management', defaultRoles: 'admin,supervisor,ceo' },
-            { name: 'SalaryIncrements', description: 'Salary increment management', defaultRoles: 'admin,supervisor' },
+            { name: 'SalaryIncrements', description: 'Salary increment management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
             { name: 'QuarterlyMinutesManagement', description: 'Quarterly minutes management', defaultRoles: 'admin,ceo' },
             { name: 'GraceMinutesManagement', description: 'Grace minutes management', defaultRoles: 'admin,ceo' },
             { name: 'AnnualLeaveManagement', description: 'Annual leave calendar management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
