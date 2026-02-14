@@ -88,11 +88,19 @@ export default function DepartmentHeadSettings() {
     });
 
     // Get department heads that can be reported to (exclude self if editing)
-    const availableReportsTo = deptHeads.filter(dh => 
-        dh.company === selectedCompany && 
-        dh.active && 
-        (!editingHead || dh.id !== editingHead.id)
-    );
+    // Sort with Executive (CEO) department heads at the top
+    const availableReportsTo = deptHeads
+        .filter(dh => 
+            dh.company === selectedCompany && 
+            dh.active && 
+            (!editingHead || dh.id !== editingHead.id)
+        )
+        .sort((a, b) => {
+            // Sort Executive (CEO) department heads to the top
+            if (a.department === 'Executive' && b.department !== 'Executive') return -1;
+            if (b.department === 'Executive' && a.department !== 'Executive') return 1;
+            return 0;
+        });
 
     const createMutation = useMutation({
         mutationFn: async () => {
@@ -202,7 +210,12 @@ export default function DepartmentHeadSettings() {
         // Check if it's a department head
         const dh = deptHeads.find(d => d.id === reportsToValue);
         if (!dh) return '—';
-        return getDeptHeadName(dh.employee_id);
+        const name = getDeptHeadName(dh.employee_id);
+        // If reports to Executive department head (CEO), show as CEO
+        if (dh.department === 'Executive') {
+            return `👑 CEO - ${name}`;
+        }
+        return name;
     };
 
     const handleEditClick = (deptHead) => {
@@ -509,9 +522,9 @@ export default function DepartmentHeadSettings() {
                                         <SelectItem value={null}>None</SelectItem>
                                         <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
                                         {availableReportsTo.map(dh => (
-                                            <SelectItem key={dh.id} value={dh.id}>
-                                                {getDeptHeadName(dh.employee_id)} ({dh.department})
-                                            </SelectItem>
+                                           <SelectItem key={dh.id} value={dh.id}>
+                                               {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh.employee_id)} ({dh.department})
+                                           </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -800,9 +813,14 @@ export default function DepartmentHeadSettings() {
                                             dh.company === editingHead.company && 
                                             dh.active && 
                                             dh.id !== editingHead.id
-                                        ).map(dh => (
+                                        ).sort((a, b) => {
+                                            // Sort Executive (CEO) department heads to the top
+                                            if (a.department === 'Executive' && b.department !== 'Executive') return -1;
+                                            if (b.department === 'Executive' && a.department !== 'Executive') return 1;
+                                            return 0;
+                                        }).map(dh => (
                                             <SelectItem key={dh.id} value={dh.id}>
-                                                {getDeptHeadName(dh.employee_id)} ({dh.department})
+                                                {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh.employee_id)} ({dh.department})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
