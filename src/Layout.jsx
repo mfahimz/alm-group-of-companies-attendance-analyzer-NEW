@@ -21,6 +21,7 @@ export default function Layout({ children, currentPageName }) {
 
     const isDepartmentHead = userRole === 'department_head';
     const isHRManager = userRole === 'hr_manager';
+    const isCEO = userRole === 'ceo';
 
     // Fetch maintenance mode
     const { data: maintenanceMode } = useQuery({
@@ -88,14 +89,16 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
-    // Redirect department heads and HR managers away from Dashboard
+    // Redirect department heads, HR managers, and CEOs away from Dashboard
     useEffect(() => {
         if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
             window.location.replace('/DepartmentHeadDashboard');
         } else if (currentUser && isHRManager && currentPageName === 'Dashboard') {
             window.location.replace('/HRManagerDashboard');
+        } else if (currentUser && isCEO && currentPageName === 'Dashboard') {
+            window.location.replace('/DepartmentHeadDashboard');
         }
-    }, [currentUser, isDepartmentHead, isHRManager, currentPageName]);
+    }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName]);
 
     if (isLoading || !currentUser) {
         return (
@@ -111,7 +114,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     // Validation checks
-    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'hr_manager')) {
+    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'hr_manager' || userRole === 'ceo')) {
         return (
             <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
                       <div className="text-[#4B5563] text-center">

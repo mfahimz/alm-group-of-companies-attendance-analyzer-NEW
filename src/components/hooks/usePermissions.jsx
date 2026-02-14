@@ -109,8 +109,8 @@ export const usePermissions = () => {
     const hasPermission = (action) => {
         if (!user) return false;
         
-        // System admins have all permissions
-        if (userRole === 'admin') return true;
+        // System admins and CEOs have all permissions
+        if (userRole === 'admin' || userRole === 'ceo') return true;
         
         // Add more permission checks as needed
         return false;
