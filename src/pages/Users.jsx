@@ -483,7 +483,6 @@ export default function Users() {
                             {pagePermissions.length === 0 ? (
                                 <div className="text-center py-8 text-slate-500">No permissions configured</div>
                             ) : (
-                                {/* Single unified table - All pages alphabetically */}
                                 <Table>
                                     <TableHeader>
                                         <TableRow className="bg-slate-100">
