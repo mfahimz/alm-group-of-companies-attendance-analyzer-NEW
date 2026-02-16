@@ -17,27 +17,11 @@ import { formatInUAE } from '@/components/ui/timezone';
 // Predefined checklist tasks for Al Maraghi Motors
 const PREDEFINED_TASKS = [
     {
-        task_type: 'Annual Leave',
-        task_description: 'Verify and process all annual leave requests and deductions'
-    },
-    {
-        task_type: 'Rejoining',
-        task_description: 'Process rejoining employees and update their records'
-    },
-    {
-        task_type: 'Medical Leave',
-        task_description: 'Review and approve medical leave applications'
-    },
-    {
-        task_type: 'LOP',
-        task_description: 'Verify Loss of Pay (LOP) days and apply deductions'
-    },
-    {
-        task_type: 'Salary spl.',
+        task_type: 'Salary Split',
         task_description: 'Review special salary adjustments and calculations'
     },
     {
-        task_type: 'Loose Salary Hold',
+        task_type: 'Leave Salary Hold',
         task_description: 'Check and release any held salaries'
     },
     {
@@ -49,8 +33,8 @@ const PREDEFINED_TASKS = [
         task_description: 'Verify overtime hours and calculate overtime pay'
     },
     {
-        task_type: 'Beneshwa',
-        task_description: 'Process Beneshwa related adjustments'
+        task_type: 'Incentives',
+        task_description: 'Process salary increments and update employee records'
     },
     {
         task_type: 'Variable Salary',
@@ -65,6 +49,10 @@ const PREDEFINED_TASKS = [
         task_description: 'Verify all deductions (late, early, other) are correctly applied'
     },
     {
+        task_type: 'New Joining',
+        task_description: 'Generate and verify leave salary calculation sheets'
+    },
+    {
         task_type: 'Bank account changes',
         task_description: 'Update employee bank account details for payroll transfer'
     },
@@ -73,11 +61,11 @@ const PREDEFINED_TASKS = [
         task_description: 'Verify attendance data and resolve any anomalies'
     },
     {
-        task_type: 'Leave Salary sheets',
+        task_type: 'Leave Salary Sheets',
         task_description: 'Generate and verify leave salary calculation sheets'
     },
     {
-        task_type: 'Cert',
+        task_type: 'Exit',
         task_description: 'Process certificates and related documentation'
     }
 ];
