@@ -59,29 +59,54 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
 
                 {/* Navigation Items */}
                 <div className="overflow-y-auto h-[calc(100vh-180px)] p-4">
-                    {/* Direct Links (Main) */}
+                    {/* Dashboards Section */}
+                    {(canAccessPage('Dashboard') || canAccessPage('DepartmentHeadDashboard')) && (
+                        <div className="mb-6">
+                            <div className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#6B7280] uppercase">
+                                Dashboards
+                            </div>
+                            {canAccessPage('Dashboard') && (
+                                <Link
+                                    to={createPageUrl('Dashboard')}
+                                    onClick={closeDrawer}
+                                    className={cn(
+                                        'flex items-center gap-3 px-4 py-2.5 mb-1 rounded-lg text-sm font-medium transition-colors',
+                                        currentPageName === 'Dashboard' && 'bg-[#EEF2FF] text-[#0F1E36]',
+                                        currentPageName !== 'Dashboard' && 'text-[#4B5563] hover:bg-[#F7F9FC]'
+                                    )}
+                                >
+                                    <BarChart3 className="w-5 h-5" />
+                                    Dashboard
+                                </Link>
+                            )}
+                            {canAccessPage('DepartmentHeadDashboard') && (
+                                <Link
+                                    to={createPageUrl('DepartmentHeadDashboard')}
+                                    onClick={closeDrawer}
+                                    className={cn(
+                                        'flex items-center gap-3 px-4 py-2.5 mb-1 rounded-lg text-sm font-medium transition-colors',
+                                        currentPageName === 'DepartmentHeadDashboard' && 'bg-[#EEF2FF] text-[#0F1E36]',
+                                        currentPageName !== 'DepartmentHeadDashboard' && 'text-[#4B5563] hover:bg-[#F7F9FC]'
+                                    )}
+                                >
+                                    <BarChart3 className="w-5 h-5" />
+                                    Department Head Dashboard
+                                </Link>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Direct Links (Main - excluding Home) */}
                     {navStructure.main?.map((item) => {
                         if (!canAccessPage(item.name)) return null;
+                        if (item.name === 'Home') return null; // Skip Home as dashboards are handled above
 
-                        // Smart routing for Home based on user role
-                        let targetPage = item.name;
-                        if (item.smartRoute && item.name === 'Home') {
-                            if (userRole === 'department_head') {
-                                targetPage = 'DepartmentHeadDashboard';
-                            } else if (userRole === 'hr_manager') {
-                                targetPage = 'HRManagerDashboard';
-                            } else {
-                                targetPage = 'Dashboard';
-                            }
-                        }
-
-                        const isActive = currentPageName === item.name || 
-                                        (item.name === 'Home' && (currentPageName === 'Dashboard' || currentPageName === 'DepartmentHeadDashboard'));
+                        const isActive = currentPageName === item.name;
 
                         return (
                             <Link
                                 key={item.name}
-                                to={createPageUrl(targetPage)}
+                                to={createPageUrl(item.name)}
                                 onClick={closeDrawer}
                                 className={cn(
                                     'flex items-center gap-3 px-4 py-2.5 mb-1 rounded-lg text-sm font-medium transition-colors',
