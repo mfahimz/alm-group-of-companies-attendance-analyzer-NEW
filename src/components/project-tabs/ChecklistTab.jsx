@@ -98,9 +98,6 @@ export default function ChecklistTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
-    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isAdmin = userRole === 'admin';
-
     // Fetch all checklist items for this project
     const { data: checklistItems = [], isLoading } = useQuery({
         queryKey: ['checklistItems', project.id],
@@ -289,7 +286,7 @@ export default function ChecklistTab({ project }) {
                                         <TableHead>Task Type</TableHead>
                                         <TableHead>Description</TableHead>
                                         <TableHead>Completed By</TableHead>
-                                        <TableHead className="text-right w-24">Actions</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -336,17 +333,15 @@ export default function ChecklistTab({ project }) {
                                                     >
                                                         <Edit className="w-4 h-4 text-slate-600" />
                                                     </Button>
-                                                    {isAdmin && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => handleDeleteTask(task)}
-                                                            disabled={deleteTaskMutation.isPending}
-                                                            title="Delete task"
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-red-600" />
-                                                        </Button>
-                                                    )}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => handleDeleteTask(task)}
+                                                        disabled={deleteTaskMutation.isPending}
+                                                        title="Delete task"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -367,17 +362,37 @@ export default function ChecklistTab({ project }) {
                     <div className="space-y-4 py-4">
                         <div>
                             <Label>Task Type *</Label>
-                            <Input
-                                list="task-types"
+                            <Select
                                 value={newTask.task_type}
-                                onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
-                                placeholder="Select or enter task type..."
-                            />
-                            <datalist id="task-types">
-                                {PREDEFINED_TASKS.map(task => (
-                                    <option key={task.task_type} value={task.task_type} />
-                                ))}
-                            </datalist>
+                                onValueChange={(value) => {
+                                    if (value === '__custom__') {
+                                        setNewTask({...newTask, task_type: ''});
+                                    } else {
+                                        setNewTask({...newTask, task_type: value});
+                                    }
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select task type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PREDEFINED_TASKS.map(task => (
+                                        <SelectItem key={task.task_type} value={task.task_type}>
+                                            {task.task_type}
+                                        </SelectItem>
+                                    ))}
+                                    <SelectItem value="__custom__">Enter Custom Type...</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {newTask.task_type === '' && (
+                                <Input
+                                    className="mt-2"
+                                    value={newTask.task_type}
+                                    onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
+                                    placeholder="Enter custom task type..."
+                                    autoFocus
+                                />
+                            )}
                         </div>
                         <div>
                             <Label>Description *</Label>
