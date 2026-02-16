@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
@@ -57,7 +57,6 @@ export default function ExceptionsTab({ project }) {
         date_from: '',
         date_to: '',
         type: 'PUBLIC_HOLIDAY',
-        custom_type_name: '',
         new_am_start: '',
         new_am_end: '',
         new_pm_start: '',
@@ -154,9 +153,7 @@ export default function ExceptionsTab({ project }) {
                 ...data,
                 project_id: project.id,
                 approval_status: 'approved',
-                // If type is CUSTOM, mark it and ensure it's never used in analysis
-                is_custom_type: data.type === 'CUSTOM',
-                use_in_analysis: data.type === 'CUSTOM' ? false : true
+                use_in_analysis: true
             };
             
             return await base44.entities.Exception.create(exceptionData);
@@ -233,38 +230,7 @@ export default function ExceptionsTab({ project }) {
         }
     });
 
-    // Move custom exception to checklist
-    const moveToChecklistMutation = useMutation({
-        mutationFn: async (exception) => {
-            const employee = employees.find(e => String(e.attendance_id) === String(exception.attendance_id));
-            const employeeName = employee?.name || exception.attendance_id;
-            
-            // Create checklist item with employee name in description
-            const taskDescription = exception.attendance_id === 'ALL' 
-                ? (exception.details || 'Custom exception') 
-                : `${employeeName}: ${exception.details || 'Custom exception'}`;
-            
-            await base44.entities.ChecklistItem.create({
-                project_id: project.id,
-                task_type: exception.custom_type_name || 'Custom',
-                task_description: taskDescription,
-                status: 'pending',
-                is_predefined: false,
-                notes: `Moved from exception (ID: ${exception.id.substring(0, 8)})`
-            });
-            
-            // Delete the exception after moving
-            await base44.entities.Exception.delete(exception.id);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
-            queryClient.invalidateQueries(['checklistItems', project.id]);
-            toast.success('Exception moved to checklist');
-        },
-        onError: (error) => {
-            toast.error('Failed to move to checklist: ' + error.message);
-        }
-    });
+
 
     const handleCellChange = (exceptionId, field, value) => {
         setEditedRows(prev => ({
@@ -538,7 +504,6 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             date_from: '',
             date_to: '',
             type: 'PUBLIC_HOLIDAY',
-            custom_type_name: '',
             new_am_start: '',
             new_am_end: '',
             new_pm_start: '',
@@ -574,9 +539,6 @@ Exception types:
 - SICK_LEAVE: Medical leave
 - ANNUAL_LEAVE: Vacation/paid leave
 - ALLOWED_MINUTES: Excuse late arrival or early checkout (natural calamity, personal reasons)
-- CUSTOM: Use this for ANY other reason not in the above list (training, site visit, business trip, meeting, etc.)
-
-IMPORTANT: If the user describes something that doesn't match the standard types above, automatically use type="CUSTOM" and extract a meaningful custom_type_name from their description (e.g., "Training", "Site Visit", "Business Trip", "Off-site Meeting").
 
 User request: "${nlpText}"
 
@@ -585,8 +547,7 @@ Return JSON:
     "attendance_id": "employee ID or 'ALL' for company-wide",
     "date_from": "YYYY-MM-DD",
     "date_to": "YYYY-MM-DD",
-    "type": "one of the types above - use CUSTOM if it doesn't fit",
-    "custom_type_name": "if type=CUSTOM, extract a clean name like 'Training' or 'Site Visit'",
+    "type": "one of the types above",
     "details": "brief description",
     "new_am_start": "if SHIFT_OVERRIDE: HH:MM",
     "new_am_end": "if SHIFT_OVERRIDE: HH:MM",
@@ -605,7 +566,6 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                         date_to: { type: "string" },
                         type: { type: "string" },
                         details: { type: "string" },
-                        custom_type_name: { type: "string" },
                         new_am_start: { type: "string" },
                         new_am_end: { type: "string" },
                         new_pm_start: { type: "string" },
@@ -625,7 +585,6 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 date_from: parsed.date_from || '',
                 date_to: parsed.date_to || parsed.date_from || '',
                 type: parsed.type || 'PUBLIC_HOLIDAY',
-                custom_type_name: parsed.custom_type_name || '',
                 new_am_start: parsed.new_am_start || '',
                 new_am_end: parsed.new_am_end || '',
                 new_pm_start: parsed.new_pm_start || '',
@@ -651,19 +610,19 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // For PUBLIC_HOLIDAY, ALLOWED_MINUTES, and CUSTOM types, attendance_id is optional
-        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'CUSTOM' && !formData.attendance_id) {
+        // For PUBLIC_HOLIDAY and ALLOWED_MINUTES types, attendance_id is optional
+        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && !formData.attendance_id) {
             toast.error('Please select an employee');
             return;
         }
 
-        // For ALLOWED_MINUTES and CUSTOM, default to ALL if not selected
-        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'CUSTOM') && !formData.attendance_id) {
+        // For ALLOWED_MINUTES, default to ALL if not selected
+        if (formData.type === 'ALLOWED_MINUTES' && !formData.attendance_id) {
             formData.attendance_id = 'ALL';
         }
         
-        // Date range is mandatory for all types except SINGLE_SHIFT and CUSTOM
-        if (formData.type !== 'SINGLE_SHIFT' && formData.type !== 'CUSTOM' && (!formData.date_from || !formData.date_to)) {
+        // Date range is mandatory for all types except SINGLE_SHIFT
+        if (formData.type !== 'SINGLE_SHIFT' && (!formData.date_from || !formData.date_to)) {
             toast.error('Please fill in date range');
             return;
         }
@@ -674,17 +633,12 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             : formData;
         
         // Clean up empty string values and convert early_checkout_minutes to number
-         // For SINGLE_SHIFT or CUSTOM (if no dates), use project date range as placeholder
+         // For SINGLE_SHIFT, use project date range as placeholder
          const cleanedData = {
              attendance_id: submitData.attendance_id === 'ALL' ? 'ALL' : String(submitData.attendance_id),
-            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : 
-                       (submitData.type === 'CUSTOM' && !submitData.date_from) ? project.date_from :
-                       submitData.date_from,
-            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : 
-                     (submitData.type === 'CUSTOM' && !submitData.date_to) ? project.date_to :
-                     submitData.date_to,
+            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : submitData.date_from,
+            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : submitData.date_to,
             type: submitData.type,
-            custom_type_name: submitData.type === 'CUSTOM' ? (submitData.custom_type_name?.trim() || 'Custom') : null,
             details: submitData.details || null
         };
         
@@ -916,14 +870,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'CUSTOM' && '*'}</Label>
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && '*'}</Label>
                                     {formData.type === 'PUBLIC_HOLIDAY' ? (
                                         <Input 
                                             value="All Employees" 
                                             disabled 
                                             className="bg-slate-50"
                                         />
-                                    ) : (formData.type === 'ALLOWED_MINUTES' || formData.type === 'CUSTOM') ? (
+                                    ) : formData.type === 'ALLOWED_MINUTES' ? (
                                         <Select
                                             value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
@@ -1016,7 +970,6 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                             <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
-                                            <SelectItem value="CUSTOM">Custom Type (Not used in analysis)</SelectItem>
                                             {/* MANUAL_LATE, MANUAL_EARLY_CHECKOUT, MANUAL_OTHER_MINUTES are excluded - only creatable from report edits */}
                                         </SelectContent>
                                     </Select>
@@ -1026,7 +979,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             {formData.type !== 'SINGLE_SHIFT' && (
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <Label>From Date {formData.type !== 'CUSTOM' && <span className="text-red-500">*</span>}</Label>
+                                       <Label>From Date <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="date"
                                             value={formData.date_from}
@@ -1042,7 +995,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         />
                                     </div>
                                     <div>
-                                        <Label>To Date {formData.type !== 'CUSTOM' && <span className="text-red-500">*</span>}</Label>
+                                       <Label>To Date <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="date"
                                             value={formData.date_to}
@@ -1149,19 +1102,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 </div>
                             )}
 
-                            {formData.type === 'CUSTOM' && (
-                                <div>
-                                    <Label>Custom Exception Type Name (Optional)</Label>
-                                    <Input
-                                        placeholder="Enter custom type name (e.g. Training, Site Visit)"
-                                        value={formData.custom_type_name}
-                                        onChange={(e) => setFormData({ ...formData, custom_type_name: e.target.value })}
-                                    />
-                                    <p className="text-xs text-amber-600 mt-1">
-                                        ⚠️ Custom types are for record-keeping only and will never be used in analysis calculations
-                                    </p>
-                                </div>
-                            )}
+
 
                             <div>
                                 <Label>Details / Reason</Label>
@@ -1360,7 +1301,6 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                             <SelectItem value="ANNUAL_LEAVE">Annual Leave</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
-                                            <SelectItem value="CUSTOM">Custom Type</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1545,21 +1485,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                     >
                                                        <Edit className="w-4 h-4 text-blue-600" />
                                                     </Button>
-                                                    {exception.is_custom_type && project.company === 'Al Maraghi Motors' && (
-                                                       <Button
-                                                           size="sm"
-                                                           variant="ghost"
-                                                           onClick={() => {
-                                                               if (window.confirm('Move this custom exception to checklist? The exception will be removed and added as a checklist task.')) {
-                                                                   moveToChecklistMutation.mutate(exception);
-                                                               }
-                                                           }}
-                                                           title="Move to checklist"
-                                                           disabled={moveToChecklistMutation.isPending}
-                                                       >
-                                                           <ClipboardList className="w-4 h-4 text-emerald-600" />
-                                                       </Button>
-                                                    )}
+
                                                     <Button
                                                        size="sm"
                                                        variant="ghost"
@@ -1628,7 +1554,6 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
                                     <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
-                                    <SelectItem value="CUSTOM">Custom Type</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
