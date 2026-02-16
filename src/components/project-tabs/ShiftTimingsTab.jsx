@@ -857,30 +857,30 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
         }
     };
 
-    // Find duplicate shifts in a block (same attendance_id with same or overlapping timings)
-    const findDuplicateShifts = (blockShifts) => {
-        const duplicates = [];
-        const seen = new Map();
-        
-        blockShifts.forEach(shift => {
-            const key = `${shift.attendance_id}_${shift.am_start}_${shift.am_end}_${shift.pm_start}_${shift.pm_end}_${shift.is_friday_shift}_${shift.applicable_days}`;
-            
-            if (seen.has(key)) {
-                // Found a duplicate - add both the original and this one
-                const originalShift = seen.get(key);
-                if (!duplicates.some(d => d.id === originalShift.id)) {
-                    duplicates.push(originalShift);
-                }
-                duplicates.push(shift);
-            } else {
-                seen.set(key, shift);
-            }
-        });
-        
-        return duplicates;
-    };
-
     const renderShiftBlock = (blockId, blockShifts, blockLabel) => {
+        // Find duplicate shifts in this block
+        const findDuplicateShifts = (shifts) => {
+            const duplicates = [];
+            const seen = new Map();
+            
+            shifts.forEach(shift => {
+                const key = `${shift.attendance_id}_${shift.am_start}_${shift.am_end}_${shift.pm_start}_${shift.pm_end}_${shift.is_friday_shift}_${shift.applicable_days}`;
+                
+                if (seen.has(key)) {
+                    // Found a duplicate - add both the original and this one
+                    const originalShift = seen.get(key);
+                    if (!duplicates.some(d => d.id === originalShift.id)) {
+                        duplicates.push(originalShift);
+                    }
+                    duplicates.push(shift);
+                } else {
+                    seen.set(key, shift);
+                }
+            });
+            
+            console.log(`Duplicate check for ${blockLabel}: Found ${duplicates.length} duplicates out of ${shifts.length} shifts`);
+            return duplicates;
+        };
         const blockRange = blockDateRanges[blockId] || { from: project.date_from, to: project.date_to };
         
         const filteredShifts = blockShifts
