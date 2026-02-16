@@ -857,6 +857,29 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
         }
     };
 
+    // Find duplicate shifts in a block (same attendance_id with same or overlapping timings)
+    const findDuplicateShifts = (blockShifts) => {
+        const duplicates = [];
+        const seen = new Map();
+        
+        blockShifts.forEach(shift => {
+            const key = `${shift.attendance_id}_${shift.am_start}_${shift.am_end}_${shift.pm_start}_${shift.pm_end}_${shift.is_friday_shift}_${shift.applicable_days}`;
+            
+            if (seen.has(key)) {
+                // Found a duplicate - add both the original and this one
+                const originalShift = seen.get(key);
+                if (!duplicates.some(d => d.id === originalShift.id)) {
+                    duplicates.push(originalShift);
+                }
+                duplicates.push(shift);
+            } else {
+                seen.set(key, shift);
+            }
+        });
+        
+        return duplicates;
+    };
+
     const renderShiftBlock = (blockId, blockShifts, blockLabel) => {
         const blockRange = blockDateRanges[blockId] || { from: project.date_from, to: project.date_to };
         
@@ -1085,15 +1108,33 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                                         )}
                                     </div>
                                     <div className="flex gap-2 flex-wrap">
-                                        <div className="relative flex-1 min-w-[200px]">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                            <Input
-                                                placeholder="Search by ID or name..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-9"
-                                            />
-                                        </div>
+                                       <Button
+                                           size="sm"
+                                           variant="outline"
+                                           onClick={() => {
+                                               const duplicates = findDuplicateShifts(blockShifts);
+                                               if (duplicates.length === 0) {
+                                                   toast.info('No duplicate shifts found in this block');
+                                               } else {
+                                                   setSearchTerm('');
+                                                   setSelectedShifts(duplicates);
+                                                   toast.success(`Found ${duplicates.length} duplicate shifts - now selected`);
+                                               }
+                                           }}
+                                           className="text-orange-600 hover:text-orange-700"
+                                       >
+                                           <Search className="w-4 h-4 mr-2" />
+                                           Find Duplicates
+                                       </Button>
+                                       <div className="relative flex-1 min-w-[200px]">
+                                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                           <Input
+                                               placeholder="Search by ID or name..."
+                                               value={searchTerm}
+                                               onChange={(e) => setSearchTerm(e.target.value)}
+                                               className="pl-9"
+                                           />
+                                       </div>
                                         <Select value={departmentFilter || undefined} onValueChange={setDepartmentFilter}>
                                             <SelectTrigger className="w-[160px]">
                                                 <SelectValue placeholder="Department" />
