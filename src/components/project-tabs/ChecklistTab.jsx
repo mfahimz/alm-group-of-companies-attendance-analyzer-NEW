@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CheckCircle2, Circle, Clock, Plus, Trash2, Edit, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatInUAE } from '@/components/ui/timezone';
@@ -260,7 +261,7 @@ export default function ChecklistTab({ project }) {
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
                             <Plus className="w-4 h-4 mr-2" />
-                            Add Custom Task
+                            Add Task
                         </Button>
                     </div>
                 </CardHeader>
@@ -284,8 +285,6 @@ export default function ChecklistTab({ project }) {
                                         <TableHead className="w-12">Status</TableHead>
                                         <TableHead>Task Type</TableHead>
                                         <TableHead>Description</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead>Type</TableHead>
                                         <TableHead>Completed By</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -313,16 +312,6 @@ export default function ChecklistTab({ project }) {
                                             </TableCell>
                                             <TableCell className={task.status === 'completed' ? 'line-through text-slate-500' : ''}>
                                                 {task.task_description}
-                                            </TableCell>
-                                            <TableCell>
-                                                {task.due_date ? formatInUAE(new Date(task.due_date), 'MMM dd, yyyy') : '—'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {task.is_predefined ? (
-                                                    <Badge className="bg-blue-100 text-blue-700">Predefined</Badge>
-                                                ) : (
-                                                    <Badge className="bg-purple-100 text-purple-700">Custom</Badge>
-                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {task.completed_by ? (
@@ -368,16 +357,42 @@ export default function ChecklistTab({ project }) {
             <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Add Custom Task</DialogTitle>
+                        <DialogTitle>Add Task</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div>
                             <Label>Task Type *</Label>
-                            <Input
+                            <Select
                                 value={newTask.task_type}
-                                onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
-                                placeholder="e.g., Data Verification"
-                            />
+                                onValueChange={(value) => {
+                                    if (value === '__custom__') {
+                                        setNewTask({...newTask, task_type: ''});
+                                    } else {
+                                        setNewTask({...newTask, task_type: value});
+                                    }
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select task type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PREDEFINED_TASKS.map(task => (
+                                        <SelectItem key={task.task_type} value={task.task_type}>
+                                            {task.task_type}
+                                        </SelectItem>
+                                    ))}
+                                    <SelectItem value="__custom__">Enter Custom Type...</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {newTask.task_type === '' && (
+                                <Input
+                                    className="mt-2"
+                                    value={newTask.task_type}
+                                    onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
+                                    placeholder="Enter custom task type..."
+                                    autoFocus
+                                />
+                            )}
                         </div>
                         <div>
                             <Label>Description *</Label>
@@ -386,14 +401,6 @@ export default function ChecklistTab({ project }) {
                                 onChange={(e) => setNewTask({...newTask, task_description: e.target.value})}
                                 placeholder="Describe the task in detail..."
                                 rows={3}
-                            />
-                        </div>
-                        <div>
-                            <Label>Due Date (Optional)</Label>
-                            <Input
-                                type="date"
-                                value={newTask.due_date}
-                                onChange={(e) => setNewTask({...newTask, due_date: e.target.value})}
                             />
                         </div>
                         <div>
