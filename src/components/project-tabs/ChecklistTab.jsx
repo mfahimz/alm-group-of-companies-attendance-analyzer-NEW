@@ -1,0 +1,460 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle2, Circle, Clock, Plus, Trash2, Edit, Save } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatInUAE } from '@/components/ui/timezone';
+
+// Predefined checklist tasks for Al Maraghi Motors
+const PREDEFINED_TASKS = [
+    {
+        task_type: 'Punch Verification',
+        task_description: 'Verify all employee punches have been uploaded for the reporting period'
+    },
+    {
+        task_type: 'Shift Timing Review',
+        task_description: 'Review and confirm all shift timings are correctly configured'
+    },
+    {
+        task_type: 'Exception Approval',
+        task_description: 'Review and approve all pending exceptions (annual leave, sick leave, etc.)'
+    },
+    {
+        task_type: 'Analysis Review',
+        task_description: 'Run attendance analysis and review results for anomalies'
+    },
+    {
+        task_type: 'Report Verification',
+        task_description: 'Verify all employees in the report and mark report as final'
+    },
+    {
+        task_type: 'Salary Snapshot Check',
+        task_description: 'Review salary snapshots and ensure all calculations are correct'
+    },
+    {
+        task_type: 'Overtime Review',
+        task_description: 'Verify overtime hours and salary adjustments'
+    },
+    {
+        task_type: 'Final Payroll Export',
+        task_description: 'Export final salary report for payroll processing'
+    }
+];
+
+export default function ChecklistTab({ project }) {
+    const queryClient = useQueryClient();
+    const [showAddDialog, setShowAddDialog] = useState(false);
+    const [editingTask, setEditingTask] = useState(null);
+    const [newTask, setNewTask] = useState({
+        task_type: '',
+        task_description: '',
+        due_date: '',
+        notes: ''
+    });
+
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    // Fetch all checklist items for this project
+    const { data: checklistItems = [], isLoading } = useQuery({
+        queryKey: ['checklistItems', project.id],
+        queryFn: () => base44.entities.ChecklistItem.filter({ project_id: project.id }, 'created_date'),
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false
+    });
+
+    // Initialize predefined tasks if none exist
+    const initializePredefinedTasksMutation = useMutation({
+        mutationFn: async () => {
+            const tasksToCreate = PREDEFINED_TASKS.map(task => ({
+                project_id: project.id,
+                task_type: task.task_type,
+                task_description: task.task_description,
+                is_predefined: true,
+                status: 'pending'
+            }));
+            
+            // Create all tasks
+            await Promise.all(tasksToCreate.map(task => 
+                base44.entities.ChecklistItem.create(task)
+            ));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Checklist initialized with predefined tasks');
+        },
+        onError: (error) => {
+            toast.error('Failed to initialize checklist: ' + error.message);
+        }
+    });
+
+    // Create new custom task
+    const createTaskMutation = useMutation({
+        mutationFn: (taskData) => base44.entities.ChecklistItem.create({
+            ...taskData,
+            project_id: project.id,
+            is_predefined: false,
+            status: 'pending'
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Task added to checklist');
+            setShowAddDialog(false);
+            setNewTask({ task_type: '', task_description: '', due_date: '', notes: '' });
+        },
+        onError: (error) => {
+            toast.error('Failed to add task: ' + error.message);
+        }
+    });
+
+    // Update task status or details
+    const updateTaskMutation = useMutation({
+        mutationFn: ({ id, updates }) => base44.entities.ChecklistItem.update(id, updates),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Task updated');
+            setEditingTask(null);
+        },
+        onError: (error) => {
+            toast.error('Failed to update task: ' + error.message);
+        }
+    });
+
+    // Delete task
+    const deleteTaskMutation = useMutation({
+        mutationFn: (id) => base44.entities.ChecklistItem.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Task deleted');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete task: ' + error.message);
+        }
+    });
+
+    const handleToggleStatus = (task) => {
+        const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+        const updates = {
+            status: newStatus,
+            ...(newStatus === 'completed' ? {
+                completed_by: currentUser?.email,
+                completed_date: new Date().toISOString()
+            } : {
+                completed_by: null,
+                completed_date: null
+            })
+        };
+        updateTaskMutation.mutate({ id: task.id, updates });
+    };
+
+    const handleAddTask = () => {
+        if (!newTask.task_type || !newTask.task_description) {
+            toast.error('Please fill in task type and description');
+            return;
+        }
+        createTaskMutation.mutate(newTask);
+    };
+
+    const handleDeleteTask = (task) => {
+        if (task.is_predefined) {
+            if (!window.confirm('Delete this predefined task? You can re-initialize all predefined tasks later.')) {
+                return;
+            }
+        }
+        deleteTaskMutation.mutate(task.id);
+    };
+
+    const completedCount = checklistItems.filter(t => t.status === 'completed').length;
+    const totalCount = checklistItems.length;
+    const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center p-12">
+                <div className="text-slate-600">Loading checklist...</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Progress Card */}
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-50 to-white">
+                <CardContent className="pt-6">
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-slate-900">Payroll Preparation Progress</h3>
+                            <span className="text-2xl font-bold text-indigo-600">{progressPercentage}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-3">
+                            <div 
+                                className="bg-indigo-600 h-3 rounded-full transition-all duration-500"
+                                style={{ width: `${progressPercentage}%` }}
+                            />
+                        </div>
+                        <p className="text-sm text-slate-600 mt-2">
+                            {completedCount} of {totalCount} tasks completed
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Main Checklist */}
+            <Card className="border-0 shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Payroll Checklist</CardTitle>
+                    <div className="flex gap-2">
+                        {checklistItems.length === 0 && (
+                            <Button
+                                onClick={() => initializePredefinedTasksMutation.mutate()}
+                                disabled={initializePredefinedTasksMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                Initialize Predefined Tasks
+                            </Button>
+                        )}
+                        <Button
+                            onClick={() => setShowAddDialog(true)}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Custom Task
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {checklistItems.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            <p className="mb-4">No tasks in the checklist yet.</p>
+                            <Button
+                                onClick={() => initializePredefinedTasksMutation.mutate()}
+                                disabled={initializePredefinedTasksMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                Initialize Predefined Tasks
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-12">Status</TableHead>
+                                        <TableHead>Task Type</TableHead>
+                                        <TableHead>Description</TableHead>
+                                        <TableHead>Due Date</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Completed By</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {checklistItems.map((task) => (
+                                        <TableRow key={task.id} className={task.status === 'completed' ? 'bg-green-50' : ''}>
+                                            <TableCell>
+                                                <button
+                                                    onClick={() => handleToggleStatus(task)}
+                                                    disabled={updateTaskMutation.isPending}
+                                                    className="hover:opacity-70 transition-opacity"
+                                                >
+                                                    {task.status === 'completed' ? (
+                                                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                                                    ) : task.status === 'in_progress' ? (
+                                                        <Clock className="w-6 h-6 text-amber-600" />
+                                                    ) : (
+                                                        <Circle className="w-6 h-6 text-slate-400" />
+                                                    )}
+                                                </button>
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {task.task_type}
+                                            </TableCell>
+                                            <TableCell className={task.status === 'completed' ? 'line-through text-slate-500' : ''}>
+                                                {task.task_description}
+                                            </TableCell>
+                                            <TableCell>
+                                                {task.due_date ? formatInUAE(new Date(task.due_date), 'MMM dd, yyyy') : '—'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {task.is_predefined ? (
+                                                    <Badge className="bg-blue-100 text-blue-700">Predefined</Badge>
+                                                ) : (
+                                                    <Badge className="bg-purple-100 text-purple-700">Custom</Badge>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {task.completed_by ? (
+                                                    <div className="text-sm">
+                                                        <div className="text-slate-900">{task.completed_by}</div>
+                                                        <div className="text-slate-500">
+                                                            {formatInUAE(new Date(task.completed_date), 'MMM dd, HH:mm')}
+                                                        </div>
+                                                    </div>
+                                                ) : '—'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex gap-1 justify-end">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setEditingTask(task)}
+                                                        title="Edit task"
+                                                    >
+                                                        <Edit className="w-4 h-4 text-slate-600" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => handleDeleteTask(task)}
+                                                        disabled={deleteTaskMutation.isPending}
+                                                        title="Delete task"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Add Task Dialog */}
+            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Add Custom Task</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label>Task Type *</Label>
+                            <Input
+                                value={newTask.task_type}
+                                onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
+                                placeholder="e.g., Data Verification"
+                            />
+                        </div>
+                        <div>
+                            <Label>Description *</Label>
+                            <Textarea
+                                value={newTask.task_description}
+                                onChange={(e) => setNewTask({...newTask, task_description: e.target.value})}
+                                placeholder="Describe the task in detail..."
+                                rows={3}
+                            />
+                        </div>
+                        <div>
+                            <Label>Due Date (Optional)</Label>
+                            <Input
+                                type="date"
+                                value={newTask.due_date}
+                                onChange={(e) => setNewTask({...newTask, due_date: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <Label>Notes (Optional)</Label>
+                            <Textarea
+                                value={newTask.notes}
+                                onChange={(e) => setNewTask({...newTask, notes: e.target.value})}
+                                placeholder="Additional notes..."
+                                rows={2}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleAddTask}
+                            disabled={createTaskMutation.isPending}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            Add Task
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Task Dialog */}
+            <Dialog open={!!editingTask} onOpenChange={() => setEditingTask(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit Task</DialogTitle>
+                    </DialogHeader>
+                    {editingTask && (
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label>Task Type</Label>
+                                <Input
+                                    value={editingTask.task_type}
+                                    onChange={(e) => setEditingTask({...editingTask, task_type: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <Label>Description</Label>
+                                <Textarea
+                                    value={editingTask.task_description}
+                                    onChange={(e) => setEditingTask({...editingTask, task_description: e.target.value})}
+                                    rows={3}
+                                />
+                            </div>
+                            <div>
+                                <Label>Due Date</Label>
+                                <Input
+                                    type="date"
+                                    value={editingTask.due_date || ''}
+                                    onChange={(e) => setEditingTask({...editingTask, due_date: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <Label>Notes</Label>
+                                <Textarea
+                                    value={editingTask.notes || ''}
+                                    onChange={(e) => setEditingTask({...editingTask, notes: e.target.value})}
+                                    rows={2}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingTask(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                updateTaskMutation.mutate({
+                                    id: editingTask.id,
+                                    updates: {
+                                        task_type: editingTask.task_type,
+                                        task_description: editingTask.task_description,
+                                        due_date: editingTask.due_date,
+                                        notes: editingTask.notes
+                                    }
+                                });
+                            }}
+                            disabled={updateTaskMutation.isPending}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
