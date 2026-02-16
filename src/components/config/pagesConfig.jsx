@@ -1,20 +1,15 @@
 import {
     LayoutDashboard,
-    BarChart3,
     FolderKanban,
     Users,
     Settings,
-    Shield,
-    Book,
     Calendar,
     Clock,
     Home,
     UserCog,
     DollarSign,
     AlertCircle,
-    GraduationCap,
-    ClipboardCheck,
-    Database
+    ClipboardCheck
 } from 'lucide-react';
 
 /**
@@ -304,16 +299,10 @@ export const NAV_CATEGORIES = {
         order: 4,
         renderAs: 'dropdown'
     },
-    CalendarPayroll: {
-        label: 'Calendar Payroll',
-        icon: Calendar,
-        order: 5,
-        renderAs: 'dropdown'
-    },
     Admin: {
         label: 'Admin',
         icon: Settings,
-        order: 6,
+        order: 5,
         renderAs: 'dropdown'
     }
 };
