@@ -16,36 +16,68 @@ import { formatInUAE } from '@/components/ui/timezone';
 // Predefined checklist tasks for Al Maraghi Motors
 const PREDEFINED_TASKS = [
     {
-        task_type: 'Punch Verification',
-        task_description: 'Verify all employee punches have been uploaded for the reporting period'
+        task_type: 'Annual Leave',
+        task_description: 'Verify and process all annual leave requests and deductions'
     },
     {
-        task_type: 'Shift Timing Review',
-        task_description: 'Review and confirm all shift timings are correctly configured'
+        task_type: 'Rejoining',
+        task_description: 'Process rejoining employees and update their records'
     },
     {
-        task_type: 'Exception Approval',
-        task_description: 'Review and approve all pending exceptions (annual leave, sick leave, etc.)'
+        task_type: 'Medical Leave',
+        task_description: 'Review and approve medical leave applications'
     },
     {
-        task_type: 'Analysis Review',
-        task_description: 'Run attendance analysis and review results for anomalies'
+        task_type: 'LOP',
+        task_description: 'Verify Loss of Pay (LOP) days and apply deductions'
     },
     {
-        task_type: 'Report Verification',
-        task_description: 'Verify all employees in the report and mark report as final'
+        task_type: 'Salary spl.',
+        task_description: 'Review special salary adjustments and calculations'
     },
     {
-        task_type: 'Salary Snapshot Check',
-        task_description: 'Review salary snapshots and ensure all calculations are correct'
+        task_type: 'Loose Salary Hold',
+        task_description: 'Check and release any held salaries'
     },
     {
-        task_type: 'Overtime Review',
-        task_description: 'Verify overtime hours and salary adjustments'
+        task_type: 'Increment',
+        task_description: 'Process salary increments and update employee records'
     },
     {
-        task_type: 'Final Payroll Export',
-        task_description: 'Export final salary report for payroll processing'
+        task_type: 'Over Time',
+        task_description: 'Verify overtime hours and calculate overtime pay'
+    },
+    {
+        task_type: 'Beneshwa',
+        task_description: 'Process Beneshwa related adjustments'
+    },
+    {
+        task_type: 'Variable Salary',
+        task_description: 'Calculate and apply variable salary components'
+    },
+    {
+        task_type: 'Allowance / Additions',
+        task_description: 'Review and add allowances and additional payments'
+    },
+    {
+        task_type: 'Deductions',
+        task_description: 'Verify all deductions (late, early, other) are correctly applied'
+    },
+    {
+        task_type: 'Bank account changes',
+        task_description: 'Update employee bank account details for payroll transfer'
+    },
+    {
+        task_type: 'Attendance',
+        task_description: 'Verify attendance data and resolve any anomalies'
+    },
+    {
+        task_type: 'Leave Salary sheets',
+        task_description: 'Generate and verify leave salary calculation sheets'
+    },
+    {
+        task_type: 'Cert',
+        task_description: 'Process certificates and related documentation'
     }
 ];
 
