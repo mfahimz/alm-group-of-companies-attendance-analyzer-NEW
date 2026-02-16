@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar, ClipboardList } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
@@ -230,6 +230,39 @@ export default function ExceptionsTab({ project }) {
         onSuccess: () => {
             queryClient.invalidateQueries(['exceptions', project.id]);
             toast.success('Exception updated');
+        }
+    });
+
+    // Move custom exception to checklist
+    const moveToChecklistMutation = useMutation({
+        mutationFn: async (exception) => {
+            const employee = employees.find(e => String(e.attendance_id) === String(exception.attendance_id));
+            const employeeName = employee?.name || exception.attendance_id;
+            
+            // Create checklist item with employee name in description
+            const taskDescription = exception.attendance_id === 'ALL' 
+                ? (exception.details || 'Custom exception') 
+                : `${employeeName}: ${exception.details || 'Custom exception'}`;
+            
+            await base44.entities.ChecklistItem.create({
+                project_id: project.id,
+                task_type: exception.custom_type_name || 'Custom',
+                task_description: taskDescription,
+                status: 'pending',
+                is_predefined: false,
+                notes: `Moved from exception (ID: ${exception.id.substring(0, 8)})`
+            });
+            
+            // Delete the exception after moving
+            await base44.entities.Exception.delete(exception.id);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Exception moved to checklist');
+        },
+        onError: (error) => {
+            toast.error('Failed to move to checklist: ' + error.message);
         }
     });
 
@@ -1497,27 +1530,42 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <TableCell className="text-right p-1">
                                                 <div className="flex gap-1 justify-end">
                                                     <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setViewingException(exception)}
-                                                        title="View exception"
+                                                       size="sm"
+                                                       variant="ghost"
+                                                       onClick={() => setViewingException(exception)}
+                                                       title="View exception"
                                                     >
-                                                        <Eye className="w-4 h-4 text-indigo-600" />
+                                                       <Eye className="w-4 h-4 text-indigo-600" />
                                                     </Button>
                                                     <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setEditingException(exception)}
-                                                        title="Edit exception"
+                                                       size="sm"
+                                                       variant="ghost"
+                                                       onClick={() => setEditingException(exception)}
+                                                       title="Edit exception"
                                                     >
-                                                        <Edit className="w-4 h-4 text-blue-600" />
+                                                       <Edit className="w-4 h-4 text-blue-600" />
                                                     </Button>
+                                                    {exception.is_custom_type && project.company === 'Al Maraghi Motors' && (
+                                                       <Button
+                                                           size="sm"
+                                                           variant="ghost"
+                                                           onClick={() => {
+                                                               if (window.confirm('Move this custom exception to checklist? The exception will be removed and added as a checklist task.')) {
+                                                                   moveToChecklistMutation.mutate(exception);
+                                                               }
+                                                           }}
+                                                           title="Move to checklist"
+                                                           disabled={moveToChecklistMutation.isPending}
+                                                       >
+                                                           <ClipboardList className="w-4 h-4 text-emerald-600" />
+                                                       </Button>
+                                                    )}
                                                     <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => deleteMutation.mutate(exception.id)}
+                                                       size="sm"
+                                                       variant="ghost"
+                                                       onClick={() => deleteMutation.mutate(exception.id)}
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                                       <Trash2 className="w-4 h-4 text-red-600" />
                                                     </Button>
                                                 </div>
                                             </TableCell>
