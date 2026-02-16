@@ -92,6 +92,11 @@ export default function OvertimeTab({ project }) {
             );
         }
 
+        // For Al Maraghi Motors, exclude employees without attendance_id
+        if (project?.company === 'Al Maraghi Motors') {
+            filteredEmployees = filteredEmployees.filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '');
+        }
+
         return filteredEmployees.map(emp => {
             const otRecord = overtimeRecords.find(ot => 
                 String(ot.attendance_id) === String(emp.attendance_id)
