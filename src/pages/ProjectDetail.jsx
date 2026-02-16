@@ -11,7 +11,6 @@ import OverviewTab from '../components/project-tabs/OverviewTab';
 import PunchUploadTab from '../components/project-tabs/PunchUploadTab';
 import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
 import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
-import RunAnalysisTab from '../components/project-tabs/RunAnalysisTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
@@ -321,15 +320,9 @@ export default function ProjectDetail() {
                             </TabsTrigger>
             }
                         <TabsTrigger
-              value="analysis"
-              disabled={isReadOnly}
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-purple-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
-                            Analysis {isReadOnly && '🔒'}
-                        </TabsTrigger>
-                        <TabsTrigger
               value="report"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-indigo-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
-                            Report
+                            Report {isReadOnly && '🔒'}
                         </TabsTrigger>
                         {project.company === 'Al Maraghi Motors' &&
             <TabsTrigger
@@ -359,10 +352,6 @@ export default function ProjectDetail() {
 
                 <TabsContent value="overtime">
                     {activeTab === 'overtime' && <OvertimeTab project={project} />}
-                </TabsContent>
-
-                <TabsContent value="analysis">
-                    {activeTab === 'analysis' && <RunAnalysisTab project={project} />}
                 </TabsContent>
 
                 <TabsContent value="report">

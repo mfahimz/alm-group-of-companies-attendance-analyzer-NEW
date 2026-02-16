@@ -3,8 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Trash2, CheckCircle, Star, Save, Settings, AlertCircle } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, Star, Save, Settings, AlertCircle, Play, Loader2, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
@@ -24,6 +26,15 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         status: 'Processing...'
     });
 
+    // Analysis tab state
+    const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+    const [analysisProgress, setAnalysisProgress] = React.useState(null);
+    const [dateFrom, setDateFrom] = React.useState(project.date_from);
+    const [dateTo, setDateTo] = React.useState(project.date_to);
+    const [reportName, setReportName] = React.useState('');
+    const [dataQualityIssues, setDataQualityIssues] = React.useState([]);
+    const [showQualityCheck, setShowQualityCheck] = React.useState(false);
+
 
 
     const { data: currentUser } = useQuery({
@@ -37,6 +48,148 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
     console.log('[ReportTab] User role:', { userRole, isDepartmentHead, isAdmin, isSupervisor });
+
+    // Fetch data needed for analysis
+    const { data: punches = [] } = useQuery({
+        queryKey: ['punches', project.id],
+        queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const { data: shifts = [] } = useQuery({
+        queryKey: ['shifts', project.id],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const { data: exceptions = [] } = useQuery({
+        queryKey: ['exceptions', project.id],
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const { data: rules } = useQuery({
+        queryKey: ['rules', project.company],
+        queryFn: async () => {
+            const rulesList = await base44.entities.AttendanceRules.filter({ company: project.company });
+            if (rulesList.length > 0) {
+                return JSON.parse(rulesList[0].rules_json);
+            }
+            return null;
+        },
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const uniqueEmployeeIds = [...new Set(punches.map(p => p.attendance_id))];
+
+    // Analysis functions
+    const performDataQualityCheck = () => {
+        const issues = [];
+        
+        if (punches.length > 0 && shifts.length === 0) {
+            issues.push({
+                type: 'error',
+                title: 'No shift timings configured',
+                details: 'Add shift timings in the Shifts tab before running analysis'
+            });
+        }
+        
+        setDataQualityIssues(issues);
+        return issues;
+    };
+
+    const handleAnalyze = async () => {
+        if (!dateFrom || !dateTo) {
+            toast.error('Please select date range');
+            return;
+        }
+        
+        const issues = performDataQualityCheck();
+        const hasErrors = issues.some(i => i.type === 'error');
+        
+        if (hasErrors && !isAdmin) {
+            setShowQualityCheck(true);
+            return;
+        }
+        
+        await runAnalysis();
+    };
+
+    const runAnalysis = async () => {
+        if (!rules) {
+            toast.error('Please configure attendance rules first');
+            return;
+        }
+
+        if (punches.length === 0) {
+            toast.error('No punch data available. Please upload punches first.');
+            return;
+        }
+
+        if (shifts.length === 0) {
+            const proceed = window.confirm('⚠️ No shift timings found. Analysis will proceed but may produce incorrect results. Continue anyway?');
+            if (!proceed) return;
+        }
+
+        setIsAnalyzing(true);
+        setAnalysisProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Starting analysis on server...' });
+
+        try {
+            setAnalysisProgress({ 
+                current: 0, 
+                total: uniqueEmployeeIds.length, 
+                status: 'Processing on server...',
+                subStatus: 'Analysis is running in the background. This may take a few minutes.'
+            });
+
+            const response = await base44.functions.invoke('runAnalysis', {
+                project_id: project.id,
+                date_from: dateFrom,
+                date_to: dateTo,
+                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`
+            });
+
+            if (response.data.success) {
+                queryClient.invalidateQueries(['results', project.id]);
+                queryClient.invalidateQueries(['reportRuns', project.id]);
+                queryClient.invalidateQueries(['project', project.id]);
+                queryClient.invalidateQueries(['projects']);
+                toast.success(response.data.message);
+                setAnalysisProgress({ 
+                    current: response.data.processed_count, 
+                    total: response.data.total_count, 
+                    status: 'Complete!',
+                    subStatus: 'Report generated successfully'
+                });
+            } else {
+                throw new Error(response.data.error || 'Analysis failed');
+            }
+        } catch (error) {
+            toast.error('Analysis failed: ' + error.message);
+            console.error(error);
+        } finally {
+            setTimeout(() => {
+                setIsAnalyzing(false);
+                setAnalysisProgress(null);
+            }, 2000);
+        }
+    };
 
     // Get department head verification if department head
     const { data: deptHeadVerification, error: deptHeadError } = useQuery({
@@ -454,6 +607,246 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     return (
         <div className="space-y-6">
+            {/* Run Analysis Section - Always at top */}
+            {!isDepartmentHead && (
+                <Card className="border-0 shadow-md bg-white ring-1 ring-slate-950/5">
+                    <CardHeader>
+                        <CardTitle>Run Attendance Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                                {punches.length > 0 ? (
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                ) : (
+                                    <AlertCircle className="w-5 h-5 text-amber-600" />
+                                )}
+                                <span className="text-slate-700">
+                                    Punch Data: <strong>{punches.length}</strong> records from <strong>{uniqueEmployeeIds.length}</strong> employees
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {shifts.length > 0 ? (
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                ) : (
+                                    <AlertCircle className="w-5 h-5 text-amber-600" />
+                                )}
+                                <span className="text-slate-700">
+                                    Shift Timings: <strong>{shifts.length}</strong> records
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <CheckCircle className="w-5 h-5 text-blue-600" />
+                                <span className="text-slate-700">
+                                    Exceptions: <strong>{exceptions.length}</strong> records
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {rules ? (
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                ) : (
+                                    <AlertCircle className="w-5 h-5 text-red-600" />
+                                )}
+                                <span className="text-slate-700">
+                                    Rules Configuration: {rules ? 'Configured' : 'Not configured'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <Label>Report Name (Optional)</Label>
+                                <Input
+                                    placeholder="e.g., December 2024 - Final"
+                                    value={reportName}
+                                    onChange={(e) => setReportName(e.target.value)}
+                                    disabled={isAnalyzing}
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Give this report a name for easy identification
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label>From Date</Label>
+                                    <Input
+                                        type="date"
+                                        value={dateFrom}
+                                        onChange={(e) => setDateFrom(e.target.value)}
+                                        min={project.date_from}
+                                        max={project.date_to}
+                                        disabled={isAnalyzing}
+                                        title="Date range must be within project period"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>To Date</Label>
+                                    <Input
+                                        type="date"
+                                        value={dateTo}
+                                        onChange={(e) => {
+                                            const newDate = e.target.value;
+                                            if (newDate >= dateFrom && newDate <= project.date_to) {
+                                                setDateTo(newDate);
+                                            }
+                                        }}
+                                        min={dateFrom}
+                                        max={project.date_to}
+                                        disabled={isAnalyzing}
+                                        title="Date range must be within project period"
+                                    />
+                                </div>
+                            </div>
+
+                            {analysisProgress && (
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                                        <div className="flex-1">
+                                            <p className="font-medium text-indigo-900">{analysisProgress.status}</p>
+                                            {analysisProgress.subStatus && (
+                                                <p className="text-sm text-indigo-700 mt-0.5">{analysisProgress.subStatus}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="w-full bg-indigo-200 rounded-full h-2">
+                                        <div 
+                                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${analysisProgress.total > 0 ? (analysisProgress.current / analysisProgress.total) * 100 : 0}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-sm text-indigo-700 mt-2">
+                                        {analysisProgress.current} / {analysisProgress.total} employees processed
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Button 
+                                onClick={() => {
+                                    performDataQualityCheck();
+                                    setShowQualityCheck(true);
+                                }}
+                                variant="outline"
+                                disabled={isAnalyzing}
+                                size="lg"
+                            >
+                                <AlertTriangle className="w-5 h-5 mr-2" />
+                                Check Data Quality
+                            </Button>
+                            <Button
+                                onClick={handleAnalyze}
+                                disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                size="lg"
+                            >
+                                <Play className="w-5 h-5 mr-2" />
+                                {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+                            </Button>
+                        </div>
+                        <p className="text-sm text-slate-500">
+                            Select a date range and run analysis to generate attendance report for that period.
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Data Quality Check Dialog */}
+            <Dialog open={showQualityCheck} onOpenChange={setShowQualityCheck}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Data Quality Check</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {dataQualityIssues.length === 0 ? (
+                            <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <CheckCircle className="w-6 h-6 text-green-600" />
+                                <div>
+                                    <p className="font-medium text-green-900">All checks passed!</p>
+                                    <p className="text-sm text-green-700">Your data is ready for analysis.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {dataQualityIssues.map((issue, idx) => (
+                                    <div 
+                                        key={idx}
+                                        className={`flex items-start gap-3 p-4 rounded-lg border ${
+                                            issue.type === 'error' ? 'bg-red-50 border-red-200' :
+                                            issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                                            'bg-blue-50 border-blue-200'
+                                        }`}
+                                    >
+                                        {issue.type === 'error' && <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
+                                        {issue.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />}
+                                        {issue.type === 'info' && <Info className="w-5 h-5 text-blue-600 mt-0.5" />}
+                                        <div className="flex-1">
+                                            <p className={`font-medium ${
+                                                issue.type === 'error' ? 'text-red-900' :
+                                                issue.type === 'warning' ? 'text-amber-900' :
+                                                'text-blue-900'
+                                            }`}>
+                                                {issue.title}
+                                            </p>
+                                            <p className={`text-sm mt-1 ${
+                                                issue.type === 'error' ? 'text-red-700' :
+                                                issue.type === 'warning' ? 'text-amber-700' :
+                                                'text-blue-700'
+                                            }`}>
+                                                {issue.details}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {dataQualityIssues.some(i => i.type === 'error') && !isAdmin && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                <p className="text-sm text-slate-700">
+                                    <strong>Action Required:</strong> Please fix the errors above before running analysis.
+                                </p>
+                            </div>
+                        )}
+                        {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <p className="text-sm text-amber-700">
+                                    <strong>Admin Override Available:</strong> Errors detected, but as an admin you can proceed anyway.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setShowQualityCheck(false)}>
+                            Close
+                        </Button>
+                        {!dataQualityIssues.some(i => i.type === 'error') && (
+                            <Button 
+                                onClick={() => {
+                                    setShowQualityCheck(false);
+                                    runAnalysis();
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                Proceed with Analysis
+                            </Button>
+                        )}
+                        {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
+                            <Button 
+                                onClick={() => {
+                                    setShowQualityCheck(false);
+                                    runAnalysis();
+                                }}
+                                className="bg-amber-600 hover:bg-amber-700"
+                            >
+                                Proceed Anyway (Admin Override)
+                            </Button>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* Progress Dialog - Cannot be closed until complete */}
             <Dialog open={progressDialog.open} onOpenChange={() => {}}>
                 <DialogContent 
