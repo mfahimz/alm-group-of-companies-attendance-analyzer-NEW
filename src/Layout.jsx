@@ -89,14 +89,12 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
-    // Redirect department heads, HR managers, and CEOs away from Dashboard
+    // Redirect to appropriate default dashboard on first load
     useEffect(() => {
-        if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
-            window.location.replace('/DepartmentHeadDashboard');
-        } else if (currentUser && isHRManager && currentPageName === 'Dashboard') {
-            window.location.replace('/HRManagerDashboard');
-        } else if (currentUser && isCEO && currentPageName === 'Dashboard') {
-            window.location.replace('/DepartmentHeadDashboard');
+        if (currentUser && currentPageName === 'Dashboard') {
+            if (isDepartmentHead || isCEO || isHRManager) {
+                window.location.replace('/DepartmentHeadDashboard');
+            }
         }
     }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName]);
 
