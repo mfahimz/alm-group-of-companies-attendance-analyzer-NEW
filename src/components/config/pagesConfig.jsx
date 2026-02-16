@@ -159,16 +159,6 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
-    Reports: {
-        name: 'Reports',
-        title: 'Reports & Analytics',
-        icon: BarChart3,
-        category: 'Projects',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'ceo']
-    },
 
     // Admin Menu
     Users: {
@@ -220,76 +210,6 @@ export const PAGES_CONFIG = {
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
-    },
-    SecurityAudit: {
-        name: 'SecurityAudit',
-        title: 'Security Audit',
-        icon: Shield,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    SystemHealth: {
-        name: 'SystemHealth',
-        title: 'System Health',
-        icon: Database,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    SalaryDataIntegrityRepair: {
-        name: 'SalaryDataIntegrityRepair',
-        title: 'Salary Data Repair',
-        icon: Database,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    MigrationTools: {
-        name: 'MigrationTools',
-        title: 'Migration Tools',
-        icon: Database,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    Documentation: {
-        name: 'Documentation',
-        title: 'Documentation',
-        icon: Book,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
-    },
-    Training: {
-        name: 'Training',
-        title: 'Training Guide',
-        icon: GraduationCap,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
-    },
-    Calendar: {
-        name: 'Calendar',
-        title: 'Calendar Payroll',
-        icon: Calendar,
-        category: 'CalendarPayroll',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
     },
 
     // Hidden Pages (No navigation)
