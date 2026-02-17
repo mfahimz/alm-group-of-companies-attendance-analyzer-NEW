@@ -84,14 +84,22 @@ export default function EmployeeProfile() {
             const record = quarterlyMinutes.find(q => q.id === id);
             const newRemaining = Math.max(0, total_minutes - record.used_minutes);
             
+            // Update EmployeeQuarterlyMinutes
             await base44.entities.EmployeeQuarterlyMinutes.update(id, {
                 total_minutes: total_minutes,
                 remaining_minutes: newRemaining
             });
+            
+            // Sync back to Employee profile (bi-directional sync)
+            await base44.functions.invoke('syncQuarterlyMinutesToEmployee', {
+                quarterly_minutes_id: id,
+                total_minutes: total_minutes
+            });
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['quarterlyMinutes']);
-            toast.success('Quarterly minutes updated');
+            queryClient.invalidateQueries(['employee']);
+            toast.success('Quarterly minutes updated and synced');
             setEditingQuarter(null);
         },
         onError: (error) => {

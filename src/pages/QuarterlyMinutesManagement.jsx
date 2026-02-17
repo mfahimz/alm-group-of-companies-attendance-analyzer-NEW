@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Search, Save, RefreshCw, Edit2, AlertCircle } from 'lucide-react';
+import { Search, Save, RefreshCw, Edit2, AlertCircle, Trash2, CheckSquare } from 'lucide-react';
 import SortableTableHead from '@/components/ui/SortableTableHead';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -21,6 +21,7 @@ export default function QuarterlyMinutesManagement() {
     const [quarterFilter, setQuarterFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_name', direction: 'asc' });
     const [editingValues, setEditingValues] = useState({});
+    const [selectedRecords, setSelectedRecords] = useState([]);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -84,6 +85,37 @@ export default function QuarterlyMinutesManagement() {
         },
         onError: (error) => {
             toast.error('Failed to update: ' + error.message);
+        }
+    });
+
+    const deleteRecordMutation = useMutation({
+        mutationFn: async (recordId) => {
+            await base44.entities.EmployeeQuarterlyMinutes.delete(recordId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            toast.success('Record deleted successfully');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete: ' + error.message);
+        }
+    });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (recordIds) => {
+            await Promise.all(recordIds.map(id => 
+                base44.entities.EmployeeQuarterlyMinutes.delete(id)
+            ));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            setSelectedRecords([]);
+            toast.success('Records deleted successfully');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete records: ' + error.message);
         }
     });
 
@@ -186,6 +218,38 @@ export default function QuarterlyMinutesManagement() {
         });
     };
 
+    const handleDelete = (recordId) => {
+        if (confirm('Are you sure you want to delete this quarterly minutes record?')) {
+            deleteRecordMutation.mutate(recordId);
+        }
+    };
+
+    const handleBulkDelete = () => {
+        if (selectedRecords.length === 0) {
+            toast.error('No records selected');
+            return;
+        }
+        if (confirm(`Are you sure you want to delete ${selectedRecords.length} selected record(s)?`)) {
+            bulkDeleteMutation.mutate(selectedRecords);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedRecords.length === filteredAndSortedData.length) {
+            setSelectedRecords([]);
+        } else {
+            setSelectedRecords(filteredAndSortedData.map(r => r.id));
+        }
+    };
+
+    const toggleSelectRecord = (recordId) => {
+        setSelectedRecords(prev => 
+            prev.includes(recordId) 
+                ? prev.filter(id => id !== recordId)
+                : [...prev, recordId]
+        );
+    };
+
     const availableCompanies = [...new Set(combinedData.map(d => d.employee_company))].filter(Boolean);
     const availableDepartments = [...new Set(combinedData.map(d => d.employee_department))].filter(Boolean);
     const availableYears = [...new Set(combinedData.map(d => d.year))].filter(Boolean).sort((a, b) => b - a);
@@ -208,17 +272,29 @@ export default function QuarterlyMinutesManagement() {
                         Manage approved minutes allowances for all employees
                     </p>
                 </div>
-                <Button
-                    variant="outline"
-                    onClick={() => {
-                        queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
-                        queryClient.invalidateQueries({ queryKey: ['employees'] });
-                        toast.success('Data refreshed');
-                    }}
-                >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                    {selectedRecords.length > 0 && (
+                        <Button
+                            variant="destructive"
+                            onClick={handleBulkDelete}
+                            disabled={bulkDeleteMutation.isPending}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete {selectedRecords.length} Selected
+                        </Button>
+                    )}
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
+                            queryClient.invalidateQueries({ queryKey: ['employees'] });
+                            toast.success('Data refreshed');
+                        }}
+                    >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -320,6 +396,14 @@ export default function QuarterlyMinutesManagement() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-12">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedRecords.length === filteredAndSortedData.length && filteredAndSortedData.length > 0}
+                                            onChange={toggleSelectAll}
+                                            className="rounded border-slate-300"
+                                        />
+                                    </TableHead>
                                     <SortableTableHead
                                         label="HRMS ID"
                                         sortKey="employee_id"
@@ -389,7 +473,7 @@ export default function QuarterlyMinutesManagement() {
                             <TableBody>
                                 {filteredAndSortedData.length === 0 ? (
                                    <TableRow>
-                                       <TableCell colSpan={isAdminOrCEO ? 12 : 11} className="text-center py-8 text-slate-500">
+                                       <TableCell colSpan={isAdminOrCEO ? 13 : 12} className="text-center py-8 text-slate-500">
                                            No quarterly minutes records found
                                        </TableCell>
                                    </TableRow>
@@ -399,9 +483,18 @@ export default function QuarterlyMinutesManagement() {
                                         const totalMinutes = isEditing?.total_minutes ?? record.total_minutes;
                                         const usedMinutes = isEditing?.used_minutes ?? record.used_minutes;
                                         const remainingMinutes = totalMinutes - usedMinutes;
+                                        const isSelected = selectedRecords.includes(record.id);
 
                                         return (
-                                            <TableRow key={record.id}>
+                                            <TableRow key={record.id} className={isSelected ? 'bg-blue-50' : ''}>
+                                                <TableCell>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleSelectRecord(record.id)}
+                                                        className="rounded border-slate-300"
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="font-medium">{record.employee_id}</TableCell>
                                                 <TableCell className="font-medium">
                                                     <Link 
@@ -484,21 +577,32 @@ export default function QuarterlyMinutesManagement() {
                                                             </Button>
                                                         </div>
                                                     ) : (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => {
-                                                                setEditingValues(prev => ({
-                                                                    ...prev,
-                                                                    [record.id]: {
-                                                                        total_minutes: record.total_minutes,
-                                                                        used_minutes: record.used_minutes
-                                                                    }
-                                                                }));
-                                                            }}
-                                                        >
-                                                            <Edit2 className="w-4 h-4" />
-                                                        </Button>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => {
+                                                                    setEditingValues(prev => ({
+                                                                        ...prev,
+                                                                        [record.id]: {
+                                                                            total_minutes: record.total_minutes,
+                                                                            used_minutes: record.used_minutes
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                            >
+                                                                <Edit2 className="w-4 h-4" />
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => handleDelete(record.id)}
+                                                                disabled={deleteRecordMutation.isPending}
+                                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
