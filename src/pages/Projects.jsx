@@ -122,12 +122,21 @@ export default function Projects() {
                     return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
                 }
                 
-                // Admin, Supervisor, CEO can see all projects
+                // Admin, Supervisor, CEO can see all projects OR filtered by company if company is set
                 if (isAdminRole) {
-                    console.log('[Projects] Fetching all projects (admin/supervisor/ceo)');
-                    const items = await base44.entities.Project.list('-created_date', pageSize, skip);
-                    console.log('[Projects] Fetched', items.length, 'projects');
-                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+                    if (currentUser.company) {
+                        console.log('[Projects] Fetching projects for selected company (admin/supervisor/ceo):', currentUser.company);
+                        const items = await base44.entities.Project.filter({
+                            company: currentUser.company
+                        }, '-created_date', pageSize, skip);
+                        console.log('[Projects] Fetched', items.length, 'projects for company');
+                        return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+                    } else {
+                        console.log('[Projects] Fetching all projects (admin/supervisor/ceo)');
+                        const items = await base44.entities.Project.list('-created_date', pageSize, skip);
+                        console.log('[Projects] Fetched', items.length, 'projects');
+                        return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+                    }
                 }
                 
                 // Regular users see all non-closed projects from their company
