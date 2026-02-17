@@ -63,7 +63,7 @@ export default function AdminDashboard({ projects, employees, currentUser }) {
     return (
         <div className="space-y-6">
             {/* Attendance Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Link to={createPageUrl('Projects')} className="block">
                     <Card className="border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer bg-gradient-to-br from-indigo-50 to-indigo-100">
                         <CardContent className="p-5">
@@ -115,22 +115,7 @@ export default function AdminDashboard({ projects, employees, currentUser }) {
                     </Card>
                 </Link>
 
-                <Link to={createPageUrl('Users')} className="block">
-                    <Card className="border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer bg-gradient-to-br from-purple-50 to-purple-100">
-                        <CardContent className="p-5">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-purple-600 mb-1">System Users</p>
-                                    <p className="text-3xl font-bold text-purple-900">{users.length}</p>
-                                    <p className="text-xs text-purple-600 mt-1">Active accounts</p>
-                                </div>
-                                <div className="bg-purple-500 text-white p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                                    <Shield className="w-5 h-5" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </Link>
+
             </div>
 
             {/* Company Overview */}
