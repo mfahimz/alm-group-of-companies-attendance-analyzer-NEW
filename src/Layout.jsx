@@ -110,7 +110,8 @@ export default function Layout({ children, currentPageName }) {
             }
         });
 
-        console.log('Navigation Structure:', structure);
+        console.log('Navigation Structure:', JSON.stringify(structure, null, 2));
+        console.log('Current User Role:', userRole);
         return structure;
     }, [currentUser, canAccessPage]);
 
