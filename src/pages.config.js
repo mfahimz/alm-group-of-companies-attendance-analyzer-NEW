@@ -78,6 +78,9 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import DevelopmentLog from './pages/DevelopmentLog';
+import AppDocumentation from './pages/AppDocumentation';
+import FeatureRequests from './pages/FeatureRequests';
 import __Layout from './Layout.jsx';
 
 
@@ -113,6 +116,9 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
+    "DevelopmentLog": DevelopmentLog,
+    "AppDocumentation": AppDocumentation,
+    "FeatureRequests": FeatureRequests,
 }
 
 export const pagesConfig = {
