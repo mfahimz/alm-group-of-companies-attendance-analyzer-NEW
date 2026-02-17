@@ -9,7 +9,9 @@ import {
     UserCog,
     DollarSign,
     AlertCircle,
-    ClipboardCheck
+    ClipboardCheck,
+    Shield,
+    BarChart3
 } from 'lucide-react';
 
 /**
