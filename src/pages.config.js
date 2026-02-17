@@ -52,6 +52,7 @@ import BusinessDocumentation from './pages/BusinessDocumentation';
 import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
 import CompanyBranding from './pages/CompanyBranding';
 import CompanyManagement from './pages/CompanyManagement';
+import CompanySelection from './pages/CompanySelection';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
@@ -76,7 +77,6 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import CompanySelection from './pages/CompanySelection';
 import __Layout from './Layout.jsx';
 
 
@@ -86,6 +86,7 @@ export const PAGES = {
     "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
     "CompanyBranding": CompanyBranding,
     "CompanyManagement": CompanyManagement,
+    "CompanySelection": CompanySelection,
     "Dashboard": Dashboard,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
@@ -110,7 +111,6 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
-    "CompanySelection": CompanySelection,
 }
 
 export const pagesConfig = {

@@ -12,7 +12,6 @@ import PunchUploadTab from '../components/project-tabs/PunchUploadTab';
 import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
 import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import ReportTab from '../components/project-tabs/ReportTab';
-import ChecklistTab from '../components/project-tabs/ChecklistTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -313,13 +312,6 @@ export default function ProjectDetail() {
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
                             Exceptions {isReadOnly && '🔒'}
                         </TabsTrigger>
-                        {project.company === 'Al Maraghi Motors' && (
-                            <TabsTrigger
-                value="checklist"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-emerald-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
-                                Checklist
-                            </TabsTrigger>
-                        )}
                         {project.company === 'Al Maraghi Motors' &&
             <TabsTrigger
               value="overtime"
@@ -357,12 +349,6 @@ export default function ProjectDetail() {
                 <TabsContent value="exceptions">
                     {activeTab === 'exceptions' && <ExceptionsTab project={project} />}
                 </TabsContent>
-
-                {project.company === 'Al Maraghi Motors' && (
-                    <TabsContent value="checklist">
-                        {activeTab === 'checklist' && <ChecklistTab project={project} />}
-                    </TabsContent>
-                )}
 
                 <TabsContent value="overtime">
                     {activeTab === 'overtime' && <OvertimeTab project={project} />}
