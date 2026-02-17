@@ -13,7 +13,11 @@ import {
     Shield,
     BarChart3,
     Palette,
-    Brain
+    Brain,
+    Code,
+    GitPullRequest,
+    BookText,
+    Lightbulb
 } from 'lucide-react';
 
 /**
@@ -231,6 +235,38 @@ export const PAGES_CONFIG = {
         defaultRoles: ['admin', 'ceo', 'supervisor']
     },
 
+    // Developer Tools
+    DevelopmentLog: {
+        name: 'DevelopmentLog',
+        title: 'Development Log',
+        icon: GitPullRequest,
+        category: 'Developer',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+    AppDocumentation: {
+        name: 'AppDocumentation',
+        title: 'App Documentation',
+        icon: BookText,
+        category: 'Developer',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+    FeatureRequests: {
+        name: 'FeatureRequests',
+        title: 'Feature Requests',
+        icon: Lightbulb,
+        category: 'Developer',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+
     // Hidden Pages (No navigation)
     ProjectDetail: {
         name: 'ProjectDetail',
@@ -327,6 +363,12 @@ export const NAV_CATEGORIES = {
         label: 'Admin',
         icon: Settings,
         order: 5,
+        renderAs: 'dropdown'
+    },
+    Developer: {
+        label: 'Developer',
+        icon: Code,
+        order: 100,
         renderAs: 'dropdown'
     }
 };
