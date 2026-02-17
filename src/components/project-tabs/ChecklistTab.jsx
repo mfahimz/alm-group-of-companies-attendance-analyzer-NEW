@@ -199,17 +199,22 @@ export default function ChecklistTab({ project }) {
     const totalCount = checklistItems.length;
     const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    // Group tasks by type for overview
-    const taskTypeStats = checklistItems.reduce((acc, task) => {
-        if (!acc[task.task_type]) {
-            acc[task.task_type] = { total: 0, completed: 0 };
-        }
-        acc[task.task_type].total++;
-        if (task.status === 'completed') {
-            acc[task.task_type].completed++;
-        }
+    // Group tasks by type for overview - include all predefined task types
+    const taskTypeStats = PREDEFINED_TASKS.reduce((acc, predefinedTask) => {
+        acc[predefinedTask.task_type] = { total: 0, completed: 0 };
         return acc;
     }, {});
+
+    // Update stats based on actual checklist items
+    checklistItems.forEach(task => {
+        if (!taskTypeStats[task.task_type]) {
+            taskTypeStats[task.task_type] = { total: 0, completed: 0 };
+        }
+        taskTypeStats[task.task_type].total++;
+        if (task.status === 'completed') {
+            taskTypeStats[task.task_type].completed++;
+        }
+    });
 
     if (isLoading) {
         return (
