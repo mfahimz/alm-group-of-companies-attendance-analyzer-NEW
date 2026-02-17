@@ -11,7 +11,8 @@ import {
     AlertCircle,
     ClipboardCheck,
     Shield,
-    BarChart3
+    BarChart3,
+    Palette
 } from 'lucide-react';
 
 /**
@@ -202,6 +203,16 @@ export const PAGES_CONFIG = {
         name: 'MaintenanceSettings',
         title: 'Maintenance Mode',
         icon: AlertCircle,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo']
+    },
+    CompanyBranding: {
+        name: 'CompanyBranding',
+        title: 'Company Branding',
+        icon: Palette,
         category: 'Admin',
         showInNav: true,
         requiresAuth: true,
