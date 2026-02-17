@@ -228,11 +228,6 @@ export default function Layout({ children, currentPageName }) {
                         
                         {/* Desktop User Menu */}
                         <div className="hidden lg:flex items-center gap-3">
-                            {currentUser?.company && (
-                                      <div className="px-3 py-1 bg-[#EEF2FF] text-[#0F1E36] text-xs font-medium rounded-md border border-[#E2E6EC]">
-                                          {currentUser.company}
-                                      </div>
-                                  )}
                             <div className="flex items-center gap-3">
                                 <div className="text-right">
                                       <p className="text-sm font-medium text-[#1F2937]">
