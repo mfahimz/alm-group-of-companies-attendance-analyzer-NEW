@@ -110,6 +110,7 @@ export default function Layout({ children, currentPageName }) {
             }
         });
 
+        console.log('Navigation Structure:', structure);
         return structure;
     }, [currentUser, canAccessPage]);
 
