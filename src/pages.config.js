@@ -50,6 +50,7 @@
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import BusinessDocumentation from './pages/BusinessDocumentation';
 import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
+import CompanyBranding from './pages/CompanyBranding';
 import CompanyManagement from './pages/CompanyManagement';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
@@ -75,7 +76,6 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import CompanyBranding from './pages/CompanyBranding';
 import __Layout from './Layout.jsx';
 
 
@@ -83,6 +83,7 @@ export const PAGES = {
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "BusinessDocumentation": BusinessDocumentation,
     "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
+    "CompanyBranding": CompanyBranding,
     "CompanyManagement": CompanyManagement,
     "Dashboard": Dashboard,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
@@ -108,7 +109,6 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
-    "CompanyBranding": CompanyBranding,
 }
 
 export const pagesConfig = {
