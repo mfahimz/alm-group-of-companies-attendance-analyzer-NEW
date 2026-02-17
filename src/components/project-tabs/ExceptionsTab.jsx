@@ -1055,14 +1055,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // For PUBLIC_HOLIDAY and ALLOWED_MINUTES types, attendance_id is optional
-        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && !formData.attendance_id) {
+        // For PUBLIC_HOLIDAY, ALLOWED_MINUTES, and SKIP_PUNCH types, attendance_id is optional
+        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && !formData.attendance_id) {
             toast.error('Please select an employee');
             return;
         }
 
-        // For ALLOWED_MINUTES, default to ALL if not selected
-        if (formData.type === 'ALLOWED_MINUTES' && !formData.attendance_id) {
+        // For ALLOWED_MINUTES and SKIP_PUNCH, default to ALL if not selected
+        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH') && !formData.attendance_id) {
             formData.attendance_id = 'ALL';
         }
         
@@ -1336,8 +1336,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && '*'}</Label>
-                                    {formData.type === 'PUBLIC_HOLIDAY' ? (
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && '*'}</Label>
+                                    {formData.type === 'PUBLIC_HOLIDAY' || formData.type === 'SKIP_PUNCH' ? (
                                         <Input 
                                             value="All Employees" 
                                             disabled 
@@ -1576,20 +1576,61 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         <p className="text-sm text-amber-800 mb-3">
                                             This exception will skip a specific punch (AM Punch In or PM Punch Out) from the analysis for the selected dates.
                                         </p>
-                                        <div>
-                                            <Label>Punch to Skip *</Label>
-                                            <Select
-                                                value={formData.punch_to_skip}
-                                                onValueChange={(value) => setFormData({ ...formData, punch_to_skip: value })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="AM_PUNCH_IN">AM Punch In (Morning Start)</SelectItem>
-                                                    <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Evening End)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <Label>Apply To *</Label>
+                                                <Select
+                                                    value={formData.attendance_id || 'ALL'}
+                                                    onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select scope..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="ALL">All Employees</SelectItem>
+                                                        <div className="p-2 border-t">
+                                                            <Input
+                                                                placeholder="Search employees..."
+                                                                value={employeeSearch}
+                                                                onChange={(e) => setEmployeeSearch(e.target.value)}
+                                                                className="mb-2"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onKeyDown={(e) => e.stopPropagation()}
+                                                            />
+                                                        </div>
+                                                        <div className="max-h-[200px] overflow-y-auto">
+                                                            {employees
+                                                                .filter(emp => {
+                                                                    if (!employeeSearch) return true;
+                                                                    const search = employeeSearch.toLowerCase();
+                                                                    return emp.name.toLowerCase().includes(search) || 
+                                                                           String(emp.attendance_id).toLowerCase().includes(search);
+                                                                })
+                                                                .filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '')
+                                                                .map(emp => (
+                                                                   <SelectItem key={emp.id} value={String(emp.attendance_id)}>
+                                                                       {emp.attendance_id} - {emp.name}
+                                                                   </SelectItem>
+                                                                ))}
+                                                        </div>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div>
+                                                <Label>Punch to Skip *</Label>
+                                                <Select
+                                                    value={formData.punch_to_skip}
+                                                    onValueChange={(value) => setFormData({ ...formData, punch_to_skip: value })}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="AM_PUNCH_IN">AM Punch In (Morning Start)</SelectItem>
+                                                        <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Evening End)</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
