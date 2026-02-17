@@ -134,7 +134,7 @@ export default function Dashboard() {
                     </h1>
                     <p className="text-slate-600 mt-2 text-lg">System administration and monitoring</p>
                 </div>
-                <AdminDashboard projects={projects} employees={employees} />
+                <AdminDashboard projects={projects} employees={employees} currentUser={currentUser} />
             </div>
         );
     }

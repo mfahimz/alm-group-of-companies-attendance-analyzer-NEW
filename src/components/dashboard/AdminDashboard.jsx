@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 // Companies with salary/payroll feature enabled
 const PAYROLL_ENABLED_COMPANIES = ['Al Maraghi Auto Repairs'];
 
-export default function AdminDashboard({ projects, employees }) {
+export default function AdminDashboard({ projects, employees, currentUser }) {
     const { data: auditLogs = [] } = useQuery({
         queryKey: ['recentAudit'],
         queryFn: () => base44.entities.AuditLog.list('-created_date', 8),
@@ -24,21 +24,32 @@ export default function AdminDashboard({ projects, employees }) {
         staleTime: 5 * 60 * 1000
     });
 
-    // Project stats
-    const activeProjects = projects.filter(p => p.status !== 'closed');
-    const analyzedProjects = projects.filter(p => p.status === 'analyzed');
-    const draftProjects = projects.filter(p => p.status === 'draft');
-    const lockedProjects = projects.filter(p => p.status === 'locked');
-    const activeEmployees = employees.filter(e => e.active);
+    // Filter by current user's company if company is set
+    const filteredProjects = React.useMemo(() => {
+        if (!currentUser?.company) return projects;
+        return projects.filter(p => p.company === currentUser.company);
+    }, [projects, currentUser?.company]);
 
-    // Group by company
-    const projectsByCompany = projects.reduce((acc, p) => {
+    const filteredEmployees = React.useMemo(() => {
+        if (!currentUser?.company) return employees;
+        return employees.filter(e => e.company === currentUser.company);
+    }, [employees, currentUser?.company]);
+
+    // Project stats (using filtered data)
+    const activeProjects = filteredProjects.filter(p => p.status !== 'closed');
+    const analyzedProjects = filteredProjects.filter(p => p.status === 'analyzed');
+    const draftProjects = filteredProjects.filter(p => p.status === 'draft');
+    const lockedProjects = filteredProjects.filter(p => p.status === 'locked');
+    const activeEmployees = filteredEmployees.filter(e => e.active);
+
+    // Group by company (using filtered data)
+    const projectsByCompany = filteredProjects.reduce((acc, p) => {
         acc[p.company] = acc[p.company] || [];
         acc[p.company].push(p);
         return acc;
     }, {});
 
-    const employeesByCompany = employees.reduce((acc, e) => {
+    const employeesByCompany = filteredEmployees.reduce((acc, e) => {
         acc[e.company] = acc[e.company] || [];
         acc[e.company].push(e);
         return acc;
@@ -60,7 +71,7 @@ export default function AdminDashboard({ projects, employees }) {
                                 <div>
                                     <p className="text-sm font-medium text-indigo-600 mb-1">Active Projects</p>
                                     <p className="text-3xl font-bold text-indigo-900">{activeProjects.length}</p>
-                                    <p className="text-xs text-indigo-600 mt-1">{projects.length} total</p>
+                                    <p className="text-xs text-indigo-600 mt-1">{filteredProjects.length} total</p>
                                 </div>
                                 <div className="bg-indigo-500 text-white p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
                                     <FolderKanban className="w-5 h-5" />
@@ -94,7 +105,7 @@ export default function AdminDashboard({ projects, employees }) {
                                 <div>
                                     <p className="text-sm font-medium text-blue-600 mb-1">Employees</p>
                                     <p className="text-3xl font-bold text-blue-900">{activeEmployees.length}</p>
-                                    <p className="text-xs text-blue-600 mt-1">{employees.length - activeEmployees.length} inactive</p>
+                                    <p className="text-xs text-blue-600 mt-1">{filteredEmployees.length - activeEmployees.length} inactive</p>
                                 </div>
                                 <div className="bg-blue-500 text-white p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
                                     <Users className="w-5 h-5" />
