@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
  * - Hover dropdowns for other categories
  * - Active page highlighting
  */
-export default function DesktopNav({ navStructure, currentPageName, canAccessPage, userRole }) {
+export default function DesktopNav({ navStructure, currentPageName, canAccessPage, userRole, companyLogo }) {
     const [homeDropdownOpen, setHomeDropdownOpen] = useState(false);
 
     // Dashboards available to the user
@@ -30,8 +30,14 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
         <nav className="hidden lg:flex items-center gap-1 flex-1">
             {/* Logo */}
             <Link to={createPageUrl('Dashboard')} className="flex items-center gap-3 mr-6">
-                <BarChart3 className="w-8 h-8 text-[#0F1E36] flex-shrink-0" />
-                <span className="font-bold text-lg text-[#0F1E36]">ALM Attendance</span>
+                {companyLogo ? (
+                    <img src={companyLogo} alt="Company Logo" className="h-8 w-auto max-w-[200px] object-contain" />
+                ) : (
+                    <>
+                        <BarChart3 className="w-8 h-8 text-[#0F1E36] flex-shrink-0" />
+                        <span className="font-bold text-lg text-[#0F1E36]">ALM Attendance</span>
+                    </>
+                )}
             </Link>
 
             {/* Home/Dashboard Dropdown */}
