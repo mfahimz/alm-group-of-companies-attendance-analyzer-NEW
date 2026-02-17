@@ -4,6 +4,7 @@ import NotificationCenter from './components/ui/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { formatInUAE } from '@/components/ui/timezone';
+import { useNavigate } from 'react-router-dom';
 
 import { usePermissions } from './components/hooks/usePermissions';
 import DesktopNav from './components/navigation/DesktopNav';
@@ -13,6 +14,7 @@ import { LogOut } from 'lucide-react';
 
 
 export default function Layout({ children, currentPageName }) {
+    const navigate = useNavigate();
     const publicPages = ['Maintenance'];
     const isPublicPage = publicPages.includes(currentPageName);
 
@@ -119,10 +121,10 @@ export default function Layout({ children, currentPageName }) {
     useEffect(() => {
         if (currentUser && currentPageName === 'Dashboard') {
             if (isDepartmentHead || isCEO || isHRManager) {
-                window.location.replace('/DepartmentHeadDashboard');
+                navigate('/DepartmentHeadDashboard', { replace: true });
             }
         }
-    }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName]);
+    }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName, navigate]);
 
     if (isLoading || !currentUser) {
         return (
@@ -133,7 +135,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     if (maintenanceMode && userRole !== 'admin' && currentPageName !== 'Maintenance') {
-        window.location.href = '/Maintenance';
+        navigate('/Maintenance', { replace: true });
         return null;
     }
 
@@ -260,7 +262,7 @@ export default function Layout({ children, currentPageName }) {
             {(userRole === 'admin' || userRole === 'ceo' || userRole === 'supervisor' || userRole === 'hr_manager') && (
                 <div className="fixed bottom-6 right-6 z-20">
                     <button
-                        onClick={() => window.location.href = '/CompanySelection'}
+                        onClick={() => navigate('/CompanySelection')}
                         className="group flex items-center gap-3 bg-white border-2 border-[#0F1E36] text-[#0F1E36] px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:bg-[#0F1E36] hover:text-white transition-all duration-300"
                         title="Switch Company"
                     >

@@ -5,9 +5,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Building2, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function CompanySelection() {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const [selectedCompany, setSelectedCompany] = useState(null);
 
     const { data: currentUser, isLoading: userLoading } = useQuery({
@@ -26,10 +29,9 @@ export default function CompanySelection() {
             await base44.auth.updateMe({ company });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries();
+            queryClient.invalidateQueries(['currentUser']);
             toast.success('Company switched successfully');
-            // Reload to apply new company context
-            window.location.href = '/Dashboard';
+            navigate('/Dashboard');
         },
         onError: (error) => {
             toast.error('Failed to switch company');
@@ -39,8 +41,22 @@ export default function CompanySelection() {
 
     if (userLoading || settingsLoading) {
         return (
-            <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
-                <div className="text-[#6B7280]">Loading companies...</div>
+            <div className="min-h-screen bg-gradient-to-br from-[#F4F6F9] to-[#E7EBF1] flex items-center justify-center p-6">
+                <div className="w-full max-w-5xl">
+                    <div className="text-center mb-12">
+                        <Skeleton className="h-10 w-80 mx-auto mb-3" />
+                        <Skeleton className="h-6 w-96 mx-auto" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                        {[1, 2, 3, 4].map((i) => (
+                            <Card key={i} className="p-8">
+                                <Skeleton className="h-24 w-24 mx-auto mb-6 rounded-2xl" />
+                                <Skeleton className="h-8 w-48 mx-auto mb-4" />
+                                <Skeleton className="h-6 w-32 mx-auto" />
+                            </Card>
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -57,7 +73,7 @@ export default function CompanySelection() {
 
     // If only one company, redirect automatically
     if (availableCompanies.length === 1 && currentUser?.company === availableCompanies[0]) {
-        window.location.href = '/Dashboard';
+        navigate('/Dashboard', { replace: true });
         return null;
     }
 
