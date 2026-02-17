@@ -48,6 +48,32 @@ export default function Layout({ children, currentPageName }) {
         retry: 1
     });
 
+    // Fetch company branding settings
+    const { data: companyBranding } = useQuery({
+        queryKey: ['companyBranding', currentUser?.company],
+        queryFn: async () => {
+            if (!currentUser?.company) return null;
+            try {
+                const settings = await base44.entities.CompanySettings.filter({
+                    company: currentUser.company
+                });
+                if (settings.length > 0) {
+                    return settings[0];
+                }
+                return null;
+            } catch {
+                return null;
+            }
+        },
+        enabled: !!currentUser?.company,
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false,
+        retry: 1
+    });
+
     // Build navigation structure from config
     const navStructure = React.useMemo(() => {
         if (!currentUser) return { main: [], dropdowns: {} };
@@ -160,6 +186,18 @@ export default function Layout({ children, currentPageName }) {
 
     return (
         <div className="min-h-screen bg-[#F4F6F9]">
+            {/* Dynamic Company Branding Styles */}
+            {companyBranding && (
+                <style>{`
+                    :root {
+                        ${companyBranding.primary_color ? `--primary: ${companyBranding.primary_color};` : ''}
+                        ${companyBranding.secondary_color ? `--secondary: ${companyBranding.secondary_color};` : ''}
+                        ${companyBranding.font_family ? `--font-family: ${companyBranding.font_family};` : ''}
+                    }
+                    ${companyBranding.font_family ? `body { font-family: ${companyBranding.font_family}; }` : ''}
+                `}</style>
+            )}
+            
             {/* Top Navigation Bar */}
             <header className="bg-white border-b border-[#E2E6EC] sticky top-0 z-30" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
                 <div className="flex items-center justify-between px-6 py-3">
@@ -169,6 +207,7 @@ export default function Layout({ children, currentPageName }) {
                         currentPageName={currentPageName}
                         canAccessPage={canAccessPage}
                         userRole={userRole}
+                        companyLogo={companyBranding?.logo_url}
                     />
 
                     {/* Mobile Navigation */}
