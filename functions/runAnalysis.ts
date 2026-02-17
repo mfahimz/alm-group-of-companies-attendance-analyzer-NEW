@@ -442,12 +442,7 @@ Deno.serve(async (req) => {
                     weeklyOffDay = dayNameToNumber[employee.weekly_off];
                 }
                 
-                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                    continue;
-                }
-
-                // Get ALL matching exceptions for this date BEFORE incrementing workingDays
-                // This allows PUBLIC_HOLIDAY to completely skip the day
+                // Get ALL matching exceptions for this date first (to check DAY_SWAP)
                 let matchingExceptions = [];
                 try {
                     matchingExceptions = employeeExceptions.filter(ex => {
@@ -462,6 +457,29 @@ Deno.serve(async (req) => {
                 } catch {
                     matchingExceptions = [];
                 }
+                
+                // DAY_SWAP exception: Override weekly off for specific dates
+                const daySwapException = matchingExceptions.find(ex => ex.type === 'DAY_SWAP');
+                if (daySwapException) {
+                    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    const currentDayName = dayNames[dayOfWeek];
+                    
+                    // If current day matches new_weekly_off, treat it as weekly off
+                    if (daySwapException.new_weekly_off === currentDayName) {
+                        continue; // Skip this day - it's the new weekly off
+                    }
+                    
+                    // If current day matches working_day_override, treat it as working day (ignore standard weekly off)
+                    if (daySwapException.working_day_override === currentDayName) {
+                        weeklyOffDay = null; // Override the weekly off - make this day a working day
+                    }
+                }
+                
+                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    continue;
+                }
+
+                // matchingExceptions already fetched above for DAY_SWAP check
 
                 // Check for PUBLIC_HOLIDAY - day is NOT a working day
                 const hasPublicHoliday = matchingExceptions.some(ex => 
@@ -673,6 +691,30 @@ Deno.serve(async (req) => {
                     });
 
                 let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
+                
+                // SKIP_PUNCH exception: Remove specific punch from analysis
+                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+                if (skipPunchException && skipPunchException.punch_to_skip) {
+                    const punchToSkip = skipPunchException.punch_to_skip;
+                    
+                    // Match punches to shift points to identify which to skip
+                    const tempMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds);
+                    
+                    // Filter out the punch we need to skip
+                    if (punchToSkip === 'AM_PUNCH_IN') {
+                        // Remove the punch matched to AM_START
+                        filteredPunches = filteredPunches.filter((p, idx) => {
+                            const match = tempMatches[idx];
+                            return match?.matchedTo !== 'AM_START';
+                        });
+                    } else if (punchToSkip === 'PM_PUNCH_OUT') {
+                        // Remove the punch matched to PM_END
+                        filteredPunches = filteredPunches.filter((p, idx) => {
+                            const match = tempMatches[idx];
+                            return match?.matchedTo !== 'PM_END';
+                        });
+                    }
+                }
                 
                 let punchMatches = [];
                 let hasUnmatchedPunch = false;

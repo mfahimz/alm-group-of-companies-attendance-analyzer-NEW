@@ -34,7 +34,10 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
         allowed_minutes: '',
         allowed_minutes_type: 'both',
         include_friday: false,
-        salary_leave_days: ''
+        salary_leave_days: '',
+        punch_to_skip: 'AM_PUNCH_IN',
+        new_weekly_off: '',
+        working_day_override: ''
     });
 
     const queryClient = useQueryClient();
@@ -65,7 +68,10 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 allowed_minutes: exception.allowed_minutes || '',
                 allowed_minutes_type: exception.allowed_minutes_type || 'both',
                 include_friday: exception.include_friday || false,
-                salary_leave_days: calculatedDays
+                salary_leave_days: calculatedDays,
+                punch_to_skip: exception.punch_to_skip || 'AM_PUNCH_IN',
+                new_weekly_off: exception.new_weekly_off || '',
+                working_day_override: exception.working_day_override || ''
             });
         }
     }, [exception, project]);
@@ -116,6 +122,15 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.salary_leave_days = parseFloat(formData.salary_leave_days);
         }
 
+        if (formData.type === 'SKIP_PUNCH') {
+            cleanedData.punch_to_skip = formData.punch_to_skip;
+        }
+
+        if (formData.type === 'DAY_SWAP') {
+            cleanedData.new_weekly_off = formData.new_weekly_off;
+            cleanedData.working_day_override = formData.working_day_override;
+        }
+
         updateMutation.mutate(cleanedData);
     };
 
@@ -125,6 +140,8 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
     const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
+    const needsSkipPunch = formData.type === 'SKIP_PUNCH';
+    const needsDaySwap = formData.type === 'DAY_SWAP';
     
     // Calculate days between dates for annual leave
     const calculateDaysBetween = () => {
@@ -172,6 +189,8 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                     <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                     <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
+                                    <SelectItem value="SKIP_PUNCH">Skip Specific Punch</SelectItem>
+                                    <SelectItem value="DAY_SWAP">Day Swap (Weekly Off Override)</SelectItem>
                                     <SelectItem value="CUSTOM">Custom Type (Not used in analysis)</SelectItem>
                                     </SelectContent>
                             </Select>
@@ -353,6 +372,85 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     ⚠️ This value is used ONLY for salary calculation, not for attendance reports.
                                 </p>
                             )}
+                        </div>
+                    )}
+
+                    {needsSkipPunch && (
+                        <div className="border-t pt-4">
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <p className="text-sm text-amber-800 mb-3">
+                                    This exception will skip a specific punch (AM Punch In or PM Punch Out) from the analysis.
+                                </p>
+                                <div>
+                                    <Label>Punch to Skip *</Label>
+                                    <Select
+                                        value={formData.punch_to_skip}
+                                        onValueChange={(value) => setFormData({ ...formData, punch_to_skip: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="AM_PUNCH_IN">AM Punch In (Morning Start)</SelectItem>
+                                            <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Evening End)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {needsDaySwap && (
+                        <div className="border-t pt-4">
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <p className="text-sm text-blue-800 mb-4">
+                                    This exception swaps a weekly off day with a working day for the selected date range.
+                                </p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label>New Weekly Off Day *</Label>
+                                        <Select
+                                            value={formData.new_weekly_off}
+                                            onValueChange={(value) => setFormData({ ...formData, new_weekly_off: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select day..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Sunday">Sunday</SelectItem>
+                                                <SelectItem value="Monday">Monday</SelectItem>
+                                                <SelectItem value="Tuesday">Tuesday</SelectItem>
+                                                <SelectItem value="Wednesday">Wednesday</SelectItem>
+                                                <SelectItem value="Thursday">Thursday</SelectItem>
+                                                <SelectItem value="Friday">Friday</SelectItem>
+                                                <SelectItem value="Saturday">Saturday</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-slate-500 mt-1">This day will become the holiday</p>
+                                    </div>
+                                    <div>
+                                        <Label>New Working Day *</Label>
+                                        <Select
+                                            value={formData.working_day_override}
+                                            onValueChange={(value) => setFormData({ ...formData, working_day_override: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select day..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Sunday">Sunday</SelectItem>
+                                                <SelectItem value="Monday">Monday</SelectItem>
+                                                <SelectItem value="Tuesday">Tuesday</SelectItem>
+                                                <SelectItem value="Wednesday">Wednesday</SelectItem>
+                                                <SelectItem value="Thursday">Thursday</SelectItem>
+                                                <SelectItem value="Friday">Friday</SelectItem>
+                                                <SelectItem value="Saturday">Saturday</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-slate-500 mt-1">This day will become a working day</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
