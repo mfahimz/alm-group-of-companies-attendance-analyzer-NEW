@@ -173,7 +173,7 @@ function ChecklistSection({ project }) {
         <Card className="border-0 shadow-sm bg-green-50/30">
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle>Payroll Checklist</CardTitle>
+                    <CardTitle>Checklist</CardTitle>
                     <div className="flex gap-2">
                         {checklistItems.length === 0 && (
                             <Button
