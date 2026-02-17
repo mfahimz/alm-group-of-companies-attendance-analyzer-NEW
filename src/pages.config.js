@@ -47,6 +47,7 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import AIPayrollInsights from './pages/AIPayrollInsights';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import BusinessDocumentation from './pages/BusinessDocumentation';
 import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
@@ -77,11 +78,11 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import AIPayrollInsights from './pages/AIPayrollInsights';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "AIPayrollInsights": AIPayrollInsights,
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "BusinessDocumentation": BusinessDocumentation,
     "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
@@ -112,7 +113,6 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
-    "AIPayrollInsights": AIPayrollInsights,
 }
 
 export const pagesConfig = {

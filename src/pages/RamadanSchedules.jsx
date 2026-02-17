@@ -19,6 +19,7 @@ export default function RamadanSchedules() {
     const [editingSchedule, setEditingSchedule] = useState(null);
     const [editingDates, setEditingDates] = useState(null);
     const [calendarViewSchedule, setCalendarViewSchedule] = useState(null);
+    const [selectedCompany, setSelectedCompany] = useState('all');
     const [formData, setFormData] = useState({
         company: '',
         year: new Date().getFullYear(),
@@ -32,10 +33,14 @@ export default function RamadanSchedules() {
         queryFn: () => base44.auth.me()
     });
 
-    const { data: schedules = [] } = useQuery({
+    const { data: allSchedules = [] } = useQuery({
         queryKey: ['ramadanSchedules'],
         queryFn: () => base44.entities.RamadanSchedule.list('-year')
     });
+
+    const schedules = selectedCompany === 'all' 
+        ? allSchedules 
+        : allSchedules.filter(s => s.company === selectedCompany);
 
     const { data: companies = [] } = useQuery({
         queryKey: ['companySettings'],
@@ -146,7 +151,23 @@ export default function RamadanSchedules() {
 
             <Card className="border-0 shadow-sm">
                 <CardHeader>
-                    <CardTitle>Schedules</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Schedules</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-sm">Filter by Company:</Label>
+                            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="All Companies" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Companies</SelectItem>
+                                    {companies.map((comp) => (
+                                        <SelectItem key={comp.id} value={comp.company}>{comp.company}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {schedules.length === 0 ? (
