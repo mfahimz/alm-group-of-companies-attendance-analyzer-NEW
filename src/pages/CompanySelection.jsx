@@ -7,10 +7,12 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function CompanySelection() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const { setSelectedCompany: setCompanyFilter } = useCompanyFilter();
     const [selectedCompany, setSelectedCompany] = useState(null);
 
     const { data: currentUser, isLoading: userLoading } = useQuery({
@@ -27,9 +29,10 @@ export default function CompanySelection() {
     const updateCompanyMutation = useMutation({
         mutationFn: async (company) => {
             await base44.auth.updateMe({ company });
+            setCompanyFilter(company);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['currentUser']);
+            queryClient.invalidateQueries();
             toast.success('Company switched successfully');
             navigate('/Dashboard');
         },

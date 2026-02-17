@@ -11,6 +11,7 @@ import DesktopNav from './components/navigation/DesktopNav';
 import MobileNav from './components/navigation/MobileNav';
 import { getPagesByCategory, NAV_CATEGORIES } from './components/config/pagesConfig';
 import { LogOut } from 'lucide-react';
+import { CompanyFilterProvider } from './components/context/CompanyContext';
 
 
 export default function Layout({ children, currentPageName }) {
@@ -187,6 +188,7 @@ export default function Layout({ children, currentPageName }) {
     };
 
     return (
+        <CompanyFilterProvider>
         <div className="min-h-screen bg-[#F4F6F9]">
             {/* Dynamic Company Branding Styles */}
             {companyBranding && (
@@ -272,5 +274,6 @@ export default function Layout({ children, currentPageName }) {
 
             <Toaster position="top-right" richColors />
         </div>
+        </CompanyFilterProvider>
     );
 }
