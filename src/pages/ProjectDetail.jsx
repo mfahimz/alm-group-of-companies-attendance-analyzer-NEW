@@ -328,7 +328,7 @@ export default function ProjectDetail() {
             <TabsTrigger
               value="salary"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-green-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
-                                Salary Adjustments
+                                Salary
                             </TabsTrigger>
             }
                     </TabsList>
