@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar, CheckCircle2, Circle, Clock } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
@@ -17,6 +18,440 @@ import EditExceptionDialog from '../exceptions/EditExceptionDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import TablePagination from '../ui/TablePagination';
 import TimePicker from '../ui/TimePicker';
+import { formatInUAE } from '@/components/ui/timezone';
+
+// Predefined checklist tasks
+const PREDEFINED_TASKS = [
+    { task_type: 'Salary Split', task_description: 'Review special salary adjustments and calculations' },
+    { task_type: 'Leave Salary Hold', task_description: 'Check and release any held salaries' },
+    { task_type: 'Increment', task_description: 'Process salary increments and update employee records' },
+    { task_type: 'Over Time', task_description: 'Verify overtime hours and calculate overtime pay' },
+    { task_type: 'Incentives', task_description: 'Process salary increments and update employee records' },
+    { task_type: 'Variable Salary', task_description: 'Calculate and apply variable salary components' },
+    { task_type: 'Allowance / Additions', task_description: 'Review and add allowances and additional payments' },
+    { task_type: 'Deductions', task_description: 'Verify all deductions (late, early, other) are correctly applied' },
+    { task_type: 'New Joining', task_description: 'Generate and verify leave salary calculation sheets' },
+    { task_type: 'Bank account changes', task_description: 'Update employee bank account details for payroll transfer' },
+    { task_type: 'Attendance', task_description: 'Verify attendance data and resolve any anomalies' },
+    { task_type: 'Leave Salary Sheets', task_description: 'Generate and verify leave salary calculation sheets' },
+    { task_type: 'Exit', task_description: 'Process certificates and related documentation' }
+];
+
+// Checklist Section Component
+function ChecklistSection({ project }) {
+    const queryClient = useQueryClient();
+    const [showAddDialog, setShowAddDialog] = useState(false);
+    const [editingTask, setEditingTask] = useState(null);
+    const [newTask, setNewTask] = useState({
+        task_type: '',
+        task_description: '',
+        due_date: '',
+        notes: ''
+    });
+
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const { data: checklistItems = [] } = useQuery({
+        queryKey: ['checklistItems', project.id],
+        queryFn: () => base44.entities.ChecklistItem.filter({ project_id: project.id }, 'created_date'),
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false
+    });
+
+    const initializePredefinedTasksMutation = useMutation({
+        mutationFn: async () => {
+            const tasksToCreate = PREDEFINED_TASKS.map(task => ({
+                project_id: project.id,
+                task_type: task.task_type,
+                task_description: task.task_description,
+                is_predefined: true,
+                status: 'pending'
+            }));
+            await Promise.all(tasksToCreate.map(task => base44.entities.ChecklistItem.create(task)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Checklist initialized with predefined tasks');
+        },
+        onError: (error) => {
+            toast.error('Failed to initialize checklist: ' + error.message);
+        }
+    });
+
+    const createTaskMutation = useMutation({
+        mutationFn: (taskData) => base44.entities.ChecklistItem.create({
+            ...taskData,
+            project_id: project.id,
+            is_predefined: false,
+            status: 'pending'
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Task added to checklist');
+            setShowAddDialog(false);
+            setNewTask({ task_type: '', task_description: '', due_date: '', notes: '' });
+        },
+        onError: (error) => {
+            toast.error('Failed to add task: ' + error.message);
+        }
+    });
+
+    const updateTaskMutation = useMutation({
+        mutationFn: ({ id, updates }) => base44.entities.ChecklistItem.update(id, updates),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Task updated');
+            setEditingTask(null);
+        },
+        onError: (error) => {
+            toast.error('Failed to update task: ' + error.message);
+        }
+    });
+
+    const deleteTaskMutation = useMutation({
+        mutationFn: (id) => base44.entities.ChecklistItem.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success('Task deleted');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete task: ' + error.message);
+        }
+    });
+
+    const handleToggleStatus = (task) => {
+        const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+        const updates = {
+            status: newStatus,
+            ...(newStatus === 'completed' ? {
+                completed_by: currentUser?.email,
+                completed_date: new Date().toISOString()
+            } : {
+                completed_by: null,
+                completed_date: null
+            })
+        };
+        updateTaskMutation.mutate({ id: task.id, updates });
+    };
+
+    const handleAddTask = () => {
+        if (!newTask.task_type || !newTask.task_description) {
+            toast.error('Please fill in task type and description');
+            return;
+        }
+        createTaskMutation.mutate(newTask);
+    };
+
+    const handleDeleteTask = (task) => {
+        if (task.is_predefined) {
+            if (!window.confirm('Delete this predefined task? You can re-initialize all predefined tasks later.')) {
+                return;
+            }
+        }
+        deleteTaskMutation.mutate(task.id);
+    };
+
+    const taskTypeStats = PREDEFINED_TASKS.reduce((acc, predefinedTask) => {
+        acc[predefinedTask.task_type] = { total: 0, completed: 0 };
+        return acc;
+    }, {});
+
+    checklistItems.forEach(task => {
+        if (!taskTypeStats[task.task_type]) {
+            taskTypeStats[task.task_type] = { total: 0, completed: 0 };
+        }
+        taskTypeStats[task.task_type].total++;
+        if (task.status === 'completed') {
+            taskTypeStats[task.task_type].completed++;
+        }
+    });
+
+    return (
+        <Card className="border-0 shadow-sm bg-green-50/30">
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <CardTitle>Payroll Checklist</CardTitle>
+                    <div className="flex gap-2">
+                        {checklistItems.length === 0 && (
+                            <Button
+                                onClick={() => initializePredefinedTasksMutation.mutate()}
+                                disabled={initializePredefinedTasksMutation.isPending}
+                                className="bg-green-700 hover:bg-green-800"
+                            >
+                                Initialize Predefined Tasks
+                            </Button>
+                        )}
+                        <Button
+                            onClick={() => setShowAddDialog(true)}
+                            size="sm"
+                            className="bg-green-700 hover:bg-green-800"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Task
+                        </Button>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {/* Task Type Overview */}
+                {checklistItems.length > 0 && (
+                    <Card className="border-0 shadow-sm bg-white">
+                        <CardContent className="py-4">
+                            <div className="flex items-center gap-2 overflow-x-auto">
+                                <span className="text-xs font-medium text-slate-600 whitespace-nowrap mr-2">Quick View:</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.entries(taskTypeStats).map(([taskType, stats]) => {
+                                        const isComplete = stats.completed === stats.total;
+                                        return (
+                                            <div
+                                                key={taskType}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                                                    isComplete 
+                                                        ? 'bg-green-50 border-green-200 text-green-700' 
+                                                        : 'bg-white border-slate-200 text-slate-700'
+                                                }`}
+                                            >
+                                                {isComplete ? (
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                                                ) : (
+                                                    <Circle className="w-3.5 h-3.5 text-slate-400" />
+                                                )}
+                                                <span className="whitespace-nowrap">{taskType}</span>
+                                                <span className={`ml-1 ${isComplete ? 'text-green-600' : 'text-slate-500'}`}>
+                                                    {stats.completed}/{stats.total}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Checklist Table */}
+                {checklistItems.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">
+                        <p className="mb-4">No tasks in the checklist yet.</p>
+                        <Button
+                            onClick={() => initializePredefinedTasksMutation.mutate()}
+                            disabled={initializePredefinedTasksMutation.isPending}
+                            className="bg-green-700 hover:bg-green-800"
+                        >
+                            Initialize Predefined Tasks
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-12">Status</TableHead>
+                                    <TableHead>Task Type</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead>Completed By</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {checklistItems.map((task) => (
+                                    <TableRow key={task.id} className={task.status === 'completed' ? 'bg-green-50' : ''}>
+                                        <TableCell>
+                                            <button
+                                                onClick={() => handleToggleStatus(task)}
+                                                disabled={updateTaskMutation.isPending}
+                                                className="hover:opacity-70 transition-opacity"
+                                            >
+                                                {task.status === 'completed' ? (
+                                                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                                                ) : task.status === 'in_progress' ? (
+                                                    <Clock className="w-6 h-6 text-amber-600" />
+                                                ) : (
+                                                    <Circle className="w-6 h-6 text-slate-400" />
+                                                )}
+                                            </button>
+                                        </TableCell>
+                                        <TableCell className="font-medium">{task.task_type}</TableCell>
+                                        <TableCell className={task.status === 'completed' ? 'line-through text-slate-500' : ''}>
+                                            {task.task_description}
+                                        </TableCell>
+                                        <TableCell>
+                                            {task.completed_by ? (
+                                                <div className="text-sm">
+                                                    <div className="text-slate-900">{task.completed_by}</div>
+                                                    <div className="text-slate-500">
+                                                        {formatInUAE(new Date(task.completed_date), 'MMM dd, HH:mm')}
+                                                    </div>
+                                                </div>
+                                            ) : '—'}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex gap-1 justify-end">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => setEditingTask(task)}
+                                                    title="Edit task"
+                                                >
+                                                    <Edit className="w-4 h-4 text-slate-600" />
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleDeleteTask(task)}
+                                                    disabled={deleteTaskMutation.isPending}
+                                                    title="Delete task"
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </CardContent>
+
+            {/* Add Task Dialog */}
+            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Add Task</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label>Task Type *</Label>
+                            <Select
+                                value={newTask.task_type}
+                                onValueChange={(value) => {
+                                    if (value === '__custom__') {
+                                        setNewTask({...newTask, task_type: ''});
+                                    } else {
+                                        setNewTask({...newTask, task_type: value});
+                                    }
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select task type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PREDEFINED_TASKS.map(task => (
+                                        <SelectItem key={task.task_type} value={task.task_type}>
+                                            {task.task_type}
+                                        </SelectItem>
+                                    ))}
+                                    <SelectItem value="__custom__">Enter Custom Type...</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {newTask.task_type === '' && (
+                                <Input
+                                    className="mt-2"
+                                    value={newTask.task_type}
+                                    onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
+                                    placeholder="Enter custom task type..."
+                                    autoFocus
+                                />
+                            )}
+                        </div>
+                        <div>
+                            <Label>Description *</Label>
+                            <Textarea
+                                value={newTask.task_description}
+                                onChange={(e) => setNewTask({...newTask, task_description: e.target.value})}
+                                placeholder="Describe the task in detail..."
+                                rows={3}
+                            />
+                        </div>
+                        <div>
+                            <Label>Notes (Optional)</Label>
+                            <Textarea
+                                value={newTask.notes}
+                                onChange={(e) => setNewTask({...newTask, notes: e.target.value})}
+                                placeholder="Additional notes..."
+                                rows={2}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleAddTask}
+                            disabled={createTaskMutation.isPending}
+                            className="bg-green-700 hover:bg-green-800"
+                        >
+                            Add Task
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Task Dialog */}
+            <Dialog open={!!editingTask} onOpenChange={() => setEditingTask(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit Task</DialogTitle>
+                    </DialogHeader>
+                    {editingTask && (
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label>Task Type</Label>
+                                <Input
+                                    value={editingTask.task_type}
+                                    onChange={(e) => setEditingTask({...editingTask, task_type: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <Label>Description</Label>
+                                <Textarea
+                                    value={editingTask.task_description}
+                                    onChange={(e) => setEditingTask({...editingTask, task_description: e.target.value})}
+                                    rows={3}
+                                />
+                            </div>
+                            <div>
+                                <Label>Notes</Label>
+                                <Textarea
+                                    value={editingTask.notes || ''}
+                                    onChange={(e) => setEditingTask({...editingTask, notes: e.target.value})}
+                                    rows={2}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingTask(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                updateTaskMutation.mutate({
+                                    id: editingTask.id,
+                                    updates: {
+                                        task_type: editingTask.task_type,
+                                        task_description: editingTask.task_description,
+                                        notes: editingTask.notes
+                                    }
+                                });
+                            }}
+                            disabled={updateTaskMutation.isPending}
+                            className="bg-green-700 hover:bg-green-800"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
+}
 
 // Map user-friendly names to system type codes
 const TYPE_MAP = {
@@ -1129,42 +1564,10 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 </Card>
             )}
 
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="text-sm text-slate-600">Total</div>
-                        <div className="text-2xl font-bold text-slate-900">{exceptionStats.total}</div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="text-sm text-slate-600">Public Holidays</div>
-                        <div className="text-2xl font-bold text-purple-600">{exceptionStats.publicHolidays}</div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="text-sm text-slate-600">Sick Leave</div>
-                        <div className="text-2xl font-bold text-red-600">{exceptionStats.sickLeave}</div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="text-sm text-slate-600">Annual Leave</div>
-                        <div className="text-2xl font-bold text-blue-600">{exceptionStats.annualLeave}</div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="text-sm text-slate-600">From Reports</div>
-                        <div className="text-2xl font-bold text-indigo-600">{exceptionStats.reportGenerated}</div>
-                    </CardContent>
-                </Card>
-            </div>
 
-            {/* Exceptions List */}
-            <Card className="border-0 shadow-sm">
+
+            {/* Exceptions Section */}
+            <Card className="border-0 shadow-sm bg-blue-50/30">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <CardTitle>Exceptions ({filteredExceptions.length})</CardTitle>
@@ -1517,9 +1920,12 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 </CardContent>
             </Card>
 
+            {/* Payroll Checklist Section */}
+            <ChecklistSection project={project} />
+
             {/* Report-Generated Exceptions */}
             {reportExceptions.length > 0 && (
-                <Card className="border-0 shadow-sm bg-purple-50/50 ring-1 ring-purple-200">
+                <Card className="border-0 shadow-sm bg-purple-50/30 ring-1 ring-purple-200">
                     <CardHeader>
                         <CardTitle className="text-purple-900">Report-Generated Exceptions ({reportExceptions.length})</CardTitle>
                         <p className="text-sm text-purple-700 mt-1">
