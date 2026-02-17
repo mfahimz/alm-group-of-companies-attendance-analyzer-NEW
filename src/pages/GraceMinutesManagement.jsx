@@ -11,14 +11,15 @@ import { Search, Save, RefreshCw, Edit2, AlertCircle, Clock } from 'lucide-react
 import SortableTableHead from '@/components/ui/SortableTableHead';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function GraceMinutesManagement() {
     const queryClient = useQueryClient();
     const [searchQuery, setSearchQuery] = useState('');
-    const [companyFilter, setCompanyFilter] = useState('all');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
     const [editingValues, setEditingValues] = useState({});
+    const { selectedCompany: companyFilter } = useCompanyFilter();
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -30,8 +31,13 @@ export default function GraceMinutesManagement() {
     const userCompany = currentUser?.company;
 
     const { data: employees = [], isLoading: employeesLoading } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.filter({ active: true }, null, 5000)
+        queryKey: ['employees', companyFilter],
+        queryFn: async () => {
+            if (companyFilter) {
+                return base44.entities.Employee.filter({ active: true, company: companyFilter }, null, 5000);
+            }
+            return base44.entities.Employee.filter({ active: true }, null, 5000);
+        }
     });
 
     const updateGraceMutation = useMutation({
@@ -57,7 +63,7 @@ export default function GraceMinutesManagement() {
                 String(emp.attendance_id).toLowerCase().includes(searchQuery.toLowerCase()) ||
                 String(emp.hrms_id).toLowerCase().includes(searchQuery.toLowerCase());
 
-            const matchesCompany = companyFilter === 'all' || emp.company === companyFilter;
+            const matchesCompany = !companyFilter || emp.company === companyFilter;
             const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
 
             // User role filtering
@@ -194,19 +200,7 @@ export default function GraceMinutesManagement() {
                             />
                         </div>
 
-                        {isAdminOrCEO && (
-                            <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Companies" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Companies</SelectItem>
-                                    {availableCompanies.map(company => (
-                                        <SelectItem key={company} value={company}>{company}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
+
 
                         <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                             <SelectTrigger>

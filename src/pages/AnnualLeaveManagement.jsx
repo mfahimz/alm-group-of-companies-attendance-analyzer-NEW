@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { formatInUAE } from '@/components/ui/timezone';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { usePermissions } from '@/components/hooks/usePermissions';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function AnnualLeaveManagement() {
     const { user: currentUser, userRole } = usePermissions();
@@ -21,7 +22,6 @@ export default function AnnualLeaveManagement() {
     const [editingLeave, setEditingLeave] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
-    const [filterCompany, setFilterCompany] = useState('all');
     const [formData, setFormData] = useState({
         company: '',
         employee_id: '',
@@ -32,15 +32,26 @@ export default function AnnualLeaveManagement() {
     });
 
     const queryClient = useQueryClient();
+    const { selectedCompany: filterCompany } = useCompanyFilter();
 
     const { data: leaves = [] } = useQuery({
-        queryKey: ['annualLeaves'],
-        queryFn: () => base44.entities.AnnualLeave.list('-created_date')
+        queryKey: ['annualLeaves', filterCompany],
+        queryFn: async () => {
+            if (filterCompany) {
+                return base44.entities.AnnualLeave.filter({ company: filterCompany }, '-created_date');
+            }
+            return base44.entities.AnnualLeave.list('-created_date');
+        }
     });
 
     const { data: employees = [] } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.filter({ active: true })
+        queryKey: ['employees', filterCompany],
+        queryFn: async () => {
+            if (filterCompany) {
+                return base44.entities.Employee.filter({ active: true, company: filterCompany });
+            }
+            return base44.entities.Employee.filter({ active: true });
+        }
     });
 
     const { data: companies = [] } = useQuery({
@@ -57,10 +68,9 @@ export default function AnnualLeaveManagement() {
                 leave.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 leave.attendance_id?.includes(searchTerm);
             const matchesStatus = filterStatus === 'all' || leave.status === filterStatus;
-            const matchesCompany = filterCompany === 'all' || leave.company === filterCompany;
-            return matchesSearch && matchesStatus && matchesCompany;
+            return matchesSearch && matchesStatus;
         });
-    }, [leaves, searchTerm, filterStatus, filterCompany]);
+    }, [leaves, searchTerm, filterStatus]);
 
     const calculateDays = (from, to) => {
         if (!from || !to) return 0;
@@ -251,18 +261,6 @@ export default function AnnualLeaveManagement() {
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>
-                    {userRole === 'admin' && (
-                        <select
-                            value={filterCompany}
-                            onChange={(e) => setFilterCompany(e.target.value)}
-                            className="h-9 px-3 border rounded-md text-sm"
-                        >
-                            <option value="all">All Companies</option>
-                            {companies.map(c => (
-                                <option key={c} value={c}>{c}</option>
-                            ))}
-                        </select>
-                    )}
                 </div>
             </Card>
 

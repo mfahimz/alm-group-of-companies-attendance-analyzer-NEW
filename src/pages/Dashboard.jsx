@@ -14,9 +14,11 @@ import ProjectStatusChart from '../components/dashboard/ProjectStatusChart';
 import AdminDashboard from '../components/dashboard/AdminDashboard';
 import SupervisorDashboard from '../components/dashboard/SupervisorDashboard';
 import UserDashboard from '../components/dashboard/UserDashboard';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function Dashboard() {
     usePageTitle('Dashboard');
+    const { selectedCompany } = useCompanyFilter();
     const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
@@ -33,15 +35,25 @@ export default function Dashboard() {
     }, [currentUser]);
 
     const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
-        queryKey: ['projects'],
-        queryFn: () => base44.entities.Project.list('-created_date', 100),
+        queryKey: ['projects', selectedCompany],
+        queryFn: async () => {
+            if (selectedCompany) {
+                return base44.entities.Project.filter({ company: selectedCompany }, '-created_date', 100);
+            }
+            return base44.entities.Project.list('-created_date', 100);
+        },
         enabled: !!currentUser,
         staleTime: 5 * 60 * 1000
     });
 
     const { data: allEmployees = [], isLoading: employeesLoading } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list('name', 500),
+        queryKey: ['employees', selectedCompany],
+        queryFn: async () => {
+            if (selectedCompany) {
+                return base44.entities.Employee.filter({ company: selectedCompany }, 'name', 500);
+            }
+            return base44.entities.Employee.list('name', 500);
+        },
         enabled: !!currentUser,
         staleTime: 5 * 60 * 1000
     });

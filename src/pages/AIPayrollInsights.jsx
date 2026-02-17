@@ -10,11 +10,13 @@ import { AlertTriangle, TrendingUp, FileText, Sparkles, Brain, RefreshCw, Chevro
 import { toast } from 'sonner';
 import { usePageTitle } from '@/components/ui/PageTitle';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function AIPayrollInsights() {
     usePageTitle('AI Payroll Insights');
     const [selectedProject, setSelectedProject] = useState('all');
     const [activeTab, setActiveTab] = useState('anomaly');
+    const { selectedCompany } = useCompanyFilter();
 
     // Fetch current user
     const { data: user } = useQuery({
@@ -24,13 +26,12 @@ export default function AIPayrollInsights() {
 
     // Fetch projects
     const { data: projects = [] } = useQuery({
-        queryKey: ['projects', user?.company],
+        queryKey: ['projects', selectedCompany],
         queryFn: async () => {
-            const allProjects = await base44.entities.Project.list();
-            if (user?.role === 'admin' || user?.role === 'supervisor') {
-                return allProjects;
+            if (selectedCompany) {
+                return base44.entities.Project.filter({ company: selectedCompany });
             }
-            return allProjects.filter(p => p.company === user?.company);
+            return base44.entities.Project.list();
         },
         enabled: !!user
     });

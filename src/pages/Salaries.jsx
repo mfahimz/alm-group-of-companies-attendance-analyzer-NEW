@@ -15,10 +15,10 @@ import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import PINLock from '../components/ui/PINLock';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function Salaries() {
     const [searchTerm, setSearchTerm] = useState('');
-    const [companyFilter, setCompanyFilter] = useState('all');
     const [showDialog, setShowDialog] = useState(false);
     const [editingSalary, setEditingSalary] = useState(null);
     const [selectedCompany, setSelectedCompany] = useState('');
@@ -32,6 +32,7 @@ export default function Salaries() {
     const [unmatchedRecords, setUnmatchedRecords] = useState([]);
     const [showUnmatchedDialog, setShowUnmatchedDialog] = useState(false);
     const [pendingValidRecords, setPendingValidRecords] = useState([]);
+    const { selectedCompany: companyFilter } = useCompanyFilter();
     
     const [formData, setFormData] = useState({
         employee_id: '',
@@ -59,13 +60,23 @@ export default function Salaries() {
     const canAccessAllCompanies = isAdmin || isSupervisor;
 
     const { data: salaries = [] } = useQuery({
-        queryKey: ['salaries'],
-        queryFn: () => base44.entities.EmployeeSalary.list('-created_date')
+        queryKey: ['salaries', companyFilter],
+        queryFn: async () => {
+            if (companyFilter) {
+                return base44.entities.EmployeeSalary.filter({ company: companyFilter }, '-created_date');
+            }
+            return base44.entities.EmployeeSalary.list('-created_date');
+        }
     });
 
     const { data: employees = [] } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list()
+        queryKey: ['employees', companyFilter],
+        queryFn: async () => {
+            if (companyFilter) {
+                return base44.entities.Employee.filter({ company: companyFilter });
+            }
+            return base44.entities.Employee.list();
+        }
     });
 
     const { data: companies = [] } = useQuery({
@@ -228,7 +239,6 @@ export default function Salaries() {
     const filteredSalaries = salaries
         .filter(s => {
             if (!canAccessAllCompanies && currentUser && s.company !== currentUser.company) return false;
-            if (companyFilter !== 'all' && s.company !== companyFilter) return false;
             const searchLower = searchTerm.toLowerCase();
             return s.name.toLowerCase().includes(searchLower) || 
                    s.attendance_id.toLowerCase().includes(searchLower) ||
@@ -620,19 +630,6 @@ export default function Salaries() {
                                 className="pl-10"
                             />
                         </div>
-                        {canAccessAllCompanies && (
-                            <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                                <SelectTrigger className="w-64">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Companies</SelectItem>
-                                    {companies.map(company => (
-                                        <SelectItem key={company} value={company}>{company}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
                     </div>
                 </CardContent>
             </Card>

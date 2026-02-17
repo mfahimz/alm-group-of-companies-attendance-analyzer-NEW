@@ -11,17 +11,18 @@ import { Search, Save, RefreshCw, Edit2, AlertCircle, Trash2, CheckSquare } from
 import SortableTableHead from '@/components/ui/SortableTableHead';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function QuarterlyMinutesManagement() {
     const queryClient = useQueryClient();
     const [searchQuery, setSearchQuery] = useState('');
-    const [companyFilter, setCompanyFilter] = useState('all');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [yearFilter, setYearFilter] = useState('all');
     const [quarterFilter, setQuarterFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_name', direction: 'asc' });
     const [editingValues, setEditingValues] = useState({});
     const [selectedRecords, setSelectedRecords] = useState([]);
+    const { selectedCompany: companyFilter } = useCompanyFilter();
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -33,13 +34,23 @@ export default function QuarterlyMinutesManagement() {
     const userCompany = currentUser?.company;
 
     const { data: employees = [], isLoading: employeesLoading } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => base44.entities.Employee.list()
+        queryKey: ['employees', companyFilter],
+        queryFn: async () => {
+            if (companyFilter) {
+                return base44.entities.Employee.filter({ company: companyFilter });
+            }
+            return base44.entities.Employee.list();
+        }
     });
 
     const { data: quarterlyMinutes = [], isLoading: minutesLoading } = useQuery({
-        queryKey: ['quarterlyMinutes'],
-        queryFn: () => base44.entities.EmployeeQuarterlyMinutes.list()
+        queryKey: ['quarterlyMinutes', companyFilter],
+        queryFn: async () => {
+            if (companyFilter) {
+                return base44.entities.EmployeeQuarterlyMinutes.filter({ company: companyFilter });
+            }
+            return base44.entities.EmployeeQuarterlyMinutes.list();
+        }
     });
 
     const { data: projects = [] } = useQuery({
@@ -147,7 +158,7 @@ export default function QuarterlyMinutesManagement() {
                 String(item.employee_attendance_id).toLowerCase().includes(searchQuery.toLowerCase()) ||
                 String(item.employee_id).toLowerCase().includes(searchQuery.toLowerCase());
 
-            const matchesCompany = companyFilter === 'all' || item.employee_company === companyFilter;
+            const matchesCompany = !companyFilter || item.employee_company === companyFilter;
             const matchesDepartment = departmentFilter === 'all' || item.employee_department === departmentFilter;
             const matchesYear = yearFilter === 'all' || String(item.year) === yearFilter;
             const matchesQuarter = quarterFilter === 'all' || String(item.quarter) === quarterFilter;
@@ -311,19 +322,7 @@ export default function QuarterlyMinutesManagement() {
                             />
                         </div>
 
-                        {isAdminOrCEO && (
-                            <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Companies" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Companies</SelectItem>
-                                    {availableCompanies.map(company => (
-                                        <SelectItem key={company} value={company}>{company}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
+
 
                         <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                             <SelectTrigger>

@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
+import { useCompanyFilter } from '../components/context/CompanyContext';
 
 export default function Employees() {
     usePageTitle('Employees');
@@ -32,10 +33,10 @@ export default function Employees() {
     const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [companyFilter, setCompanyFilter] = useState('all');
     const [importProgress, setImportProgress] = useState(null);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const { selectedCompany } = useCompanyFilter();
 
     // Check page access
     const { data: currentUser } = useQuery({
@@ -72,12 +73,15 @@ export default function Employees() {
 
     // Fetch all employees (server-side filtering by role, client-side pagination)
     const { data: employees = [], isLoading } = useQuery({
-        queryKey: ['employees', currentUser?.company, currentUser?.department, userRole],
+        queryKey: ['employees', selectedCompany, currentUser?.company, currentUser?.department, userRole],
         queryFn: async () => {
             if (!currentUser) return [];
             
-            // Admin, Supervisor, CEO can see all employees
+            // Admin, Supervisor, CEO can see all employees OR filtered by selected company
             if (isAdmin || isSupervisor || isCEO) {
+                if (selectedCompany) {
+                    return await base44.entities.Employee.filter({ company: selectedCompany }, 'name', 1000);
+                }
                 return await base44.entities.Employee.list('name', 1000);
             }
             
@@ -212,8 +216,7 @@ export default function Employees() {
             const matchesSearch = emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                 String(emp.attendance_id || '').includes(searchTerm);
             const matchesDuplicateFilter = !showOnlyDuplicates || isDuplicate(emp);
-            const matchesCompany = companyFilter === 'all' || emp.company === companyFilter;
-            return matchesSearch && matchesDuplicateFilter && matchesCompany;
+            return matchesSearch && matchesDuplicateFilter;
         })
         .sort((a, b) => {
             let aVal = a[sort.key];
@@ -558,20 +561,6 @@ export default function Employees() {
                         className="pl-10"
                     />
                 </div>
-                {(isAdmin || isSupervisor || isCEO) && (
-                    <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                        <SelectTrigger className="w-64">
-                            <SelectValue placeholder="All Companies" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Companies</SelectItem>
-                            <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
-                            <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
-                            <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
-                            <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
-                        </SelectContent>
-                    </Select>
-                )}
                 <Button
                     variant={showOnlyDuplicates ? "default" : "outline"}
                     onClick={() => setShowOnlyDuplicates(!showOnlyDuplicates)}
