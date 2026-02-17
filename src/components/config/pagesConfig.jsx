@@ -12,7 +12,8 @@ import {
     ClipboardCheck,
     Shield,
     BarChart3,
-    Palette
+    Palette,
+    Brain
 } from 'lucide-react';
 
 /**
@@ -218,6 +219,16 @@ export const PAGES_CONFIG = {
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
+    },
+    AIPayrollInsights: {
+        name: 'AIPayrollInsights',
+        title: 'AI Payroll Insights',
+        icon: Brain,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo', 'supervisor']
     },
 
     // Hidden Pages (No navigation)
