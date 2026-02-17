@@ -259,26 +259,20 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Switch Company Button - Bottom Right for privileged roles */}
             {(userRole === 'admin' || userRole === 'ceo' || userRole === 'supervisor' || userRole === 'hr_manager') && (
-                <div className="fixed bottom-6 right-6 z-20">
-                    <button
-                        onClick={() => navigate('/CompanySelection')}
-                        className="group flex items-center gap-3 bg-white border-2 border-[#0F1E36] text-[#0F1E36] px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:bg-[#0F1E36] hover:text-white transition-all duration-300"
-                        title="Switch Company"
+                <button
+                    onClick={() => navigate('/CompanySelection')}
+                    className="fixed bottom-4 right-4 z-20 w-10 h-10 bg-white border border-slate-300 text-slate-600 rounded-full shadow-md hover:shadow-lg hover:bg-slate-50 transition-all duration-200 flex items-center justify-center group"
+                    title="Switch Company"
+                >
+                    <svg 
+                        className="w-4 h-4 group-hover:scale-110 transition-transform" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
                     >
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-[#15803D] animate-pulse" />
-                            <span className="font-semibold">Switch Company</span>
-                        </div>
-                        <svg 
-                            className="w-5 h-5 group-hover:translate-x-1 transition-transform" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                    </button>
-                </div>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                </button>
             )}
 
             <Toaster position="top-right" richColors />
