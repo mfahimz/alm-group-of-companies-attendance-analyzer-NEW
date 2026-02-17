@@ -199,6 +199,18 @@ export default function ChecklistTab({ project }) {
     const totalCount = checklistItems.length;
     const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+    // Group tasks by type for overview
+    const taskTypeStats = checklistItems.reduce((acc, task) => {
+        if (!acc[task.task_type]) {
+            acc[task.task_type] = { total: 0, completed: 0 };
+        }
+        acc[task.task_type].total++;
+        if (task.status === 'completed') {
+            acc[task.task_type].completed++;
+        }
+        return acc;
+    }, {});
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center p-12">
@@ -209,6 +221,42 @@ export default function ChecklistTab({ project }) {
 
     return (
         <div className="space-y-6">
+            {/* Task Type Overview Bar */}
+            {checklistItems.length > 0 && (
+                <Card className="border-0 shadow-sm">
+                    <CardContent className="py-4">
+                        <div className="flex items-center gap-2 overflow-x-auto">
+                            <span className="text-xs font-medium text-slate-600 whitespace-nowrap mr-2">Quick View:</span>
+                            <div className="flex flex-wrap gap-2">
+                                {Object.entries(taskTypeStats).map(([taskType, stats]) => {
+                                    const isComplete = stats.completed === stats.total;
+                                    return (
+                                        <div
+                                            key={taskType}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                                                isComplete 
+                                                    ? 'bg-green-50 border-green-200 text-green-700' 
+                                                    : 'bg-white border-slate-200 text-slate-700'
+                                            }`}
+                                        >
+                                            {isComplete ? (
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                                            ) : (
+                                                <Circle className="w-3.5 h-3.5 text-slate-400" />
+                                            )}
+                                            <span className="whitespace-nowrap">{taskType}</span>
+                                            <span className={`ml-1 ${isComplete ? 'text-green-600' : 'text-slate-500'}`}>
+                                                {stats.completed}/{stats.total}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Progress Card */}
             <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-50 to-white">
                 <CardContent className="pt-6">
