@@ -49,6 +49,7 @@
  */
 import AIPayrollInsights from './pages/AIPayrollInsights';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
+import AppDocumentation from './pages/AppDocumentation';
 import BusinessDocumentation from './pages/BusinessDocumentation';
 import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
 import CompanyBranding from './pages/CompanyBranding';
@@ -57,8 +58,10 @@ import CompanySelection from './pages/CompanySelection';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
+import DevelopmentLog from './pages/DevelopmentLog';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
+import FeatureRequests from './pages/FeatureRequests';
 import GraceMinutesManagement from './pages/GraceMinutesManagement';
 import Home from './pages/Home';
 import Maintenance from './pages/Maintenance';
@@ -78,15 +81,13 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import DevelopmentLog from './pages/DevelopmentLog';
-import AppDocumentation from './pages/AppDocumentation';
-import FeatureRequests from './pages/FeatureRequests';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AIPayrollInsights": AIPayrollInsights,
     "AnnualLeaveManagement": AnnualLeaveManagement,
+    "AppDocumentation": AppDocumentation,
     "BusinessDocumentation": BusinessDocumentation,
     "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
     "CompanyBranding": CompanyBranding,
@@ -95,8 +96,10 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
+    "DevelopmentLog": DevelopmentLog,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
+    "FeatureRequests": FeatureRequests,
     "GraceMinutesManagement": GraceMinutesManagement,
     "Home": Home,
     "Maintenance": Maintenance,
@@ -116,9 +119,6 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
-    "DevelopmentLog": DevelopmentLog,
-    "AppDocumentation": AppDocumentation,
-    "FeatureRequests": FeatureRequests,
 }
 
 export const pagesConfig = {

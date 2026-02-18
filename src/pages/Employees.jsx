@@ -241,7 +241,7 @@ export default function Employees() {
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, showOnlyDuplicates, companyFilter]);
+    }, [searchTerm, showOnlyDuplicates, selectedCompany]);
 
     if (!currentUser) {
         return <div className="text-center py-12 text-slate-500">Loading...</div>;
