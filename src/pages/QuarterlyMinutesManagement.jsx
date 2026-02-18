@@ -295,6 +295,23 @@ export default function QuarterlyMinutesManagement() {
                         </Button>
                     )}
                     <Button
+                        variant="destructive"
+                        onClick={() => {
+                            const invalidRecords = combinedData.filter(r => !r.year || !r.quarter);
+                            if (invalidRecords.length === 0) {
+                                toast.info('No records without year/quarter found');
+                                return;
+                            }
+                            if (confirm(`Delete ${invalidRecords.length} record(s) without year/quarter?`)) {
+                                bulkDeleteMutation.mutate(invalidRecords.map(r => r.id));
+                            }
+                        }}
+                        disabled={bulkDeleteMutation.isPending}
+                    >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Invalid Records
+                    </Button>
+                    <Button
                         variant="outline"
                         onClick={() => {
                             queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
