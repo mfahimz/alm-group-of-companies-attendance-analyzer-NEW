@@ -58,6 +58,9 @@ export default function GraceMinutesManagement() {
     // Filter and sort data
     const filteredAndSortedData = useMemo(() => {
         let filtered = employees.filter(emp => {
+            // Exclude employees without attendance_id
+            if (!emp.attendance_id) return false;
+
             const matchesSearch = 
                 emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 String(emp.attendance_id).toLowerCase().includes(searchQuery.toLowerCase()) ||
