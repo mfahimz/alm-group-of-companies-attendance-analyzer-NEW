@@ -646,6 +646,9 @@ export default function Salaries() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <SortableTableHead sortKey="employee_id" currentSort={sort} onSort={setSort}>
+                                        HRMS ID
+                                    </SortableTableHead>
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
                                         Attendance ID
                                     </SortableTableHead>
@@ -672,7 +675,8 @@ export default function Salaries() {
                                 {filteredSalaries.map((salary) => {
                                     return (
                                         <TableRow key={salary.id}>
-                                            <TableCell className="font-medium">{salary.attendance_id}</TableCell>
+                                            <TableCell className="font-medium text-slate-700">{salary.employee_id || '-'}</TableCell>
+                                            <TableCell className="font-medium">{salary.attendance_id || '-'}</TableCell>
                                             <TableCell>{salary.name}</TableCell>
                                             <TableCell>{salary.company}</TableCell>
                                             <TableCell>
