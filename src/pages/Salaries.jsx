@@ -240,13 +240,17 @@ export default function Salaries() {
         .filter(s => {
             if (!canAccessAllCompanies && currentUser && s.company !== currentUser.company) return false;
             const searchLower = searchTerm.toLowerCase();
-            return s.name.toLowerCase().includes(searchLower) || 
-                   s.attendance_id.toLowerCase().includes(searchLower) ||
-                   s.employee_id.toLowerCase().includes(searchLower);
+            return s.name?.toLowerCase().includes(searchLower) || 
+                   String(s.attendance_id || '').toLowerCase().includes(searchLower) ||
+                   String(s.employee_id || '').toLowerCase().includes(searchLower);
         })
         .sort((a, b) => {
             let aVal = a[sort.key];
             let bVal = b[sort.key];
+            
+            // Handle undefined/null values
+            if (aVal === undefined || aVal === null) aVal = '';
+            if (bVal === undefined || bVal === null) bVal = '';
             
             if (typeof aVal === 'string') aVal = aVal.toLowerCase();
             if (typeof bVal === 'string') bVal = bVal.toLowerCase();
@@ -624,7 +628,7 @@ export default function Salaries() {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <Input
-                                placeholder="Search by name, ID..."
+                                placeholder="Search by name, HRMS ID, or Attendance ID..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-10"
