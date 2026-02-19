@@ -805,9 +805,10 @@ Deno.serve(async (req) => {
                     let dayEarlyMinutes = 0;
                     
                     // BUG FIX #1: SKIP_PUNCH should zero out late minutes for THAT PUNCH ONLY
-                    // It does NOT remove the punch, just removes the lateness calculation
-                    const skipAMPunch = skipPunchException?.punch_to_skip === 'AM_PUNCH_IN';
-                    const skipPMPunch = skipPunchException?.punch_to_skip === 'PM_PUNCH_OUT';
+                    // CRITICAL: Never apply on SICK_LEAVE or ANNUAL_LEAVE days
+                    const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
+                    const skipAMPunch = !isOnLeave && skipPunchException?.punch_to_skip === 'AM_PUNCH_IN';
+                    const skipPMPunch = !isOnLeave && skipPunchException?.punch_to_skip === 'PM_PUNCH_OUT';
                     
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
