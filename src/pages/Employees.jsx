@@ -29,7 +29,7 @@ export default function Employees() {
     const [importFile, setImportFile] = useState(null);
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
-    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
     const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -214,7 +214,10 @@ export default function Employees() {
     const filteredEmployees = employees
         .filter(emp => {
             const matchesSearch = emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                String(emp.attendance_id || '').includes(searchTerm);
+                                String(emp.attendance_id || '').includes(searchTerm) ||
+                                String(emp.hrms_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                emp.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                emp.department?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesDuplicateFilter = !showOnlyDuplicates || isDuplicate(emp);
             return matchesSearch && matchesDuplicateFilter;
         })
@@ -222,9 +225,19 @@ export default function Employees() {
             let aVal = a[sort.key];
             let bVal = b[sort.key];
             
+            // Handle undefined/null values
+            if (aVal === undefined || aVal === null) aVal = '';
+            if (bVal === undefined || bVal === null) bVal = '';
+            
+            // Convert to lowercase for string comparison
             if (typeof aVal === 'string') aVal = aVal.toLowerCase();
             if (typeof bVal === 'string') bVal = bVal.toLowerCase();
             
+            // Special handling for boolean (active status)
+            if (typeof aVal === 'boolean') aVal = aVal ? 1 : 0;
+            if (typeof bVal === 'boolean') bVal = bVal ? 1 : 0;
+            
+            // Compare values
             if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
             return 0;
