@@ -702,9 +702,11 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // BUG FIX #3: SKIP_PUNCH should remove late minutes for that punch ONLY
-                // It should NEVER affect leave days or mark people as absent
+                // BUG FIX #3: SKIP_PUNCH should NOT mark employee as absent or partial
+                // It should ONLY remove late/early minutes for that specific punch
+                // NEVER apply on leave days
                 const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+                const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
                 
                 const dayPunches = employeePunches
                     .filter(p => p.punch_date === dateStr)
@@ -716,9 +718,21 @@ Deno.serve(async (req) => {
 
                 let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
                 
+                // CRITICAL FIX: If SKIP_PUNCH exception exists (and not on leave), 
+                // add a fake punch so employee is NOT marked as absent or partial
+                let hasSkipPunchApplied = false;
+                if (skipPunchException && !isOnLeave && skipPunchException.punch_to_skip) {
+                    hasSkipPunchApplied = true;
+                    // Add a fake "present" marker to ensure employee is counted as present
+                    // This prevents partial day detection and absence marking
+                    if (filteredPunches.length === 0) {
+                        filteredPunches = [{ _fake_skip_punch: true }];
+                    }
+                }
+                
                 let punchMatches = [];
                 let hasUnmatchedPunch = false;
-                if (shift && filteredPunches.length > 0) {
+                if (shift && filteredPunches.length > 0 && !hasSkipPunchApplied) {
                     punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds);
                     hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 }
@@ -729,7 +743,10 @@ Deno.serve(async (req) => {
                                        shift.am_end !== '-' && shift.pm_start !== '-';
                 const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-                const partialDayResult = detectPartialDay(filteredPunches, shift, includeSeconds);
+                // Skip partial day detection if SKIP_PUNCH is applied
+                const partialDayResult = hasSkipPunchApplied 
+                    ? { isPartial: false, reason: '' } 
+                    : detectPartialDay(filteredPunches, shift, includeSeconds);
 
                 if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
                     if (filteredPunches.length === 0) {
@@ -800,16 +817,12 @@ Deno.serve(async (req) => {
                     if (dateException.other_minutes && dateException.other_minutes > 0) {
                         otherMinutes += dateException.other_minutes;
                     }
-                } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
+                } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !hasSkipPunchApplied) {
                     let dayLateMinutes = 0;
                     let dayEarlyMinutes = 0;
                     
-                    // BUG FIX #1: SKIP_PUNCH should zero out late minutes for THAT PUNCH ONLY
-                    // CRITICAL: Never apply on SICK_LEAVE or ANNUAL_LEAVE days
-                    const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
-                    const skipAMPunch = !isOnLeave && skipPunchException?.punch_to_skip === 'AM_PUNCH_IN';
-                    const skipPMPunch = !isOnLeave && skipPunchException?.punch_to_skip === 'PM_PUNCH_OUT';
-                    
+                    // Calculate late/early minutes normally
+                    // SKIP_PUNCH already handled above by preventing absence/partial detection
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         
@@ -817,12 +830,6 @@ Deno.serve(async (req) => {
                         const shiftTime = match.shiftTime;
                         
                         if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                            // Skip late calculation if this is the punch we need to skip
-                            if (match.matchedTo === 'AM_START' && skipAMPunch) {
-                                // Don't add late minutes for AM punch
-                                continue;
-                            }
-                            
                             if (punchTime > shiftTime) {
                                 const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
                                 dayLateMinutes += minutes;
@@ -830,12 +837,6 @@ Deno.serve(async (req) => {
                         }
                         
                         if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                            // Skip early calculation if this is the punch we need to skip
-                            if (match.matchedTo === 'PM_END' && skipPMPunch) {
-                                // Don't add early minutes for PM punch
-                                continue;
-                            }
-                            
                             if (punchTime < shiftTime) {
                                 const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
                                 dayEarlyMinutes += minutes;
