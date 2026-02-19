@@ -13,10 +13,20 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { project_id, date_from, date_to, report_name } = await req.json();
+        const { project_id, date_from, date_to, report_name, _existing_report_run_id } = await req.json();
 
         if (!project_id || !date_from || !date_to) {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
+        }
+        
+        // BUG FIX #1: Support updating existing reports after shift/exception changes
+        let reportRun;
+        if (_existing_report_run_id) {
+            const existingRuns = await base44.asServiceRole.entities.ReportRun.filter({ id: _existing_report_run_id });
+            if (existingRuns.length > 0) {
+                reportRun = existingRuns[0];
+                console.log('[runAnalysis] Updating existing report run:', _existing_report_run_id);
+            }
         }
 
         // Fetch project
@@ -149,16 +159,23 @@ Deno.serve(async (req) => {
             }))
         ];
 
-        // Create report run - count ALL active employees being analyzed
-        const reportRun = await base44.asServiceRole.entities.ReportRun.create({
-            project_id,
-            report_name: report_name || `Report - ${new Date().toLocaleDateString()}`,
-            date_from,
-            date_to,
-            employee_count: uniqueEmployeeIds.length
-        });
-        
-        console.log('[runAnalysis] Created report run with', uniqueEmployeeIds.length, 'employees');
+        // Create or use existing report run - count ALL active employees being analyzed
+        if (!reportRun) {
+            reportRun = await base44.asServiceRole.entities.ReportRun.create({
+                project_id,
+                report_name: report_name || `Report - ${new Date().toLocaleDateString()}`,
+                date_from,
+                date_to,
+                employee_count: uniqueEmployeeIds.length
+            });
+            console.log('[runAnalysis] Created new report run with', uniqueEmployeeIds.length, 'employees');
+        } else {
+            // Update employee count if it changed
+            await base44.asServiceRole.entities.ReportRun.update(reportRun.id, {
+                employee_count: uniqueEmployeeIds.length
+            });
+            console.log('[runAnalysis] Updating existing report run with', uniqueEmployeeIds.length, 'employees');
+        }
 
         // Helper functions (moved from frontend)
         const parseTime = (timeStr, includeSeconds = false) => {
