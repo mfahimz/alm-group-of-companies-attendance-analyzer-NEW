@@ -702,11 +702,9 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // BUG FIX #3: SKIP_PUNCH should NOT apply on leave days
+                // BUG FIX #3: SKIP_PUNCH should remove late minutes for that punch ONLY
+                // It should NEVER affect leave days or mark people as absent
                 const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
-                const isOnLeaveToday = matchingExceptions.some(ex => 
-                    ex.type === 'ANNUAL_LEAVE' || ex.type === 'SICK_LEAVE'
-                );
                 
                 const dayPunches = employeePunches
                     .filter(p => p.punch_date === dateStr)
@@ -717,30 +715,6 @@ Deno.serve(async (req) => {
                     });
 
                 let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
-                
-                // SKIP_PUNCH exception: Remove specific punch from analysis
-                // BUG FIX #3: Only apply if employee is NOT on leave
-                if (skipPunchException && skipPunchException.punch_to_skip && !isOnLeaveToday) {
-                    const punchToSkip = skipPunchException.punch_to_skip;
-                    
-                    // Match punches to shift points to identify which to skip
-                    const tempMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds);
-                    
-                    // Filter out the punch we need to skip
-                    if (punchToSkip === 'AM_PUNCH_IN') {
-                        // Remove the punch matched to AM_START
-                        filteredPunches = filteredPunches.filter((p, idx) => {
-                            const match = tempMatches[idx];
-                            return match?.matchedTo !== 'AM_START';
-                        });
-                    } else if (punchToSkip === 'PM_PUNCH_OUT') {
-                        // Remove the punch matched to PM_END
-                        filteredPunches = filteredPunches.filter((p, idx) => {
-                            const match = tempMatches[idx];
-                            return match?.matchedTo !== 'PM_END';
-                        });
-                    }
-                }
                 
                 let punchMatches = [];
                 let hasUnmatchedPunch = false;
@@ -830,6 +804,11 @@ Deno.serve(async (req) => {
                     let dayLateMinutes = 0;
                     let dayEarlyMinutes = 0;
                     
+                    // BUG FIX #1: SKIP_PUNCH should zero out late minutes for THAT PUNCH ONLY
+                    // It does NOT remove the punch, just removes the lateness calculation
+                    const skipAMPunch = skipPunchException?.punch_to_skip === 'AM_PUNCH_IN';
+                    const skipPMPunch = skipPunchException?.punch_to_skip === 'PM_PUNCH_OUT';
+                    
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         
@@ -837,6 +816,12 @@ Deno.serve(async (req) => {
                         const shiftTime = match.shiftTime;
                         
                         if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            // Skip late calculation if this is the punch we need to skip
+                            if (match.matchedTo === 'AM_START' && skipAMPunch) {
+                                // Don't add late minutes for AM punch
+                                continue;
+                            }
+                            
                             if (punchTime > shiftTime) {
                                 const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
                                 dayLateMinutes += minutes;
@@ -844,6 +829,12 @@ Deno.serve(async (req) => {
                         }
                         
                         if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                            // Skip early calculation if this is the punch we need to skip
+                            if (match.matchedTo === 'PM_END' && skipPMPunch) {
+                                // Don't add early minutes for PM punch
+                                continue;
+                            }
+                            
                             if (punchTime < shiftTime) {
                                 const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
                                 dayEarlyMinutes += minutes;
@@ -935,31 +926,36 @@ Deno.serve(async (req) => {
             
             // BUG FIX #2: Properly fetch and use carried_grace_minutes
             let carriedGrace = 0;
-            if (project.use_carried_grace_minutes && employee?.carried_grace_minutes) {
-                carriedGrace = employee.carried_grace_minutes;
-                console.log(`[runAnalysis] Employee ${attendanceIdStr}: Using carried grace ${carriedGrace} minutes`);
+            if (project.use_carried_grace_minutes === true) {
+                // CRITICAL: ALWAYS fetch fresh employee data to get current carried_grace_minutes
+                const freshEmployee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
+                if (freshEmployee && typeof freshEmployee.carried_grace_minutes === 'number') {
+                    carriedGrace = freshEmployee.carried_grace_minutes;
+                    console.log(`[runAnalysis] Employee ${attendanceIdStr}: Using carried grace ${carriedGrace} minutes (from Employee.carried_grace_minutes)`);
+                } else {
+                    console.log(`[runAnalysis] Employee ${attendanceIdStr}: No carried grace found`);
+                }
             }
             
             // ============================================================================
             // CRITICAL: DEDUCTIBLE_MINUTES CALCULATION (IMMUTABLE FOR SALARY)
             // ============================================================================
-            // RULE: Grace applies ONLY to late + early minutes, never to other minutes
-            // Edge case: If no late/early exists, grace must not reduce anything
-            // Formula:
-            //   base = lateMinutes + earlyCheckoutMinutes
-            //   baseAfterGrace = (base > 0) ? max(0, base - graceMinutes) : 0
-            //   deductible = baseAfterGrace + otherMinutes - totalApprovedMinutes
-            // This value is FINAL and stored in AnalysisResult for salary calculation
-            // Salary calculations fetch this directly, NO recalculation
-            // For Al Maraghi Motors, once report is finalized, this is locked
-            // DO NOT modify this formula without updating all downstream salary logic
+            // BUG FIX #3: CORRECT formula per requirements
+            // RULE: Grace minutes reduce ONLY late+early (never other minutes, never approved minutes)
+            // FORMULA:
+            //   1. base = lateMinutes + earlyCheckoutMinutes
+            //   2. baseAfterGrace = max(0, base - totalGraceMinutes)
+            //   3. deductibleMinutes = baseAfterGrace + otherMinutes - approvedMinutes
+            // 
+            // Grace = baseGrace + carriedGrace
+            // Grace applies FIRST to (late + early), then add other, then subtract approved
             // ============================================================================
-            const graceMinutes = baseGrace + carriedGrace;
+            const totalGraceMinutes = baseGrace + carriedGrace;
             const baseMinutes = lateMinutes + earlyCheckoutMinutes;
-            const baseAfterGrace = baseMinutes > 0 ? Math.max(0, baseMinutes - graceMinutes) : 0;
-            const deductibleMinutes = baseAfterGrace + otherMinutes - totalApprovedMinutes;
+            const baseAfterGrace = Math.max(0, baseMinutes - totalGraceMinutes);
+            const deductibleMinutes = Math.max(0, baseAfterGrace + otherMinutes - totalApprovedMinutes);
             
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${graceMinutes}, After Grace=${baseAfterGrace}, Other=${otherMinutes}, Approved=${totalApprovedMinutes}, Final Deductible=${Math.max(0, deductibleMinutes)}`);
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${totalGraceMinutes}, After Grace=${baseAfterGrace}, Other=${otherMinutes}, Approved=${totalApprovedMinutes}, Final Deductible=${deductibleMinutes}`);
 
             return {
                 attendance_id,
@@ -973,8 +969,8 @@ Deno.serve(async (req) => {
                 early_checkout_minutes: earlyCheckoutMinutes,
                 other_minutes: otherMinutes,
                 approved_minutes: totalApprovedMinutes,
-                deductible_minutes: Math.max(0, deductibleMinutes),
-                grace_minutes: baseGrace + carriedGrace,
+                deductible_minutes: deductibleMinutes,
+                grace_minutes: totalGraceMinutes,
                 abnormal_dates: [...abnormal_dates_set].sort().join(', '),
                 notes: criticalDatesFormatted,
                 auto_resolutions: autoResolutionNotes
