@@ -10,7 +10,7 @@ import { usePermissions } from './components/hooks/usePermissions';
 import DesktopNav from './components/navigation/DesktopNav';
 import MobileNav from './components/navigation/MobileNav';
 import { getPagesByCategory, NAV_CATEGORIES } from './components/config/pagesConfig';
-import { LogOut } from 'lucide-react';
+import { LogOut, Shield } from 'lucide-react';
 import { CompanyFilterProvider } from './components/context/CompanyContext';
 
 
