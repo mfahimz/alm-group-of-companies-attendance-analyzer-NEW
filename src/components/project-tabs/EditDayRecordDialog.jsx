@@ -426,7 +426,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
             // Only send the fields we're actually changing (NOT attendance_id - it's immutable)
             const updatePayload = {
-                day_overrides: JSON.stringify(overrides)
+                day_overrides: JSON.stringify(overrides),
+                late_minutes: updatedTotals.late_minutes,
+                early_checkout_minutes: updatedTotals.early_checkout_minutes,
+                other_minutes: updatedTotals.other_minutes,
+                deductible_minutes: updatedTotals.deductible_minutes
             };
 
             // Only include abnormal_dates if not empty
@@ -529,8 +533,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     });
 
     const recalculateTotals = (result, overrides) => {
-        // Only update abnormal_dates - the late/early/absence totals are stored in day_overrides
-        // and calculated when displaying the report table
+        // Recalculate totals based on original + day overrides
+        let totalLateMinutes = result.late_minutes || 0;
+        let totalEarlyCheckoutMinutes = result.early_checkout_minutes || 0;
+        let totalOtherMinutes = result.other_minutes || 0;
         const abnormalDates = new Set();
         
         // Parse existing abnormal dates
@@ -538,18 +544,44 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             result.abnormal_dates.split(',').filter(Boolean).forEach(d => abnormalDates.add(d));
         }
         
-        // Update based on overrides
+        // Apply overrides to adjust totals
         if (overrides && typeof overrides === 'object') {
             Object.entries(overrides).forEach(([dateStr, override]) => {
-                if (override && override.isAbnormal === true) {
-                    abnormalDates.add(dateStr);
-                } else if (override && override.isAbnormal === false) {
-                    abnormalDates.delete(dateStr);
+                if (override) {
+                    // Subtract original values and add new values
+                    const originalLate = override.originalLateMinutes || 0;
+                    const originalEarly = override.originalEarlyCheckout || 0;
+                    const originalOther = override.originalOtherMinutes || 0;
+                    
+                    totalLateMinutes = totalLateMinutes - originalLate + (override.lateMinutes || 0);
+                    totalEarlyCheckoutMinutes = totalEarlyCheckoutMinutes - originalEarly + (override.earlyCheckoutMinutes || 0);
+                    totalOtherMinutes = totalOtherMinutes - originalOther + (override.otherMinutes || 0);
+                    
+                    // Update abnormal dates
+                    if (override.isAbnormal === true) {
+                        abnormalDates.add(dateStr);
+                    } else if (override.isAbnormal === false) {
+                        abnormalDates.delete(dateStr);
+                    }
                 }
             });
         }
-
+        
+        // Recalculate deductible minutes with correct formula
+        // Grace = result.grace_minutes (already calculated from base + carried)
+        // baseAfterGrace = max(0, (late + early) - grace)
+        // deductible = max(0, baseAfterGrace + other - approved)
+        const totalGrace = result.grace_minutes || 0;
+        const baseMinutes = totalLateMinutes + totalEarlyCheckoutMinutes;
+        const baseAfterGrace = Math.max(0, baseMinutes - totalGrace);
+        const approvedMinutes = result.approved_minutes || 0;
+        const deductibleMinutes = Math.max(0, baseAfterGrace + totalOtherMinutes - approvedMinutes);
+        
         return {
+            late_minutes: totalLateMinutes,
+            early_checkout_minutes: totalEarlyCheckoutMinutes,
+            other_minutes: totalOtherMinutes,
+            deductible_minutes: deductibleMinutes,
             abnormal_dates: Array.from(abnormalDates).filter(Boolean).join(',') || ''
         };
     };
