@@ -17,7 +17,8 @@ import {
     Code,
     GitPullRequest,
     BookText,
-    Lightbulb
+    Lightbulb,
+    FileText
 } from 'lucide-react';
 
 /**
@@ -233,6 +234,16 @@ export const PAGES_CONFIG = {
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin', 'ceo', 'supervisor']
+    },
+    AuditLogs: {
+        name: 'AuditLogs',
+        title: 'Audit Logs',
+        icon: FileText,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
     },
 
     // Developer Tools
