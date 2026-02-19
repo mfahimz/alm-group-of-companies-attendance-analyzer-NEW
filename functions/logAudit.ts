@@ -1,5 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+/**
+ * Centralized Audit Logging Function
+ * 
+ * Usage from backend functions:
+ * await base44.functions.invoke('logAudit', {
+ *   action_type: 'update',
+ *   entity_name: 'Project',
+ *   entity_id: projectId,
+ *   changes: JSON.stringify({status: {old: 'draft', new: 'analyzed'}}),
+ *   project_id: projectId,
+ *   company: 'Al Maraghi Motors'
+ * });
+ * 
+ * Or call directly from frontend via base44.functions.invoke
+ */
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -9,55 +24,33 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await req.json();
+        const payload = await req.json();
         const {
-            action,
-            entity_type,
-            entity_id,
+            action_type,
             entity_name,
-            old_data,
-            new_data,
-            details,
-            company,
-            success = true,
-            error_message
-        } = body;
+            entity_id,
+            changes,
+            context,
+            project_id,
+            company
+        } = payload;
 
-        if (!action || !entity_type) {
-            return Response.json({ error: 'action and entity_type are required' }, { status: 400 });
-        }
-
-        // Get IP address
-        let ipAddress = 'Unknown';
-        try {
-            const ipResponse = await fetch('https://api.ipify.org?format=json');
-            const ipData = await ipResponse.json();
-            ipAddress = ipData.ip;
-        } catch {}
-
-        // Get extended role if available
-        const userRole = user.extended_role || user.role;
-        
         // Create audit log entry
         await base44.asServiceRole.entities.AuditLog.create({
-            action,
-            entity_type,
-            entity_id: entity_id || null,
+            action_type,
             entity_name: entity_name || null,
-            old_data: old_data ? JSON.stringify(old_data) : null,
-            new_data: new_data ? JSON.stringify(new_data) : null,
+            entity_id: entity_id || null,
             user_email: user.email,
-            user_name: user.full_name,
-            user_role: userRole,
-            ip_address: ipAddress,
-            details: details || null,
-            company: company || null,
-            success,
-            error_message: error_message || null
+            user_role: user.role,
+            changes: changes || null,
+            context: context || null,
+            project_id: project_id || null,
+            company: company || user.company || null
         });
 
         return Response.json({ success: true });
     } catch (error) {
+        console.error('Audit log error:', error);
         return Response.json({ error: error.message }, { status: 500 });
     }
 });
