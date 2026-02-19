@@ -50,6 +50,7 @@
 import AIPayrollInsights from './pages/AIPayrollInsights';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import AppDocumentation from './pages/AppDocumentation';
+import AuditLogs from './pages/AuditLogs';
 import BusinessDocumentation from './pages/BusinessDocumentation';
 import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
 import CompanyBranding from './pages/CompanyBranding';
@@ -82,7 +83,6 @@ import TestDataViewer from './pages/TestDataViewer';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import AuditLogs from './pages/AuditLogs';
 import __Layout from './Layout.jsx';
 
 
@@ -90,6 +90,7 @@ export const PAGES = {
     "AIPayrollInsights": AIPayrollInsights,
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "AppDocumentation": AppDocumentation,
+    "AuditLogs": AuditLogs,
     "BusinessDocumentation": BusinessDocumentation,
     "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
     "CompanyBranding": CompanyBranding,
@@ -122,7 +123,6 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
-    "AuditLogs": AuditLogs,
 }
 
 export const pagesConfig = {
