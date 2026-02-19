@@ -56,6 +56,8 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.ProjectEmployee.filter({ project_id }),
             base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true })
         ]);
+        
+        console.log('[runAnalysis] All employees fetched:', allEmployees.length);
 
         // Parse Ramadan schedules for shift lookup - only include schedules that overlap with project date range
         const projectStart = new Date(date_from);
@@ -395,6 +397,8 @@ Deno.serve(async (req) => {
             
             const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
             const includeSeconds = project.company === 'Al Maraghi Automotive';
+            
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: carried_grace_minutes = ${employee?.carried_grace_minutes || 0}`);
 
             let workingDays = 0;
             let presentDays = 0;
