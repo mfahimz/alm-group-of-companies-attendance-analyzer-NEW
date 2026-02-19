@@ -111,7 +111,10 @@ Deno.serve(async (req) => {
         }
         
         // Get attendance IDs of filtered employees - keep as strings
-        const activeEmployeeAttendanceIds = filteredEmployees.map(e => String(e.attendance_id));
+        // CRITICAL BUG FIX #4: Filter out employees without attendance_id (has_attendance_tracking=false)
+        const activeEmployeeAttendanceIds = filteredEmployees
+            .filter(e => e.attendance_id && e.attendance_id.trim() !== '')
+            .map(e => String(e.attendance_id));
         
         // CRITICAL: Include ALL active employees, not just those with punches
         // Employees may have exceptions (annual leave, sick leave, LOP) even without any punches
@@ -682,6 +685,12 @@ Deno.serve(async (req) => {
                     }
                 }
 
+                // BUG FIX #3: SKIP_PUNCH should NOT apply on leave days
+                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+                const isOnLeaveToday = matchingExceptions.some(ex => 
+                    ex.type === 'ANNUAL_LEAVE' || ex.type === 'SICK_LEAVE'
+                );
+                
                 const dayPunches = employeePunches
                     .filter(p => p.punch_date === dateStr)
                     .sort((a, b) => {
@@ -693,8 +702,8 @@ Deno.serve(async (req) => {
                 let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
                 
                 // SKIP_PUNCH exception: Remove specific punch from analysis
-                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
-                if (skipPunchException && skipPunchException.punch_to_skip) {
+                // BUG FIX #3: Only apply if employee is NOT on leave
+                if (skipPunchException && skipPunchException.punch_to_skip && !isOnLeaveToday) {
                     const punchToSkip = skipPunchException.punch_to_skip;
                     
                     // Match punches to shift points to identify which to skip
@@ -906,7 +915,13 @@ Deno.serve(async (req) => {
             
             const dept = employee?.department || 'Admin';
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
-            const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
+            
+            // BUG FIX #2: Properly fetch and use carried_grace_minutes
+            let carriedGrace = 0;
+            if (project.use_carried_grace_minutes && employee?.carried_grace_minutes) {
+                carriedGrace = employee.carried_grace_minutes;
+                console.log(`[runAnalysis] Employee ${attendanceIdStr}: Using carried grace ${carriedGrace} minutes`);
+            }
             
             // ============================================================================
             // CRITICAL: DEDUCTIBLE_MINUTES CALCULATION (IMMUTABLE FOR SALARY)
@@ -926,6 +941,8 @@ Deno.serve(async (req) => {
             const baseMinutes = lateMinutes + earlyCheckoutMinutes;
             const baseAfterGrace = baseMinutes > 0 ? Math.max(0, baseMinutes - graceMinutes) : 0;
             const deductibleMinutes = baseAfterGrace + otherMinutes - totalApprovedMinutes;
+            
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${graceMinutes}, After Grace=${baseAfterGrace}, Other=${otherMinutes}, Approved=${totalApprovedMinutes}, Final Deductible=${Math.max(0, deductibleMinutes)}`);
 
             return {
                 attendance_id,
