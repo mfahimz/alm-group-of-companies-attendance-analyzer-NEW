@@ -45,7 +45,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
+    const isUser = userRole === 'user';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
+    const canDeleteReports = isAdmin || isSupervisor || isUser;
 
     console.log('[ReportTab] User role:', { userRole, isDepartmentHead, isAdmin, isSupervisor });
 

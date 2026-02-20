@@ -495,7 +495,7 @@ export default function Employees() {
                     <p className="text-slate-600 mt-2">Manage employee master list</p>
                 </div>
                 <div className="flex gap-3">
-                    {selectedEmployeeIds.length > 0 && (
+                    {isAdmin && selectedEmployeeIds.length > 0 && (
                         <Button 
                             onClick={handleBulkDelete}
                             variant="destructive"
@@ -505,7 +505,7 @@ export default function Employees() {
                             Delete {selectedEmployeeIds.length} Selected
                         </Button>
                     )}
-                    {selectedEmployeeIds.length > 0 && (
+                    {isAdmin && selectedEmployeeIds.length > 0 && (
                         <Button 
                             onClick={() => setShowBulkEditDialog(true)}
                             variant="outline"
@@ -514,7 +514,7 @@ export default function Employees() {
                             Bulk Edit ({selectedEmployeeIds.length})
                         </Button>
                     )}
-                    {(isAdmin || isSupervisor || isCEO) && (
+                    {isAdmin && (
                         <>
                             <label>
                                 <input
@@ -550,16 +550,18 @@ export default function Employees() {
                             </label>
                         </>
                     )}
-                    <Button 
-                        onClick={() => {
-                            setSelectedEmployee(null);
-                            setShowDialog(true);
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-700"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Employee
-                    </Button>
+                    {isAdmin && (
+                        <Button 
+                            onClick={() => {
+                                setSelectedEmployee(null);
+                                setShowDialog(true);
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Employee
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -710,21 +712,25 @@ export default function Employees() {
                                                 >
                                                     <Eye className="w-4 h-4 text-blue-600" />
                                                 </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleEdit(employee)}
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleDelete(employee)}
-                                                    title="Delete employee"
-                                                >
-                                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                                </Button>
+                                                {isAdmin && (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => handleEdit(employee)}
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => handleDelete(employee)}
+                                                            title="Delete employee"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>
