@@ -930,17 +930,20 @@ Deno.serve(async (req) => {
             const dept = employee?.department || 'Admin';
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
             
-            // BUG FIX #2: Properly fetch and use carried_grace_minutes
+            // BUG FIX #2: Fetch carried_grace_minutes from Employee entity (for Al Maraghi Motors)
             let carriedGrace = 0;
-            if (project.use_carried_grace_minutes === true) {
-                // CRITICAL: ALWAYS fetch fresh employee data to get current carried_grace_minutes
+            if (project.use_carried_grace_minutes === true && project.company === 'Al Maraghi Motors') {
+                // CRITICAL: For Al Maraghi Motors, ALWAYS read from Employee.carried_grace_minutes
+                // This field is bi-directionally synced with the Carried Grace Minutes Management table
                 const freshEmployee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
                 if (freshEmployee && typeof freshEmployee.carried_grace_minutes === 'number') {
                     carriedGrace = freshEmployee.carried_grace_minutes;
-                    console.log(`[runAnalysis] Employee ${attendanceIdStr}: Using carried grace ${carriedGrace} minutes (from Employee.carried_grace_minutes)`);
+                    console.log(`[runAnalysis] Al Maraghi Motors - Employee ${attendanceIdStr}: Using carried grace ${carriedGrace} minutes (from Employee.carried_grace_minutes)`);
                 } else {
-                    console.log(`[runAnalysis] Employee ${attendanceIdStr}: No carried grace found`);
+                    console.log(`[runAnalysis] Al Maraghi Motors - Employee ${attendanceIdStr}: No carried grace found in Employee entity`);
                 }
+            } else if (project.use_carried_grace_minutes === true) {
+                console.log(`[runAnalysis] Employee ${attendanceIdStr}: Carried grace is only enabled for Al Maraghi Motors`);
             }
             
             // ============================================================================
@@ -948,20 +951,25 @@ Deno.serve(async (req) => {
             // ============================================================================
             // BUG FIX #3: CORRECT formula per requirements
             // RULE: Grace minutes reduce ONLY late+early (never other minutes, never approved minutes)
+            // RULE #2: Other minutes are EXCLUDED from deductible if they're already counted elsewhere
             // FORMULA:
             //   1. base = lateMinutes + earlyCheckoutMinutes
             //   2. baseAfterGrace = max(0, base - totalGraceMinutes)
-            //   3. deductibleMinutes = baseAfterGrace + otherMinutes - approvedMinutes
+            //   3. otherDeductible = max(0, otherMinutes - totalApprovedMinutes)
+            //   4. deductibleMinutes = baseAfterGrace + otherDeductible
             // 
             // Grace = baseGrace + carriedGrace
-            // Grace applies FIRST to (late + early), then add other, then subtract approved
+            // Grace applies FIRST to (late + early), then other minutes is reduced by approved minutes separately
             // ============================================================================
             const totalGraceMinutes = baseGrace + carriedGrace;
             const baseMinutes = lateMinutes + earlyCheckoutMinutes;
             const baseAfterGrace = Math.max(0, baseMinutes - totalGraceMinutes);
-            const deductibleMinutes = Math.max(0, baseAfterGrace + otherMinutes - totalApprovedMinutes);
             
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${totalGraceMinutes}, After Grace=${baseAfterGrace}, Other=${otherMinutes}, Approved=${totalApprovedMinutes}, Final Deductible=${deductibleMinutes}`);
+            // Other minutes calculation: only deductible if NOT covered by approved minutes
+            const otherDeductible = Math.max(0, otherMinutes - totalApprovedMinutes);
+            const deductibleMinutes = baseAfterGrace + otherDeductible;
+            
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${totalGraceMinutes}, After Grace=${baseAfterGrace}, Other=${otherMinutes}, Approved=${totalApprovedMinutes}, Other Deductible=${otherDeductible}, Final Deductible=${deductibleMinutes}`);
 
             return {
                 attendance_id,
