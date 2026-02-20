@@ -853,6 +853,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annualLeaveCount
             } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
 
+            // DYNAMIC DEDUCTIBLE CALCULATION
+            // Exclude other_minutes, apply grace then approved minutes
+            const baseMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
+            const graceMinutes = result.grace_minutes ?? 15;
+            const approvedMinutes = result.approved_minutes || 0;
+            const afterGrace = Math.max(0, baseMinutes - graceMinutes);
+            const dynamicDeductible = Math.max(0, afterGrace - approvedMinutes);
+
             return {
                 ...result,
                 name: employee?.name || 'Unknown',
@@ -865,6 +873,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout),
                 other_minutes: Math.max(0, totalOtherMinutes),
+                deductible_minutes: dynamicDeductible,
                 has_no_punches: hasNoPunches
             };
         });
