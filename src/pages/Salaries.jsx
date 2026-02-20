@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Edit, Trash2, DollarSign, Upload, Download, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, DollarSign, Upload, Download, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -170,6 +170,26 @@ export default function Salaries() {
         },
         onError: () => {
             toast.error('Failed to delete salary record');
+        }
+    });
+
+    const syncIncrementsMutation = useMutation({
+        mutationFn: async () => {
+            const response = await base44.functions.invoke('syncSalaryIncrements', {});
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['salaries']);
+            if (data.success) {
+                toast.success(data.message, {
+                    description: `Synced: ${data.synced}, Skipped: ${data.skipped}, Errors: ${data.errors.length}`
+                });
+            } else {
+                toast.error('Sync failed: ' + data.error);
+            }
+        },
+        onError: (error) => {
+            toast.error('Failed to sync salary increments: ' + error.message);
         }
     });
 
