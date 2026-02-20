@@ -1024,7 +1024,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                                  <Star className="w-4 h-4 text-amber-600" />
                                                              </Button>
                                                          )}
-                                                        {!isDepartmentHead && isAdmin && (
+                                                        {!isDepartmentHead && canDeleteReports && (
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="ghost"
