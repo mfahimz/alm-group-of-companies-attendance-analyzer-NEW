@@ -613,6 +613,15 @@ export default function Salaries() {
                             <Search className="w-4 h-4 mr-2" />
                             Sync Employee Data
                         </Button>
+                        <Button 
+                            onClick={() => syncIncrementsMutation.mutate()} 
+                            variant="outline"
+                            disabled={syncIncrementsMutation.isPending}
+                            title="Sync active salary increments to main salary table"
+                        >
+                            <RefreshCw className={`w-4 h-4 mr-2 ${syncIncrementsMutation.isPending ? 'animate-spin' : ''}`} />
+                            Sync Increments
+                        </Button>
                         <Button onClick={() => setShowDialog(true)} className="bg-indigo-600 hover:bg-indigo-700">
                             <Plus className="w-4 h-4 mr-2" />
                             Add Salary Record
