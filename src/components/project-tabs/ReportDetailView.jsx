@@ -1403,10 +1403,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 r.name,
                 r.has_no_punches ? 'No' : 'Yes',
                 Math.max(0, r.working_days || 0),
-                Math.max(0, r.manual_present_days ?? r.present_days || 0),
+                Math.max(0, (r.manual_present_days ?? r.present_days) || 0),
                 Math.max(0, r.manual_annual_leave_count ?? r.annual_leave_count ?? 0),
                 Math.max(0, r.manual_sick_leave_count ?? r.sick_leave_count ?? 0),
-                Math.max(0, r.manual_full_absence_count ?? r.full_absence_count || 0),
+                Math.max(0, (r.manual_full_absence_count ?? r.full_absence_count) || 0),
                 Math.max(0, r.half_absence_count || 0),
                 minutesToHours(Math.max(0, late)),
                 minutesToHours(Math.max(0, early))
