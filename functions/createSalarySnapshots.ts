@@ -27,6 +27,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  *    - Try to find AnalysisResult for the finalized report_run_id
  *    - If found → use attendance values, set attendance_source = "ANALYZED"
  *    - If NOT found → create ZERO-ATTENDANCE snapshot, set attendance_source = "NO_ATTENDANCE_DATA"
+ * 
+ * SALARY-ONLY EMPLOYEES:
+ * - Employees without attendance_id (has_attendance_tracking=false) are supported
+ * - They will have NO_ATTENDANCE_DATA status (no deductions from attendance)
+ * - Only their base salary + allowances + manual adjustments are paid
  */
 
 Deno.serve(async (req) => {
@@ -159,7 +164,7 @@ Deno.serve(async (req) => {
 
         // Fetch core data
         // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()
-        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData] = await Promise.all([
+        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.AnalysisResult.filter({ 
@@ -170,7 +175,9 @@ Deno.serve(async (req) => {
             isAlMaraghi 
                 ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true }, null, 5000)
                 : Promise.resolve([]),
-            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000)
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000),
+            base44.asServiceRole.entities.Punch.filter({ project_id: project_id }, null, 5000),
+            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }, null, 5000)
         ]);
 
         console.log(`[createSalarySnapshots] ============================================`);
@@ -188,8 +195,6 @@ Deno.serve(async (req) => {
                 console.warn('[createSalarySnapshots] Failed to parse rules, using defaults');
             }
         }
-
-        // DELETION MOVED: Now handled earlier in function, only for batch_start === 0
 
         // Helper: Parse time string to Date object
         const parseTime = (timeStr, includeSeconds = false) => {
@@ -364,9 +369,7 @@ Deno.serve(async (req) => {
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const currentDate = new Date(d);
                 const dateStr = currentDate.toISOString().split('T')[0];
-                // CRITICAL: Use UTC day of week to avoid timezone issues
-                // new Date(dateStr) creates a date at UTC midnight, so we must use getUTCDay()
-                // Otherwise, server timezone can shift the day and cause incorrect weekly off detection
+                // CRITICAL BUG FIX #6: Use getUTCDay() consistently for weekly off detection
                 const dayOfWeek = currentDate.getUTCDay();
 
                 // Check weekly off
@@ -389,13 +392,15 @@ Deno.serve(async (req) => {
                 const isAssumedPresentDay = assumedDays.includes(dateStr);
                 
                 if (isAssumedPresentDay) {
-                    // Check if employee has annual leave on this assumed day
-                    // FIX Issue 3: Use date string comparison to avoid timezone issues
+                    // BUG FIX #7: Better error logging for date parsing failures
                     const hasAnnualLeaveOnAssumedDay = employeeExceptions.some(ex => {
                         if (ex.type !== 'ANNUAL_LEAVE') return false;
                         try {
                             return dateStr >= ex.date_from && dateStr <= ex.date_to;
-                        } catch { return false; }
+                        } catch (e) {
+                            console.warn(`[createSalarySnapshots] Invalid date format in ANNUAL_LEAVE exception for ${emp.name} (${ex.id}): ${e.message}`);
+                            return false;
+                        }
                     });
                     
                     if (!hasAnnualLeaveOnAssumedDay) {
@@ -568,16 +573,17 @@ Deno.serve(async (req) => {
                     let dayLateMinutes = 0;
                     let dayEarlyMinutes = 0;
                     
+                    // BUG FIX #2: Use Math.abs on RESULT of time difference, not individual components
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         const punchTime = match.punch.time;
                         const shiftTime = match.shiftTime;
                         
                         if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
-                            dayLateMinutes += Math.round((punchTime - shiftTime) / (1000 * 60));
+                            dayLateMinutes += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
                         }
                         if ((match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') && punchTime < shiftTime) {
-                            dayEarlyMinutes += Math.round((shiftTime - punchTime) / (1000 * 60));
+                            dayEarlyMinutes += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
                         }
                     }
                     
@@ -865,10 +871,10 @@ Deno.serve(async (req) => {
                         const shiftTime = match.shiftTime;
                         
                         if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
-                            dayLateMinutes += Math.round((punchTime - shiftTime) / (1000 * 60));
+                            dayLateMinutes += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
                         }
                         if ((match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') && punchTime < shiftTime) {
-                            dayEarlyMinutes += Math.round((shiftTime - punchTime) / (1000 * 60));
+                            dayEarlyMinutes += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
                         }
                     }
                 }
@@ -919,15 +925,30 @@ Deno.serve(async (req) => {
         let eligibleEmployees = employees;
         if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
             const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
-            eligibleEmployees = employees.filter(emp => 
-                customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id))
-            );
+            // SALARY-ONLY FIX: Include employees without attendance_id if has_attendance_tracking=false
+            eligibleEmployees = employees.filter(emp => {
+                const isMatched = customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id));
+                
+                // If employee is matched by custom_employee_ids but lacks attendance_id:
+                // - If has_attendance_tracking is FALSE, include them (salary-only)
+                // - If has_attendance_tracking is TRUE, skip them and warn (data inconsistency)
+                if (isMatched && !(emp.attendance_id && String(emp.attendance_id).trim() !== '')) {
+                    if (emp.has_attendance_tracking !== true) {
+                        console.log(`[createSalarySnapshots] INFO: Including salary-only employee ${emp.name} (HRMS ID: ${emp.hrms_id}) without attendance_id per user request.`);
+                        return true; // Include this employee as salary-only
+                    } else {
+                        console.warn(`[createSalarySnapshots] WARNING: Skipping employee ${emp.name} (HRMS ID: ${emp.hrms_id}) because they are marked for attendance tracking but have no attendance_id. This is a data inconsistency and needs to be resolved.`);
+                        return false; // Skip as it's an inconsistency
+                    }
+                }
+                return isMatched;
+            });
             console.log(`[createSalarySnapshots] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids`);
         }
         
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] ✅ TOTAL ELIGIBLE EMPLOYEES: ${eligibleEmployees.length}`);
-        console.log(`[createSalarySnapshots] ELIGIBLE EMPLOYEE IDs: [${eligibleEmployees.map(e => e.attendance_id).slice(0, 20).join(', ')}${eligibleEmployees.length > 20 ? '...' : ''}]`);
+        console.log(`[createSalarySnapshots] ELIGIBLE EMPLOYEE IDs: [${eligibleEmployees.map(e => e.attendance_id || e.hrms_id).slice(0, 20).join(', ')}${eligibleEmployees.length > 20 ? '...' : ''}]`);
         console.log(`[createSalarySnapshots] ============================================`);
         
         // BATCH MODE: Process only a subset of employees
@@ -936,7 +957,7 @@ Deno.serve(async (req) => {
             : eligibleEmployees;
         
         console.log(`[createSalarySnapshots] 📦 THIS BATCH: ${employeesToProcess.length} employees (indices ${batch_start} to ${batch_start + employeesToProcess.length - 1})`);
-        console.log(`[createSalarySnapshots] THIS BATCH IDs: [${employeesToProcess.map(e => e.attendance_id).join(', ')}]`);
+        console.log(`[createSalarySnapshots] THIS BATCH IDs: [${employeesToProcess.map(e => e.attendance_id || e.hrms_id).join(', ')}]`);
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] 🔄 ENTERING FOR LOOP - Processing ${employeesToProcess.length} employees`);
         console.log(`[createSalarySnapshots] ============================================`);
@@ -944,7 +965,7 @@ Deno.serve(async (req) => {
         let loopIterationCount = 0;
         for (const emp of employeesToProcess) {
             loopIterationCount++;
-            console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id}, hrms_id: ${emp.hrms_id})`);
+            console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
             // Find matching salary record (REQUIRED for salary snapshot)
             const baseSalary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
@@ -953,7 +974,7 @@ Deno.serve(async (req) => {
             
             // Skip if no salary record - employee is not eligible for salary
             if (!baseSalary) {
-                console.log(`[createSalarySnapshots] ⚠️ SKIP: ${emp.name} (${emp.attendance_id}) - no salary record found`);
+                console.log(`[createSalarySnapshots] ⚠️ SKIP: ${emp.name} (${emp.attendance_id || emp.hrms_id}) - no salary record found`);
                 console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE (skipped - no salary)`);
                 continue;
             }
@@ -979,8 +1000,16 @@ Deno.serve(async (req) => {
                 if (empIncrements.length > 0) {
                     // Current month salary (use salary month start for resolution)
                     const currentMonthStr = salaryMonthStartStr; // e.g., "2026-01-01"
+                    // BUG FIX #8: Proper date parsing with error handling
                     const applicableCurrentIncrements = empIncrements
-                        .filter(inc => inc.effective_month <= currentMonthStr)
+                        .filter(inc => {
+                            try {
+                                return new Date(inc.effective_month) <= new Date(currentMonthStr);
+                            } catch (e) {
+                                console.warn(`[createSalarySnapshots] Invalid date format in salary increment effective_month for ${emp.name} (${inc.id}): ${e.message}`);
+                                return false;
+                            }
+                        })
                         .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
                     
                     if (applicableCurrentIncrements.length > 0) {
@@ -1001,8 +1030,16 @@ Deno.serve(async (req) => {
                         const prevMonthDate = new Date(extraPrevMonthFrom);
                         const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
                         
+                        // BUG FIX #8: Proper date parsing with error handling
                         const applicablePrevIncrements = empIncrements
-                            .filter(inc => inc.effective_month <= prevMonthStr)
+                            .filter(inc => {
+                                try {
+                                    return new Date(inc.effective_month) <= new Date(prevMonthStr);
+                                } catch (e) {
+                                    console.warn(`[createSalarySnapshots] Invalid date format in salary increment effective_month for ${emp.name} (prev month, ${inc.id}): ${e.message}`);
+                                    return false;
+                                }
+                            })
                             .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
                         
                         if (applicablePrevIncrements.length > 0) {
@@ -1024,7 +1061,10 @@ Deno.serve(async (req) => {
             const salary = currentMonthSalary;
 
             // Check if employee has analysis result
-            const analysisResult = analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id));
+            // SALARY-ONLY FIX: For employees without attendance_id, they won't have AnalysisResult
+            const analysisResult = emp.attendance_id 
+                ? analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id))
+                : null;
             const hasAnalysisResult = !!analysisResult;
             
             let calculated;
@@ -1053,7 +1093,7 @@ Deno.serve(async (req) => {
                 analyzedCount++;
                 console.log(`[createSalarySnapshots] 1:1 copy from AnalysisResult for ${emp.name} (${emp.attendance_id}): deductible=${calculated.deductibleMinutes}, fullAbsence=${calculated.fullAbsenceCount} (manual override: ${analysisResult.manual_full_absence_count !== null ? 'YES' : 'NO'})`);
             } else {
-                // NO_ATTENDANCE_DATA: Employee missing from analysis
+                // NO_ATTENDANCE_DATA: Employee missing from analysis OR salary-only employee
                 // Use zero attendance for salary safety
                 calculated = {
                     workingDays: 0,
@@ -1071,7 +1111,7 @@ Deno.serve(async (req) => {
                 };
                 attendanceSource = 'NO_ATTENDANCE_DATA';
                 noAttendanceCount++;
-                console.log(`[createSalarySnapshots] No AnalysisResult for ${emp.name} (${emp.attendance_id}) - using zero attendance`);
+                console.log(`[createSalarySnapshots] No AnalysisResult for ${emp.name} (${emp.attendance_id || emp.hrms_id}) - using zero attendance (salary-only)`);
             }
 
             // ============================================================
@@ -1094,14 +1134,17 @@ Deno.serve(async (req) => {
             // Previous month salary values (for OT and prev month deductions)
             const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
             
-            // DISABLED: Previous month deduction calculation (no longer used)
-            const extraPrevMonthData = {
+            // BUG FIX #9: Only calculate extraPrevMonthData if Al Maraghi AND extra range exists
+            let extraPrevMonthData = {
                 extraDeductibleMinutes: 0,
                 extraLopDays: 0,
                 extraLopPay: 0,
                 extraDeductibleHoursPay: 0,
                 prevMonthDivisor: otDivisor
             };
+            if (isAlMaraghi && hasExtraPrevMonthRange && emp.attendance_id) {
+                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
+            }
 
             // Salary leave days always equals finalized annual leave count
             // No exception overrides - use the value from finalized AnalysisResult
@@ -1193,10 +1236,11 @@ Deno.serve(async (req) => {
 
             console.log(`[createSalarySnapshots] 💾 Creating snapshot for ${emp.name} - Total: ${finalTotal}, WPS: ${wpsAmount}, Balance: ${balanceAmount}`);
             
+            // SALARY-ONLY FIX: Store attendance_id as null if employee doesn't have one
             snapshots.push({
                 project_id: String(project_id),
                 report_run_id: String(report_run_id),
-                attendance_id: String(emp.attendance_id),
+                attendance_id: emp.attendance_id ? String(emp.attendance_id) : null,
                 hrms_id: String(emp.hrms_id),
                 name: emp.name,
                 department: emp.department,

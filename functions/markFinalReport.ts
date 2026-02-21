@@ -8,6 +8,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * VALIDATION REQUIREMENT:
  * After snapshot creation, validates that snapshots count equals eligible employee count.
  * If mismatch, the finalization is blocked with an error.
+ * 
+ * SALARY-ONLY EMPLOYEES:
+ * - Employees without attendance_id (has_attendance_tracking=false) are NOT expected to have AnalysisResult
+ * - Validation only checks employees WITH attendance_id AND has_attendance_tracking != false
  */
 
 Deno.serve(async (req) => {
@@ -99,9 +103,17 @@ Deno.serve(async (req) => {
         }
 
         // Validate AnalysisResult completeness (ALL COMPANIES)
+        // SALARY-ONLY FIX: Only validate for employees who actually have attendance_id AND are marked for attendance tracking
+        // Employees with has_attendance_tracking=false are expected to NOT have AnalysisResult
         const analysisAttendanceIds = new Set(analysisResults.map(r => String(r.attendance_id)));
-        const allActiveEmployeeIds = eligibleEmployees.map(e => String(e.attendance_id));
-        const missingAnalysisIds = allActiveEmployeeIds.filter(id => !analysisAttendanceIds.has(id));
+        const attendanceTrackedEligibleEmployees = eligibleEmployees.filter(e => 
+            e.attendance_id && 
+            String(e.attendance_id).trim() !== '' && 
+            e.has_attendance_tracking !== false
+        );
+        const allAttendanceTrackedEmployeeIds = attendanceTrackedEligibleEmployees.map(e => String(e.attendance_id));
+        
+        const missingAnalysisIds = allAttendanceTrackedEmployeeIds.filter(id => !analysisAttendanceIds.has(id));
         
         if (missingAnalysisIds.length > 0) {
             console.log(`[markFinalReport] ANALYSIS VALIDATION FAILED: ${missingAnalysisIds.length} employees missing AnalysisResult`);
@@ -121,7 +133,7 @@ Deno.serve(async (req) => {
                 success: false,
                 error: `VALIDATION FAILED: ${missingAnalysisIds.length} employees missing from AnalysisResult. Run backfillReportMissingEmployees first.`,
                 analysis_count: analysisResults.length,
-                expected_count: allActiveEmployeeIds.length,
+                expected_count: allAttendanceTrackedEmployeeIds.length,
                 missing_attendance_ids: missingAnalysisIds,
                 missing_employees: missingEmployees.slice(0, 10),
                 action_required: `Run backfillReportMissingEmployees with project_id="${project_id}" and report_run_id="${report_run_id}"`
