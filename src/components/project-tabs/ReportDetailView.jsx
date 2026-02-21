@@ -1412,6 +1412,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             toast.error('No data to export');
             return;
         }
+        
+        // CRITICAL FIX: For finalized reports, use stored values WITHOUT recalculation
+        const isFinalized = reportRun.is_final || project.status === 'closed';
 
         // Build headers matching the visible table columns - using Hours instead of Minutes
         const headers = [
@@ -1434,7 +1437,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         ];
 
         const rows = filteredResults.map(r => {
-            // PERMANENT LOCK: For finalized reports, use stored AnalysisResult values DIRECTLY
+            // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
+            // For non-finalized reports, use the recalculated values from enrichedResults
             const deductible = r.deductible_minutes || 0;
             const late = r.late_minutes || 0;
             const early = r.early_checkout_minutes || 0;

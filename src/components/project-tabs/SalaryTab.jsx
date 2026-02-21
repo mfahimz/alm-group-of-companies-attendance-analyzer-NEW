@@ -173,6 +173,11 @@ export default function SalaryTab({ project }) {
             toast.error('Please select date range');
             return;
         }
+        // CRITICAL FIX: Validate date range - start date cannot be after end date
+        if (new Date(newReportDateFrom) > new Date(newReportDateTo)) {
+            toast.error('Start date cannot be after end date');
+            return;
+        }
         if (!finalReport || !finalReport.is_final) {
             toast.error('No finalized report found. Please finalize a report in the Report tab first.');
             return;

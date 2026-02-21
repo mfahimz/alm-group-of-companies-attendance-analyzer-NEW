@@ -459,7 +459,11 @@ Deno.serve(async (req) => {
                             const exFrom = new Date(ex.date_from);
                             const exTo = new Date(ex.date_to);
                             return currentDate >= exFrom && currentDate <= exTo;
-                        } catch { return false; }
+                        } catch (dateError) {
+                            // CRITICAL FIX: Log invalid exception dates in assumed_present_daily block
+                            console.warn(`[runAnalysis] ⚠️ INVALID EXCEPTION DATE (assumed_present_daily check) - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, Type: ${ex.type}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
+                            return false;
+                        }
                     });
                     const hasPublicHoliday = matchingExceptions.some(ex => 
                         ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
@@ -520,8 +524,9 @@ Deno.serve(async (req) => {
                             }
                         }
                     }
-                } catch {
-                    // Skip invalid date ranges
+                } catch (dateError) {
+                    // CRITICAL FIX: Log invalid exception dates instead of silently failing
+                    console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${alEx.id}, date_from: ${alEx.date_from}, date_to: ${alEx.date_to}, Error: ${dateError.message}`);
                 }
             }
             
@@ -558,7 +563,9 @@ Deno.serve(async (req) => {
                             const exFrom = new Date(ex.date_from);
                             const exTo = new Date(ex.date_to);
                             return currentDate >= exFrom && currentDate <= exTo;
-                        } catch {
+                        } catch (dateError) {
+                            // CRITICAL FIX: Log invalid exception dates instead of silently failing
+                            console.warn(`[runAnalysis] ⚠️ INVALID EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, Type: ${ex.type}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
                             return false;
                         }
                     });
@@ -658,7 +665,9 @@ Deno.serve(async (req) => {
                         const exFrom = new Date(ex.date_from);
                         const exTo = new Date(ex.date_to);
                         return ex.type === 'ANNUAL_LEAVE' && currentDate >= exFrom && currentDate <= exTo;
-                    } catch {
+                    } catch (dateError) {
+                        // CRITICAL FIX: Log invalid exception dates
+                        console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE DATE in daily loop - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
                         return false;
                     }
                 });
@@ -769,6 +778,14 @@ Deno.serve(async (req) => {
                             shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                         }
                     }
+                }
+                
+                // CRITICAL FIX: Log missing shift configuration for working days with punches
+                // This makes missing shift data visible instead of silently skipping calculations
+                if (!shift && filteredPunches.length > 0 && !dateException) {
+                    console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
+                    abnormal_dates_set.add(dateStr);
+                    critical_abnormal_dates_set.add(dateStr);
                 }
 
                 if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
