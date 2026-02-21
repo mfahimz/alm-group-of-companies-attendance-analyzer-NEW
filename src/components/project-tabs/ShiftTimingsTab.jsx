@@ -64,7 +64,8 @@ export default function ShiftTimingsTab({ project }) {
         pm_start: '',
         pm_end: '',
         is_single_shift: false,
-        is_friday_shift: false
+        is_friday_shift: false,
+        applicable_days: []
     });
     const queryClient = useQueryClient();
 
@@ -683,10 +684,12 @@ Return JSON:
     "pm_start": "HH:MM AM/PM (e.g., 1:00 PM)",
     "pm_end": "HH:MM AM/PM (e.g., 5:00 PM)",
     "is_single_shift": boolean (true if single shift/punch in-out only),
-    "is_friday_shift": boolean (true if Friday shift)
+    "is_friday_shift": boolean (true if Friday shift),
+    "applicable_days": array of day names (e.g., ["Monday", "Tuesday", "Friday"]) - leave empty or null for all days
 }
 
-Match employee names/IDs intelligently. If single shift, only fill am_start and pm_end.`,
+Match employee names/IDs intelligently. If single shift, only fill am_start and pm_end.
+For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all working days", specific days mentioned.`,
                 response_json_schema: {
                     type: "object",
                     properties: {
@@ -696,7 +699,8 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                         pm_start: { type: "string" },
                         pm_end: { type: "string" },
                         is_single_shift: { type: "boolean" },
-                        is_friday_shift: { type: "boolean" }
+                        is_friday_shift: { type: "boolean" },
+                        applicable_days: { type: "array", items: { type: "string" } }
                     },
                     required: ["attendance_id"]
                 }
@@ -712,7 +716,8 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                 pm_start: parsed.pm_start || '',
                 pm_end: parsed.pm_end || '',
                 is_single_shift: parsed.is_single_shift || false,
-                is_friday_shift: parsed.is_friday_shift || false
+                is_friday_shift: parsed.is_friday_shift || false,
+                applicable_days: parsed.applicable_days || []
             });
 
             setNlpText('');
@@ -732,7 +737,10 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
             project_id: project.id,
             shift_block: selectedBlock,
             effective_from: blockDateRanges[selectedBlock].from,
-            effective_to: blockDateRanges[selectedBlock].to
+            effective_to: blockDateRanges[selectedBlock].to,
+            applicable_days: data.applicable_days && data.applicable_days.length > 0 
+                ? JSON.stringify(data.applicable_days) 
+                : null
         }),
         onSuccess: () => {
             queryClient.invalidateQueries(['shifts', project.id]);
@@ -745,7 +753,8 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                 pm_start: '',
                 pm_end: '',
                 is_single_shift: false,
-                is_friday_shift: false
+                is_friday_shift: false,
+                applicable_days: []
             });
             setNlpText('');
         },
@@ -1662,6 +1671,40 @@ Match employee names/IDs intelligently. If single shift, only fill am_start and 
                                     </div>
                                 </div>
                             )}
+
+                            <div>
+                                <Label>Applicable Days (Optional)</Label>
+                                <p className="text-xs text-slate-500 mb-2">Leave empty for all working days</p>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                                        <div key={day} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`day-${day}`}
+                                                checked={formData.applicable_days.includes(day)}
+                                                onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                        setFormData({ 
+                                                            ...formData, 
+                                                            applicable_days: [...formData.applicable_days, day]
+                                                        });
+                                                    } else {
+                                                        setFormData({ 
+                                                            ...formData, 
+                                                            applicable_days: formData.applicable_days.filter(d => d !== day)
+                                                        });
+                                                    }
+                                                }}
+                                            />
+                                            <Label htmlFor={`day-${day}`} className="cursor-pointer text-sm">{day.substring(0, 3)}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                                {formData.applicable_days.length > 0 && (
+                                    <p className="text-xs text-green-600 mt-2">
+                                        ✓ Shift applies to: {formData.applicable_days.join(', ')}
+                                    </p>
+                                )}
+                            </div>
 
                             <p className="text-sm text-slate-500">
                                 This shift will be added to <strong>{selectedBlock === 'block1' ? 'Block 1' : 'Block 2'}</strong> ({new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')})
