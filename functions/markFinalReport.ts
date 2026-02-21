@@ -151,13 +151,17 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        // Log audit
-        await base44.asServiceRole.functions.invoke('logAudit', {
-            action: 'MARK_FINAL_REPORT',
-            entity_type: 'ReportRun',
-            entity_id: report_run_id,
-            details: `Marked report as final for project ${project_id}. Frontend will create salary snapshots.`
-        });
+        // Log audit (use try-catch to prevent blocking on logAudit 403 errors)
+        try {
+            await base44.asServiceRole.functions.invoke('logAudit', {
+                action: 'MARK_FINAL_REPORT',
+                entity_type: 'ReportRun',
+                entity_id: report_run_id,
+                details: `Marked report as final for project ${project_id}. Frontend will create salary snapshots.`
+            });
+        } catch (auditError) {
+            console.warn('[markFinalReport] Audit log failed (non-blocking):', auditError.message);
+        }
 
         console.log(`[markFinalReport] Report marked as final successfully. Frontend will create snapshots in batches.`);
 
