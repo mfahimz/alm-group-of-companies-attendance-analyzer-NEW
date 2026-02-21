@@ -1452,6 +1452,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (!selectedEmployee) return [];
 
         const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
+        
+        // CRITICAL: For finalized reports, use STORED values from AnalysisResult
+        // Do NOT recalculate from punches
+        const isFinalized = reportRun.is_final || project.status === 'closed';
 
         const breakdown = [];
         const startDate = new Date(reportRun.date_from);
@@ -1681,7 +1685,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             // Check if exception has manual minutes - skip punch calculation if it does
             const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
 
-            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc && !hasExceptionMinutes) {
+            // CRITICAL: For finalized reports, skip ALL punch calculations
+            // The late/early minutes are already finalized in AnalysisResult
+            const shouldSkipPunchCalc = isFinalized || shouldSkipTimeCalc || hasExceptionMinutes;
+            
+            if (shift && punchMatches.length > 0 && !shouldSkipPunchCalc) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
                 
@@ -1798,7 +1806,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         lateMinutesTotal = 0;
                         earlyCheckoutInfo = '';
 
-                        if (!shouldSkipTimeCalc) {
+                        if (!shouldSkipPunchCalc) {
                             for (const match of punchMatches) {
                                 if (!match.matchedTo) continue;
 
