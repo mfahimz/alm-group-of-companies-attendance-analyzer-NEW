@@ -949,33 +949,85 @@ Deno.serve(async (req) => {
         let analyzedCount = 0;
         let noAttendanceCount = 0;
         
+        // ============================================================
+        // COMPANY-SPECIFIC CONFIGURATION: Include All Employees in Salary
+        // ============================================================
+        // Fetch company settings to determine salary inclusion rules
+        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({
+            company: project.company
+        }, null, 1);
+        
+        const includeAllEmployeesInSalary = companySettings.length > 0 
+            ? (companySettings[0].include_all_employees_in_salary || false)
+            : false;
+        
+        // Al Maraghi Motors & Naser Mohsin: Hardcoded to include all employees (until migrated to settings)
+        const isAlMaraghiOrNaser = project.company === 'Al Maraghi Motors' || 
+                                    project.company === 'Naser Mohsin Auto Parts';
+        
+        const shouldIncludeAllEmployees = isAlMaraghiOrNaser || includeAllEmployeesInSalary;
+        
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] COMPANY SALARY MODE: ${project.company}`);
+        console.log(`[createSalarySnapshots]   Include All Employees in Salary: ${shouldIncludeAllEmployees ? 'YES (including non-attendance)' : 'NO (attendance_id required)'}`);
+        console.log(`[createSalarySnapshots]   Config Source: ${isAlMaraghiOrNaser ? 'HARDCODED' : companySettings.length > 0 ? 'CompanySettings' : 'DEFAULT (false)'}`);
+        console.log(`[createSalarySnapshots] ============================================`);
+        
         // Filter employees to project's custom_employee_ids if specified
-        let eligibleEmployees = employees;
+        let eligibleEmployees;
+        
         if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
             const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
-            // SALARY-ONLY FIX: Include employees without attendance_id if has_attendance_tracking=false
-            eligibleEmployees = employees.filter(emp => {
-                const isMatched = customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id));
-                
-                // If employee is matched by custom_employee_ids but lacks attendance_id:
-                // - If has_attendance_tracking is FALSE, include them (salary-only)
-                // - If has_attendance_tracking is TRUE, skip them and warn (data inconsistency)
-                if (isMatched && !(emp.attendance_id && String(emp.attendance_id).trim() !== '')) {
-                    if (emp.has_attendance_tracking !== true) {
-                        console.log(`[createSalarySnapshots] INFO: Including salary-only employee ${emp.name} (HRMS ID: ${emp.hrms_id}) without attendance_id per user request.`);
-                        return true; // Include this employee as salary-only
-                    } else {
-                        console.warn(`[createSalarySnapshots] WARNING: Skipping employee ${emp.name} (HRMS ID: ${emp.hrms_id}) because they are marked for attendance tracking but have no attendance_id. This is a data inconsistency and needs to be resolved.`);
-                        return false; // Skip as it's an inconsistency
+            
+            if (shouldIncludeAllEmployees) {
+                // Al Maraghi / Include All Mode: ALL employees in custom list, regardless of attendance_id
+                eligibleEmployees = employees.filter(emp => {
+                    return customIds.includes(String(emp.hrms_id)) || 
+                           (emp.attendance_id && customIds.includes(String(emp.attendance_id)));
+                });
+                console.log(`[createSalarySnapshots] [INCLUDE ALL MODE] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids (including non-attendance)`);
+            } else {
+                // Standard Mode: ONLY employees with valid attendance_id
+                eligibleEmployees = employees.filter(emp => {
+                    const hasValidAttendanceId = emp.attendance_id && 
+                                                  emp.attendance_id !== null && 
+                                                  emp.attendance_id !== undefined &&
+                                                  String(emp.attendance_id).trim() !== '';
+                    
+                    if (!hasValidAttendanceId) {
+                        return false;
                     }
-                }
-                return isMatched;
-            });
-            console.log(`[createSalarySnapshots] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids`);
+                    
+                    return customIds.includes(String(emp.hrms_id)) || 
+                           customIds.includes(String(emp.attendance_id));
+                });
+                console.log(`[createSalarySnapshots] [STANDARD MODE] Filtered to ${eligibleEmployees.length} employees with attendance_id from custom_employee_ids`);
+            }
+        } else {
+            // No custom_employee_ids - use ALL active employees
+            if (shouldIncludeAllEmployees) {
+                eligibleEmployees = employees;  // All active employees
+                console.log(`[createSalarySnapshots] [INCLUDE ALL MODE] Including ALL ${eligibleEmployees.length} active employees`);
+            } else {
+                eligibleEmployees = employees.filter(emp => {
+                    const hasValidAttendanceId = emp.attendance_id && 
+                                                  emp.attendance_id !== null && 
+                                                  emp.attendance_id !== undefined &&
+                                                  String(emp.attendance_id).trim() !== '';
+                    return hasValidAttendanceId;
+                });
+                console.log(`[createSalarySnapshots] [STANDARD MODE] Filtered to ${eligibleEmployees.length} employees with attendance_id`);
+            }
         }
+        
+        // Calculate statistics for logging transparency
+        const withAttendanceId = eligibleEmployees.filter(e => e.attendance_id && String(e.attendance_id).trim() !== '').length;
+        const withoutAttendanceId = eligibleEmployees.length - withAttendanceId;
         
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] ✅ TOTAL ELIGIBLE EMPLOYEES: ${eligibleEmployees.length}`);
+        console.log(`[createSalarySnapshots]    - With attendance_id: ${withAttendanceId}`);
+        console.log(`[createSalarySnapshots]    - Without attendance_id: ${withoutAttendanceId}`);
         console.log(`[createSalarySnapshots] ELIGIBLE EMPLOYEE IDs: [${eligibleEmployees.map(e => e.attendance_id || e.hrms_id).slice(0, 20).join(', ')}${eligibleEmployees.length > 20 ? '...' : ''}]`);
         console.log(`[createSalarySnapshots] ============================================`);
         
