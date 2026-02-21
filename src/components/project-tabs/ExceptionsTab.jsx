@@ -169,12 +169,54 @@ function ChecklistSection({ project }) {
         }
     });
 
+    const handleExportChecklist = async () => {
+        if (checklistItems.length === 0) {
+            toast.error('No checklist items to export');
+            return;
+        }
+
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            
+            const exportData = checklistItems.map(task => ({
+                'Task Type': task.task_type,
+                'Description': task.task_description,
+                'Status': task.status === 'completed' ? 'Completed' : task.status === 'in_progress' ? 'In Progress' : 'Pending',
+                'Completed By': task.completed_by || '—',
+                'Completed Date': task.completed_date ? formatInUAE(new Date(task.completed_date), 'dd/MM/yyyy HH:mm') : '—',
+                'Notes': task.notes || '—',
+                'Is Predefined': task.is_predefined ? 'Yes' : 'No'
+            }));
+            
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Checklist');
+            
+            const filename = `checklist_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+            
+            toast.success(`Exported ${exportData.length} checklist items`);
+        } catch (error) {
+            toast.error('Failed to export: ' + error.message);
+        }
+    };
+
     return (
         <Card className="border-0 shadow-sm bg-green-50/30">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardTitle>Checklist</CardTitle>
                     <div className="flex gap-2">
+                        {checklistItems.length > 0 && (
+                            <Button
+                                onClick={handleExportChecklist}
+                                size="sm"
+                                variant="outline"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Export
+                            </Button>
+                        )}
                         {checklistItems.length === 0 && (
                             <Button
                                 onClick={() => initializePredefinedTasksMutation.mutate()}
@@ -1258,8 +1300,79 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
         currentPage * rowsPerPage
     );
 
+    const handleGroupExport = async () => {
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            const workbook = XLSX.utils.book_new();
+            
+            // Export Exceptions Sheet
+            if (sortedExceptions.length > 0) {
+                const exceptionsData = sortedExceptions.map(ex => {
+                    const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
+                    return {
+                        'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
+                        'Employee Name': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
+                        'Department': ex.attendance_id === 'ALL' ? '—' : (employee?.department || '—'),
+                        'Type': ex.is_custom_type ? ex.custom_type_name || 'Custom' : ex.type.replace(/_/g, ' '),
+                        'From Date': ex.is_custom_type && (!ex.date_from || ex.date_from === project.date_from) ? '—' : new Date(ex.date_from).toLocaleDateString(),
+                        'To Date': ex.is_custom_type && (!ex.date_to || ex.date_to === project.date_to) ? '—' : new Date(ex.date_to).toLocaleDateString(),
+                        'Details': ex.details || '',
+                        'Use in Analysis': ex.use_in_analysis !== false ? 'Yes' : 'No',
+                        'From Report': ex.created_from_report ? 'Yes' : 'No'
+                    };
+                });
+                
+                const exceptionsSheet = XLSX.utils.json_to_sheet(exceptionsData);
+                XLSX.utils.book_append_sheet(workbook, exceptionsSheet, 'Exceptions');
+            }
+            
+            // Export Checklist Sheet
+            if (checklistItems.length > 0) {
+                const checklistData = checklistItems.map(task => ({
+                    'Task Type': task.task_type,
+                    'Description': task.task_description,
+                    'Status': task.status === 'completed' ? 'Completed' : task.status === 'in_progress' ? 'In Progress' : 'Pending',
+                    'Completed By': task.completed_by || '—',
+                    'Completed Date': task.completed_date ? formatInUAE(new Date(task.completed_date), 'dd/MM/yyyy HH:mm') : '—',
+                    'Notes': task.notes || '—',
+                    'Is Predefined': task.is_predefined ? 'Yes' : 'No'
+                }));
+                
+                const checklistSheet = XLSX.utils.json_to_sheet(checklistData);
+                XLSX.utils.book_append_sheet(workbook, checklistSheet, 'Checklist');
+            }
+            
+            const filename = `${project.name}_exceptions_checklist_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+            
+            toast.success(`Exported exceptions and checklist data`);
+        } catch (error) {
+            toast.error('Failed to export: ' + error.message);
+        }
+    };
+
     return (
         <div className="space-y-6">
+            {/* Group Export Button */}
+            <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-green-50">
+                <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-medium text-slate-900">Export All Data</p>
+                            <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in one file</p>
+                        </div>
+                        <Button
+                            onClick={handleGroupExport}
+                            disabled={sortedExceptions.length === 0 && checklistItems.length === 0}
+                            className="bg-gradient-to-r from-indigo-600 to-green-600 hover:from-indigo-700 hover:to-green-700"
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export All
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Upload Progress */}
             {uploadProgress && (
                 <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
