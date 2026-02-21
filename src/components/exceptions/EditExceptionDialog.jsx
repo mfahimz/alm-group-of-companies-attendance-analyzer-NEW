@@ -312,7 +312,10 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                 type="number"
                                 placeholder="e.g. 30"
                                 value={formData.early_checkout_minutes}
-                                onChange={(e) => setFormData({ ...formData, early_checkout_minutes: e.target.value })}
+                                onChange={(e) => {
+                                    const value = Math.abs(parseInt(e.target.value) || 0);
+                                    setFormData({ ...formData, early_checkout_minutes: value || '' });
+                                }}
                                 min="1"
                             />
                             <p className="text-xs text-slate-500 mt-1">Minutes to add to early checkout total</p>
@@ -328,7 +331,10 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                         type="number"
                                         placeholder="e.g. 60"
                                         value={formData.allowed_minutes}
-                                        onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
+                                        onChange={(e) => {
+                                            const value = Math.abs(parseInt(e.target.value) || 0);
+                                            setFormData({ ...formData, allowed_minutes: value || '' });
+                                        }}
                                         min="1"
                                     />
                                 </div>
