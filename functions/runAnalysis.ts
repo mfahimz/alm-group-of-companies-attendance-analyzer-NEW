@@ -1070,6 +1070,31 @@ Deno.serve(async (req) => {
             }
         }
 
+        // Create MANUAL_OTHER_MINUTES exceptions for employees with other minutes
+        if (otherMinutesExceptionsToCreate.length > 0) {
+            console.log(`[runAnalysis] Creating ${otherMinutesExceptionsToCreate.length} MANUAL_OTHER_MINUTES exceptions`);
+            
+            for (const detail of otherMinutesExceptionsToCreate) {
+                try {
+                    await base44.asServiceRole.entities.Exception.create({
+                        project_id,
+                        attendance_id: detail.attendance_id,
+                        date_from: date_from,
+                        date_to: date_to,
+                        type: 'MANUAL_OTHER_MINUTES',
+                        other_minutes: detail.other_minutes,
+                        details: `Other minutes detected during analysis for ${detail.employee_name}`,
+                        created_from_report: true,
+                        report_run_id: reportRun.id,
+                        use_in_analysis: true,
+                        approval_status: 'pending_dept_head'
+                    });
+                } catch (exError) {
+                    console.warn(`[runAnalysis] Failed to create other minutes exception for ${detail.attendance_id}:`, exError.message);
+                }
+            }
+        }
+
         // Update project status
         await base44.asServiceRole.entities.Project.update(project_id, {
             last_saved_report_id: reportRun.id,
@@ -1081,6 +1106,7 @@ Deno.serve(async (req) => {
             report_run_id: reportRun.id,
             processed_count: allResults.length,
             total_count: uniqueEmployeeIds.length,
+            other_minutes_exceptions_created: otherMinutesExceptionsToCreate.length,
             message: `Analysis complete for ${allResults.length} employees`
         });
 
