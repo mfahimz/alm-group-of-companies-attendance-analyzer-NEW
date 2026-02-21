@@ -874,12 +874,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
 
             // DYNAMIC DEDUCTIBLE CALCULATION
-            // Exclude other_minutes, apply grace then approved minutes
+            // CRITICAL: For UI display - exclude other_minutes, apply grace then approved
+            // Other_minutes stays separate and is ONLY added when creating payroll snapshots
             const baseMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
             const graceMinutes = result.grace_minutes ?? 15;
             const approvedMinutes = result.approved_minutes || 0;
             const afterGrace = Math.max(0, baseMinutes - graceMinutes);
             const dynamicDeductible = Math.max(0, afterGrace - approvedMinutes);
+            // OTHER_MINUTES: Kept separate, not included in deductible for UI display
 
             return {
                 ...result,
@@ -2386,8 +2388,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     </div>
                                                 );
                                             })()}
-                                        </td>
-                                        <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
+                                            </td>
+                                            <td className="p-2 align-middle text-xs text-slate-400">
+                                            {result.other_minutes > 0 ? (
+                                                <span className="text-purple-600 font-medium">{result.other_minutes}</span>
+                                            ) : (
+                                                '-'
+                                            )}
+                                            </td>
+                                            <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
                                             {result.notes || '-'}
                                         </td>
                                         <td className="p-2 align-middle text-right">
