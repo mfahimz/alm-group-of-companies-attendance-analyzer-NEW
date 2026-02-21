@@ -545,7 +545,12 @@ Deno.serve(async (req) => {
                     weeklyOffDay = dayNameToNumber[employee.weekly_off];
                 }
                 
-                // Get ALL matching exceptions for this date first (to check DAY_SWAP)
+                // Check if this is employee's weekly off day - BEFORE any other processing
+                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    continue;
+                }
+                
+                // Get ALL matching exceptions for this date first (to check DAY_SWAP and PUBLIC_HOLIDAY)
                 let matchingExceptions = [];
                 try {
                     matchingExceptions = employeeExceptions.filter(ex => {
@@ -559,6 +564,30 @@ Deno.serve(async (req) => {
                     });
                 } catch {
                     matchingExceptions = [];
+                }
+                
+                // Check for PUBLIC_HOLIDAY - day is NOT a working day (check BEFORE assumed_present_daily)
+                const hasPublicHoliday = matchingExceptions.some(ex => 
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
+                
+                if (hasPublicHoliday) {
+                    // Check for MANUAL_ABSENT even on public holiday
+                    const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
+                    if (hasManualAbsent) {
+                        fullAbsenceCount++;
+                    }
+                    continue; // Skip this day - it's a holiday
+                }
+                
+                // CRITICAL FIX: ASSUMED_PRESENT_DAILY logic
+                // Employees flagged as "assumed present" are automatically marked present every working day
+                // This applies AFTER checking weekly off and public holidays
+                if (employee?.assumed_present_daily === true) {
+                    workingDays++;
+                    presentDays++;
+                    // Skip ALL punch processing, late/early calculations, exceptions for this day
+                    continue;
                 }
                 
                 // DAY_SWAP exception: Override weekly off for specific dates
@@ -576,31 +605,6 @@ Deno.serve(async (req) => {
                     if (daySwapException.working_day_override === currentDayName) {
                         weeklyOffDay = null; // Override the weekly off - make this day a working day
                     }
-                }
-                
-                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                    continue;
-                }
-
-                // matchingExceptions already fetched above for DAY_SWAP check
-
-                // Check for PUBLIC_HOLIDAY - day is NOT a working day
-                const hasPublicHoliday = matchingExceptions.some(ex => 
-                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
-                );
-                
-                // Check for MANUAL_ABSENT on the same date (even if it's a public holiday)
-                const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
-                
-                if (hasPublicHoliday) {
-                    // PUBLIC_HOLIDAY: Day is NOT a working day
-                    // BUT if there's also a MANUAL_ABSENT, count LOP without adding to working days
-                    // This handles the case where employee was marked absent on a holiday
-                    if (hasManualAbsent) {
-                        fullAbsenceCount++;
-                    }
-                    // Skip rest of day processing - not a working day
-                    continue;
                 }
 
                 // Now it's safe to count as a working day
@@ -1037,13 +1041,14 @@ Deno.serve(async (req) => {
             //   2. baseAfterGrace = max(0, base - totalGraceMinutes)
             //   3. deductibleMinutes = max(0, baseAfterGrace - totalApprovedMinutes)
             // 
+            // CRITICAL FIX: Force positive values at EVERY step to prevent negative data corruption
             // Grace = baseGrace + carriedGrace
             // Other minutes are NOT part of deductible calculation at all
             // ============================================================================
-            const totalGraceMinutes = baseGrace + carriedGrace;
-            const baseMinutes = lateMinutes + earlyCheckoutMinutes;  // EXCLUDE other_minutes
+            const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
+            const baseMinutes = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);  // EXCLUDE other_minutes
             const baseAfterGrace = Math.max(0, baseMinutes - totalGraceMinutes);
-            const deductibleMinutes = Math.max(0, baseAfterGrace - totalApprovedMinutes);
+            const deductibleMinutes = Math.max(0, baseAfterGrace - Math.max(0, totalApprovedMinutes));
             
             console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes} (NO other minutes), BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${totalGraceMinutes}, After Grace=${baseAfterGrace}, Approved=${totalApprovedMinutes}, Final Deductible=${deductibleMinutes}, Other Minutes=${otherMinutes} (NOT in deductible)`);
 

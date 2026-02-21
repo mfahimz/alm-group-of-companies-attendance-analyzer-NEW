@@ -70,15 +70,30 @@ Deno.serve(async (req) => {
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
 
         // ============================================================
+        // IDEMPOTENCY CHECK: Prevent duplicate snapshot creation
+        // If snapshots already exist for this report_run_id, return existing count
+        // This handles double-clicks, network retries, and concurrent requests
+        // ============================================================
+        const existingSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
+            project_id: project_id,
+            report_run_id: report_run_id
+        }, null, 5000);
+
+        if (existingSnapshots.length > 0 && !batch_mode) {
+            console.log(`[createSalarySnapshots] ⚠️ IDEMPOTENCY: ${existingSnapshots.length} snapshots already exist for report_run_id ${report_run_id}. Skipping creation.`);
+            return Response.json({
+                success: true,
+                snapshots_created: 0,
+                existing_snapshots: existingSnapshots.length,
+                message: `Snapshots already exist for this report (${existingSnapshots.length} found). No duplicates created.`
+            });
+        }
+
+        // ============================================================
         // CRITICAL FIX: Delete existing snapshots ONLY on first batch
         // This prevents each batch from destroying previous batches' work
         // ============================================================
         if (batch_mode && batch_start === 0) {
-            const existingSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
-                project_id: project_id,
-                report_run_id: report_run_id
-            }, null, 5000);
-
             if (existingSnapshots.length > 0) {
                 console.log(`[createSalarySnapshots] 🗑️ BATCH 1: Deleting ${existingSnapshots.length} existing snapshots`);
                 await Promise.all(existingSnapshots.map(s => base44.asServiceRole.entities.SalarySnapshot.delete(s.id)));
@@ -388,11 +403,23 @@ Deno.serve(async (req) => {
                 // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS LOGIC
                 // If this day is in assumedDays array, treat as fully present
                 // UNLESS employee has ANNUAL_LEAVE on this day
+                // CRITICAL FIX: Check if assumed day is employee's weekly off - if so, don't mark present
                 // ============================================================
                 const isAssumedPresentDay = assumedDays.includes(dateStr);
                 
                 if (isAssumedPresentDay) {
-                    // BUG FIX #7: Better error logging for date parsing failures
+                    // Check if this assumed day is the employee's weekly off
+                    // Each employee has their own weekly_off field
+                    const assumedDayOfWeek = currentDate.getUTCDay();
+                    const employeeWeeklyOff = emp.weekly_off ? dayNameToNumber[emp.weekly_off] : null;
+                    
+                    // If assumed day is employee's weekly off, skip it (don't mark as present)
+                    if (employeeWeeklyOff !== null && assumedDayOfWeek === employeeWeeklyOff) {
+                        console.log(`[createSalarySnapshots] ${emp.name}: Skipping assumed present day ${dateStr} - it's their weekly off (${emp.weekly_off})`);
+                        continue; // Don't mark as present, it's their weekly off
+                    }
+                    
+                    // Check if employee has annual leave on this assumed day
                     const hasAnnualLeaveOnAssumedDay = employeeExceptions.some(ex => {
                         if (ex.type !== 'ANNUAL_LEAVE') return false;
                         try {
@@ -407,6 +434,7 @@ Deno.serve(async (req) => {
                         // Assumed present: count as working day, present day, NO deductions
                         workingDays++;
                         presentDays++;
+                        console.log(`[createSalarySnapshots] ${emp.name}: Assumed present on ${dateStr} (last 2 days of month)`);
                         // Skip all other processing for this day - no late/early/absence tracking
                         continue;
                     }
