@@ -400,12 +400,26 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                         </div>
                     )}
 
-                    {needsDaySwap && (
+                    {needsDaySwap && (() => {
+                        // Show the working_day_override as read-only display
+                        return (
                         <div className="border-t pt-4">
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <p className="text-sm text-blue-800 mb-4">
                                     This exception swaps a weekly off day with a working day for the selected date range.
                                 </p>
+                                
+                                {formData.working_day_override && (
+                                    <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                                        <p className="text-sm font-medium text-blue-900">
+                                            Current Weekly Off: <span className="text-blue-700 font-bold">{formData.working_day_override}</span>
+                                        </p>
+                                        <p className="text-xs text-blue-700 mt-1">
+                                            This is automatically set as the new working day when you change the weekly off
+                                        </p>
+                                    </div>
+                                )}
+                                
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <Label>New Weekly Off Day *</Label>
@@ -429,30 +443,21 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                         <p className="text-xs text-slate-500 mt-1">This day will become the holiday</p>
                                     </div>
                                     <div>
-                                        <Label>New Working Day *</Label>
-                                        <Select
+                                        <Label>New Working Day (Auto-filled) *</Label>
+                                        <Input
                                             value={formData.working_day_override}
-                                            onValueChange={(value) => setFormData({ ...formData, working_day_override: value })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select day..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Sunday">Sunday</SelectItem>
-                                                <SelectItem value="Monday">Monday</SelectItem>
-                                                <SelectItem value="Tuesday">Tuesday</SelectItem>
-                                                <SelectItem value="Wednesday">Wednesday</SelectItem>
-                                                <SelectItem value="Thursday">Thursday</SelectItem>
-                                                <SelectItem value="Friday">Friday</SelectItem>
-                                                <SelectItem value="Saturday">Saturday</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-slate-500 mt-1">This day will become a working day</p>
+                                            disabled
+                                            className="bg-slate-100"
+                                        />
+                                        <p className="text-xs text-green-600 mt-1">
+                                            ✓ Automatically set to current weekly off
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
 
                     <div className="border-t pt-4">
                         <Label>Details / Reason</Label>

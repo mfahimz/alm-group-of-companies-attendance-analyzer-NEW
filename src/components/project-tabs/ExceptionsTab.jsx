@@ -1636,18 +1636,40 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 </div>
                             )}
 
-                            {needsDaySwap && (
+                            {needsDaySwap && (() => {
+                                const selectedEmployee = employees.find(e => String(e.attendance_id) === String(formData.attendance_id));
+                                const currentWeeklyOff = selectedEmployee?.weekly_off || 'Sunday';
+                                
+                                return (
                                 <div className="space-y-4">
                                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                         <p className="text-sm text-blue-800 mb-4">
                                             This exception swaps a weekly off day with a working day for the selected date range.
                                         </p>
+                                        
+                                        {formData.attendance_id && selectedEmployee && (
+                                            <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                                                <p className="text-sm font-medium text-blue-900">
+                                                    Current Weekly Off: <span className="text-blue-700 font-bold">{currentWeeklyOff}</span>
+                                                </p>
+                                                <p className="text-xs text-blue-700 mt-1">
+                                                    Select a new weekly off day below, and {currentWeeklyOff} will automatically become a working day
+                                                </p>
+                                            </div>
+                                        )}
+                                        
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <Label>New Weekly Off Day *</Label>
                                                 <Select
                                                     value={formData.new_weekly_off}
-                                                    onValueChange={(value) => setFormData({ ...formData, new_weekly_off: value })}
+                                                    onValueChange={(value) => {
+                                                        setFormData({ 
+                                                            ...formData, 
+                                                            new_weekly_off: value,
+                                                            working_day_override: currentWeeklyOff
+                                                        });
+                                                    }}
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Select day..." />
@@ -1665,30 +1687,21 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                 <p className="text-xs text-slate-500 mt-1">This day will become the holiday</p>
                                             </div>
                                             <div>
-                                                <Label>New Working Day *</Label>
-                                                <Select
+                                                <Label>New Working Day (Auto-filled) *</Label>
+                                                <Input
                                                     value={formData.working_day_override}
-                                                    onValueChange={(value) => setFormData({ ...formData, working_day_override: value })}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select day..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Sunday">Sunday</SelectItem>
-                                                        <SelectItem value="Monday">Monday</SelectItem>
-                                                        <SelectItem value="Tuesday">Tuesday</SelectItem>
-                                                        <SelectItem value="Wednesday">Wednesday</SelectItem>
-                                                        <SelectItem value="Thursday">Thursday</SelectItem>
-                                                        <SelectItem value="Friday">Friday</SelectItem>
-                                                        <SelectItem value="Saturday">Saturday</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <p className="text-xs text-slate-500 mt-1">This day will become a working day</p>
+                                                    disabled
+                                                    className="bg-slate-100"
+                                                />
+                                                <p className="text-xs text-green-600 mt-1">
+                                                    ✓ Automatically set to current weekly off
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                                );
+                            })()}
 
 
 
