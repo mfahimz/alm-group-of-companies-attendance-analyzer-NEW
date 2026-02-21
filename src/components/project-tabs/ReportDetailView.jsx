@@ -737,13 +737,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                     // Apply ALL manual time fields from exception (already stored in variables)
                     if (exceptionLateMinutes > 0) {
-                        totalLateMinutes += exceptionLateMinutes;
+                        totalLateMinutes += Math.abs(exceptionLateMinutes);
                     }
                     if (exceptionEarlyMinutes > 0) {
-                        totalEarlyCheckout += exceptionEarlyMinutes;
+                        totalEarlyCheckout += Math.abs(exceptionEarlyMinutes);
                     }
                     if (currentOtherMinutes > 0) {
-                        totalOtherMinutes += currentOtherMinutes;
+                        totalOtherMinutes += Math.abs(currentOtherMinutes);
                     }
                 }
             }
@@ -761,14 +761,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                         if (punchTime > shiftTime) {
-                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                            const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                             dayLateMinutes += minutes;
                         }
                     }
                     
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                         if (punchTime < shiftTime) {
-                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                            const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                             dayEarlyMinutes += minutes;
                         }
                     }
@@ -793,15 +793,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
 
         return { 
-            totalLateMinutes, 
-            totalEarlyCheckout, 
-            totalOtherMinutes,
-            workingDays, 
-            presentDays, 
-            fullAbsenceCount, 
-            halfAbsenceCount, 
-            sickLeaveCount,
-            annualLeaveCount
+            totalLateMinutes: Math.max(0, totalLateMinutes), 
+            totalEarlyCheckout: Math.max(0, totalEarlyCheckout), 
+            totalOtherMinutes: Math.max(0, totalOtherMinutes),
+            workingDays: Math.max(0, workingDays), 
+            presentDays: Math.max(0, presentDays), 
+            fullAbsenceCount: Math.max(0, fullAbsenceCount), 
+            halfAbsenceCount: Math.max(0, halfAbsenceCount), 
+            sickLeaveCount: Math.max(0, sickLeaveCount),
+            annualLeaveCount: Math.max(0, annualLeaveCount)
         };
     };
 
@@ -1693,7 +1693,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                         if (punchTime > shiftTime) {
-                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                            const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                             dayLateMinutes += minutes;
                             const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
                             if (lateInfo) lateInfo += ' | ';
@@ -1703,7 +1703,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                         if (punchTime < shiftTime) {
-                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                            const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                             dayEarlyMinutes += minutes;
                             if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
                                 earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
@@ -1807,7 +1807,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                                 if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                                     if (punchTime > shiftTime) {
-                                        const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                                        const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                                         lateMinutesTotal += minutes;
                                         const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
                                         if (lateInfo) lateInfo += ' | ';
@@ -1817,7 +1817,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                                 if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                                     if (punchTime < shiftTime) {
-                                        const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                                        const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                                         if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
                                             earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
                                         } else {
@@ -1837,15 +1837,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 else if (dayOverride.type === 'SICK_LEAVE') status = 'Sick Leave (Admin)';
 
                 if (dayOverride.lateMinutes !== undefined) {
-                    lateMinutesTotal = dayOverride.lateMinutes;
-                    lateInfo = dayOverride.lateMinutes > 0 ? `${dayOverride.lateMinutes} min (edited)` : '-';
+                    lateMinutesTotal = Math.max(0, dayOverride.lateMinutes);
+                    lateInfo = dayOverride.lateMinutes > 0 ? `${Math.max(0, dayOverride.lateMinutes)} min (edited)` : '-';
                 }
                 if (dayOverride.earlyCheckoutMinutes !== undefined) {
-                    earlyCheckoutInfo = dayOverride.earlyCheckoutMinutes > 0 ? `${dayOverride.earlyCheckoutMinutes} min (edited)` : '-';
+                    earlyCheckoutInfo = dayOverride.earlyCheckoutMinutes > 0 ? `${Math.max(0, dayOverride.earlyCheckoutMinutes)} min (edited)` : '-';
                 }
                 // Added for otherMinutes - keep separate from late/early calculations
                 if (dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes > 0) {
-                    currentOtherMinutes = dayOverride.otherMinutes;
+                    currentOtherMinutes = Math.max(0, dayOverride.otherMinutes);
                 }
                 if (dayOverride.isAbnormal !== undefined) {
                     isAbnormal = dayOverride.isAbnormal;
@@ -1878,11 +1878,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             // If exception has manual minutes, use them exclusively (not added to calculations)
             if (exceptionLateMinutes > 0 && !dayOverride) {
-                lateMinutesTotal = exceptionLateMinutes;
-                lateInfo = `${exceptionLateMinutes} min (from exception)`;
+                lateMinutesTotal = Math.abs(exceptionLateMinutes);
+                lateInfo = `${Math.abs(exceptionLateMinutes)} min (from exception)`;
             }
             if (exceptionEarlyMinutes > 0 && !dayOverride) {
-                earlyCheckoutInfo = `${exceptionEarlyMinutes} min (from exception)`;
+                earlyCheckoutInfo = `${Math.abs(exceptionEarlyMinutes)} min (from exception)`;
             }
 
             breakdown.push({
@@ -1899,9 +1899,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 abnormal: isAbnormal,
                 isCriticalAbnormal: isCriticalAbnormal,
                 lateInfo: lateInfo || '-',
-                lateMinutesTotal: lateMinutesTotal || 0,
+                lateMinutesTotal: Math.max(0, lateMinutesTotal || 0),
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
-                otherMinutes: currentOtherMinutes,
+                otherMinutes: Math.max(0, currentOtherMinutes),
                 hasOverride: !!dayOverride,
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
