@@ -838,14 +838,14 @@ Deno.serve(async (req) => {
                         
                         if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                             if (punchTime > shiftTime) {
-                                const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                                const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                                 dayLateMinutes += minutes;
                             }
                         }
                         
                         if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                             if (punchTime < shiftTime) {
-                                const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                                const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                                 dayEarlyMinutes += minutes;
                             }
                         }
@@ -972,24 +972,24 @@ Deno.serve(async (req) => {
 
             return {
                 attendance_id,
-                working_days: workingDays,
-                present_days: presentDays,
-                full_absence_count: fullAbsenceCount,
-                half_absence_count: halfAbsenceCount,
-                sick_leave_count: sickLeaveCount,
-                annual_leave_count: annualLeaveCount,
-                late_minutes: lateMinutes,
-                early_checkout_minutes: earlyCheckoutMinutes,
-                other_minutes: otherMinutes,
-                approved_minutes: totalApprovedMinutes,
-                deductible_minutes: deductibleMinutes,
-                grace_minutes: totalGraceMinutes,
+                working_days: Math.max(0, workingDays),
+                present_days: Math.max(0, presentDays),
+                full_absence_count: Math.max(0, fullAbsenceCount),
+                half_absence_count: Math.max(0, halfAbsenceCount),
+                sick_leave_count: Math.max(0, sickLeaveCount),
+                annual_leave_count: Math.max(0, annualLeaveCount),
+                late_minutes: Math.max(0, lateMinutes),
+                early_checkout_minutes: Math.max(0, earlyCheckoutMinutes),
+                other_minutes: Math.max(0, otherMinutes),
+                approved_minutes: Math.max(0, totalApprovedMinutes),
+                deductible_minutes: Math.max(0, deductibleMinutes),
+                grace_minutes: Math.max(0, totalGraceMinutes),
                 abnormal_dates: [...abnormal_dates_set].sort().join(', '),
                 notes: criticalDatesFormatted,
                 auto_resolutions: autoResolutionNotes,
                 _otherMinutesDetails: otherMinutes > 0 ? {
                     attendance_id: attendanceIdStr,
-                    other_minutes: otherMinutes,
+                    other_minutes: Math.max(0, otherMinutes),
                     employee_name: employee?.name || attendanceIdStr,
                     breakdown: otherMinutesByDate
                 } : null
