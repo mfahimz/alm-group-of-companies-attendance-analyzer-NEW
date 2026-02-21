@@ -1402,25 +1402,25 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 r.attendance_id,
                 r.name,
                 r.has_no_punches ? 'No' : 'Yes',
-                r.working_days,
-                r.manual_present_days ?? r.present_days,
-                r.manual_annual_leave_count ?? r.annual_leave_count ?? 0,
-                r.manual_sick_leave_count ?? r.sick_leave_count ?? 0,
-                r.manual_full_absence_count ?? r.full_absence_count,
-                r.half_absence_count || 0,
-                minutesToHours(late),
-                minutesToHours(early)
+                Math.max(0, r.working_days || 0),
+                Math.max(0, r.manual_present_days ?? r.present_days || 0),
+                Math.max(0, r.manual_annual_leave_count ?? r.annual_leave_count ?? 0),
+                Math.max(0, r.manual_sick_leave_count ?? r.sick_leave_count ?? 0),
+                Math.max(0, r.manual_full_absence_count ?? r.full_absence_count || 0),
+                Math.max(0, r.half_absence_count || 0),
+                minutesToHours(Math.max(0, late)),
+                minutesToHours(Math.max(0, early))
             ];
 
             // Add approved minutes only if company allows it
             if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
-                baseRow.push(minutesToHours(r.approved_minutes || 0));
+                baseRow.push(minutesToHours(Math.max(0, r.approved_minutes || 0)));
             }
 
             baseRow.push(
-                minutesToHours(r.other_minutes || 0),
-                minutesToHours(grace),
-                minutesToHours(deductible),
+                minutesToHours(Math.max(0, r.other_minutes || 0)),
+                minutesToHours(Math.max(0, grace)),
+                minutesToHours(Math.max(0, deductible)),
                 r.notes || ''
             );
 
@@ -2191,14 +2191,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="p-2 align-middle">{result.working_days}</td>
+                                        <td className="p-2 align-middle">{Math.max(0, result.working_days || 0)}</td>
                                         <td className="p-2 align-middle">
                                             <InlineEditableCell
-                                                value={result.manual_present_days ?? result.present_days}
+                                                value={Math.max(0, result.manual_present_days ?? result.present_days)}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                     id: result.id, 
                                                     field: 'manual_present_days', 
-                                                    value 
+                                                    value: Math.max(0, value)
                                                 })}
                                                 isEditable={isAdmin}
                                                 className={result.manual_present_days !== null && result.manual_present_days !== undefined ? 'text-blue-600 font-bold' : ''}
@@ -2206,11 +2206,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </td>
                                         <td className="p-2 align-middle">
                                             <InlineEditableCell
-                                                value={result.manual_annual_leave_count ?? result.annual_leave_count ?? 0}
+                                                value={Math.max(0, result.manual_annual_leave_count ?? result.annual_leave_count ?? 0)}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                     id: result.id, 
                                                     field: 'manual_annual_leave_count', 
-                                                    value 
+                                                    value: Math.max(0, value)
                                                 })}
                                                 isEditable={isAdmin}
                                                 className={result.manual_annual_leave_count !== null && result.manual_annual_leave_count !== undefined 
@@ -2220,11 +2220,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </td>
                                         <td className="p-2 align-middle">
                                             <InlineEditableCell
-                                                value={result.manual_sick_leave_count ?? result.sick_leave_count ?? 0}
+                                                value={Math.max(0, result.manual_sick_leave_count ?? result.sick_leave_count ?? 0)}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                     id: result.id, 
                                                     field: 'manual_sick_leave_count', 
-                                                    value 
+                                                    value: Math.max(0, value)
                                                 })}
                                                 isEditable={isAdmin}
                                                 className={result.manual_sick_leave_count !== null && result.manual_sick_leave_count !== undefined 
@@ -2234,11 +2234,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </td>
                                         <td className="p-2 align-middle">
                                             <InlineEditableCell
-                                                value={result.manual_full_absence_count ?? result.full_absence_count}
+                                                value={Math.max(0, result.manual_full_absence_count ?? result.full_absence_count)}
                                                 onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                     id: result.id, 
                                                     field: 'manual_full_absence_count', 
-                                                    value 
+                                                    value: Math.max(0, value)
                                                 })}
                                                 isEditable={isAdmin}
                                                 className={result.manual_full_absence_count !== null && result.manual_full_absence_count !== undefined 
@@ -2248,34 +2248,34 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </td>
                                         <td className="p-2 align-middle">
                                             <span className={`${result.half_absence_count > 0 ? 'text-amber-600 font-medium' : ''}`}>
-                                                {result.half_absence_count || 0}
+                                                {Math.max(0, result.half_absence_count || 0)}
                                             </span>
                                         </td>
                                         <td className="p-2 align-middle">
                                             <span className={`${result.late_minutes > 0 ? 'text-orange-600 font-medium' : ''}`}>
-                                                {result.late_minutes}
+                                                {Math.max(0, result.late_minutes || 0)}
                                             </span>
                                         </td>
                                         <td className="p-2 align-middle">
                                             <span className={`${result.early_checkout_minutes > 0 ? 'text-blue-600 font-medium' : ''}`}>
-                                                {result.early_checkout_minutes || 0}
+                                                {Math.max(0, result.early_checkout_minutes || 0)}
                                             </span>
                                         </td>
                                         {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
                                             <td className="p-2 align-middle">
                                                 <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
-                                                    {result.approved_minutes || 0}
+                                                    {Math.max(0, result.approved_minutes || 0)}
                                                 </span>
                                             </td>
                                         )}
                                         <td className="p-2 align-middle">
                                             <span className={`${result.other_minutes > 0 ? 'text-purple-600 font-medium' : 'text-slate-400'}`}>
-                                                {result.other_minutes || 0}
+                                                {Math.max(0, result.other_minutes || 0)}
                                             </span>
                                         </td>
                                         <td className="p-2 align-middle">
                                             <div className="flex items-center gap-2 group">
-                                                <span>{result.grace_minutes ?? 15}</span>
+                                                <span>{Math.max(0, result.grace_minutes ?? 15)}</span>
                                                 {(isAdmin || isSupervisor) && (
                                                     <Button
                                                         size="sm"
@@ -2292,7 +2292,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             {(() => {
                                                 // Use stored deductible_minutes from AnalysisResult
                                                 // Formula: ((late + early) - grace) + other - approved
-                                                const displayDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? 0;
+                                                const displayDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
 
                                                 return (
                                                     <div className="flex flex-col">
@@ -2301,7 +2301,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                             onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                                 id: result.id, 
                                                                 field: 'manual_deductible_minutes', 
-                                                                value 
+                                                                value: Math.max(0, value)
                                                             })}
                                                             isEditable={isAdmin && !reportRun.is_final}
                                                             className={`font-bold ${displayDeductible > 0 ? 'text-red-600' : 'text-green-600'}`}
@@ -2440,25 +2440,25 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-xs">
-                                            {day.lateMinutesTotal > 0 ? (
-                                                <span className="text-orange-600 font-medium">{day.lateMinutesTotal} min</span>
-                                            ) : (
-                                                <span className="text-slate-400">-</span>
-                                            )}
+                                           {day.lateMinutesTotal > 0 ? (
+                                               <span className="text-orange-600 font-medium">{Math.max(0, day.lateMinutesTotal)} min</span>
+                                           ) : (
+                                               <span className="text-slate-400">-</span>
+                                           )}
                                         </TableCell>
                                         <TableCell className="text-xs">
-                                            {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
-                                                <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
-                                            ) : (
-                                                <span className="text-slate-400">-</span>
-                                            )}
+                                           {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
+                                               <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
+                                           ) : (
+                                               <span className="text-slate-400">-</span>
+                                           )}
                                         </TableCell>
                                         <TableCell className="text-xs">
-                                            {day.otherMinutes > 0 ? (
-                                                <span className="text-purple-600 font-medium">{day.otherMinutes} min</span>
-                                            ) : (
-                                                <span className="text-slate-400">-</span>
-                                            )}
+                                           {day.otherMinutes > 0 ? (
+                                               <span className="text-purple-600 font-medium">{Math.max(0, day.otherMinutes)} min</span>
+                                           ) : (
+                                               <span className="text-slate-400">-</span>
+                                           )}
                                         </TableCell>
                                         <TableCell className="text-xs">
                                             {day.abnormal && (
