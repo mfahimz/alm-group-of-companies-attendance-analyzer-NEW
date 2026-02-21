@@ -63,11 +63,56 @@ Deno.serve(async (req) => {
         }
 
         const project = projects[0];
+        
+        // ============================================================
+        // USE PROJECT-LEVEL DEFAULTS (Settings entity removed)
+        // ============================================================
+        const settings = null;
+        
         // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
-        const divisor = project.salary_calculation_days || 30;
+        let divisor = settings?.salary_divisor || project.salary_calculation_days || 30;
+        if (!divisor || divisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid salary_divisor from settings, using default 30');
+            divisor = 30;
+        }
+        
         // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
-        const otDivisor = project.ot_calculation_days || divisor;
+        let otDivisor = settings?.ot_divisor || project.ot_calculation_days || divisor;
+        if (!otDivisor || otDivisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_divisor from settings, using default divisor');
+            otDivisor = divisor;
+        }
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
+        
+        // OT Rates from settings
+        let otNormalRate = settings?.ot_normal_rate || 1.25;
+        let otSpecialRate = settings?.ot_special_rate || 1.5;
+        if (!otNormalRate || otNormalRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_normal_rate, using default 1.25');
+            otNormalRate = 1.25;
+        }
+        if (!otSpecialRate || otSpecialRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_special_rate, using default 1.5');
+            otSpecialRate = 1.5;
+        }
+        
+        // WPS Cap settings
+        const wpsCapEnabledGlobal = settings?.wps_cap_enabled ?? (isAlMaraghi ? true : false);
+        const wpsCapAmountGlobal = settings?.wps_cap_amount ?? 4900;
+        const balanceRoundingRule = settings?.balance_rounding_rule || 'EXACT';
+        
+        // Formula settings
+        const leavePayFormula = settings?.leave_pay_formula || 'TOTAL_SALARY';
+        const salaryLeaveFormula = settings?.salary_leave_formula || 'BASIC_PLUS_ALLOWANCES';
+        const assumedPresentLastDays = settings?.assumed_present_last_days ?? (isAlMaraghi ? 2 : 0);
+        
+        console.log('[createSalarySnapshots] ============================================');
+        console.log('[createSalarySnapshots] CALCULATION SETTINGS (from Project):');
+        console.log('[createSalarySnapshots]   Salary Divisor:', divisor);
+        console.log('[createSalarySnapshots]   OT Divisor:', otDivisor);
+        console.log('[createSalarySnapshots]   WPS Cap Enabled:', wpsCapEnabledGlobal);
+        console.log('[createSalarySnapshots]   Assumed Present Days:', assumedPresentLastDays);
+        console.log('[createSalarySnapshots] ============================================');
 
         // ============================================================
         // UNIVERSAL IDEMPOTENCY CHECK (BATCH & NON-BATCH)
@@ -142,17 +187,15 @@ Deno.serve(async (req) => {
             salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
             salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
 
-            // Calculate assumed present days: last 2 days of salary month
-            // Day before end of month (e.g., Jan 30)
-            const assumedDay1 = new Date(projectDateTo);
-            assumedDay1.setDate(assumedDay1.getDate() - 1);
-            // Last day of month (e.g., Jan 31)
-            const assumedDay2 = new Date(projectDateTo);
-            
-            assumedPresentDays = [
-                assumedDay1.toISOString().split('T')[0],
-                assumedDay2.toISOString().split('T')[0]
-            ];
+            // Calculate assumed present days based on settings
+            // assumedPresentLastDays = 2 means last 2 days, = 0 means none
+            if (assumedPresentLastDays > 0) {
+                for (let i = 0; i < assumedPresentLastDays; i++) {
+                    const assumedDay = new Date(projectDateTo);
+                    assumedDay.setDate(assumedDay.getDate() - i);
+                    assumedPresentDays.push(assumedDay.toISOString().split('T')[0]);
+                }
+            }
 
             // Extra previous month range
             const projectDateFrom = new Date(project.date_from);
@@ -1240,20 +1283,24 @@ Deno.serve(async (req) => {
 
             // Calculate derived salary values - ALL rounded to 2 decimal places
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
-            const leavePay = Math.round((leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0) * 100) / 100;
             
-            // ============================================================
-            // SALARY LEAVE AMOUNT FORMULA (NON-NEGOTIABLE)
-            // Base = Basic Salary + Allowances ONLY (NO BONUS, NO allowances_with_bonus)
-            // Formula: (Basic + Allowances) / salary_divisor × salary_leave_days
-            // ============================================================
-            const salaryBaseForLeave = basicSalary + allowancesAmount;
-            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryBaseForLeave / divisor) * salaryLeaveDays : 0) * 100) / 100;
+            // Leave Pay Formula (configurable)
+            const leavePayBase = leavePayFormula === 'BASIC_PLUS_ALLOWANCES' 
+                ? (basicSalary + allowancesAmount)
+                : totalSalaryAmount;
+            const leavePay = Math.round((leaveDays > 0 ? (leavePayBase / divisor) * leaveDays : 0) * 100) / 100;
+            
+            // Salary Leave Amount Formula (configurable)
+            const salaryLeaveBase = salaryLeaveFormula === 'BASIC_PLUS_ALLOWANCES' 
+                ? (basicSalary + allowancesAmount)
+                : totalSalaryAmount;
+            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryLeaveBase / divisor) * salaryLeaveDays : 0) * 100) / 100;
             
             console.log(`[createSalarySnapshots] 💡 SALARY LEAVE CALCULATION for ${emp.name}:`);
+            console.log(`[createSalarySnapshots]    Formula: ${salaryLeaveFormula}`);
             console.log(`[createSalarySnapshots]    basicSalary = ${basicSalary}`);
             console.log(`[createSalarySnapshots]    allowancesAmount = ${allowancesAmount}`);
-            console.log(`[createSalarySnapshots]    salaryBaseForLeave = ${salaryBaseForLeave}`);
+            console.log(`[createSalarySnapshots]    salaryLeaveBase = ${salaryLeaveBase}`);
             console.log(`[createSalarySnapshots]    divisor = ${divisor}`);
             console.log(`[createSalarySnapshots]    salaryLeaveDays = ${salaryLeaveDays}`);
             console.log(`[createSalarySnapshots]    salaryLeaveAmount = ${salaryLeaveAmount}`);
@@ -1275,6 +1322,7 @@ Deno.serve(async (req) => {
             const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
             
             // Current month deductible hours pay (2 decimals)
+            // Uses combined deductible + other minutes for payroll
             const currentMonthDeductibleHoursPay = Math.round((hourlyRate * deductibleHours) * 100) / 100;
             
             // ============================================================
@@ -1342,8 +1390,8 @@ Deno.serve(async (req) => {
             
             const normalOtHours = otRecord?.normalOtHours || 0;
             const specialOtHours = otRecord?.specialOtHours || 0;
-            const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
-            const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
+            const normalOtSalary = Math.round(otHourlyRate * otNormalRate * normalOtHours * 100) / 100;
+            const specialOtSalary = Math.round(otHourlyRate * otSpecialRate * specialOtHours * 100) / 100;
             const totalOtSalary = normalOtSalary + specialOtSalary;
             
             // Get adjustment values from OvertimeData
@@ -1361,15 +1409,25 @@ Deno.serve(async (req) => {
             let finalBalanceAmount = 0;
             let finalWpsCapApplied = false;
             
-            if (project.company === 'Al Maraghi Motors' && wpsCapEnabled) {
+            // Use global WPS settings (from SalaryCalculationSettings or employee-specific override)
+            const effectiveWpsCapEnabled = wpsCapEnabled !== undefined ? wpsCapEnabled : wpsCapEnabledGlobal;
+            const effectiveWpsCapAmount = wpsCapAmount !== undefined ? wpsCapAmount : wpsCapAmountGlobal;
+            
+            if (effectiveWpsCapEnabled) {
                 if (totalWithAdjustments <= 0) {
                     finalWpsAmount = 0;
                     finalBalanceAmount = 0;
                     finalWpsCapApplied = false;
                 } else {
-                    const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
+                    const cap = effectiveWpsCapAmount;
                     const rawExcess = Math.max(0, totalWithAdjustments - cap);
-                    finalBalanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
+                    
+                    if (balanceRoundingRule === 'NEAREST_100') {
+                        finalBalanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
+                    } else {
+                        finalBalanceAmount = Math.round(rawExcess * 100) / 100;
+                    }
+                    
                     finalWpsAmount = Math.round((totalWithAdjustments - finalBalanceAmount) * 100) / 100;
                     finalWpsCapApplied = rawExcess > 0;
                 }
