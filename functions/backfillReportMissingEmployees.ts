@@ -529,7 +529,61 @@ Deno.serve(async (req) => {
 
             // Create missing AnalysisResult records
             for (const emp of missingEmployees) {
-                const calculated = calculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to);
+                // CRITICAL: Employees without attendance_id (has_attendance_tracking=false) should be:
+                // - Present all days (present_days = working_days)
+                // - No deductions (LOP = 0, late = 0, early = 0, other = 0, deductible = 0)
+                // - Full salary (no attendance tracking, salary-only)
+                const hasAttendanceId = emp.attendance_id && String(emp.attendance_id).trim() !== '';
+                
+                let calculated;
+                if (!hasAttendanceId) {
+                    // Salary-only employee - no attendance tracking
+                    // Count working days in period (excluding weekly offs and public holidays)
+                    const startDate = new Date(reportRun.date_from);
+                    const endDate = new Date(reportRun.date_to);
+                    const dayNameToNumber = {
+                        'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                        'Thursday': 4, 'Friday': 5, 'Saturday': 6
+                    };
+                    
+                    let workingDays = 0;
+                    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                        const currentDate = new Date(d);
+                        const dayOfWeek = currentDate.getUTCDay();
+                        
+                        // Check weekly off
+                        let weeklyOffDay = null;
+                        if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                            weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                        } else if (emp.weekly_off) {
+                            weeklyOffDay = dayNameToNumber[emp.weekly_off];
+                        }
+                        
+                        if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                            continue;
+                        }
+                        
+                        workingDays++;
+                    }
+                    
+                    calculated = {
+                        workingDays,
+                        presentDays: workingDays, // Present all days
+                        fullAbsenceCount: 0,
+                        halfAbsenceCount: 0,
+                        sickLeaveCount: 0,
+                        annualLeaveCount: 0,
+                        lateMinutes: 0,
+                        earlyCheckoutMinutes: 0,
+                        otherMinutes: 0,
+                        approvedMinutes: 0,
+                        graceMinutes: 0,
+                        deductibleMinutes: 0
+                    };
+                } else {
+                    // Normal employee with attendance tracking
+                    calculated = calculateEmployeeAttendance(emp, reportRun.date_from, reportRun.date_to);
+                }
                 
                 const analysisResult = {
                     project_id,
