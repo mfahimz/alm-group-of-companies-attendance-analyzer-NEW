@@ -18,7 +18,8 @@ import {
     GitPullRequest,
     BookText,
     Lightbulb,
-    FileText
+    FileText,
+    Calculator
 } from 'lucide-react';
 
 /**
@@ -187,8 +188,18 @@ export const PAGES_CONFIG = {
     },
     RulesSettings: {
         name: 'RulesSettings',
-        title: 'Rules Settings',
+        title: 'Attendance Rules',
         icon: Settings,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo']
+    },
+    SalaryCalculationSettings: {
+        name: 'SalaryCalculationSettings',
+        title: 'Salary Formulas',
+        icon: Calculator,
         category: 'Admin',
         showInNav: true,
         requiresAuth: true,

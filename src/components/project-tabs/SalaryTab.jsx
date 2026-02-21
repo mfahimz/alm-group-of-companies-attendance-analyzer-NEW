@@ -203,93 +203,23 @@ export default function SalaryTab({ project }) {
             await new Promise(resolve => setTimeout(resolve, 300)); // Visual feedback
 
             // CRITICAL FIX: ALWAYS use finalized SalarySnapshot values
-            // date_from/date_to are just report metadata, they MUST NOT trigger attendance recalculation
-            // Salary MUST use finalized AnalysisResult values regardless of report date range
+            // Snapshots already contain ALL calculated values including OT and adjustments
+            // No need to recalculate - just use snapshot data directly
             const calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
 
-            setGenerationProgress('Calculating overtime and adjustments...');
-            await new Promise(resolve => setTimeout(resolve, 300)); // Visual feedback
+            setGenerationProgress('Preparing final report data...');
+            await new Promise(resolve => setTimeout(resolve, 300));
             
-            // Merge OT data from OvertimeData entity into calculated data
-            // ALSO merge adjustment fields from SalarySnapshot
-            // DIVISOR_OT: Use ot_calculation_days for OT salary calculations
-            // [MERGE_NOTE: If merging divisors, change otDivisor to use divisor (salary_calculation_days) instead]
-            const otDivisor = project.ot_calculation_days || 30;
-            
+            // Snapshots already have all values calculated correctly
             const finalCalculatedData = calculatedData.map(row => {
-                const otRecord = row.attendance_id 
-                    ? overtimeData.find(ot => String(ot.attendance_id) === String(row.attendance_id))
-                    : null;
-                
-                // Get the latest SalarySnapshot for adjustment values
-                const snapshotRecord = row.attendance_id
-                    ? salarySnapshots.find(s => String(s.attendance_id) === String(row.attendance_id))
-                    : salarySnapshots.find(s => String(s.hrms_id) === String(row.hrms_id));
-                
-                const salary = row.attendance_id
-                    ? employeeSalaries.find(s => String(s.attendance_id) === String(row.attendance_id) || String(s.employee_id) === String(row.hrms_id))
-                    : employeeSalaries.find(s => String(s.employee_id) === String(row.hrms_id));
-                const totalSalary = row.total_salary || salary?.total_salary || 0;
-                const workingHours = row.working_hours || salary?.working_hours || 9;
-                
-                // DIVISOR_OT: OT hourly rate uses snapshot's stored OT values (already calculated with correct logic)
-                // The snapshot was created with the correct previous month salary resolution
-                // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
-                const otHourlyRate = totalSalary / otDivisor / workingHours;
-
-                // OT hours from OvertimeData (pre-finalization entry)
-                const normalOtHours = otRecord?.normalOtHours || 0;
-                const specialOtHours = otRecord?.specialOtHours || 0;
-                const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
-                const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
-                const totalOtSalary = normalOtSalary + specialOtSalary;
-
-                // Get adjustment values from SalarySnapshot (post-finalization edits)
-                const netDeduction = row.netDeduction || 0;
-                const deductibleHoursPay = row.deductibleHoursPay || 0;
-                const bonus = snapshotRecord?.bonus ?? row.bonus ?? 0;
-                const incentive = snapshotRecord?.incentive ?? row.incentive ?? 0;
-                const otherDeduction = snapshotRecord?.otherDeduction ?? row.otherDeduction ?? 0;
-                const advanceSalaryDeduction = snapshotRecord?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0;
-
-                // Previous month deductions (Al Maraghi Motors - from recalculated snapshots)
-                // CRITICAL: These must come from the row (recalculated data), NOT snapshot
-                const extraPrevMonthDeductibleMinutes = row.extra_prev_month_deductible_minutes || 0;
-                const extraPrevMonthLopDays = row.extra_prev_month_lop_days || 0;
-                const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
-                const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
-
-                const finalTotal = totalSalary + totalOtSalary + bonus + incentive
-                    - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
-                    - otherDeduction - advanceSalaryDeduction;
-
-                // WPS SPLIT LOGIC (Al Maraghi Motors only)
-                // Balance must always be a multiple of 100 (round down)
-                let wpsAmount = finalTotal;
-                let balanceAmount = 0;
-                let wpsCapApplied = false;
-                const wpsCapEnabled = salary?.wps_cap_enabled || false;
-                const wpsCapAmount = salary?.wps_cap_amount ?? 4900;
-
-                if (isAlMaraghi && wpsCapEnabled) {
-                    if (finalTotal <= 0) {
-                        wpsAmount = 0;
-                        balanceAmount = 0;
-                        wpsCapApplied = false;
-                    } else {
-                        const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                        // Calculate raw excess over cap
-                        const rawExcess = Math.max(0, finalTotal - cap);
-                        // Round balance DOWN to nearest 100
-                        balanceAmount = Math.floor(rawExcess / 100) * 100;
-                        // WPS gets the rest (total - balance)
-                        wpsAmount = finalTotal - balanceAmount;
-                        wpsCapApplied = rawExcess > 0;
-                    }
-                } else if (finalTotal <= 0) {
-                    wpsAmount = 0;
-                    balanceAmount = 0;
-                }
+                return {
+                    ...row,
+                    // All values already in snapshot
+                    total: row.total || 0,
+                    wpsPay: row.wpsPay || 0,
+                    balance: row.balance || 0
+                };
+            });
 
                 const result = {
                     ...row,
