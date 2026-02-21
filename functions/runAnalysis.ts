@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
         }
         
         // Get attendance IDs of filtered employees - keep as strings
-        // CRITICAL BUG FIX #4: Filter out employees without attendance_id (has_attendance_tracking=false)
+        // CRITICAL BUG FIX #4: Filter out employees without attendance_id UNLESS they have has_attendance_tracking=false (salary-only)
         const activeEmployeeAttendanceIds = filteredEmployees
             .filter(e => e.attendance_id && e.attendance_id !== null && e.attendance_id !== undefined)
             .filter(e => String(e.attendance_id).trim() !== '')
@@ -425,6 +425,75 @@ Deno.serve(async (req) => {
 
             const startDate = new Date(date_from);
             const endDate = new Date(date_to);
+
+            // CRITICAL: Handle assumed present daily for salary-only employees
+            if (employee?.assumed_present_daily === true && employee?.has_attendance_tracking === false) {
+                // For assumed present employees without attendance tracking,
+                // they are considered present every working day within the report range
+                // and should not have attendance deductions.
+                // This will count all working days as present, ignoring punches/lates/earlies.
+                let tempWorkingDays = 0;
+                const dayNameToNumber = {
+                    'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                    'Thursday': 4, 'Friday': 5, 'Saturday': 6
+                };
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const currentDate = new Date(d);
+                    const dayOfWeek = currentDate.getUTCDay();
+                    let weeklyOffDay = null;
+                    if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                        weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                    } else if (employee?.weekly_off) {
+                        weeklyOffDay = dayNameToNumber[employee.weekly_off];
+                    }
+                    
+                    // Check if this day is also marked as a weekly off. If so, don't count as working day.
+                    if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                        continue;
+                    }
+
+                    // Additionally, ensure no public holidays mark this day off
+                    const dateStr = currentDate.toISOString().split('T')[0];
+                    const matchingExceptions = employeeExceptions.filter(ex => {
+                        try {
+                            const exFrom = new Date(ex.date_from);
+                            const exTo = new Date(ex.date_to);
+                            return currentDate >= exFrom && currentDate <= exTo;
+                        } catch { return false; }
+                    });
+                    const hasPublicHoliday = matchingExceptions.some(ex => 
+                        ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                    );
+
+                    if (hasPublicHoliday) {
+                        continue;
+                    }
+                    tempWorkingDays++;
+                }
+                workingDays = tempWorkingDays;
+                presentDays = tempWorkingDays;
+                // All other counts (absences, late, early, other minutes) remain 0
+                // This means assumed_present_daily overrides any other attendance logic
+                return {
+                    attendance_id,
+                    working_days: Math.max(0, workingDays),
+                    present_days: Math.max(0, presentDays),
+                    full_absence_count: 0,
+                    half_absence_count: 0,
+                    sick_leave_count: 0,
+                    annual_leave_count: 0,
+                    late_minutes: 0,
+                    early_checkout_minutes: 0,
+                    other_minutes: 0,
+                    approved_minutes: 0,
+                    deductible_minutes: 0, // No deductions for assumed present
+                    grace_minutes: 0,
+                    abnormal_dates: '',
+                    notes: 'Assumed Present Daily',
+                    auto_resolutions: '',
+                    _otherMinutesDetails: null
+                };
+            }
             
             // Calculate annual leave as CALENDAR DAYS (not working days)
             // This is done upfront, counting all days including weekends/holidays
@@ -711,7 +780,8 @@ Deno.serve(async (req) => {
                                 pm_end: dateException.new_pm_end
                             };
                         }
-                    } catch {
+                    } catch (e) {
+                        console.warn(`[runAnalysis] Failed to apply SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, e.message);
                         // Continue with existing shift
                     }
                 }
@@ -836,8 +906,7 @@ Deno.serve(async (req) => {
                     let dayLateMinutes = 0;
                     let dayEarlyMinutes = 0;
                     
-                    // Calculate late/early minutes normally
-                    // SKIP_PUNCH already handled above by preventing absence/partial detection
+                    // BUG FIX #2: Use Math.abs on RESULT of time difference, not individual components
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         
@@ -846,14 +915,14 @@ Deno.serve(async (req) => {
                         
                         if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                             if (punchTime > shiftTime) {
-                                const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                                const minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
                                 dayLateMinutes += minutes;
                             }
                         }
                         
                         if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                             if (punchTime < shiftTime) {
-                                const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                                const minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
                                 dayEarlyMinutes += minutes;
                             }
                         }
@@ -1009,7 +1078,7 @@ Deno.serve(async (req) => {
         const allResults = [];
         const processedAttendanceIds = new Set();
         const otherMinutesExceptionsToCreate = []; // Track other minutes exceptions to create
-        const ANALYSIS_BATCH_SIZE = 5; // Process 5 employees at a time
+        const ANALYSIS_BATCH_SIZE = 15; // BUG FIX #5: Increased from 5 to 15 for better performance
         const ANALYSIS_BATCH_DELAY = 500; // 500ms delay between analysis batches
         
         // Convert to array for batch processing
