@@ -70,39 +70,46 @@ Deno.serve(async (req) => {
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
 
         // ============================================================
-        // IDEMPOTENCY CHECK: Prevent duplicate snapshot creation
-        // If snapshots already exist for this report_run_id, return existing count
-        // This handles double-clicks, network retries, and concurrent requests
+        // UNIVERSAL IDEMPOTENCY CHECK (BATCH & NON-BATCH)
+        // CRITICAL: Must run FIRST before ANY processing to prevent duplicates
+        // Handles: double-clicks, network retries, concurrent requests, simultaneous batch starts
         // ============================================================
         const existingSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
             project_id: project_id,
             report_run_id: report_run_id
         }, null, 5000);
 
-        if (existingSnapshots.length > 0 && !batch_mode) {
-            console.log(`[createSalarySnapshots] ⚠️ IDEMPOTENCY: ${existingSnapshots.length} snapshots already exist for report_run_id ${report_run_id}. Skipping creation.`);
-            return Response.json({
-                success: true,
-                snapshots_created: 0,
-                existing_snapshots: existingSnapshots.length,
-                message: `Snapshots already exist for this report (${existingSnapshots.length} found). No duplicates created.`
-            });
-        }
-
-        // ============================================================
-        // CRITICAL FIX: Delete existing snapshots ONLY on first batch
-        // This prevents each batch from destroying previous batches' work
-        // ============================================================
-        if (batch_mode && batch_start === 0) {
-            if (existingSnapshots.length > 0) {
-                console.log(`[createSalarySnapshots] 🗑️ BATCH 1: Deleting ${existingSnapshots.length} existing snapshots`);
-                await Promise.all(existingSnapshots.map(s => base44.asServiceRole.entities.SalarySnapshot.delete(s.id)));
+        if (existingSnapshots.length > 0) {
+            console.log(`[createSalarySnapshots] 🛑 IDEMPOTENCY GATE: ${existingSnapshots.length} snapshots already exist for report_run_id ${report_run_id}`);
+            console.log(`[createSalarySnapshots] ⚠️ Request type: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}`);
+            console.log(`[createSalarySnapshots] ✅ Returning existing count - NO duplicates created`);
+            
+            // Return appropriate response based on mode
+            if (batch_mode) {
+                // Batch mode: Return batch-style response indicating completion
+                return Response.json({
+                    success: true,
+                    batch_mode: true,
+                    batch_completed: 0,
+                    total_employees: existingSnapshots.length,
+                    current_position: existingSnapshots.length,
+                    has_more: false,
+                    message: `Snapshots already exist (${existingSnapshots.length} found). Idempotency gate prevented duplicates.`,
+                    current_batch: []
+                });
             } else {
-                console.log(`[createSalarySnapshots] ✅ BATCH 1: No existing snapshots to delete`);
+                // Standard mode: Return standard response
+                return Response.json({
+                    success: true,
+                    snapshots_created: 0,
+                    existing_snapshots: existingSnapshots.length,
+                    message: `Snapshots already exist for this report (${existingSnapshots.length} found). No duplicates created.`
+                });
             }
-        } else if (batch_mode) {
-            console.log(`[createSalarySnapshots] ⏭️ BATCH ${Math.floor(batch_start / batch_size) + 1}: Skipping deletion (not first batch)`);
         }
+        
+        console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: No existing snapshots found - proceeding with creation`);
+        console.log(`[createSalarySnapshots] Request mode: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}, batch_size: ${batch_size}`);
 
         // ============================================================
         // AL MARAGHI MOTORS: Calculate salary month ranges
