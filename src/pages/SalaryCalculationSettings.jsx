@@ -86,6 +86,42 @@ export default function SalaryCalculationSettings() {
             toast.error('Company name is required');
             return;
         }
+        
+        // Check for duplicate company if creating new
+        if (!editingCompany.id) {
+            const existingForCompany = allSettings.find(s => s.company === editingCompany.company);
+            if (existingForCompany) {
+                toast.error('Settings already exist for this company');
+                return;
+            }
+        }
+        
+        // Validate numeric fields
+        if (editingCompany.salary_divisor <= 0) {
+            toast.error('Salary Divisor must be greater than 0');
+            return;
+        }
+        if (editingCompany.ot_divisor <= 0) {
+            toast.error('OT Divisor must be greater than 0');
+            return;
+        }
+        if (editingCompany.ot_normal_rate <= 0) {
+            toast.error('Normal OT Rate must be greater than 0');
+            return;
+        }
+        if (editingCompany.ot_special_rate <= 0) {
+            toast.error('Special OT Rate must be greater than 0');
+            return;
+        }
+        if (editingCompany.wps_cap_amount <= 0) {
+            toast.error('WPS Cap Amount must be greater than 0');
+            return;
+        }
+        if (editingCompany.assumed_present_last_days < 0 || editingCompany.assumed_present_last_days > 5) {
+            toast.error('Assumed Present Last Days must be between 0 and 5');
+            return;
+        }
+        
         saveMutation.mutate(editingCompany);
     };
 
@@ -236,8 +272,10 @@ export default function SalaryCalculationSettings() {
                                             <Label>Salary Divisor</Label>
                                             <Input
                                                 type="number"
-                                                value={editingCompany.salary_divisor}
-                                                onChange={(e) => setEditingCompany({...editingCompany, salary_divisor: parseFloat(e.target.value)})}
+                                                min="1"
+                                                step="1"
+                                                value={editingCompany.salary_divisor || ''}
+                                                onChange={(e) => setEditingCompany({...editingCompany, salary_divisor: parseFloat(e.target.value) || 30})}
                                                 className="mt-2"
                                             />
                                             <p className="text-xs text-slate-500 mt-1">Used for: Leave Pay, Salary Leave, Deductible Hours</p>
@@ -246,8 +284,10 @@ export default function SalaryCalculationSettings() {
                                             <Label>OT Divisor</Label>
                                             <Input
                                                 type="number"
-                                                value={editingCompany.ot_divisor}
-                                                onChange={(e) => setEditingCompany({...editingCompany, ot_divisor: parseFloat(e.target.value)})}
+                                                min="1"
+                                                step="1"
+                                                value={editingCompany.ot_divisor || ''}
+                                                onChange={(e) => setEditingCompany({...editingCompany, ot_divisor: parseFloat(e.target.value) || 30})}
                                                 className="mt-2"
                                             />
                                             <p className="text-xs text-slate-500 mt-1">Used for: OT Hourly Rate, Previous Month calculations</p>
@@ -263,9 +303,10 @@ export default function SalaryCalculationSettings() {
                                             <Label>Normal OT Rate</Label>
                                             <Input
                                                 type="number"
+                                                min="0.01"
                                                 step="0.01"
-                                                value={editingCompany.ot_normal_rate}
-                                                onChange={(e) => setEditingCompany({...editingCompany, ot_normal_rate: parseFloat(e.target.value)})}
+                                                value={editingCompany.ot_normal_rate || ''}
+                                                onChange={(e) => setEditingCompany({...editingCompany, ot_normal_rate: parseFloat(e.target.value) || 1.25})}
                                                 className="mt-2"
                                             />
                                             <p className="text-xs text-slate-500 mt-1">Multiplier (e.g., 1.25 = 125%)</p>
@@ -274,9 +315,10 @@ export default function SalaryCalculationSettings() {
                                             <Label>Special OT Rate</Label>
                                             <Input
                                                 type="number"
+                                                min="0.01"
                                                 step="0.01"
-                                                value={editingCompany.ot_special_rate}
-                                                onChange={(e) => setEditingCompany({...editingCompany, ot_special_rate: parseFloat(e.target.value)})}
+                                                value={editingCompany.ot_special_rate || ''}
+                                                onChange={(e) => setEditingCompany({...editingCompany, ot_special_rate: parseFloat(e.target.value) || 1.5})}
                                                 className="mt-2"
                                             />
                                             <p className="text-xs text-slate-500 mt-1">Multiplier (e.g., 1.5 = 150%)</p>
@@ -300,8 +342,10 @@ export default function SalaryCalculationSettings() {
                                                 <Label>WPS Cap Amount (AED)</Label>
                                                 <Input
                                                     type="number"
-                                                    value={editingCompany.wps_cap_amount}
-                                                    onChange={(e) => setEditingCompany({...editingCompany, wps_cap_amount: parseFloat(e.target.value)})}
+                                                    min="1"
+                                                    step="1"
+                                                    value={editingCompany.wps_cap_amount || ''}
+                                                    onChange={(e) => setEditingCompany({...editingCompany, wps_cap_amount: parseFloat(e.target.value) || 4900})}
                                                     className="mt-2"
                                                 />
                                             </div>
@@ -410,8 +454,8 @@ export default function SalaryCalculationSettings() {
                                             type="number"
                                             min="0"
                                             max="5"
-                                            value={editingCompany.assumed_present_last_days}
-                                            onChange={(e) => setEditingCompany({...editingCompany, assumed_present_last_days: parseInt(e.target.value) || 0})}
+                                            value={editingCompany.assumed_present_last_days === undefined || editingCompany.assumed_present_last_days === null ? '' : editingCompany.assumed_present_last_days}
+                                            onChange={(e) => setEditingCompany({...editingCompany, assumed_present_last_days: e.target.value === '' ? 0 : Math.max(0, Math.min(5, parseInt(e.target.value) || 0))})}
                                             className="mt-2"
                                         />
                                         <p className="text-xs text-slate-500 mt-1">
@@ -478,8 +522,10 @@ export default function SalaryCalculationSettings() {
                                         <Label>Salary Divisor</Label>
                                         <Input
                                             type="number"
-                                            value={editingCompany.salary_divisor}
-                                            onChange={(e) => setEditingCompany({...editingCompany, salary_divisor: parseFloat(e.target.value)})}
+                                            min="1"
+                                            step="1"
+                                            value={editingCompany.salary_divisor || ''}
+                                            onChange={(e) => setEditingCompany({...editingCompany, salary_divisor: parseFloat(e.target.value) || 30})}
                                             className="mt-2"
                                         />
                                     </div>
@@ -487,8 +533,10 @@ export default function SalaryCalculationSettings() {
                                         <Label>OT Divisor</Label>
                                         <Input
                                             type="number"
-                                            value={editingCompany.ot_divisor}
-                                            onChange={(e) => setEditingCompany({...editingCompany, ot_divisor: parseFloat(e.target.value)})}
+                                            min="1"
+                                            step="1"
+                                            value={editingCompany.ot_divisor || ''}
+                                            onChange={(e) => setEditingCompany({...editingCompany, ot_divisor: parseFloat(e.target.value) || 30})}
                                             className="mt-2"
                                         />
                                     </div>
@@ -500,9 +548,10 @@ export default function SalaryCalculationSettings() {
                                         <Label>Normal OT Rate</Label>
                                         <Input
                                             type="number"
+                                            min="0.01"
                                             step="0.01"
-                                            value={editingCompany.ot_normal_rate}
-                                            onChange={(e) => setEditingCompany({...editingCompany, ot_normal_rate: parseFloat(e.target.value)})}
+                                            value={editingCompany.ot_normal_rate || ''}
+                                            onChange={(e) => setEditingCompany({...editingCompany, ot_normal_rate: parseFloat(e.target.value) || 1.25})}
                                             className="mt-2"
                                         />
                                     </div>
@@ -510,9 +559,10 @@ export default function SalaryCalculationSettings() {
                                         <Label>Special OT Rate</Label>
                                         <Input
                                             type="number"
+                                            min="0.01"
                                             step="0.01"
-                                            value={editingCompany.ot_special_rate}
-                                            onChange={(e) => setEditingCompany({...editingCompany, ot_special_rate: parseFloat(e.target.value)})}
+                                            value={editingCompany.ot_special_rate || ''}
+                                            onChange={(e) => setEditingCompany({...editingCompany, ot_special_rate: parseFloat(e.target.value) || 1.5})}
                                             className="mt-2"
                                         />
                                     </div>
@@ -530,8 +580,10 @@ export default function SalaryCalculationSettings() {
                                     {editingCompany.wps_cap_enabled && (
                                         <Input
                                             type="number"
-                                            value={editingCompany.wps_cap_amount}
-                                            onChange={(e) => setEditingCompany({...editingCompany, wps_cap_amount: parseFloat(e.target.value)})}
+                                            min="1"
+                                            step="1"
+                                            value={editingCompany.wps_cap_amount || ''}
+                                            onChange={(e) => setEditingCompany({...editingCompany, wps_cap_amount: parseFloat(e.target.value) || 4900})}
                                             placeholder="WPS cap amount (AED)"
                                         />
                                     )}
@@ -578,8 +630,8 @@ export default function SalaryCalculationSettings() {
                                         type="number"
                                         min="0"
                                         max="5"
-                                        value={editingCompany.assumed_present_last_days}
-                                        onChange={(e) => setEditingCompany({...editingCompany, assumed_present_last_days: parseInt(e.target.value) || 0})}
+                                        value={editingCompany.assumed_present_last_days === undefined || editingCompany.assumed_present_last_days === null ? '' : editingCompany.assumed_present_last_days}
+                                        onChange={(e) => setEditingCompany({...editingCompany, assumed_present_last_days: e.target.value === '' ? 0 : Math.max(0, Math.min(5, parseInt(e.target.value) || 0))})}
                                         className="mt-2"
                                     />
                                     <p className="text-xs text-slate-500 mt-1">Al Maraghi: 2 days, Others: 0</p>

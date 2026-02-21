@@ -75,14 +75,31 @@ Deno.serve(async (req) => {
         const settings = companySettings.length > 0 ? companySettings[0] : null;
         
         // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
-        const divisor = settings?.salary_divisor || project.salary_calculation_days || 30;
+        let divisor = settings?.salary_divisor || project.salary_calculation_days || 30;
+        if (!divisor || divisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid salary_divisor from settings, using default 30');
+            divisor = 30;
+        }
+        
         // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
-        const otDivisor = settings?.ot_divisor || project.ot_calculation_days || divisor;
+        let otDivisor = settings?.ot_divisor || project.ot_calculation_days || divisor;
+        if (!otDivisor || otDivisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_divisor from settings, using default divisor');
+            otDivisor = divisor;
+        }
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
         
         // OT Rates from settings
-        const otNormalRate = settings?.ot_normal_rate || 1.25;
-        const otSpecialRate = settings?.ot_special_rate || 1.5;
+        let otNormalRate = settings?.ot_normal_rate || 1.25;
+        let otSpecialRate = settings?.ot_special_rate || 1.5;
+        if (!otNormalRate || otNormalRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_normal_rate, using default 1.25');
+            otNormalRate = 1.25;
+        }
+        if (!otSpecialRate || otSpecialRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_special_rate, using default 1.5');
+            otSpecialRate = 1.5;
+        }
         
         // WPS Cap settings
         const wpsCapEnabledGlobal = settings?.wps_cap_enabled ?? (isAlMaraghi ? true : false);
