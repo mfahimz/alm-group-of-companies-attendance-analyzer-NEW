@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Calculator, Plus, Edit, Save, X, Info, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageTitle } from '@/components/ui/PageTitle';
+
 
 export default function SalaryCalculationSettings() {
     const [editingCompany, setEditingCompany] = useState(null);
@@ -105,11 +105,14 @@ export default function SalaryCalculationSettings() {
     return (
         <div className="min-h-screen bg-[#F4F6F9] p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-                <PageTitle 
-                    title="Salary Calculation Settings"
-                    description="Configure company-specific salary calculation rules and formulas"
-                    icon={Calculator}
-                />
+                {/* Page Title */}
+                <div className="flex items-center gap-3">
+                    <Calculator className="w-8 h-8 text-indigo-600" />
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900">Salary Calculation Settings</h1>
+                        <p className="text-sm text-slate-600 mt-1">Configure company-specific salary calculation rules and formulas</p>
+                    </div>
+                </div>
 
                 {/* Info Banner */}
                 <Card className="border-l-4 border-l-blue-500 bg-blue-50">
