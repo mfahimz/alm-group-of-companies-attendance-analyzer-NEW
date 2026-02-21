@@ -48,6 +48,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
         due_date: '',
         notes: ''
     });
+    const [isCustomType, setIsCustomType] = useState(false);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -85,6 +86,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
             queryClient.invalidateQueries(['checklistItems', project.id]);
             toast.success('Task added to checklist');
             setShowAddDialog(false);
+            setIsCustomType(false);
             setNewTask({ task_type: '', task_description: '', due_date: '', notes: '' });
         },
         onError: (error) => {
@@ -331,36 +333,51 @@ function ChecklistSection({ project, checklistItems = [] }) {
                     <div className="space-y-4 py-4">
                         <div>
                             <Label>Task Type *</Label>
-                            <Select
-                                value={newTask.task_type}
-                                onValueChange={(value) => {
-                                    if (value === '__custom__') {
-                                        setNewTask({...newTask, task_type: ''});
-                                    } else {
-                                        setNewTask({...newTask, task_type: value});
-                                    }
-                                }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select task type..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {PREDEFINED_TASKS.map(task => (
-                                        <SelectItem key={task.task_type} value={task.task_type}>
-                                            {task.task_type}
-                                        </SelectItem>
-                                    ))}
-                                    <SelectItem value="__custom__">Enter Custom Type...</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {newTask.task_type === '' && (
-                                <Input
-                                    className="mt-2"
+                            {!isCustomType ? (
+                                <Select
                                     value={newTask.task_type}
-                                    onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
-                                    placeholder="Enter custom task type..."
-                                    autoFocus
-                                />
+                                    onValueChange={(value) => {
+                                        if (value === '__custom__') {
+                                            setIsCustomType(true);
+                                            setNewTask({...newTask, task_type: ''});
+                                        } else {
+                                            setNewTask({...newTask, task_type: value});
+                                        }
+                                    }}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select task type..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PREDEFINED_TASKS.map(task => (
+                                            <SelectItem key={task.task_type} value={task.task_type}>
+                                                {task.task_type}
+                                            </SelectItem>
+                                        ))}
+                                        <SelectItem value="__custom__">Enter Custom Type...</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <div className="space-y-2">
+                                    <Input
+                                        value={newTask.task_type}
+                                        onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
+                                        placeholder="Enter custom task type..."
+                                        autoFocus
+                                    />
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => {
+                                            setIsCustomType(false);
+                                            setNewTask({...newTask, task_type: ''});
+                                        }}
+                                        className="text-xs"
+                                    >
+                                        ← Back to predefined types
+                                    </Button>
+                                </div>
                             )}
                         </div>
                         <div>
@@ -383,7 +400,10 @@ function ChecklistSection({ project, checklistItems = [] }) {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                        <Button variant="outline" onClick={() => {
+                            setShowAddDialog(false);
+                            setIsCustomType(false);
+                        }}>
                             Cancel
                         </Button>
                         <Button
