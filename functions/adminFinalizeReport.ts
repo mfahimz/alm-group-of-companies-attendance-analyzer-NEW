@@ -44,13 +44,30 @@ Deno.serve(async (req) => {
 
         // Mark the selected report as final
         await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-            is_final: true
+            is_final: true,
+            finalized_by: user.email,
+            finalized_date: new Date().toISOString()
         });
 
         // Update project's last_saved_report_id to track which report was finalized
         await base44.asServiceRole.entities.Project.update(project_id, {
             last_saved_report_id: report_run_id
         });
+
+        // Create salary snapshots for Al Maraghi Motors ONLY
+        const project = projects[0];
+        if (project.company === 'Al Maraghi Motors') {
+            try {
+                await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
+                    project_id,
+                    report_run_id
+                });
+                console.log('[adminFinalizeReport] Salary snapshots created for Al Maraghi Motors');
+            } catch (salaryError) {
+                console.warn('[adminFinalizeReport] Failed to create salary snapshots:', salaryError.message);
+                // Don't block finalization if salary snapshot creation fails
+            }
+        }
 
         // Log audit (with error handling to not block finalization)
         try {
