@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
         const balanceRoundingRule = settings?.balance_rounding_rule || 'EXACT';
         
         // Formula settings
-        const leavePay Formula = settings?.leave_pay_formula || 'TOTAL_SALARY';
+        const leavePayFormula = settings?.leave_pay_formula || 'TOTAL_SALARY';
         const salaryLeaveFormula = settings?.salary_leave_formula || 'BASIC_PLUS_ALLOWANCES';
         const assumedPresentLastDays = settings?.assumed_present_last_days ?? (isAlMaraghi ? 2 : 0);
         
