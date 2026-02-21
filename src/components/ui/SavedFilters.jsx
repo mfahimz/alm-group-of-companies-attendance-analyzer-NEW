@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Filter, Save, Trash2, Star } from 'lucide-react';
+import { Save, Trash2, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SavedFilters({ filters, onApplyFilter, storageKey = 'saved_filters' }) {
