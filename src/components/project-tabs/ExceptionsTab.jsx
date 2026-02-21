@@ -246,25 +246,22 @@ function ChecklistSection({ project }) {
                                 <span className="text-xs font-medium text-slate-600 whitespace-nowrap mr-2">Quick View:</span>
                                 <div className="flex flex-wrap gap-2">
                                     {Object.entries(taskTypeStats).map(([taskType, stats]) => {
-                                        const isComplete = stats.completed === stats.total;
+                                        const hasTasks = stats.total > 0;
                                         return (
                                             <div
                                                 key={taskType}
                                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
-                                                    isComplete 
+                                                    hasTasks 
                                                         ? 'bg-green-50 border-green-200 text-green-700' 
-                                                        : 'bg-white border-slate-200 text-slate-700'
+                                                        : 'bg-white border-slate-200 text-slate-500'
                                                 }`}
                                             >
-                                                {isComplete ? (
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                                                ) : (
-                                                    <Circle className="w-3.5 h-3.5 text-slate-400" />
-                                                )}
                                                 <span className="whitespace-nowrap">{taskType}</span>
-                                                <span className={`ml-1 ${isComplete ? 'text-green-600' : 'text-slate-500'}`}>
-                                                    {stats.completed}/{stats.total}
-                                                </span>
+                                                {hasTasks && (
+                                                    <span className="ml-1 text-green-600 font-semibold">
+                                                        {stats.total}
+                                                    </span>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -291,44 +288,17 @@ function ChecklistSection({ project }) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-12">Status</TableHead>
                                     <TableHead>Task Type</TableHead>
                                     <TableHead>Description</TableHead>
-                                    <TableHead>Completed By</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {checklistItems.map((task) => (
                                     <TableRow key={task.id} className={task.status === 'completed' ? 'bg-green-50' : ''}>
-                                        <TableCell>
-                                            <button
-                                                onClick={() => handleToggleStatus(task)}
-                                                disabled={updateTaskMutation.isPending}
-                                                className="hover:opacity-70 transition-opacity"
-                                            >
-                                                {task.status === 'completed' ? (
-                                                    <CheckCircle2 className="w-6 h-6 text-green-600" />
-                                                ) : task.status === 'in_progress' ? (
-                                                    <Clock className="w-6 h-6 text-amber-600" />
-                                                ) : (
-                                                    <Circle className="w-6 h-6 text-slate-400" />
-                                                )}
-                                            </button>
-                                        </TableCell>
                                         <TableCell className="font-medium">{task.task_type}</TableCell>
                                         <TableCell className={task.status === 'completed' ? 'line-through text-slate-500' : ''}>
                                             {task.task_description}
-                                        </TableCell>
-                                        <TableCell>
-                                            {task.completed_by ? (
-                                                <div className="text-sm">
-                                                    <div className="text-slate-900">{task.completed_by}</div>
-                                                    <div className="text-slate-500">
-                                                        {formatInUAE(new Date(task.completed_date), 'MMM dd, HH:mm')}
-                                                    </div>
-                                                </div>
-                                            ) : '—'}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex gap-1 justify-end">
