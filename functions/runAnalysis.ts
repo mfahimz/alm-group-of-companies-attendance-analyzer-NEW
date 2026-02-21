@@ -984,7 +984,12 @@ Deno.serve(async (req) => {
                 grace_minutes: totalGraceMinutes,
                 abnormal_dates: [...abnormal_dates_set].sort().join(', '),
                 notes: criticalDatesFormatted,
-                auto_resolutions: autoResolutionNotes
+                auto_resolutions: autoResolutionNotes,
+                _otherMinutesDetails: otherMinutes > 0 ? {
+                    attendance_id: attendanceIdStr,
+                    other_minutes: otherMinutes,
+                    employee_name: employee?.name || attendanceIdStr
+                } : null
             };
         };
 
