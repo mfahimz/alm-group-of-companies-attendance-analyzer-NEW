@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
 
         // Fetch core data
         // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()
-        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts] = await Promise.all([
+        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts, allOvertimeData] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.AnalysisResult.filter({ 
@@ -199,13 +199,14 @@ Deno.serve(async (req) => {
                 : Promise.resolve([]),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000),
             base44.asServiceRole.entities.Punch.filter({ project_id: project_id }, null, 5000),
-            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }, null, 5000)
+            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }, null, 5000),
+            base44.asServiceRole.entities.OvertimeData.filter({ project_id: project_id }, null, 5000)
         ]);
 
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] EXECUTION TRACE START`);
         console.log(`[createSalarySnapshots] BATCH_MODE=${batch_mode}, BATCH_START=${batch_start}, BATCH_SIZE=${batch_size}`);
-        console.log(`[createSalarySnapshots] RAW DATA FETCHED: ${employees.length} employees, ${salaries.length} salaries, ${analysisResults.length} analysis results`);
+        console.log(`[createSalarySnapshots] RAW DATA FETCHED: ${employees.length} employees, ${salaries.length} salaries, ${analysisResults.length} analysis results, ${allOvertimeData.length} overtime records`);
         console.log(`[createSalarySnapshots] ============================================`);
 
         // Parse rules
@@ -1321,7 +1322,56 @@ Deno.serve(async (req) => {
                 balanceAmount = 0;
             }
 
-            console.log(`[createSalarySnapshots] 💾 Creating snapshot for ${emp.name} - Total: ${finalTotal}, WPS: ${wpsAmount}, Balance: ${balanceAmount}`);
+            // CRITICAL: Fetch OvertimeData to populate OT and adjustment fields
+            // OvertimeData is entered BEFORE finalization in the Overtime tab
+            const otRecord = allOvertimeData.find(ot => 
+                (emp.attendance_id && String(ot.attendance_id) === String(emp.attendance_id)) ||
+                String(ot.hrms_id) === String(emp.hrms_id)
+            );
+            
+            // OT calculations using previous month salary (for historical accuracy)
+            const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
+            const otHourlyRate = prevMonthTotalSalary / otDivisor / workingHours;
+            
+            const normalOtHours = otRecord?.normalOtHours || 0;
+            const specialOtHours = otRecord?.specialOtHours || 0;
+            const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
+            const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
+            const totalOtSalary = normalOtSalary + specialOtSalary;
+            
+            // Get adjustment values from OvertimeData
+            const bonus = otRecord?.bonus || 0;
+            const incentive = otRecord?.incentive || 0;
+            const otherDeduction = otRecord?.otherDeduction || 0;
+            const advanceSalaryDeduction = otRecord?.advanceSalaryDeduction || 0;
+            
+            // Recalculate final total with OT and adjustments
+            const totalWithAdjustments = totalSalaryAmount + totalOtSalary + bonus + incentive
+                - netDeduction - totalDeductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+            
+            // Recalculate WPS split with adjusted total
+            let finalWpsAmount = totalWithAdjustments;
+            let finalBalanceAmount = 0;
+            let finalWpsCapApplied = false;
+            
+            if (project.company === 'Al Maraghi Motors' && wpsCapEnabled) {
+                if (totalWithAdjustments <= 0) {
+                    finalWpsAmount = 0;
+                    finalBalanceAmount = 0;
+                    finalWpsCapApplied = false;
+                } else {
+                    const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
+                    const rawExcess = Math.max(0, totalWithAdjustments - cap);
+                    finalBalanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
+                    finalWpsAmount = Math.round((totalWithAdjustments - finalBalanceAmount) * 100) / 100;
+                    finalWpsCapApplied = rawExcess > 0;
+                }
+            } else if (totalWithAdjustments <= 0) {
+                finalWpsAmount = 0;
+                finalBalanceAmount = 0;
+            }
+            
+            console.log(`[createSalarySnapshots] 💾 Creating snapshot for ${emp.name} - Total: ${totalWithAdjustments}, WPS: ${finalWpsAmount}, Balance: ${finalBalanceAmount}, OT: ${totalOtSalary}`);
             
             // SALARY-ONLY FIX: Store attendance_id as null if employee doesn't have one
             snapshots.push({
@@ -1362,23 +1412,23 @@ Deno.serve(async (req) => {
                  deductibleHours: deductibleHours,
                  deductibleHoursPay: totalDeductibleHoursPay,
                  netDeduction: netDeduction,
-                // OT & Adjustment Fields (editable, initialized to 0, will be rounded on recalculation)
-                normalOtHours: 0,
-                normalOtSalary: 0,
-                specialOtHours: 0,
-                specialOtSalary: 0,
-                totalOtSalary: 0,
-                // Adjustment Fields (NOT rounded - user-entered values)
-                otherDeduction: 0,
-                bonus: 0,
-                incentive: 0,
-                advanceSalaryDeduction: 0,
-                total: finalTotal,
-                wpsPay: wpsAmount,
-                balance: balanceAmount,
+                // OT & Adjustment Fields (populated from OvertimeData)
+                normalOtHours: normalOtHours,
+                normalOtSalary: normalOtSalary,
+                specialOtHours: specialOtHours,
+                specialOtSalary: specialOtSalary,
+                totalOtSalary: totalOtSalary,
+                // Adjustment Fields (populated from OvertimeData)
+                otherDeduction: otherDeduction,
+                bonus: bonus,
+                incentive: incentive,
+                advanceSalaryDeduction: advanceSalaryDeduction,
+                total: totalWithAdjustments,
+                wpsPay: finalWpsAmount,
+                balance: finalBalanceAmount,
                 wps_cap_enabled: wpsCapEnabled,
                 wps_cap_amount: wpsCapAmount,
-                wps_cap_applied: wpsCapApplied,
+                wps_cap_applied: finalWpsCapApplied,
                 snapshot_created_at: new Date().toISOString(),
                 attendance_source: attendanceSource
             });
