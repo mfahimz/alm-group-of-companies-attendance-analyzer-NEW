@@ -38,7 +38,7 @@ const PREDEFINED_TASKS = [
 ];
 
 // Checklist Section Component
-function ChecklistSection({ project }) {
+function ChecklistSection({ project, checklistItems = [] }) {
     const queryClient = useQueryClient();
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
@@ -52,13 +52,6 @@ function ChecklistSection({ project }) {
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
-    });
-
-    const { data: checklistItems = [] } = useQuery({
-        queryKey: ['checklistItems', project.id],
-        queryFn: () => base44.entities.ChecklistItem.filter({ project_id: project.id }, 'created_date'),
-        staleTime: 5 * 60 * 1000,
-        refetchOnWindowFocus: false
     });
 
     const initializePredefinedTasksMutation = useMutation({
@@ -585,6 +578,13 @@ export default function ExceptionsTab({ project }) {
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
+    });
+
+    const { data: checklistItems = [] } = useQuery({
+        queryKey: ['checklistItems', project.id],
+        queryFn: () => base44.entities.ChecklistItem.filter({ project_id: project.id }, 'created_date'),
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
@@ -2172,7 +2172,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             </Card>
 
             {/* Payroll Checklist Section */}
-            <ChecklistSection project={project} />
+            <ChecklistSection project={project} checklistItems={checklistItems} />
 
             {/* Report-Generated Exceptions */}
             {reportExceptions.length > 0 && (
