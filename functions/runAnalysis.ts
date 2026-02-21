@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
         // Get attendance IDs of filtered employees - keep as strings
         // CRITICAL BUG FIX #4: Filter out employees without attendance_id (has_attendance_tracking=false)
         const activeEmployeeAttendanceIds = filteredEmployees
-            .filter(e => e.attendance_id && e.attendance_id.trim() !== '')
+            .filter(e => e.attendance_id && String(e.attendance_id).trim() !== '')
             .map(e => String(e.attendance_id));
         
         // CRITICAL: Include ALL active employees, not just those with punches
