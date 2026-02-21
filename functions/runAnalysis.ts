@@ -410,6 +410,7 @@ Deno.serve(async (req) => {
             let earlyCheckoutMinutes = 0;
             let otherMinutes = 0;
             let totalApprovedMinutes = 0;
+            const otherMinutesByDate = {}; // Track other minutes per date
             const abnormal_dates_set = new Set();
             const critical_abnormal_dates_set = new Set();
             const auto_resolutions = [];
@@ -821,6 +822,7 @@ Deno.serve(async (req) => {
                     }
                     if (dateException.other_minutes && dateException.other_minutes > 0) {
                         otherMinutes += dateException.other_minutes;
+                        otherMinutesByDate[dateStr] = dateException.other_minutes;
                     }
                 } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !hasSkipPunchApplied) {
                     let dayLateMinutes = 0;
@@ -988,7 +990,8 @@ Deno.serve(async (req) => {
                 _otherMinutesDetails: otherMinutes > 0 ? {
                     attendance_id: attendanceIdStr,
                     other_minutes: otherMinutes,
-                    employee_name: employee?.name || attendanceIdStr
+                    employee_name: employee?.name || attendanceIdStr,
+                    breakdown: otherMinutesByDate
                 } : null
             };
         };
@@ -1076,6 +1079,11 @@ Deno.serve(async (req) => {
             
             for (const detail of otherMinutesExceptionsToCreate) {
                 try {
+                    // Format breakdown for details field
+                    const breakdownText = Object.entries(detail.breakdown || {})
+                        .map(([date, minutes]) => `${new Date(date).toLocaleDateString()}: ${minutes} min`)
+                        .join(' | ');
+                    
                     await base44.asServiceRole.entities.Exception.create({
                         project_id,
                         attendance_id: detail.attendance_id,
@@ -1083,7 +1091,7 @@ Deno.serve(async (req) => {
                         date_to: date_to,
                         type: 'MANUAL_OTHER_MINUTES',
                         other_minutes: detail.other_minutes,
-                        details: `Other minutes detected during analysis for ${detail.employee_name}`,
+                        details: `Total: ${detail.other_minutes} min | Breakdown: ${breakdownText}`,
                         created_from_report: true,
                         report_run_id: reportRun.id,
                         use_in_analysis: true,
