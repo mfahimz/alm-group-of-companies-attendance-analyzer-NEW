@@ -196,70 +196,20 @@ export default function SalaryTab({ project }) {
         
         try {
             // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
-            // [MERGE_NOTE: If merging divisors, this becomes the single divisor for all calculations]
             const divisor = project.salary_calculation_days || 30;
 
             setGenerationProgress(`Loading salary snapshots for ${salarySnapshots.length} employees...`);
-            await new Promise(resolve => setTimeout(resolve, 300)); // Visual feedback
-
-            // CRITICAL FIX: ALWAYS use finalized SalarySnapshot values
-            // Snapshots already contain ALL calculated values including OT and adjustments
-            // No need to recalculate - just use snapshot data directly
-            const calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
-
-            setGenerationProgress('Preparing final report data...');
             await new Promise(resolve => setTimeout(resolve, 300));
-            
-            // Snapshots already have all values calculated correctly
-            const finalCalculatedData = calculatedData.map(row => {
+
+            // CRITICAL: Use finalized SalarySnapshot values directly
+            // Snapshots already contain ALL calculated values including OT and adjustments
+            const finalCalculatedData = salarySnapshots.map(row => {
                 return {
                     ...row,
-                    // All values already in snapshot
                     total: row.total || 0,
                     wpsPay: row.wpsPay || 0,
                     balance: row.balance || 0
                 };
-            });
-
-                const result = {
-                    ...row,
-                    normalOtHours,
-                    specialOtHours,
-                    normalOtSalary,
-                    specialOtSalary,
-                    totalOtSalary,
-                    bonus,
-                    incentive,
-                    otherDeduction,
-                    advanceSalaryDeduction,
-                    // Store divisors used for reference
-                    salary_divisor: divisor,
-                    ot_divisor: otDivisor,
-                    // CRITICAL: Preserve finalized attendance values (DO NOT RECOMPUTE)
-                    deductible_minutes: row.deductible_minutes || 0,
-                    deductibleHours: row.deductibleHours || 0,
-                    deductibleHoursPay: row.deductibleHoursPay || 0,
-                    leaveDays: row.leaveDays || 0,
-                    leavePay: row.leavePay || 0,
-                    salaryLeaveAmount: row.salaryLeaveAmount || 0,
-                    netDeduction: row.netDeduction || 0,
-                    // Preserve previous month fields from recalculated data (DISABLED - should be 0)
-                    extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
-                    extra_prev_month_lop_days: extraPrevMonthLopDays,
-                    extra_prev_month_lop_pay: extraPrevMonthLopPay,
-                    extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
-                    prev_month_divisor: row.prev_month_divisor || 0,
-                    salary_month_start: row.salary_month_start || null,
-                    salary_month_end: row.salary_month_end || null,
-                    total: Math.round(finalTotal * 100) / 100,
-                    wpsPay: Math.round(wpsAmount * 100) / 100,
-                    balance: Math.round(balanceAmount * 100) / 100,
-                    wps_cap_enabled: wpsCapEnabled,
-                    wps_cap_amount: wpsCapAmount,
-                    wps_cap_applied: wpsCapApplied
-                };
-                
-                return result;
             });
 
             setGenerationProgress('Calculating report totals...');

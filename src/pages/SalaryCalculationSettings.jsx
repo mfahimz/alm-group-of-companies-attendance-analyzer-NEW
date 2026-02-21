@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Calculator, Plus, Edit, Save, X, Info, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import PageTitle from '@/components/ui/PageTitle';
+import { PageTitle } from '@/components/ui/PageTitle';
 
 export default function SalaryCalculationSettings() {
     const [editingCompany, setEditingCompany] = useState(null);
