@@ -1204,7 +1204,7 @@ Deno.serve(async (req) => {
             // PERMANENT LOCK: For finalized reports, use AnalysisResult values AS-IS (1:1 copy)
             // CRITICAL: Check manual override fields FIRST, fallback to regular fields
             // Manual overrides are set when user edits report before finalization
-            // deductible_minutes formula in runAnalysis: ((late + early) - grace) + other - approved
+            // deductible_minutes formula in runAnalysis: ((late + early) - grace) - approved (other_minutes stored separately)
             if (hasAnalysisResult) {
                 calculated = {
                     workingDays: analysisResult.working_days || 0,
@@ -1307,11 +1307,16 @@ Deno.serve(async (req) => {
             
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
 
-            // CRITICAL: Combine other_minutes + deductible_minutes ONLY FOR PAYROLL
-            // During finalization, these are stored separately for attendance reporting
-            // For salary calculation, we combine them into deductible minutes
-            const totalDeductibleMinutes = calculated.deductibleMinutes + calculated.otherMinutes;
-            const deductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
+            // Use finalized attendance fields from AnalysisResult AS-IS.
+            // IMPORTANT: never merge other_minutes into deductible_minutes.
+            // Snapshot must persist both fields separately exactly as finalized.
+            const finalizedDeductibleMinutes = Math.max(0, calculated.deductibleMinutes || 0);
+            const finalizedOtherMinutes = Math.max(0, calculated.otherMinutes || 0);
+
+            // Payroll deduction uses both finalized deductible + finalized other minutes,
+            // while snapshot fields remain separate for UI/audit fidelity.
+            const payrollDeductibleMinutes = finalizedDeductibleMinutes + finalizedOtherMinutes;
+            const deductibleHours = Math.round((payrollDeductibleMinutes / 60) * 100) / 100;
             
             // Current month hourly rate uses salary divisor (2 decimals)
             const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
@@ -1455,10 +1460,10 @@ Deno.serve(async (req) => {
                 sick_leave_count: calculated.sickLeaveCount,
                 late_minutes: calculated.lateMinutes,
                 early_checkout_minutes: calculated.earlyCheckoutMinutes,
-                other_minutes: calculated.otherMinutes,
+                other_minutes: finalizedOtherMinutes,
                 approved_minutes: calculated.approvedMinutes,
                 grace_minutes: calculated.graceMinutes,
-                deductible_minutes: totalDeductibleMinutes,  // COMBINED for payroll: deductible + other
+                deductible_minutes: finalizedDeductibleMinutes,
                 extra_prev_month_deductible_minutes: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_days: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_pay: 0,  // DISABLED - no longer used
