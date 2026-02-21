@@ -16,7 +16,9 @@ export default function SalarySnapshotRow({
     return (
         <>
             <TableRow className="hover:bg-slate-50">
-                <TableCell className="font-medium">{snapshot.attendance_id}</TableCell>
+                <TableCell className="font-medium">
+                    {snapshot.attendance_id || <span className="text-slate-400 italic">Salary-only</span>}
+                </TableCell>
                 <TableCell>{snapshot.name}</TableCell>
                 <TableCell className="text-right text-slate-600">{snapshot.working_days}</TableCell>
                 <TableCell className="text-right text-slate-600">{snapshot.present_days}</TableCell>

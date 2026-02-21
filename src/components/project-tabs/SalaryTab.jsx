@@ -212,19 +212,18 @@ export default function SalaryTab({ project }) {
             const otDivisor = project.ot_calculation_days || 30;
             
             const finalCalculatedData = calculatedData.map(row => {
-                const otRecord = overtimeData.find(ot => 
-                    String(ot.attendance_id) === String(row.attendance_id)
-                );
+                const otRecord = row.attendance_id 
+                    ? overtimeData.find(ot => String(ot.attendance_id) === String(row.attendance_id))
+                    : null;
                 
                 // Get the latest SalarySnapshot for adjustment values
-                const snapshotRecord = salarySnapshots.find(s => 
-                    String(s.attendance_id) === String(row.attendance_id)
-                );
+                const snapshotRecord = row.attendance_id
+                    ? salarySnapshots.find(s => String(s.attendance_id) === String(row.attendance_id))
+                    : salarySnapshots.find(s => String(s.hrms_id) === String(row.hrms_id));
                 
-                const salary = employeeSalaries.find(s => 
-                    String(s.attendance_id) === String(row.attendance_id) ||
-                    String(s.employee_id) === String(row.hrms_id)
-                );
+                const salary = row.attendance_id
+                    ? employeeSalaries.find(s => String(s.attendance_id) === String(row.attendance_id) || String(s.employee_id) === String(row.hrms_id))
+                    : employeeSalaries.find(s => String(s.employee_id) === String(row.hrms_id));
                 const totalSalary = row.total_salary || salary?.total_salary || 0;
                 const workingHours = row.working_hours || salary?.working_hours || 9;
                 
@@ -386,7 +385,7 @@ export default function SalaryTab({ project }) {
         try {
             const data = JSON.parse(report.snapshot_data);
             const exportData = data.map(row => ({
-                'Attendance ID': row.attendance_id,
+                'Attendance ID': row.attendance_id || 'SALARY-ONLY',
                 'Name': row.name,
                 'Department': row.department || '-',
                 'Attendance Source': row.attendance_source || 'ANALYZED',
