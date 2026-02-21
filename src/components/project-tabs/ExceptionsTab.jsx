@@ -815,9 +815,9 @@ export default function ExceptionsTab({ project }) {
                         new_am_end: row.new_am_end || row.am_end || '',
                         new_pm_start: row.new_pm_start || row.pm_start || '',
                         new_pm_end: row.new_pm_end || row.pm_end || '',
-                        early_checkout_minutes: row.early_checkout_minutes ? parseInt(row.early_checkout_minutes) : null,
-                        other_minutes: row.other_minutes ? parseInt(row.other_minutes) : null,
-                        allowed_minutes: row.allowed_minutes ? parseInt(row.allowed_minutes) : null // Added other_minutes
+                        early_checkout_minutes: row.early_checkout_minutes ? Math.abs(parseInt(row.early_checkout_minutes)) : null,
+                        other_minutes: row.other_minutes ? Math.abs(parseInt(row.other_minutes)) : null,
+                        allowed_minutes: row.allowed_minutes ? Math.abs(parseInt(row.allowed_minutes)) : null
                     });
                 });
 
@@ -1130,14 +1130,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
 
         // Added other_minutes to cleanedData
         if (submitData.other_minutes && !isNaN(parseInt(submitData.other_minutes))) {
-            cleanedData.other_minutes = parseInt(submitData.other_minutes);
+            cleanedData.other_minutes = Math.abs(parseInt(submitData.other_minutes));
         } else {
             cleanedData.other_minutes = null;
         }
 
         // Add allowed_minutes and allowed_minutes_type
         if (submitData.type === 'ALLOWED_MINUTES' && submitData.allowed_minutes) {
-            cleanedData.allowed_minutes = parseInt(submitData.allowed_minutes);
+            cleanedData.allowed_minutes = Math.abs(parseInt(submitData.allowed_minutes));
             cleanedData.allowed_minutes_type = submitData.allowed_minutes_type || 'both';
         }
 
@@ -1649,7 +1649,10 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                 type="number"
                                                 placeholder="e.g. 60"
                                                 value={formData.allowed_minutes}
-                                                onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
+                                                onChange={(e) => {
+                                                    const value = Math.abs(parseInt(e.target.value) || 0);
+                                                    setFormData({ ...formData, allowed_minutes: value || '' });
+                                                }}
                                                 min="1"
                                             />
                                         </div>
