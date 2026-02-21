@@ -113,43 +113,10 @@ Deno.serve(async (req) => {
             );
         }
 
-        // Validate AnalysisResult completeness (ALL COMPANIES)
-        // SALARY-ONLY FIX: Only validate for employees who actually have attendance_id AND are marked for attendance tracking
-        // Employees with has_attendance_tracking=false are expected to NOT have AnalysisResult
-        const analysisAttendanceIds = new Set(analysisResults.map(r => String(r.attendance_id)));
-        const attendanceTrackedEligibleEmployees = eligibleEmployees.filter(e => 
-            e.attendance_id && 
-            String(e.attendance_id).trim() !== '' && 
-            e.has_attendance_tracking !== false
-        );
-        const allAttendanceTrackedEmployeeIds = attendanceTrackedEligibleEmployees.map(e => String(e.attendance_id));
-        
-        const missingAnalysisIds = allAttendanceTrackedEmployeeIds.filter(id => !analysisAttendanceIds.has(id));
-        
-        if (missingAnalysisIds.length > 0) {
-            console.log(`[markFinalReport] ANALYSIS VALIDATION FAILED: ${missingAnalysisIds.length} employees missing AnalysisResult`);
-            
-            // Rollback: Unmark as final
-            await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-                is_final: false,
-                finalized_by: null,
-                finalized_date: null
-            });
-
-            const missingEmployees = eligibleEmployees
-                .filter(e => missingAnalysisIds.includes(String(e.attendance_id)))
-                .map(e => ({ attendance_id: e.attendance_id, name: e.name }));
-
-            return Response.json({ 
-                success: false,
-                error: `VALIDATION FAILED: ${missingAnalysisIds.length} employees missing from AnalysisResult. Run backfillReportMissingEmployees first.`,
-                analysis_count: analysisResults.length,
-                expected_count: allAttendanceTrackedEmployeeIds.length,
-                missing_attendance_ids: missingAnalysisIds,
-                missing_employees: missingEmployees.slice(0, 10),
-                action_required: `Run backfillReportMissingEmployees with project_id="${project_id}" and report_run_id="${report_run_id}"`
-            }, { status: 400 });
-        }
+        // REMOVED: AnalysisResult validation
+        // New logic: createSalarySnapshots handles employees both with and without AnalysisResult
+        // Employees without AnalysisResult will get NO_ATTENDANCE_DATA snapshots with zero attendance
+        console.log(`[markFinalReport] ✅ Validation skipped - createSalarySnapshots handles all active employees with salary records`);
 
         // Log audit (use try-catch to prevent blocking on logAudit 403 errors)
         try {
