@@ -341,6 +341,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                                             setIsCustomType(true);
                                             setNewTask({...newTask, task_type: ''});
                                         } else {
+                                            setIsCustomType(false);
                                             setNewTask({...newTask, task_type: value});
                                         }
                                     }}
