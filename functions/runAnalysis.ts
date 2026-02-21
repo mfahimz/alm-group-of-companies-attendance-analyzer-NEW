@@ -1022,6 +1022,11 @@ Deno.serve(async (req) => {
                     report_run_id: reportRun.id,
                     ...result
                 });
+                
+                // Track other minutes for exception creation
+                if (result._otherMinutesDetails) {
+                    otherMinutesExceptionsToCreate.push(result._otherMinutesDetails);
+                }
             }
             
             // Log progress
