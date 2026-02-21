@@ -34,18 +34,15 @@ Deno.serve(async (req) => {
 
         let employeeName = exception.attendance_id;
         if (employees.length > 0) {
-            employeeName = `${employees[0].name} (${exception.attendance_id})`;
+            employeeName = employees[0].name;
         }
 
-        // Format the date
-        const dateStr = new Date(exception.date_from).toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
+        // Parse breakdown from exception details
+        const breakdownMatch = exception.details?.match(/Breakdown: (.+)/);
+        const breakdownText = breakdownMatch ? breakdownMatch[1] : '';
 
-        // Create task description
-        const taskDescription = `Review ${exception.other_minutes || 0} other minutes for ${employeeName} on ${dateStr}`;
+        // Create task description with name and total other minutes
+        const taskDescription = `${employeeName} - Total Other Minutes: ${exception.other_minutes || 0} min`;
 
         // Find department head for the employee (if available)
         let assignedTo = null;
@@ -63,13 +60,13 @@ Deno.serve(async (req) => {
         // Create the checklist item
         await base44.asServiceRole.entities.ChecklistItem.create({
             project_id: exception.project_id,
-            task_type: 'Other Minutes Approval',
+            task_type: 'Other Minutes',
             task_description: taskDescription,
             status: 'pending',
             is_predefined: false,
             linked_exception_id: exceptionId,
             assigned_to: assignedTo,
-            notes: `Other minutes: ${exception.other_minutes || 0} minutes. ${exception.details || ''}`
+            notes: breakdownText || `No breakdown available. Total: ${exception.other_minutes || 0} minutes`
         });
 
         return Response.json({ 
