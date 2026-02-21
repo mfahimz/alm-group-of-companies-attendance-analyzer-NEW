@@ -1307,14 +1307,17 @@ Deno.serve(async (req) => {
             
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
 
-            // Use finalized deductible_minutes from AnalysisResult
-            const deductibleMinutes = calculated.deductibleMinutes;
-            const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+            // CRITICAL: Combine other_minutes + deductible_minutes ONLY FOR PAYROLL
+            // During finalization, these are stored separately for attendance reporting
+            // For salary calculation, we combine them into deductible minutes
+            const totalDeductibleMinutes = calculated.deductibleMinutes + calculated.otherMinutes;
+            const deductibleHours = Math.round((totalDeductibleMinutes / 60) * 100) / 100;
             
             // Current month hourly rate uses salary divisor (2 decimals)
             const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
             
             // Current month deductible hours pay (2 decimals)
+            // Uses combined deductible + other minutes for payroll
             const currentMonthDeductibleHoursPay = Math.round((hourlyRate * deductibleHours) * 100) / 100;
             
             // ============================================================
@@ -1455,7 +1458,7 @@ Deno.serve(async (req) => {
                 other_minutes: calculated.otherMinutes,
                 approved_minutes: calculated.approvedMinutes,
                 grace_minutes: calculated.graceMinutes,
-                deductible_minutes: deductibleMinutes,
+                deductible_minutes: totalDeductibleMinutes,  // COMBINED for payroll: deductible + other
                 extra_prev_month_deductible_minutes: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_days: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_pay: 0,  // DISABLED - no longer used
