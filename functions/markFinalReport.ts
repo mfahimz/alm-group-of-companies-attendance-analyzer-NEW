@@ -67,6 +67,77 @@ Deno.serve(async (req) => {
             }
         }
 
+        // ============================================================
+        // CRITICAL FIX: Consolidate day_overrides into AnalysisResult totals
+        // Before finalization, recalculate and SAVE aggregate totals from day_overrides
+        // This ensures finalized report shows the same data user saw before clicking finalize
+        // ============================================================
+        console.log('[markFinalReport] Step 1: Consolidating day_overrides into AnalysisResult totals...');
+        
+        const analysisResultsToUpdate = await base44.asServiceRole.entities.AnalysisResult.filter({
+            project_id: project_id,
+            report_run_id: report_run_id
+        }, null, 5000);
+        
+        let updatedCount = 0;
+        for (const result of analysisResultsToUpdate) {
+            if (!result.day_overrides || result.day_overrides === '{}') continue;
+            
+            let dayOverrides = {};
+            try {
+                dayOverrides = JSON.parse(result.day_overrides);
+            } catch (e) {
+                continue;
+            }
+            
+            // Recalculate totals from day_overrides
+            let totalLate = 0;
+            let totalEarly = 0;
+            let totalOther = 0;
+            let presentDays = 0;
+            let fullAbsence = 0;
+            let halfAbsence = 0;
+            let sickLeave = 0;
+            
+            Object.entries(dayOverrides).forEach(([date, override]) => {
+                // Count attendance status
+                if (override.type === 'MANUAL_PRESENT') presentDays++;
+                else if (override.type === 'MANUAL_ABSENT') fullAbsence++;
+                else if (override.type === 'MANUAL_HALF') { presentDays++; halfAbsence++; }
+                else if (override.type === 'SICK_LEAVE') sickLeave++;
+                
+                // Accumulate minutes
+                if (override.lateMinutes !== undefined) totalLate += Math.max(0, override.lateMinutes);
+                if (override.earlyCheckoutMinutes !== undefined) totalEarly += Math.max(0, override.earlyCheckoutMinutes);
+                if (override.otherMinutes !== undefined) totalOther += Math.max(0, override.otherMinutes);
+            });
+            
+            // Update AnalysisResult with consolidated totals
+            const updates = {};
+            if (totalLate > 0) updates.late_minutes = totalLate;
+            if (totalEarly > 0) updates.early_checkout_minutes = totalEarly;
+            if (totalOther > 0) updates.other_minutes = totalOther;
+            if (presentDays > 0) updates.present_days = (result.present_days || 0) + presentDays;
+            if (fullAbsence > 0) updates.full_absence_count = (result.full_absence_count || 0) + fullAbsence;
+            if (halfAbsence > 0) updates.half_absence_count = (result.half_absence_count || 0) + halfAbsence;
+            if (sickLeave > 0) updates.sick_leave_count = (result.sick_leave_count || 0) + sickLeave;
+            
+            // Recalculate deductible_minutes with consolidated values
+            const graceMinutes = result.grace_minutes ?? 15;
+            const approvedMinutes = result.approved_minutes || 0;
+            const baseMinutes = Math.max(0, (updates.late_minutes || result.late_minutes || 0)) + 
+                                Math.max(0, (updates.early_checkout_minutes || result.early_checkout_minutes || 0));
+            const afterGrace = Math.max(0, baseMinutes - graceMinutes);
+            updates.deductible_minutes = Math.max(0, afterGrace - approvedMinutes);
+            
+            if (Object.keys(updates).length > 0) {
+                await base44.asServiceRole.entities.AnalysisResult.update(result.id, updates);
+                updatedCount++;
+            }
+        }
+        
+        console.log(`[markFinalReport] ✅ Consolidated day_overrides for ${updatedCount} employees`);
+
         // Mark the selected report as final with audit info
         const nowUAE = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString();
         await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
