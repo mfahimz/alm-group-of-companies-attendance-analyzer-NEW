@@ -1011,6 +1011,28 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         toast.success(`${cleanEmployees.length} employees verified`);
     };
 
+    const unfinalizeReportMutation = useMutation({
+        mutationFn: async () => {
+            const result = await base44.functions.invoke('unfinalizeReport', {
+                project_id: project.id,
+                report_run_id: reportRun.id
+            });
+            return result.data;
+        },
+        onSuccess: async (data) => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] }),
+                queryClient.invalidateQueries({ queryKey: ['project', project.id] }),
+                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id] })
+            ]);
+            toast.success(`Report un-finalized! ${data.deleted_snapshots} salary snapshots deleted.`);
+        },
+        onError: (error) => {
+            const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
+            toast.error('Failed to un-finalize report: ' + errorMsg);
+        }
+    });
+
     const finalizeReportMutation = useMutation({
         mutationFn: async () => {
             console.log('[ReportDetailView] Starting finalization...');
@@ -2062,7 +2084,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                        <Save className="w-4 h-4 mr-2" />
                                        {isSaving ? 'Saving...' : 'Save Report'}
                                    </Button>
-                                   {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && (
+                                   {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
                                        <Button
                                            onClick={() => finalizeReportMutation.mutate()}
                                            disabled={finalizeReportMutation.isPending}
@@ -2079,6 +2101,24 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                    <CheckCircle className="w-4 h-4 mr-2" />
                                                    Finalize Report
                                                </>
+                                           )}
+                                       </Button>
+                                   )}
+                                   {isAdmin && reportRun.is_final && (
+                                       <Button
+                                           onClick={() => unfinalizeReportMutation.mutate()}
+                                           disabled={unfinalizeReportMutation.isPending}
+                                           variant="outline"
+                                           className="border-red-300 text-red-600 hover:bg-red-50"
+                                           title="Un-finalize report (admin only)"
+                                       >
+                                           {unfinalizeReportMutation.isPending ? (
+                                               <>
+                                                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                   Un-finalizing...
+                                               </>
+                                           ) : (
+                                               <>Un-finalize Report</>
                                            )}
                                        </Button>
                                    )}
