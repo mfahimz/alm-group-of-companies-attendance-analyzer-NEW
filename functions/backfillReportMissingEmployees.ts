@@ -602,7 +602,9 @@ Deno.serve(async (req) => {
                     deductible_minutes: calculated.deductibleMinutes,
                     grace_minutes: calculated.graceMinutes,
                     abnormal_dates: '',
-                    notes: `Backfilled - Employee had no punches but was active. Annual Leave: ${calculated.annualLeaveCount} days`,
+                    notes: hasAttendanceId 
+                        ? `Backfilled - Employee had no punches but was active. Annual Leave: ${calculated.annualLeaveCount} days`
+                        : `Salary-only employee (no attendance tracking) - Present all working days`,
                     auto_resolutions: ''
                 };
 
