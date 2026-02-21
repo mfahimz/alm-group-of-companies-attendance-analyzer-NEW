@@ -815,14 +815,14 @@ Deno.serve(async (req) => {
 
                 if (hasManualTimeException) {
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        lateMinutes += dateException.late_minutes;
+                        lateMinutes += Math.abs(dateException.late_minutes);
                     }
                     if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        earlyCheckoutMinutes += dateException.early_checkout_minutes;
+                        earlyCheckoutMinutes += Math.abs(dateException.early_checkout_minutes);
                     }
                     if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        otherMinutes += dateException.other_minutes;
-                        otherMinutesByDate[dateStr] = dateException.other_minutes;
+                        otherMinutes += Math.abs(dateException.other_minutes);
+                        otherMinutesByDate[dateStr] = Math.abs(dateException.other_minutes);
                     }
                 } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !hasSkipPunchApplied) {
                     let dayLateMinutes = 0;
