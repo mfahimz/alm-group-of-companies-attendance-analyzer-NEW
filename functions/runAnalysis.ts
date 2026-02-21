@@ -992,6 +992,7 @@ Deno.serve(async (req) => {
         // Using smaller batches with delays to handle database load issues
         const allResults = [];
         const processedAttendanceIds = new Set();
+        const otherMinutesExceptionsToCreate = []; // Track other minutes exceptions to create
         const ANALYSIS_BATCH_SIZE = 5; // Process 5 employees at a time
         const ANALYSIS_BATCH_DELAY = 500; // 500ms delay between analysis batches
         
