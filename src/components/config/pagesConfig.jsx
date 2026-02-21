@@ -18,8 +18,7 @@ import {
     GitPullRequest,
     BookText,
     Lightbulb,
-    FileText,
-    Calculator
+    FileText
 } from 'lucide-react';
 
 /**
@@ -196,16 +195,7 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
-    SalaryCalculationSettings: {
-        name: 'SalaryCalculationSettings',
-        title: 'Salary Formulas',
-        icon: Calculator,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
-    },
+
     RamadanSchedules: {
         name: 'RamadanSchedules',
         title: 'Ramadan Schedules',
