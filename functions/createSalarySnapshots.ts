@@ -65,14 +65,9 @@ Deno.serve(async (req) => {
         const project = projects[0];
         
         // ============================================================
-        // LOAD COMPANY-SPECIFIC CALCULATION SETTINGS
+        // USE PROJECT-LEVEL DEFAULTS (Settings entity removed)
         // ============================================================
-        const companySettings = await base44.asServiceRole.entities.SalaryCalculationSettings.filter({
-            company: project.company,
-            active: true
-        }, null, 1);
-        
-        const settings = companySettings.length > 0 ? companySettings[0] : null;
+        const settings = null;
         
         // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
         let divisor = settings?.salary_divisor || project.salary_calculation_days || 30;
@@ -112,12 +107,9 @@ Deno.serve(async (req) => {
         const assumedPresentLastDays = settings?.assumed_present_last_days ?? (isAlMaraghi ? 2 : 0);
         
         console.log('[createSalarySnapshots] ============================================');
-        console.log('[createSalarySnapshots] COMPANY CALCULATION SETTINGS:');
-        console.log('[createSalarySnapshots]   Source:', settings ? 'SalaryCalculationSettings' : 'Project defaults');
+        console.log('[createSalarySnapshots] CALCULATION SETTINGS (from Project):');
         console.log('[createSalarySnapshots]   Salary Divisor:', divisor);
         console.log('[createSalarySnapshots]   OT Divisor:', otDivisor);
-        console.log('[createSalarySnapshots]   OT Normal Rate:', otNormalRate);
-        console.log('[createSalarySnapshots]   OT Special Rate:', otSpecialRate);
         console.log('[createSalarySnapshots]   WPS Cap Enabled:', wpsCapEnabledGlobal);
         console.log('[createSalarySnapshots]   Assumed Present Days:', assumedPresentLastDays);
         console.log('[createSalarySnapshots] ============================================');
