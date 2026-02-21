@@ -52,13 +52,17 @@ Deno.serve(async (req) => {
             last_saved_report_id: report_run_id
         });
 
-        // Log audit
-        await base44.functions.invoke('logAudit', {
-            action: 'ADMIN_FINALIZE_REPORT',
-            entity_type: 'ReportRun',
-            entity_id: report_run_id,
-            details: `Admin finalized report without saving (skipped approval link generation) for project ${project_id}`
-        });
+        // Log audit (with error handling to not block finalization)
+        try {
+            await base44.functions.invoke('logAudit', {
+                action: 'ADMIN_FINALIZE_REPORT',
+                entity_type: 'ReportRun',
+                entity_id: report_run_id,
+                details: `Admin finalized report without saving (skipped approval link generation) for project ${project_id}`
+            });
+        } catch (auditError) {
+            console.warn('Failed to log audit:', auditError.message);
+        }
 
         return Response.json({ 
             success: true,
