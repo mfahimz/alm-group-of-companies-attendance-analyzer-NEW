@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Code, Database, Workflow, Lock, AlertTriangle, Book, ChevronDown, ChevronRight } from 'lucide-react';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -726,7 +726,7 @@ export default function TechnicalDocumentation() {
 
                         <p className="text-xs text-amber-700 mt-3 bg-amber-50 border border-amber-200 rounded p-2">
                             <strong>Overlap Handling:</strong> Multiple exceptions for same employee + date are allowed. 
-                            Analysis applies them in priority order: MANUAL_* > PUBLIC_HOLIDAY > SHIFT_OVERRIDE > ALLOWED_MINUTES.
+                            Analysis applies them in priority order: MANUAL_* {`>`} PUBLIC_HOLIDAY {`>`} SHIFT_OVERRIDE {`>`} ALLOWED_MINUTES.
                         </p>
                     </div>
 

@@ -1,11 +1,9 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
-import { Badge } from '@/components/ui/badge';
 
 export default function PendingApprovals({ userRole }) {
     const isAdminOrSupervisor = userRole === 'admin' || userRole === 'supervisor';

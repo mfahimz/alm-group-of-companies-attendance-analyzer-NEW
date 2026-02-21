@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Calendar, CheckCircle, AlertTriangle, Workflow } from 'lucide-react';
 import Breadcrumb from '../components/ui/Breadcrumb';

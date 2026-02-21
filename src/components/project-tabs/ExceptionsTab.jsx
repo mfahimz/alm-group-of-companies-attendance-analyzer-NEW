@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { Plus, Trash2, Search, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
