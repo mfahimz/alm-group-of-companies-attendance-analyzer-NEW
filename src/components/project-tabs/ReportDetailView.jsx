@@ -2389,15 +2389,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 );
                                             })()}
                                             </td>
-                                            <td className="p-2 align-middle text-xs text-slate-400">
-                                            {result.other_minutes > 0 ? (
-                                                <span className="text-purple-600 font-medium">{result.other_minutes}</span>
-                                            ) : (
-                                                '-'
-                                            )}
-                                            </td>
                                             <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
-                                            {result.notes || '-'}
+                                             {result.notes || '-'}
                                         </td>
                                         <td className="p-2 align-middle text-right">
                                               <Button
