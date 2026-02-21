@@ -135,7 +135,11 @@ Deno.serve(async (req) => {
         const uniqueEmployeeIds = [...activeEmployeeAttendanceIds];
         
         // Add project-specific employee overrides (for unmatched attendance IDs)
-        const projectEmployeeIds = projectEmployees.map(pe => String(pe.attendance_id));
+        // CRITICAL: Filter out project employees without attendance_id
+        const projectEmployeeIds = projectEmployees
+            .filter(pe => pe.attendance_id && pe.attendance_id !== null && pe.attendance_id !== undefined)
+            .filter(pe => String(pe.attendance_id).trim() !== '')
+            .map(pe => String(pe.attendance_id));
         for (const peId of projectEmployeeIds) {
             if (!uniqueEmployeeIds.includes(peId)) {
                 uniqueEmployeeIds.push(peId);
@@ -148,18 +152,22 @@ Deno.serve(async (req) => {
         console.log('[runAnalysis] Employees to analyze (all active + overrides):', uniqueEmployeeIds.length);
         
         // Combine master employees with project-specific overrides for lookups
+        // CRITICAL: Only include project employees with valid attendance_id
         const employees = [
             ...filteredEmployees,
             // Add project employees as pseudo-employees for lookups
-            ...projectEmployees.map(pe => ({
-                attendance_id: pe.attendance_id,
-                hrms_id: `PROJECT_${project_id}_${pe.attendance_id}`,
-                name: pe.name,
-                department: pe.department || 'Admin',
-                weekly_off: pe.weekly_off || 'Sunday',
-                active: true,
-                _isProjectOverride: true
-            }))
+            ...projectEmployees
+                .filter(pe => pe.attendance_id && pe.attendance_id !== null && pe.attendance_id !== undefined)
+                .filter(pe => String(pe.attendance_id).trim() !== '')
+                .map(pe => ({
+                    attendance_id: pe.attendance_id,
+                    hrms_id: `PROJECT_${project_id}_${pe.attendance_id}`,
+                    name: pe.name,
+                    department: pe.department || 'Admin',
+                    weekly_off: pe.weekly_off || 'Sunday',
+                    active: true,
+                    _isProjectOverride: true
+                }))
         ];
 
         // Create or use existing report run - count ALL active employees being analyzed
