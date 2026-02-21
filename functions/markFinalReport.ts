@@ -8,10 +8,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * VALIDATION REQUIREMENT:
  * After snapshot creation, validates that snapshots count equals eligible employee count.
  * If mismatch, the finalization is blocked with an error.
- * 
- * SALARY-ONLY EMPLOYEES:
- * - Employees without attendance_id (has_attendance_tracking=false) are NOT expected to have AnalysisResult
- * - Validation only checks employees WITH attendance_id AND has_attendance_tracking != false
  */
 
 Deno.serve(async (req) => {
@@ -102,10 +98,8 @@ Deno.serve(async (req) => {
             );
         }
 
-        // Validate AnalysisResult completeness (ALL COMPANIES)
-        // SALARY-ONLY FIX: Only validate for employees who actually have attendance_id AND are marked for attendance tracking
-        // Employees with has_attendance_tracking=false are expected to NOT have AnalysisResult
-        const analysisAttendanceIds = new Set(analysisResults.map(r => String(r.attendance_id)));
+        // CRITICAL: Only validate for employees who actually have an attendance_id AND are marked for attendance tracking
+        // Salary-only employees (has_attendance_tracking: false) are expected to NOT have analysis results.
         const attendanceTrackedEligibleEmployees = eligibleEmployees.filter(e => 
             e.attendance_id && 
             String(e.attendance_id).trim() !== '' && 
@@ -113,6 +107,7 @@ Deno.serve(async (req) => {
         );
         const allAttendanceTrackedEmployeeIds = attendanceTrackedEligibleEmployees.map(e => String(e.attendance_id));
         
+        const analysisAttendanceIds = new Set(analysisResults.map(r => String(r.attendance_id)));
         const missingAnalysisIds = allAttendanceTrackedEmployeeIds.filter(id => !analysisAttendanceIds.has(id));
         
         if (missingAnalysisIds.length > 0) {
@@ -125,7 +120,7 @@ Deno.serve(async (req) => {
                 finalized_date: null
             });
 
-            const missingEmployees = eligibleEmployees
+            const missingEmployees = attendanceTrackedEligibleEmployees
                 .filter(e => missingAnalysisIds.includes(String(e.attendance_id)))
                 .map(e => ({ attendance_id: e.attendance_id, name: e.name }));
 
