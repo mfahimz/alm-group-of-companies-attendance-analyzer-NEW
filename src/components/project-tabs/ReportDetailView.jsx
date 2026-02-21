@@ -378,6 +378,26 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const calculateEmployeeTotals = (result, dateFrom, dateTo) => {
+        // CRITICAL FIX: For finalized reports, return stored values WITHOUT recalculation
+        // Finalized reports must be immutable - no punch/shift/exception recalculation
+        const isFinalized = reportRun.is_final || project.status === 'closed';
+        
+        if (isFinalized) {
+            // Return stored values AS-IS from finalized AnalysisResult
+            return {
+                totalLateMinutes: result.late_minutes || 0,
+                totalEarlyCheckout: result.early_checkout_minutes || 0,
+                totalOtherMinutes: result.other_minutes || 0,
+                workingDays: result.working_days || 0,
+                presentDays: result.present_days || 0,
+                fullAbsenceCount: result.full_absence_count || 0,
+                halfAbsenceCount: result.half_absence_count || 0,
+                sickLeaveCount: result.sick_leave_count || 0,
+                annualLeaveCount: result.annual_leave_count || 0
+            };
+        }
+        
+        // NON-FINALIZED ONLY: Recalculate from live punch data
         const attendanceIdStr = String(result.attendance_id);
         const employeePunches = punches.filter(p => 
             String(p.attendance_id) === attendanceIdStr &&

@@ -570,12 +570,13 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         // Recalculate deductible minutes with correct formula
         // Grace = result.grace_minutes (already calculated from base + carried)
         // baseAfterGrace = max(0, (late + early) - grace)
-        // deductible = max(0, baseAfterGrace + other - approved)
+        // deductible = max(0, baseAfterGrace - approved)
+        // CRITICAL: other_minutes are NEVER included in deductible calculation
         const totalGrace = result.grace_minutes || 0;
         const baseMinutes = totalLateMinutes + totalEarlyCheckoutMinutes;
         const baseAfterGrace = Math.max(0, baseMinutes - totalGrace);
         const approvedMinutes = result.approved_minutes || 0;
-        const deductibleMinutes = Math.max(0, baseAfterGrace + totalOtherMinutes - approvedMinutes);
+        const deductibleMinutes = Math.max(0, baseAfterGrace - approvedMinutes);
         
         return {
             late_minutes: totalLateMinutes,
