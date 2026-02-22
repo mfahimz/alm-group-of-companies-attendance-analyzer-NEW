@@ -1064,11 +1064,61 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 open: true,
                 current: 0,
                 total: 0,
-                currentEmployee: 'Validating report data...',
+                currentEmployee: 'Saving current report values...',
                 status: 'Please wait...'
             });
 
-            // STEP 1: Mark report as final
+            // ============================================================
+            // STEP 0: CRITICAL - Write the EXACT UI values into AnalysisResult
+            // before marking final. This ensures what you see = what gets finalized.
+            // NO backend recalculation. The frontend is the source of truth.
+            // ============================================================
+            console.log('[ReportDetailView] Step 0: Writing UI values to AnalysisResult...');
+            const currentEnriched = baseEnrichedResults;
+            let updatedCount = 0;
+            
+            for (const row of currentEnriched) {
+                // Build update payload with the EXACT values shown in the UI table
+                const updates = {};
+                let needsUpdate = false;
+                
+                // Compare UI values with stored AnalysisResult values
+                // Find the raw result to compare against
+                const rawResult = results.find(r => r.id === row.id);
+                if (!rawResult) continue;
+                
+                const fieldsToSync = [
+                    { uiKey: 'working_days', dbKey: 'working_days' },
+                    { uiKey: 'present_days', dbKey: 'present_days' },
+                    { uiKey: 'full_absence_count', dbKey: 'full_absence_count' },
+                    { uiKey: 'half_absence_count', dbKey: 'half_absence_count' },
+                    { uiKey: 'sick_leave_count', dbKey: 'sick_leave_count' },
+                    { uiKey: 'annual_leave_count', dbKey: 'annual_leave_count' },
+                    { uiKey: 'late_minutes', dbKey: 'late_minutes' },
+                    { uiKey: 'early_checkout_minutes', dbKey: 'early_checkout_minutes' },
+                    { uiKey: 'other_minutes', dbKey: 'other_minutes' },
+                    { uiKey: 'deductible_minutes', dbKey: 'deductible_minutes' },
+                    { uiKey: 'grace_minutes', dbKey: 'grace_minutes' },
+                ];
+                
+                for (const f of fieldsToSync) {
+                    const uiVal = row[f.uiKey] ?? 0;
+                    const dbVal = rawResult[f.dbKey] ?? 0;
+                    if (Math.abs(uiVal - dbVal) > 0.01) {
+                        updates[f.dbKey] = uiVal;
+                        needsUpdate = true;
+                    }
+                }
+                
+                if (needsUpdate) {
+                    console.log(`[ReportDetailView] Syncing UI→DB for ${row.attendance_id}:`, updates);
+                    await base44.entities.AnalysisResult.update(row.id, updates);
+                    updatedCount++;
+                }
+            }
+            console.log(`[ReportDetailView] Step 0 complete: synced ${updatedCount} AnalysisResults with UI values`);
+
+            // STEP 1: Mark report as final (no recalculation - just flag it)
             console.log('[ReportDetailView] Calling markFinalReport...');
             const markResult = await base44.functions.invoke('markFinalReport', {
                 project_id: project.id,
