@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Pencil, Shield, User as UserIcon, Lock, RefreshCw, LayoutDashboard, FolderKanban, Briefcase, Settings, Book, Users as UsersIcon, Home as HomeIcon } from 'lucide-react';
+import { Plus, Search, Pencil, Shield, User as UserIcon, Lock, RefreshCw } from 'lucide-react';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import { toast } from 'sonner';
 import UserDialog from '../components/users/UserDialog';
