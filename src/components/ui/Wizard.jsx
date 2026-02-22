@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { ChevronLeft, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Wizard({ steps, onComplete, onCancel }) {

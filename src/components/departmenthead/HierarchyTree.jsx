@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ChevronRight, ChevronDown, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 

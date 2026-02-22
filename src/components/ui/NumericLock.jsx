@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Lock, X } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
 export default function NumericLock({ isLocked, onUnlock }) {
     const [pin, setPin] = useState('');
