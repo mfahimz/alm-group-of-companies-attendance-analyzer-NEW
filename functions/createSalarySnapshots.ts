@@ -1129,6 +1129,7 @@ Deno.serve(async (req) => {
         console.log(`[createSalarySnapshots] ============================================`);
         
         let loopIterationCount = 0;
+        let skippedCount = 0;
         for (const emp of employeesToProcess) {
             loopIterationCount++;
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
@@ -1142,6 +1143,7 @@ Deno.serve(async (req) => {
             if (!baseSalary) {
                 console.log(`[createSalarySnapshots] ⚠️ SKIP: ${emp.name} (${emp.attendance_id || emp.hrms_id}) - no salary record found`);
                 console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE (skipped - no salary)`);
+                skippedCount++;
                 continue;
             }
             
@@ -1420,7 +1422,6 @@ Deno.serve(async (req) => {
             );
             
             // OT calculations using previous month salary (for historical accuracy)
-            const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
             const otHourlyRate = prevMonthTotalSalary / otDivisor / workingHours;
             
             const normalOtHours = otRecord?.normalOtHours || 0;
@@ -1602,9 +1603,10 @@ Deno.serve(async (req) => {
         // INVARIANT CHECK: Verify ALL snapshots were created in STANDARD mode
         // This prevents silent partial completion
         // ============================================================
-        if (!batch_mode && snapshots.length !== eligibleEmployees.length) {
-            const missingCount = eligibleEmployees.length - snapshots.length;
-            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} snapshots, but only ${snapshots.length} were created (${missingCount} missing)`;
+        // INVARIANT: snapshots + skipped (no salary record) must equal total eligible employees
+        if (!batch_mode && (snapshots.length + skippedCount) !== eligibleEmployees.length) {
+            const missingCount = eligibleEmployees.length - snapshots.length - skippedCount;
+            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} employees processed, but only ${snapshots.length} snapshots created + ${skippedCount} skipped (${missingCount} unaccounted for)`;
             console.error(`[createSalarySnapshots] ❌ ${errorMsg}`);
             throw new Error(errorMsg);
         }
