@@ -825,42 +825,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         };
     };
 
-    // Separate calculation from verification state to prevent unnecessary recalculations
+    // CRITICAL: Always use stored AnalysisResult values as the SINGLE source of truth.
+    // NEVER recalculate from punches/shifts/exceptions — that's runAnalysis's job.
+    // This ensures the attendance report shows IDENTICAL values before and after finalization.
     const baseEnrichedResults = React.useMemo(() => {
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
-            // Always use stored AnalysisResult values as the source of truth for report rows.
-            // This keeps the attendance report stable before/after finalization and ensures
-            // what the user sees is exactly the finalized data persisted in backend.
             const employeePunches = punches.filter(p =>
                 String(p.attendance_id) === String(result.attendance_id) &&
                 p.punch_date >= reportRun.date_from &&
                 p.punch_date <= reportRun.date_to
             );
             const hasNoPunches = employeePunches.length === 0;
-            
-            const { 
-                totalLateMinutes, 
-                totalEarlyCheckout, 
-                totalOtherMinutes,
-                workingDays, 
-                presentDays, 
-                fullAbsenceCount, 
-                halfAbsenceCount, 
-                sickLeaveCount,
-                annualLeaveCount
-            } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
-
-            // DYNAMIC DEDUCTIBLE CALCULATION
-            // CRITICAL: For UI display - exclude other_minutes, apply grace then approved
-            // Other_minutes stays separate and is ONLY added when creating payroll snapshots
-            const baseMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
-            const graceMinutes = result.grace_minutes ?? 15;
-            const approvedMinutes = result.approved_minutes || 0;
-            const afterGrace = Math.max(0, baseMinutes - graceMinutes);
-            const dynamicDeductible = Math.max(0, afterGrace - approvedMinutes);
-            // OTHER_MINUTES: Kept separate, not included in deductible for UI display
 
             return {
                 ...result,
