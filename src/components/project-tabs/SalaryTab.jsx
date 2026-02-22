@@ -197,6 +197,8 @@ export default function SalaryTab({ project }) {
         try {
             // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
             const divisor = project.salary_calculation_days || 30;
+            // DIVISOR_OT: Used for OT Hourly Rate
+            const otDivisor = project.ot_calculation_days || divisor;
 
             setGenerationProgress(`Loading salary snapshots for ${salarySnapshots.length} employees...`);
             await new Promise(resolve => setTimeout(resolve, 300));
