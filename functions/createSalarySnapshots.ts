@@ -1429,6 +1429,7 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots]    allowancesAmount = ${allowancesAmount}`);
             console.log(`[createSalarySnapshots]    salaryLeaveBase = ${salaryLeaveBase}`);
             console.log(`[createSalarySnapshots]    divisor = ${divisor}`);
+            console.log(`[createSalarySnapshots]    annualLeaveDaysForSalary = ${annualLeaveDaysForSalary}`);
             console.log(`[createSalarySnapshots]    salaryLeaveDays = ${salaryLeaveDays}`);
             console.log(`[createSalarySnapshots]    salaryLeaveDaysOverride = ${salaryLeaveDaysOverride}`);
             console.log(`[createSalarySnapshots]    salaryLeaveAmount = ${salaryLeaveAmount}`);
@@ -1590,7 +1591,7 @@ Deno.serve(async (req) => {
                 prev_month_divisor: extraPrevMonthData.prevMonthDivisor || 0,
                 present_days: calculated.presentDays,
                 full_absence_count: calculated.fullAbsenceCount,
-                annual_leave_count: calculated.annualLeaveCount,
+                annual_leave_count: annualLeaveDaysForSalary,
                 sick_leave_count: calculated.sickLeaveCount,
                 late_minutes: calculated.lateMinutes,
                 early_checkout_minutes: calculated.earlyCheckoutMinutes,

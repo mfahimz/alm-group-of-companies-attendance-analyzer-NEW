@@ -242,10 +242,11 @@ export default function SalaryReportDetail() {
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
 
         // Get current attendance values (may be admin-edited)
-        const annualLeaveCount = getValue(row, 'annual_leave_count') ?? row.annual_leave_count ?? 0;
-        const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
-        const leaveDays = getValue(row, 'leaveDays') ?? (annualLeaveCount + fullAbsenceCount);
         const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
+        // Salary context rule: Annual Leave must follow exception-configured salary leave days.
+        const annualLeaveCount = salaryLeaveDays;
+        const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
+        const leaveDays = annualLeaveCount + fullAbsenceCount;
         const deductibleHours = getValue(row, 'deductibleHours') ?? row.deductibleHours ?? 0;
         
         // ALWAYS recalculate derived monetary amounts based on current attendance values
@@ -316,8 +317,12 @@ export default function SalaryReportDetail() {
             
             // Recalculate derived monetary amounts based on current attendance values
             const currentTotalSalary = updated.total_salary;
-            const currentLeaveDays = updated.leaveDays || ((updated.annual_leave_count || 0) + (updated.full_absence_count || 0));
             const currentSalaryLeaveDays = updated.salary_leave_days || updated.salaryLeaveDays || 0;
+            // Salary context rule: keep annual_leave_count and leaveDays aligned to salary_leave_days + LOP.
+            const currentAnnualLeaveDays = currentSalaryLeaveDays;
+            updated.annual_leave_count = currentAnnualLeaveDays;
+            const currentLeaveDays = currentAnnualLeaveDays + (updated.full_absence_count || 0);
+            updated.leaveDays = currentLeaveDays;
             const currentDeductibleHours = updated.deductibleHours || 0;
             const basicSalary = updated.basic_salary || 0;
             const allowances = updated.allowances || 0;
@@ -523,8 +528,8 @@ export default function SalaryReportDetail() {
                 'Working Days': row.working_days || 0,
                 'Present Days': row.present_days || 0,
                 'LOP Days': row.full_absence_count || 0,
-                'Annual Leave Days': row.annual_leave_count || 0,
-                'Leave Days': Math.round(row.leaveDays || 0),
+                'Annual Leave Days': parseFloat(((row.salary_leave_days || row.salaryLeaveDays || 0)).toFixed(2)),
+                'Leave Days': parseFloat((((row.salary_leave_days || row.salaryLeaveDays || 0) + (row.full_absence_count || 0))).toFixed(2)),
                 'Leave Pay': parseFloat((row.leavePay || 0).toFixed(2)),
                 'Salary Leave Days': parseFloat((row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)),
                 'Salary Leave Amount': parseFloat((row.salaryLeaveAmount || 0).toFixed(2)),
@@ -834,12 +839,12 @@ export default function SalaryReportDetail() {
                                                         <Input
                                                             type="number"
                                                             step="0.01"
-                                                            value={getValue(row, 'annual_leave_count')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'annual_leave_count', e.target.value)}
+                                                            value={getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)}
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        row.annual_leave_count || 0
+                                                        (row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-amber-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -847,12 +852,12 @@ export default function SalaryReportDetail() {
                                                         <Input
                                                             type="number"
                                                             step="0.01"
-                                                            value={getValue(row, 'leaveDays')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'leaveDays', e.target.value)}
-                                                            className="h-8 text-xs w-16"
+                                                            value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0))).toFixed(2)}
+                                                            readOnly
+                                                            className="h-8 text-xs w-16 bg-slate-100"
                                                         />
                                                     ) : (
-                                                        (row.leaveDays || 0).toFixed(2)
+                                                        (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0))).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
