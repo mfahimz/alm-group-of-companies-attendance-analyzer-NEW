@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { usePageTitle } from '@/components/ui/PageTitle';
@@ -8,9 +8,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle, Edit, UserCheck, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import { toast } from 'sonner';
 import EmployeeDialog from '../components/employees/EmployeeDialog';
@@ -255,11 +252,6 @@ export default function Employees() {
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, showOnlyDuplicates, selectedCompany]);
-
-    if (!currentUser) {
-        return <div className="text-center py-12 text-slate-500">Loading...</div>;
-    }
-
     const handleEdit = (employee) => {
         setSelectedEmployee(employee);
         setShowDialog(true);
@@ -368,6 +360,11 @@ export default function Employees() {
             toast.error('Failed to import HRMS IDs: ' + error.message);
         }
     });
+
+
+    if (!currentUser) {
+        return <div className="text-center py-12 text-slate-500">Loading...</div>;
+    }
 
     const handleImport = async (e) => {
         const file = e.target.files[0];

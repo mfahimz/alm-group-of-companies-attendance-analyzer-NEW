@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, FileSpreadsheet, Download, Trash2, Eye, Plus, Calendar, AlertCircle } from 'lucide-react';
+import { DollarSign, FileSpreadsheet, Download, Trash2, Eye, Plus, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import * as XLSX from 'xlsx';
@@ -112,6 +112,23 @@ export default function SalaryTab({ project }) {
     // Allow access to Salary tab for Al Maraghi Motors projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryTab = isAdminOrCEO || isAlMaraghi;
+    const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
+        if (totalAmount <= 0) {
+            return { wpsAmount: 0, balanceAmount: 0, wpsCapApplied: false };
+        }
+
+        if (!(isAlMaraghi && isCapEnabled)) {
+            return { wpsAmount: totalAmount, balanceAmount: 0, wpsCapApplied: false };
+        }
+
+        const cap = capAmount != null ? capAmount : 4900;
+        const rawExcess = Math.max(0, totalAmount - cap);
+        const balanceAmount = rawExcess > 0 ? Math.ceil(rawExcess / 100) * 100 : 0;
+        const wpsAmount = totalAmount - balanceAmount;
+
+        return { wpsAmount, balanceAmount, wpsCapApplied: rawExcess > 0 };
+    };
+
     const hasFinalReport = finalReport && finalReport.is_final === true;
 
     // ============================================
@@ -265,31 +282,13 @@ export default function SalaryTab({ project }) {
 
                 // WPS SPLIT LOGIC (Al Maraghi Motors only)
                 // Balance must always be a multiple of 100 (round down)
-                let wpsAmount = finalTotal;
-                let balanceAmount = 0;
-                let wpsCapApplied = false;
                 const wpsCapEnabled = salary?.wps_cap_enabled || false;
                 const wpsCapAmount = salary?.wps_cap_amount ?? 4900;
+                const { wpsAmount, balanceAmount, wpsCapApplied } = calculateWpsSplit(finalTotal, wpsCapEnabled, wpsCapAmount);
 
-                if (isAlMaraghi && wpsCapEnabled) {
-                    if (finalTotal <= 0) {
-                        wpsAmount = 0;
-                        balanceAmount = 0;
-                        wpsCapApplied = false;
-                    } else {
-                        const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                        // Calculate raw excess over cap
-                        const rawExcess = Math.max(0, finalTotal - cap);
-                        // Round balance DOWN to nearest 100
-                        balanceAmount = Math.floor(rawExcess / 100) * 100;
-                        // WPS gets the rest (total - balance)
-                        wpsAmount = finalTotal - balanceAmount;
-                        wpsCapApplied = rawExcess > 0;
-                    }
-                } else if (finalTotal <= 0) {
-                    wpsAmount = 0;
-                    balanceAmount = 0;
-                }
+                const salaryLeaveDaysForSalary = row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0;
+                const annualLeaveDaysForSalary = salaryLeaveDaysForSalary;
+                const leaveDaysForSalary = annualLeaveDaysForSalary + (row.full_absence_count || 0);
 
                 const result = {
                     ...row,
@@ -309,7 +308,9 @@ export default function SalaryTab({ project }) {
                     deductible_minutes: row.deductible_minutes || 0,
                     deductibleHours: row.deductibleHours || 0,
                     deductibleHoursPay: row.deductibleHoursPay || 0,
-                    leaveDays: row.leaveDays || 0,
+                    annual_leave_count: annualLeaveDaysForSalary,
+                    salary_leave_days: salaryLeaveDaysForSalary,
+                    leaveDays: leaveDaysForSalary,
                     leavePay: row.leavePay || 0,
                     salaryLeaveAmount: row.salaryLeaveAmount || 0,
                     netDeduction: row.netDeduction || 0,
@@ -400,9 +401,9 @@ export default function SalaryTab({ project }) {
                 'Working Days': row.working_days,
                 'Present Days': row.present_days,
                 'LOP Days': row.full_absence_count,
-                'Annual Leave Days': row.annual_leave_count,
+                'Annual Leave Days': row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count,
                 'Sick Leave Days': row.sick_leave_count,
-                'Leave Days': row.leaveDays,
+                'Leave Days': (row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0),
                 'Leave Pay': row.leavePay,
                 'Salary Leave Days': row.salary_leave_days || row.salaryLeaveDays || 0,
                 'Salary Leave Amount': row.salaryLeaveAmount,
