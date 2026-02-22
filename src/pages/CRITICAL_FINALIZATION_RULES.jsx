@@ -395,7 +395,6 @@
  * =====================================================
  */
 
-import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, Lock, CheckCircle, XCircle } from 'lucide-react';
 
