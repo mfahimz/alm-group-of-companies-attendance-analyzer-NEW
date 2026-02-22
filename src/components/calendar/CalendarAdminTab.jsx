@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Database, Download } from 'lucide-react';
+import { Database } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function CalendarAdminTab() {

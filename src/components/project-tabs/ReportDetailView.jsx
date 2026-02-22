@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Save, Filter, Copy, Loader2, CheckCircle } from 'lucide-react';
+import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -2172,7 +2172,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Employees</SelectItem>
-                                <SelectItem value="high-risk">High Risk (>2 LOP or >120 min)</SelectItem>
+                                <SelectItem value="high-risk">High Risk ({`>`}2 LOP or {`>`}120 min)</SelectItem>
                                 <SelectItem value="clean">Clean Records (0 issues)</SelectItem>
                                 <SelectItem value="unverified">Unverified Only</SelectItem>
                             </SelectContent>
