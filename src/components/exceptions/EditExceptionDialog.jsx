@@ -118,8 +118,11 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.allowed_minutes_type = formData.allowed_minutes_type || 'both';
         }
 
-        if (formData.type === 'ANNUAL_LEAVE' && formData.salary_leave_days) {
-            cleanedData.salary_leave_days = parseFloat(formData.salary_leave_days);
+        if (formData.type === 'ANNUAL_LEAVE' && formData.salary_leave_days !== '' && formData.salary_leave_days !== null && formData.salary_leave_days !== undefined) {
+            const salaryLeaveDays = Number(formData.salary_leave_days);
+            if (Number.isFinite(salaryLeaveDays) && salaryLeaveDays >= 0) {
+                cleanedData.salary_leave_days = salaryLeaveDays;
+            }
         }
 
         if (formData.type === 'SKIP_PUNCH') {
