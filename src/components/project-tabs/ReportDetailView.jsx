@@ -51,7 +51,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
+        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000),
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
