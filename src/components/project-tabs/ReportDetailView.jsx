@@ -1132,60 +1132,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 throw new Error(markResult.data?.error || 'Finalization failed');
             }
 
-            // STEP 2: Create salary snapshots in batches
-            const BATCH_SIZE = 20;
-            let batchStart = 0;
-            let hasMore = true;
-            let totalEmployees = 0;
+            // STEP 2: Create all salary snapshots in a single invoke.
+            // Backend handles chunked persistence internally to avoid API limits.
+            setFinalizationProgress(prev => ({
+                ...prev,
+                currentEmployee: 'Creating salary snapshots for all employees...',
+                status: 'Generating snapshots. This may take some time for large reports...'
+            }));
 
-            while (hasMore) {
-                console.log(`[ReportDetailView] Creating snapshot batch starting at ${batchStart}...`);
-                
-                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
-                    project_id: project.id,
-                    report_run_id: reportRun.id,
-                    batch_mode: true,
-                    batch_start: batchStart,
-                    batch_size: BATCH_SIZE
-                });
+            const snapshotResult = await base44.functions.invoke('createSalarySnapshots', {
+                project_id: project.id,
+                report_run_id: reportRun.id
+            });
 
-                console.log('[ReportDetailView] Batch result:', {
-                    batch_mode: batchResult.data?.batch_mode,
-                    current_position: batchResult.data?.current_position,
-                    total: batchResult.data?.total_employees,
-                    has_more: batchResult.data?.has_more
-                });
-
-                if (batchResult.data?.batch_mode) {
-                    totalEmployees = batchResult.data.total_employees;
-                    const currentPos = batchResult.data.current_position;
-                    const currentBatch = batchResult.data.current_batch || [];
-                    hasMore = batchResult.data.has_more;
-
-                    const percentage = totalEmployees > 0 ? Math.round(currentPos/totalEmployees*100) : 0;
-                    console.log(`[ReportDetailView] Progress: ${currentPos}/${totalEmployees} (${percentage}%)`);
-                    
-                    setFinalizationProgress({
-                        open: true,
-                        current: currentPos,
-                        total: totalEmployees,
-                        currentEmployee: currentBatch.length > 0 
-                            ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
-                            : 'Processing...',
-                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
-                    });
-
-                    batchStart = currentPos;
-
-                    if (hasMore) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                } else {
-                    console.log('[ReportDetailView] No batch_mode in result, stopping');
-                    hasMore = false;
-                }
-            }
-            
+            console.log('[ReportDetailView] Snapshot creation result:', snapshotResult.data);
             console.log('[ReportDetailView] All snapshots created successfully');
             return markResult.data;
         },

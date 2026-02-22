@@ -201,12 +201,19 @@ Deno.serve(async (req) => {
                     repaired_snapshots: repairedSnapshots,
                     message: `Snapshots already exist for this report (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`
                 });
+
+                if (changed) {
+                    await base44.asServiceRole.entities.SalaryReport.update(salaryReport.id, {
+                        snapshot_data: JSON.stringify(repairedData)
+                    });
+                    repairedSalaryReports++;
+                }
             }
 
             console.log(`[createSalarySnapshots] ✅ BATCH CONTINUE MODE: existing snapshots repaired; continuing with remaining employees`);
         }
         
-        console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: No existing snapshots found - proceeding with creation`);
+        console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: proceeding with snapshot creation flow`);
         console.log(`[createSalarySnapshots] Request mode: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}, batch_size: ${batch_size}`);
 
         // ============================================================
@@ -1618,13 +1625,22 @@ Deno.serve(async (req) => {
         
         if (snapshots.length > 0) {
             console.log(`[createSalarySnapshots] 💾 STANDARD MODE: Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
-            await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
+
+            // Chunked persistence to avoid API/body limits on large employee sets.
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < snapshots.length; i += CHUNK_SIZE) {
+                const chunk = snapshots.slice(i, i + CHUNK_SIZE);
+                console.log(`[createSalarySnapshots] 💾 STANDARD MODE chunk ${Math.floor(i / CHUNK_SIZE) + 1}: creating ${chunk.length} snapshots`);
+                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(chunk);
+            }
+
             console.log(`[createSalarySnapshots] ✅ Successfully created ${snapshots.length} snapshots`);
         } else {
             console.warn(`[createSalarySnapshots] ⚠️ WARNING: No snapshots created - no eligible employees found`);
         }
 
-        console.log(`[createSalarySnapshots] 🎯 FINAL COUNT CHECK: ${snapshots.length} snapshots created for ${eligibleEmployees.length} eligible employees`);
+        const totalSnapshotKeysAfterRun = existingSnapshotKeys.size;
+        console.log(`[createSalarySnapshots] 🎯 FINAL COUNT CHECK: ${snapshots.length} new snapshots created; ${totalSnapshotKeysAfterRun} total keys for ${eligibleEmployees.length} eligible employees`);
 
         // ============================================================
         // INVARIANT CHECK: Verify ALL snapshots were created in STANDARD mode
@@ -1643,10 +1659,11 @@ Deno.serve(async (req) => {
         return Response.json({
             success: true,
             snapshots_created: snapshots.length,
+            total_snapshots_after_run: totalSnapshotKeysAfterRun,
             analyzed_count: analyzedCount,
             no_attendance_count: noAttendanceCount,
             employees_count: eligibleEmployees.length,
-            message: `Created ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`
+            message: `Created ${snapshots.length} new salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`
         });
 
     } catch (error) {
