@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Briefcase, Users, Shield, DollarSign, FileText, Settings, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import Breadcrumb from '../components/ui/Breadcrumb';
