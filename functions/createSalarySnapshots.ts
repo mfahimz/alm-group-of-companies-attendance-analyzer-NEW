@@ -457,6 +457,60 @@ Deno.serve(async (req) => {
 
         // RECALCULATE attendance for each employee (same logic as UI)
         // For Al Maraghi Motors: assumedPresentDays are treated as fully present for salary
+        const calculateInclusiveDays = (fromDate, toDate) => {
+            const msPerDay = 24 * 60 * 60 * 1000;
+            return Math.floor((toDate.getTime() - fromDate.getTime()) / msPerDay) + 1;
+        };
+
+        const calculateSalaryLeaveDaysOverride = (emp, dateFrom, dateTo) => {
+            const attendanceIdStr = String(emp.attendance_id);
+            const startDate = new Date(dateFrom);
+            const endDate = new Date(dateTo);
+
+            const annualLeaveExceptions = allExceptions.filter(e =>
+                e.type === 'ANNUAL_LEAVE' &&
+                (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+                e.use_in_analysis !== false &&
+                e.is_custom_type !== true
+            );
+
+            let totalSalaryLeaveDays = 0;
+
+            for (const ex of annualLeaveExceptions) {
+                try {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+
+                    if (Number.isNaN(exFrom.getTime()) || Number.isNaN(exTo.getTime()) || exFrom > exTo) {
+                        continue;
+                    }
+
+                    const overlapStart = exFrom < startDate ? startDate : exFrom;
+                    const overlapEnd = exTo > endDate ? endDate : exTo;
+                    if (overlapStart > overlapEnd) {
+                        continue;
+                    }
+
+                    const exceptionTotalDays = calculateInclusiveDays(exFrom, exTo);
+                    const overlapDays = calculateInclusiveDays(overlapStart, overlapEnd);
+                    if (exceptionTotalDays <= 0 || overlapDays <= 0) {
+                        continue;
+                    }
+
+                    const configuredSalaryLeaveDays = Number(ex.salary_leave_days);
+                    const baseSalaryLeaveDays = Number.isFinite(configuredSalaryLeaveDays)
+                        ? configuredSalaryLeaveDays
+                        : exceptionTotalDays;
+
+                    totalSalaryLeaveDays += (baseSalaryLeaveDays / exceptionTotalDays) * overlapDays;
+                } catch {
+                    // Ignore invalid exception rows
+                }
+            }
+
+            return Math.round(totalSalaryLeaveDays * 100) / 100;
+        };
+
         const recalculateEmployeeAttendance = (emp, dateFrom, dateTo, assumedDays = []) => {
             const attendanceIdStr = String(emp.attendance_id);
             const includeSeconds = project.company === 'Al Maraghi Automotive';
@@ -1346,9 +1400,13 @@ Deno.serve(async (req) => {
                 extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
             }
 
-            // Salary leave days always equals finalized annual leave count
-            // No exception overrides - use the value from finalized AnalysisResult
-            let salaryLeaveDays = calculated.annualLeaveCount;
+            // Salary leave days follow ANNUAL_LEAVE exception overrides (salary_leave_days)
+            // and are prorated if an exception partially overlaps the project date range.
+            // Fallback to finalized annual leave count when no override is configured.
+            const salaryLeaveDaysOverride = calculateSalaryLeaveDaysOverride(emp, project.date_from, project.date_to);
+            let salaryLeaveDays = salaryLeaveDaysOverride > 0
+                ? salaryLeaveDaysOverride
+                : calculated.annualLeaveCount;
 
             // Calculate derived salary values - ALL rounded to 2 decimal places
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
@@ -1372,6 +1430,7 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots]    salaryLeaveBase = ${salaryLeaveBase}`);
             console.log(`[createSalarySnapshots]    divisor = ${divisor}`);
             console.log(`[createSalarySnapshots]    salaryLeaveDays = ${salaryLeaveDays}`);
+            console.log(`[createSalarySnapshots]    salaryLeaveDaysOverride = ${salaryLeaveDaysOverride}`);
             console.log(`[createSalarySnapshots]    salaryLeaveAmount = ${salaryLeaveAmount}`);
             
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
@@ -1413,6 +1472,35 @@ Deno.serve(async (req) => {
             // ALWAYS round to 2 decimals, then apply whole number rounding for balance
             let finalTotal = Math.round((totalSalaryAmount - netDeduction - currentMonthDeductibleHoursPay) * 100) / 100;
 
+            const calculateWpsSplit = (totalAmount, capAmount, capEnabled) => {
+                if (totalAmount <= 0) {
+                    return { wpsAmount: 0, balanceAmount: 0, wpsCapApplied: false };
+                }
+
+                if (!(project.company === 'Al Maraghi Motors' && capEnabled)) {
+                    return {
+                        wpsAmount: Math.round(totalAmount * 100) / 100,
+                        balanceAmount: 0,
+                        wpsCapApplied: false
+                    };
+                }
+
+                const cap = capAmount != null ? capAmount : 4900;
+                const rawExcess = Math.max(0, totalAmount - cap);
+
+                // Balance must be integer and multiple of 100, and WPS must never exceed cap.
+                const balanceAmount = rawExcess > 0
+                    ? Math.ceil(rawExcess / 100) * 100
+                    : 0;
+
+                const wpsAmount = Math.max(0, Math.round((totalAmount - balanceAmount) * 100) / 100);
+                return {
+                    wpsAmount,
+                    balanceAmount,
+                    wpsCapApplied: rawExcess > 0
+                };
+            };
+
             // ============================================================
             // WPS SPLIT LOGIC (Al Maraghi Motors only)
             // ============================================================
@@ -1420,31 +1508,9 @@ Deno.serve(async (req) => {
             // Uses wps_cap_enabled and wps_cap_amount from EmployeeSalary
             // Balance must always be a multiple of 100 (round down)
             // ============================================================
-            let wpsAmount = finalTotal;
-            let balanceAmount = 0;
-            let wpsCapApplied = false;
             const wpsCapEnabled = salary?.wps_cap_enabled || false;
             const wpsCapAmount = salary?.wps_cap_amount ?? 4900;
-
-            if (project.company === 'Al Maraghi Motors' && wpsCapEnabled) {
-                if (finalTotal <= 0) {
-                    wpsAmount = 0;
-                    balanceAmount = 0;
-                    wpsCapApplied = false;
-                } else {
-                    const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                    // Calculate raw excess over cap
-                    const rawExcess = Math.max(0, finalTotal - cap);
-                    // Round balance DOWN to nearest 100, then round to 2 decimals
-                    balanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
-                    // WPS gets the rest (total - balance), rounded to 2 decimals
-                    wpsAmount = Math.round((finalTotal - balanceAmount) * 100) / 100;
-                    wpsCapApplied = rawExcess > 0;
-                }
-            } else if (finalTotal <= 0) {
-                wpsAmount = 0;
-                balanceAmount = 0;
-            }
+            const { wpsAmount, balanceAmount, wpsCapApplied } = calculateWpsSplit(finalTotal, wpsCapAmount, wpsCapEnabled);
 
             // CRITICAL: Fetch OvertimeData to populate OT and adjustment fields
             // OvertimeData is entered BEFORE finalization in the Overtime tab

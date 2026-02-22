@@ -110,6 +110,23 @@ export default function SalaryReportDetail() {
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
+    const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
+        if (totalAmount <= 0) {
+            return { wpsPay: 0, balance: 0, wpsCapApplied: false };
+        }
+
+        if (!(isAlMaraghi && isCapEnabled)) {
+            return { wpsPay: totalAmount, balance: 0, wpsCapApplied: false };
+        }
+
+        const cap = capAmount != null ? capAmount : 4900;
+        const rawExcess = Math.max(0, totalAmount - cap);
+        const balance = rawExcess > 0 ? Math.ceil(rawExcess / 100) * 100 : 0;
+        const wpsPay = totalAmount - balance;
+
+        return { wpsPay, balance, wpsCapApplied: rawExcess > 0 };
+    };
+
     
     // Can recalculate: Al Maraghi only, report finalized, project not closed, user has permission
     const canRecalculate = isAlMaraghi && 
@@ -249,32 +266,9 @@ export default function SalaryReportDetail() {
                       - otherDeduction - advanceSalaryDeduction;
 
         // WPS SPLIT LOGIC (Al Maraghi Motors only)
-        // Balance must always be a multiple of 100 (round down)
-        let wpsPay = total;
-        let balance = 0;
-        let wpsCapApplied = false;
         const wpsCapEnabled = row.wps_cap_enabled || false;
         const wpsCapAmount = row.wps_cap_amount ?? 4900;
-
-        if (isAlMaraghi && wpsCapEnabled) {
-            if (total <= 0) {
-                wpsPay = 0;
-                balance = 0;
-                wpsCapApplied = false;
-            } else {
-                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                // Calculate raw excess over cap
-                const rawExcess = Math.max(0, total - cap);
-                // Round balance DOWN to nearest 100
-                balance = Math.floor(rawExcess / 100) * 100;
-                // WPS gets the rest (total - balance)
-                wpsPay = total - balance;
-                wpsCapApplied = rawExcess > 0;
-            }
-        } else if (total <= 0) {
-            wpsPay = 0;
-            balance = 0;
-        }
+        const { wpsPay, balance, wpsCapApplied } = calculateWpsSplit(total, wpsCapEnabled, wpsCapAmount);
 
         return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary };
     };
@@ -368,18 +362,10 @@ export default function SalaryReportDetail() {
             const wpsCapEnabled = updated.wps_cap_enabled || false;
             const wpsCapAmount = updated.wps_cap_amount ?? 4900;
 
-            if (isAlMaraghi && wpsCapEnabled && finalTotal > 0) {
-                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                const rawExcess = Math.max(0, finalTotal - cap);
-                const balance = Math.floor(rawExcess / 100) * 100;
-                updated.wpsPay = Math.round(finalTotal - balance);
-                updated.balance = balance;
-                updated.wps_cap_applied = rawExcess > 0;
-            } else {
-                updated.wpsPay = Math.round(Math.max(0, finalTotal));
-                updated.balance = 0;
-                updated.wps_cap_applied = false;
-            }
+            const { wpsPay, balance, wpsCapApplied } = calculateWpsSplit(finalTotal, wpsCapEnabled, wpsCapAmount);
+            updated.wpsPay = Math.round(wpsPay * 100) / 100;
+            updated.balance = Math.round(balance);
+            updated.wps_cap_applied = wpsCapApplied;
 
             return updated;
             });
@@ -556,7 +542,7 @@ export default function SalaryReportDetail() {
                 'Advance Salary Deduction': parseFloat((row.advanceSalaryDeduction || 0).toFixed(2)),
                 'Total': parseFloat(total.toFixed(2)),
                 'WPS Pay': parseFloat(wpsPay.toFixed(2)),
-                'Balance': parseFloat(balance.toFixed(2)),
+                'Balance': Math.round(balance),
                 'WPS Cap Applied': wpsCapApplied ? 'Yes' : 'No',
                 'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
             };
@@ -1042,7 +1028,7 @@ export default function SalaryReportDetail() {
                                                 </td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-green-100 font-bold">{wpsPay.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100 font-bold">{balance.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100 font-bold">{Math.round(balance)}</td>
                                                 <td className="p-2 align-middle bg-slate-50 text-center">
                                                     {wpsCapApplied ? (
                                                         <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded text-xs font-medium">

@@ -112,6 +112,23 @@ export default function SalaryTab({ project }) {
     // Allow access to Salary tab for Al Maraghi Motors projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryTab = isAdminOrCEO || isAlMaraghi;
+    const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
+        if (totalAmount <= 0) {
+            return { wpsAmount: 0, balanceAmount: 0, wpsCapApplied: false };
+        }
+
+        if (!(isAlMaraghi && isCapEnabled)) {
+            return { wpsAmount: totalAmount, balanceAmount: 0, wpsCapApplied: false };
+        }
+
+        const cap = capAmount != null ? capAmount : 4900;
+        const rawExcess = Math.max(0, totalAmount - cap);
+        const balanceAmount = rawExcess > 0 ? Math.ceil(rawExcess / 100) * 100 : 0;
+        const wpsAmount = totalAmount - balanceAmount;
+
+        return { wpsAmount, balanceAmount, wpsCapApplied: rawExcess > 0 };
+    };
+
     const hasFinalReport = finalReport && finalReport.is_final === true;
 
     // ============================================
