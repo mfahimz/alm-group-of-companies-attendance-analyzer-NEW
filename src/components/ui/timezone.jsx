@@ -1,4 +1,4 @@
-import { format as formatDateFns, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 // UAE timezone
