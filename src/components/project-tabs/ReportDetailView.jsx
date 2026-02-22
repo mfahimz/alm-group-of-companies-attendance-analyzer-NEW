@@ -51,7 +51,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }),
+        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000),
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -825,14 +825,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         };
     };
 
-    // Separate calculation from verification state to prevent unnecessary recalculations
+    // For FINALIZED reports: use stored AnalysisResult values (immutable).
+    // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
+    // so the summary table matches the daily breakdown the user sees.
     const baseEnrichedResults = React.useMemo(() => {
+        const isFinalized = reportRun.is_final || project.status === 'closed';
+        
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
-            // Always use stored AnalysisResult values as the source of truth for report rows.
-            // This keeps the attendance report stable before/after finalization and ensures
-            // what the user sees is exactly the finalized data persisted in backend.
             const employeePunches = punches.filter(p =>
                 String(p.attendance_id) === String(result.attendance_id) &&
                 p.punch_date >= reportRun.date_from &&
@@ -840,25 +841,65 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             );
             const hasNoPunches = employeePunches.length === 0;
 
+            if (isFinalized) {
+                // FINALIZED: Use stored values AS-IS — never recalculate
+                return {
+                    ...result,
+                    name: employee?.name || 'Unknown',
+                    working_days: result.working_days || 0,
+                    present_days: result.manual_present_days ?? result.present_days ?? 0,
+                    full_absence_count: result.manual_full_absence_count ?? result.full_absence_count ?? 0,
+                    half_absence_count: result.half_absence_count || 0,
+                    sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
+                    annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
+                    late_minutes: result.late_minutes || 0,
+                    early_checkout_minutes: result.early_checkout_minutes || 0,
+                    other_minutes: result.other_minutes || 0,
+                    approved_minutes: result.approved_minutes || 0,
+                    deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
+                    grace_minutes: result.grace_minutes ?? 15,
+                    has_no_punches: hasNoPunches
+                };
+            }
+
+            // NON-FINALIZED: Recalculate from live punch data + day_overrides
+            const { 
+                totalLateMinutes, 
+                totalEarlyCheckout, 
+                totalOtherMinutes,
+                workingDays, 
+                presentDays, 
+                fullAbsenceCount, 
+                halfAbsenceCount, 
+                sickLeaveCount,
+                annualLeaveCount
+            } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
+
+            // Dynamic deductible: (late + early) - grace - approved (other_minutes excluded)
+            const baseMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
+            const graceMinutes = result.grace_minutes ?? 15;
+            const approvedMinutes = result.approved_minutes || 0;
+            const dynamicDeductible = Math.max(0, Math.max(0, baseMinutes - graceMinutes) - approvedMinutes);
+
             return {
                 ...result,
                 name: employee?.name || 'Unknown',
-                working_days: result.working_days || 0,
-                present_days: result.manual_present_days ?? result.present_days ?? 0,
-                full_absence_count: result.manual_full_absence_count ?? result.full_absence_count ?? 0,
-                half_absence_count: result.half_absence_count || 0,
-                sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
-                annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
-                late_minutes: result.late_minutes || 0,
-                early_checkout_minutes: result.early_checkout_minutes || 0,
-                other_minutes: result.other_minutes || 0,
-                approved_minutes: result.approved_minutes || 0,
-                deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
-                grace_minutes: result.grace_minutes ?? 15,
+                working_days: workingDays,
+                present_days: result.manual_present_days ?? presentDays,
+                full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
+                half_absence_count: halfAbsenceCount,
+                sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
+                annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount,
+                late_minutes: Math.max(0, totalLateMinutes),
+                early_checkout_minutes: Math.max(0, totalEarlyCheckout),
+                other_minutes: Math.max(0, totalOtherMinutes),
+                approved_minutes: approvedMinutes,
+                deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
+                grace_minutes: graceMinutes,
                 has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, reportRun]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, project]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
@@ -1023,11 +1064,61 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 open: true,
                 current: 0,
                 total: 0,
-                currentEmployee: 'Validating report data...',
+                currentEmployee: 'Saving current report values...',
                 status: 'Please wait...'
             });
 
-            // STEP 1: Mark report as final
+            // ============================================================
+            // STEP 0: CRITICAL - Write the EXACT UI values into AnalysisResult
+            // before marking final. This ensures what you see = what gets finalized.
+            // NO backend recalculation. The frontend is the source of truth.
+            // ============================================================
+            console.log('[ReportDetailView] Step 0: Writing UI values to AnalysisResult...');
+            const currentEnriched = baseEnrichedResults;
+            let updatedCount = 0;
+            
+            for (const row of currentEnriched) {
+                // Build update payload with the EXACT values shown in the UI table
+                const updates = {};
+                let needsUpdate = false;
+                
+                // Compare UI values with stored AnalysisResult values
+                // Find the raw result to compare against
+                const rawResult = results.find(r => r.id === row.id);
+                if (!rawResult) continue;
+                
+                const fieldsToSync = [
+                    { uiKey: 'working_days', dbKey: 'working_days' },
+                    { uiKey: 'present_days', dbKey: 'present_days' },
+                    { uiKey: 'full_absence_count', dbKey: 'full_absence_count' },
+                    { uiKey: 'half_absence_count', dbKey: 'half_absence_count' },
+                    { uiKey: 'sick_leave_count', dbKey: 'sick_leave_count' },
+                    { uiKey: 'annual_leave_count', dbKey: 'annual_leave_count' },
+                    { uiKey: 'late_minutes', dbKey: 'late_minutes' },
+                    { uiKey: 'early_checkout_minutes', dbKey: 'early_checkout_minutes' },
+                    { uiKey: 'other_minutes', dbKey: 'other_minutes' },
+                    { uiKey: 'deductible_minutes', dbKey: 'deductible_minutes' },
+                    { uiKey: 'grace_minutes', dbKey: 'grace_minutes' },
+                ];
+                
+                for (const f of fieldsToSync) {
+                    const uiVal = row[f.uiKey] ?? 0;
+                    const dbVal = rawResult[f.dbKey] ?? 0;
+                    if (Math.abs(uiVal - dbVal) > 0.01) {
+                        updates[f.dbKey] = uiVal;
+                        needsUpdate = true;
+                    }
+                }
+                
+                if (needsUpdate) {
+                    console.log(`[ReportDetailView] Syncing UI→DB for ${row.attendance_id}:`, updates);
+                    await base44.entities.AnalysisResult.update(row.id, updates);
+                    updatedCount++;
+                }
+            }
+            console.log(`[ReportDetailView] Step 0 complete: synced ${updatedCount} AnalysisResults with UI values`);
+
+            // STEP 1: Mark report as final (no recalculation - just flag it)
             console.log('[ReportDetailView] Calling markFinalReport...');
             const markResult = await base44.functions.invoke('markFinalReport', {
                 project_id: project.id,
@@ -2307,9 +2398,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     </div>
                                                 );
                                             })()}
-                                        </td>
-                                        <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
-                                            {result.notes || '-'}
+                                            </td>
+                                            <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
+                                             {result.notes || '-'}
                                         </td>
                                         <td className="p-2 align-middle text-right">
                                               <Button
