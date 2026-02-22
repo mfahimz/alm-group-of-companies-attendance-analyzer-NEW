@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
-import { Plus, Trash2, Search, Upload, Download, Save, Edit, Eye, Filter, Sparkles, Calendar, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { Plus, Trash2, Search, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
@@ -530,7 +530,8 @@ export default function ExceptionsTab({ project }) {
         other_minutes: '',
         punch_to_skip: 'AM_PUNCH_IN',
         new_weekly_off: '',
-        working_day_override: ''
+        working_day_override: '',
+        salary_leave_days: ''
     });
     const [filter, setFilter] = useState({ 
         search: '', 
@@ -989,7 +990,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             allowed_minutes_type: 'both',
             punch_to_skip: 'AM_PUNCH_IN',
             new_weekly_off: '',
-            working_day_override: ''
+            working_day_override: '',
+            salary_leave_days: ''
         });
         setEmployeeSearch('');
     };
@@ -1072,7 +1074,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 include_friday: false,
                 other_minutes: '',
                 allowed_minutes: parsed.allowed_minutes || '',
-                allowed_minutes_type: parsed.allowed_minutes_type || 'both'
+                allowed_minutes_type: parsed.allowed_minutes_type || 'both',
+                salary_leave_days: parsed.salary_leave_days || ''
             });
 
             setNlpText('');
@@ -1144,6 +1147,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
         // Add skip punch configuration
         if (submitData.type === 'SKIP_PUNCH') {
             cleanedData.punch_to_skip = submitData.punch_to_skip;
+        }
+
+        // Annual leave salary days override (supports decimals)
+        if (submitData.type === 'ANNUAL_LEAVE' && submitData.salary_leave_days !== '' && submitData.salary_leave_days !== null && submitData.salary_leave_days !== undefined) {
+            const salaryLeaveDays = Number(submitData.salary_leave_days);
+            if (Number.isFinite(salaryLeaveDays) && salaryLeaveDays >= 0) {
+                cleanedData.salary_leave_days = salaryLeaveDays;
+            }
         }
 
         // Add day swap configuration
@@ -1261,6 +1272,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
     const needsSkipPunch = formData.type === 'SKIP_PUNCH';
     const needsDaySwap = formData.type === 'DAY_SWAP';
+    const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
 
     // Group and flatten exceptions by type and custom name (invisible grouping)
     const sortedExceptions = React.useMemo(() => {
@@ -1558,7 +1570,16 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             onChange={(e) => {
                                                 const newDate = e.target.value;
                                                 if (newDate >= project.date_from && newDate <= project.date_to) {
-                                                    setFormData({ ...formData, date_from: newDate });
+                                                    setFormData(prev => {
+                                                        const next = { ...prev, date_from: newDate };
+                                                        if (prev.type === 'ANNUAL_LEAVE' && prev.date_to) {
+                                                            const from = new Date(newDate);
+                                                            const to = new Date(prev.date_to);
+                                                            const diffDays = Math.ceil((Math.abs(to - from)) / (1000 * 60 * 60 * 24)) + 1;
+                                                            next.salary_leave_days = Number.isFinite(diffDays) ? diffDays.toFixed(2) : prev.salary_leave_days;
+                                                        }
+                                                        return next;
+                                                    });
                                                 }
                                             }}
                                             min={project.date_from}
@@ -1574,7 +1595,16 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             onChange={(e) => {
                                                 const newDate = e.target.value;
                                                 if (newDate >= formData.date_from && newDate <= project.date_to && newDate >= project.date_from) {
-                                                    setFormData({ ...formData, date_to: newDate });
+                                                    setFormData(prev => {
+                                                        const next = { ...prev, date_to: newDate };
+                                                        if (prev.type === 'ANNUAL_LEAVE' && prev.date_from) {
+                                                            const from = new Date(prev.date_from);
+                                                            const to = new Date(newDate);
+                                                            const diffDays = Math.ceil((Math.abs(to - from)) / (1000 * 60 * 60 * 24)) + 1;
+                                                            next.salary_leave_days = Number.isFinite(diffDays) ? diffDays.toFixed(2) : prev.salary_leave_days;
+                                                        }
+                                                        return next;
+                                                    });
                                                 }
                                             }}
                                             min={formData.date_from}
@@ -1582,6 +1612,26 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             title="Date must be within project period"
                                         />
                                     </div>
+                                </div>
+                            )}
+
+                            {needsSalaryLeaveDays && (
+                                <div className="space-y-2 border-t pt-4">
+                                    <Label>Salary Leave Days (for salary calculation only) <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={formData.salary_leave_days}
+                                        onChange={(e) => setFormData({ ...formData, salary_leave_days: e.target.value })}
+                                        placeholder="e.g. 14.17"
+                                    />
+                                    {formData.date_from && formData.date_to && (
+                                        <p className="text-xs text-emerald-700">
+                                            💡 Calculated: {Math.ceil((Math.abs(new Date(formData.date_to) - new Date(formData.date_from))) / (1000 * 60 * 60 * 24)) + 1} days between selected dates.
+                                            Edit if partial days are needed.
+                                        </p>
+                                    )}
                                 </div>
                             )}
 

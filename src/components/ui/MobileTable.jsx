@@ -1,5 +1,3 @@
-import React from 'react';
-import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function MobileTable({ data, columns, renderActions, keyField = 'id' }) {
