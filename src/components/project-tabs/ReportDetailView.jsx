@@ -825,10 +825,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         };
     };
 
-    // CRITICAL: Always use stored AnalysisResult values as the SINGLE source of truth.
-    // NEVER recalculate from punches/shifts/exceptions — that's runAnalysis's job.
-    // This ensures the attendance report shows IDENTICAL values before and after finalization.
+    // For FINALIZED reports: use stored AnalysisResult values (immutable).
+    // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
+    // so the summary table matches the daily breakdown the user sees.
     const baseEnrichedResults = React.useMemo(() => {
+        const isFinalized = reportRun.is_final || project.status === 'closed';
+        
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
@@ -839,25 +841,65 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             );
             const hasNoPunches = employeePunches.length === 0;
 
+            if (isFinalized) {
+                // FINALIZED: Use stored values AS-IS — never recalculate
+                return {
+                    ...result,
+                    name: employee?.name || 'Unknown',
+                    working_days: result.working_days || 0,
+                    present_days: result.manual_present_days ?? result.present_days ?? 0,
+                    full_absence_count: result.manual_full_absence_count ?? result.full_absence_count ?? 0,
+                    half_absence_count: result.half_absence_count || 0,
+                    sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
+                    annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
+                    late_minutes: result.late_minutes || 0,
+                    early_checkout_minutes: result.early_checkout_minutes || 0,
+                    other_minutes: result.other_minutes || 0,
+                    approved_minutes: result.approved_minutes || 0,
+                    deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
+                    grace_minutes: result.grace_minutes ?? 15,
+                    has_no_punches: hasNoPunches
+                };
+            }
+
+            // NON-FINALIZED: Recalculate from live punch data + day_overrides
+            const { 
+                totalLateMinutes, 
+                totalEarlyCheckout, 
+                totalOtherMinutes,
+                workingDays, 
+                presentDays, 
+                fullAbsenceCount, 
+                halfAbsenceCount, 
+                sickLeaveCount,
+                annualLeaveCount
+            } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
+
+            // Dynamic deductible: (late + early) - grace - approved (other_minutes excluded)
+            const baseMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
+            const graceMinutes = result.grace_minutes ?? 15;
+            const approvedMinutes = result.approved_minutes || 0;
+            const dynamicDeductible = Math.max(0, Math.max(0, baseMinutes - graceMinutes) - approvedMinutes);
+
             return {
                 ...result,
                 name: employee?.name || 'Unknown',
-                working_days: result.working_days || 0,
-                present_days: result.manual_present_days ?? result.present_days ?? 0,
-                full_absence_count: result.manual_full_absence_count ?? result.full_absence_count ?? 0,
-                half_absence_count: result.half_absence_count || 0,
-                sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
-                annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
-                late_minutes: result.late_minutes || 0,
-                early_checkout_minutes: result.early_checkout_minutes || 0,
-                other_minutes: result.other_minutes || 0,
-                approved_minutes: result.approved_minutes || 0,
-                deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
-                grace_minutes: result.grace_minutes ?? 15,
+                working_days: workingDays,
+                present_days: result.manual_present_days ?? presentDays,
+                full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
+                half_absence_count: halfAbsenceCount,
+                sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
+                annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount,
+                late_minutes: Math.max(0, totalLateMinutes),
+                early_checkout_minutes: Math.max(0, totalEarlyCheckout),
+                other_minutes: Math.max(0, totalOtherMinutes),
+                approved_minutes: approvedMinutes,
+                deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
+                grace_minutes: graceMinutes,
                 has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, reportRun]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, project]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
