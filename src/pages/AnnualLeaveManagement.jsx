@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Plus, Filter, Check, X, FileText, Download, AlertCircle } from 'lucide-react';
+import { Plus, Check, X, FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatInUAE } from '@/components/ui/timezone';
 import Breadcrumb from '@/components/ui/Breadcrumb';
