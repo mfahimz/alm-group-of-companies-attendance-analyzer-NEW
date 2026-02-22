@@ -213,118 +213,22 @@ export default function SalaryTab({ project }) {
         
         try {
             // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Deductible Hours Pay
-            // [MERGE_NOTE: If merging divisors, this becomes the single divisor for all calculations]
             const divisor = project.salary_calculation_days || 30;
+            // DIVISOR_OT: Used for OT Hourly Rate
+            const otDivisor = project.ot_calculation_days || divisor;
 
             setGenerationProgress(`Loading salary snapshots for ${salarySnapshots.length} employees...`);
-            await new Promise(resolve => setTimeout(resolve, 300)); // Visual feedback
+            await new Promise(resolve => setTimeout(resolve, 300));
 
-            // CRITICAL FIX: ALWAYS use finalized SalarySnapshot values
-            // date_from/date_to are just report metadata, they MUST NOT trigger attendance recalculation
-            // Salary MUST use finalized AnalysisResult values regardless of report date range
-            const calculatedData = salarySnapshots.map(snapshot => ({ ...snapshot }));
-
-            setGenerationProgress('Calculating overtime and adjustments...');
-            await new Promise(resolve => setTimeout(resolve, 300)); // Visual feedback
-            
-            // Merge OT data from OvertimeData entity into calculated data
-            // ALSO merge adjustment fields from SalarySnapshot
-            // DIVISOR_OT: Use ot_calculation_days for OT salary calculations
-            // [MERGE_NOTE: If merging divisors, change otDivisor to use divisor (salary_calculation_days) instead]
-            const otDivisor = project.ot_calculation_days || 30;
-            
-            const finalCalculatedData = calculatedData.map(row => {
-                const otRecord = row.attendance_id 
-                    ? overtimeData.find(ot => String(ot.attendance_id) === String(row.attendance_id))
-                    : null;
-                
-                // Get the latest SalarySnapshot for adjustment values
-                const snapshotRecord = row.attendance_id
-                    ? salarySnapshots.find(s => String(s.attendance_id) === String(row.attendance_id))
-                    : salarySnapshots.find(s => String(s.hrms_id) === String(row.hrms_id));
-                
-                const salary = row.attendance_id
-                    ? employeeSalaries.find(s => String(s.attendance_id) === String(row.attendance_id) || String(s.employee_id) === String(row.hrms_id))
-                    : employeeSalaries.find(s => String(s.employee_id) === String(row.hrms_id));
-                const totalSalary = row.total_salary || salary?.total_salary || 0;
-                const workingHours = row.working_hours || salary?.working_hours || 9;
-                
-                // DIVISOR_OT: OT hourly rate uses snapshot's stored OT values (already calculated with correct logic)
-                // The snapshot was created with the correct previous month salary resolution
-                // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
-                const otHourlyRate = totalSalary / otDivisor / workingHours;
-
-                // OT hours from OvertimeData (pre-finalization entry)
-                const normalOtHours = otRecord?.normalOtHours || 0;
-                const specialOtHours = otRecord?.specialOtHours || 0;
-                const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
-                const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
-                const totalOtSalary = normalOtSalary + specialOtSalary;
-
-                // Get adjustment values from SalarySnapshot (post-finalization edits)
-                const netDeduction = row.netDeduction || 0;
-                const deductibleHoursPay = row.deductibleHoursPay || 0;
-                const bonus = snapshotRecord?.bonus ?? row.bonus ?? 0;
-                const incentive = snapshotRecord?.incentive ?? row.incentive ?? 0;
-                const otherDeduction = snapshotRecord?.otherDeduction ?? row.otherDeduction ?? 0;
-                const advanceSalaryDeduction = snapshotRecord?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0;
-
-                // Previous month deductions (Al Maraghi Motors - from recalculated snapshots)
-                // CRITICAL: These must come from the row (recalculated data), NOT snapshot
-                const extraPrevMonthDeductibleMinutes = row.extra_prev_month_deductible_minutes || 0;
-                const extraPrevMonthLopDays = row.extra_prev_month_lop_days || 0;
-                const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
-                const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
-
-                const finalTotal = totalSalary + totalOtSalary + bonus + incentive
-                    - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
-                    - otherDeduction - advanceSalaryDeduction;
-
-                // WPS SPLIT LOGIC (Al Maraghi Motors only)
-                // Balance must always be a multiple of 100 (round down)
-                const wpsCapEnabled = salary?.wps_cap_enabled || false;
-                const wpsCapAmount = salary?.wps_cap_amount ?? 4900;
-                const { wpsAmount, balanceAmount, wpsCapApplied } = calculateWpsSplit(finalTotal, wpsCapEnabled, wpsCapAmount);
-
-                const result = {
+            // CRITICAL: Use finalized SalarySnapshot values directly
+            // Snapshots already contain ALL calculated values including OT and adjustments
+            const finalCalculatedData = salarySnapshots.map(row => {
+                return {
                     ...row,
-                    normalOtHours,
-                    specialOtHours,
-                    normalOtSalary,
-                    specialOtSalary,
-                    totalOtSalary,
-                    bonus,
-                    incentive,
-                    otherDeduction,
-                    advanceSalaryDeduction,
-                    // Store divisors used for reference
-                    salary_divisor: divisor,
-                    ot_divisor: otDivisor,
-                    // CRITICAL: Preserve finalized attendance values (DO NOT RECOMPUTE)
-                    deductible_minutes: row.deductible_minutes || 0,
-                    deductibleHours: row.deductibleHours || 0,
-                    deductibleHoursPay: row.deductibleHoursPay || 0,
-                    leaveDays: row.leaveDays || 0,
-                    leavePay: row.leavePay || 0,
-                    salaryLeaveAmount: row.salaryLeaveAmount || 0,
-                    netDeduction: row.netDeduction || 0,
-                    // Preserve previous month fields from recalculated data (DISABLED - should be 0)
-                    extra_prev_month_deductible_minutes: extraPrevMonthDeductibleMinutes,
-                    extra_prev_month_lop_days: extraPrevMonthLopDays,
-                    extra_prev_month_lop_pay: extraPrevMonthLopPay,
-                    extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
-                    prev_month_divisor: row.prev_month_divisor || 0,
-                    salary_month_start: row.salary_month_start || null,
-                    salary_month_end: row.salary_month_end || null,
-                    total: Math.round(finalTotal * 100) / 100,
-                    wpsPay: Math.round(wpsAmount * 100) / 100,
-                    balance: Math.round(balanceAmount * 100) / 100,
-                    wps_cap_enabled: wpsCapEnabled,
-                    wps_cap_amount: wpsCapAmount,
-                    wps_cap_applied: wpsCapApplied
+                    total: row.total || 0,
+                    wpsPay: row.wpsPay || 0,
+                    balance: row.balance || 0
                 };
-                
-                return result;
             });
 
             setGenerationProgress('Calculating report totals...');
