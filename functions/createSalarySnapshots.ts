@@ -79,36 +79,109 @@ Deno.serve(async (req) => {
             report_run_id: report_run_id
         }, null, 5000);
 
+        const existingSnapshotKeys = new Set(
+            existingSnapshots.map(s => String(s.attendance_id || s.hrms_id)).filter(Boolean)
+        );
+
         if (existingSnapshots.length > 0) {
             console.log(`[createSalarySnapshots] 🛑 IDEMPOTENCY GATE: ${existingSnapshots.length} snapshots already exist for report_run_id ${report_run_id}`);
             console.log(`[createSalarySnapshots] ⚠️ Request type: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}`);
-            console.log(`[createSalarySnapshots] ✅ Returning existing count - NO duplicates created`);
-            
-            // Return appropriate response based on mode
-            if (batch_mode) {
-                // Batch mode: Return batch-style response indicating completion
-                return Response.json({
-                    success: true,
-                    batch_mode: true,
-                    batch_completed: 0,
-                    total_employees: existingSnapshots.length,
-                    current_position: existingSnapshots.length,
-                    has_more: false,
-                    message: `Snapshots already exist (${existingSnapshots.length} found). Idempotency gate prevented duplicates.`,
-                    current_batch: []
-                });
-            } else {
-                // Standard mode: Return standard response
-                return Response.json({
-                    success: true,
-                    snapshots_created: 0,
-                    existing_snapshots: existingSnapshots.length,
-                    message: `Snapshots already exist for this report (${existingSnapshots.length} found). No duplicates created.`
-                });
+
+            // SELF-HEAL: Ensure existing snapshots preserve finalized attendance fields AS-IS.
+            // Legacy snapshots may have deductible_minutes polluted with other_minutes.
+            // We repair those fields from AnalysisResult without creating duplicates.
+            const analysisResultsForRepair = await base44.asServiceRole.entities.AnalysisResult.filter({
+                project_id: project_id,
+                report_run_id: report_run_id
+            }, null, 5000);
+
+            let repairedSnapshots = 0;
+            for (const snapshot of existingSnapshots) {
+                if (!snapshot.attendance_id) continue; // Salary-only employee (no AnalysisResult)
+
+                const analysisResult = analysisResultsForRepair.find(r =>
+                    String(r.attendance_id) === String(snapshot.attendance_id)
+                );
+                if (!analysisResult) continue;
+
+                const finalizedDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                const finalizedOtherMinutes = Math.max(0, analysisResult.other_minutes || 0);
+
+                if (
+                    Number(snapshot.deductible_minutes || 0) !== Number(finalizedDeductibleMinutes) ||
+                    Number(snapshot.other_minutes || 0) !== Number(finalizedOtherMinutes)
+                ) {
+                    await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
+                        deductible_minutes: finalizedDeductibleMinutes,
+                        other_minutes: finalizedOtherMinutes
+                    });
+                    repairedSnapshots++;
+                }
             }
+
+            console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSnapshots} existing snapshots`);
+
+            // Also repair cached SalaryReport.snapshot_data rows for this finalized report,
+            // so UI screens reading snapshot_data immediately reflect corrected minute fields.
+            const salaryReportsForRepair = await base44.asServiceRole.entities.SalaryReport.filter({
+                project_id: project_id,
+                report_run_id: report_run_id
+            }, '-created_date', 5000);
+
+            let repairedSalaryReports = 0;
+            for (const salaryReport of salaryReportsForRepair) {
+                let parsedData = [];
+                try {
+                    parsedData = JSON.parse(salaryReport.snapshot_data || '[]');
+                } catch {
+                    parsedData = [];
+                }
+
+                if (!Array.isArray(parsedData) || parsedData.length === 0) continue;
+
+                let changed = false;
+                const repairedData = parsedData.map((row) => {
+                    if (!row?.attendance_id) return row;
+
+                    const analysisResult = analysisResultsForRepair.find(r =>
+                        String(r.attendance_id) === String(row.attendance_id)
+                    );
+                    if (!analysisResult) return row;
+
+                    const finalizedDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                    const finalizedOtherMinutes = Math.max(0, analysisResult.other_minutes || 0);
+
+                    if (
+                        Number(row.deductible_minutes || 0) !== Number(finalizedDeductibleMinutes) ||
+                        Number(row.other_minutes || 0) !== Number(finalizedOtherMinutes)
+                    ) {
+                        changed = true;
+                        return {
+                            ...row,
+                            deductible_minutes: finalizedDeductibleMinutes,
+                            other_minutes: finalizedOtherMinutes
+                        };
+                    }
+
+                    return row;
+                });
+
+                if (changed) {
+                    await base44.asServiceRole.entities.SalaryReport.update(salaryReport.id, {
+                        snapshot_data: JSON.stringify(repairedData)
+                    });
+                    repairedSalaryReports++;
+                }
+            }
+
+            console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSalaryReports} salary reports`);
+
+            // Continue processing for BOTH modes so partially-created reports can be completed
+            // in a single press even when some snapshots already exist.
+            console.log(`[createSalarySnapshots] ✅ CONTINUE MODE: existing snapshots repaired; continuing with remaining employees`);
         }
         
-        console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: No existing snapshots found - proceeding with creation`);
+        console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: proceeding with snapshot creation flow`);
         console.log(`[createSalarySnapshots] Request mode: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}, batch_size: ${batch_size}`);
 
         // ============================================================
@@ -1054,6 +1127,13 @@ Deno.serve(async (req) => {
         for (const emp of employeesToProcess) {
             loopIterationCount++;
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
+
+            const employeeKey = String(emp.attendance_id || emp.hrms_id);
+            if (existingSnapshotKeys.has(employeeKey)) {
+                console.log(`[createSalarySnapshots] ⏭️ SKIP: Snapshot already exists for ${emp.name} (${employeeKey})`);
+                continue;
+            }
+
             // Find matching salary record (REQUIRED for salary snapshot)
             const baseSalary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
@@ -1161,7 +1241,7 @@ Deno.serve(async (req) => {
             // PERMANENT LOCK: For finalized reports, use AnalysisResult values AS-IS (1:1 copy)
             // CRITICAL: Check manual override fields FIRST, fallback to regular fields
             // Manual overrides are set when user edits report before finalization
-            // deductible_minutes formula in runAnalysis: ((late + early) - grace) + other - approved
+            // deductible_minutes formula in runAnalysis: ((late + early) - grace) - approved (other_minutes stored separately)
             if (hasAnalysisResult) {
                 calculated = {
                     workingDays: analysisResult.working_days || 0,
@@ -1260,9 +1340,16 @@ Deno.serve(async (req) => {
             
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
 
-            // Use finalized deductible_minutes from AnalysisResult
-            const deductibleMinutes = calculated.deductibleMinutes;
-            const deductibleHours = Math.round((deductibleMinutes / 60) * 100) / 100;
+            // Use finalized attendance fields from AnalysisResult AS-IS.
+            // IMPORTANT: never merge other_minutes into deductible_minutes.
+            // Snapshot must persist both fields separately exactly as finalized.
+            const finalizedDeductibleMinutes = Math.max(0, calculated.deductibleMinutes || 0);
+            const finalizedOtherMinutes = Math.max(0, calculated.otherMinutes || 0);
+
+            // Payroll deduction uses both finalized deductible + finalized other minutes,
+            // while snapshot fields remain separate for UI/audit fidelity.
+            const payrollDeductibleMinutes = finalizedDeductibleMinutes + finalizedOtherMinutes;
+            const deductibleHours = Math.round((payrollDeductibleMinutes / 60) * 100) / 100;
             
             // Current month hourly rate uses salary divisor (2 decimals)
             const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
@@ -1395,10 +1482,10 @@ Deno.serve(async (req) => {
                 sick_leave_count: calculated.sickLeaveCount,
                 late_minutes: calculated.lateMinutes,
                 early_checkout_minutes: calculated.earlyCheckoutMinutes,
-                other_minutes: calculated.otherMinutes,
+                other_minutes: finalizedOtherMinutes,
                 approved_minutes: calculated.approvedMinutes,
                 grace_minutes: calculated.graceMinutes,
-                deductible_minutes: deductibleMinutes,
+                deductible_minutes: finalizedDeductibleMinutes,
                 extra_prev_month_deductible_minutes: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_days: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_pay: 0,  // DISABLED - no longer used
@@ -1433,6 +1520,7 @@ Deno.serve(async (req) => {
                 attendance_source: attendanceSource
             });
             
+            existingSnapshotKeys.add(employeeKey);
             console.log(`[createSalarySnapshots] ✅ Snapshot added to array (${snapshots.length} total so far)`);
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE`);
         }
@@ -1460,7 +1548,7 @@ Deno.serve(async (req) => {
                 console.log(`[createSalarySnapshots] ⚠️ WARNING: No snapshots to create in this batch`);
             }
             
-            const currentPosition = batch_start + snapshots.length;
+            const currentPosition = batch_start + employeesToProcess.length;
             const hasMore = currentPosition < eligibleEmployees.length;
             
             console.log(`[createSalarySnapshots] ============================================`);
@@ -1476,6 +1564,7 @@ Deno.serve(async (req) => {
                 success: true,
                 batch_mode: true,
                 batch_completed: snapshots.length,
+                batch_processed: employeesToProcess.length,
                 total_employees: eligibleEmployees.length,
                 current_position: currentPosition,
                 has_more: hasMore,
@@ -1490,21 +1579,30 @@ Deno.serve(async (req) => {
         
         if (snapshots.length > 0) {
             console.log(`[createSalarySnapshots] 💾 STANDARD MODE: Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
-            await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
+
+            // Chunked persistence to avoid API/body limits on large employee sets.
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < snapshots.length; i += CHUNK_SIZE) {
+                const chunk = snapshots.slice(i, i + CHUNK_SIZE);
+                console.log(`[createSalarySnapshots] 💾 STANDARD MODE chunk ${Math.floor(i / CHUNK_SIZE) + 1}: creating ${chunk.length} snapshots`);
+                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(chunk);
+            }
+
             console.log(`[createSalarySnapshots] ✅ Successfully created ${snapshots.length} snapshots`);
         } else {
             console.warn(`[createSalarySnapshots] ⚠️ WARNING: No snapshots created - no eligible employees found`);
         }
 
-        console.log(`[createSalarySnapshots] 🎯 FINAL COUNT CHECK: ${snapshots.length} snapshots created for ${eligibleEmployees.length} eligible employees`);
+        const totalSnapshotKeysAfterRun = existingSnapshotKeys.size;
+        console.log(`[createSalarySnapshots] 🎯 FINAL COUNT CHECK: ${snapshots.length} new snapshots created; ${totalSnapshotKeysAfterRun} total keys for ${eligibleEmployees.length} eligible employees`);
 
         // ============================================================
         // INVARIANT CHECK: Verify ALL snapshots were created in STANDARD mode
         // This prevents silent partial completion
         // ============================================================
-        if (!batch_mode && snapshots.length !== eligibleEmployees.length) {
-            const missingCount = eligibleEmployees.length - snapshots.length;
-            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} snapshots, but only ${snapshots.length} were created (${missingCount} missing)`;
+        if (!batch_mode && totalSnapshotKeysAfterRun < eligibleEmployees.length) {
+            const missingCount = eligibleEmployees.length - totalSnapshotKeysAfterRun;
+            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} snapshots, but only ${totalSnapshotKeysAfterRun} total snapshot keys exist after run (${missingCount} missing)`;
             console.error(`[createSalarySnapshots] ❌ ${errorMsg}`);
             throw new Error(errorMsg);
         }
@@ -1514,10 +1612,11 @@ Deno.serve(async (req) => {
         return Response.json({
             success: true,
             snapshots_created: snapshots.length,
+            total_snapshots_after_run: totalSnapshotKeysAfterRun,
             analyzed_count: analyzedCount,
             no_attendance_count: noAttendanceCount,
             employees_count: eligibleEmployees.length,
-            message: `Created ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`
+            message: `Created ${snapshots.length} new salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`
         });
 
     } catch (error) {

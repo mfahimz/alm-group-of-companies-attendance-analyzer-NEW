@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Check, X, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

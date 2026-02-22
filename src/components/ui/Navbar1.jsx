@@ -1,4 +1,4 @@
-import { Book, Menu, Sunset, Trees, Zap, BarChart3 } from "lucide-react";
+import { Menu, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 

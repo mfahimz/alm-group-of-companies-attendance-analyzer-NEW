@@ -2,8 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { TableHead } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw, Eye, CheckCircle } from 'lucide-react';
@@ -209,7 +208,7 @@ export default function SalaryReportDetail() {
         // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
         const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
 
-        const totalSalary = getValue(row, 'total_salary') || row.total_salary || 0;
+        const totalSalary = Math.round(getValue(row, 'total_salary') ?? row.total_salary ?? 0);
         const workingHours = row.working_hours || 9;
 
         // Recalculate OT salaries based on current edits using DIVISOR_OT
@@ -534,7 +533,7 @@ export default function SalaryReportDetail() {
                 'Attendance ID': row.attendance_id,
                 'Name': row.name,
                 'Attendance Source': row.attendance_source || 'ANALYZED',
-                'Total Salary': row.total_salary || 0,
+                'Total Salary': Math.round(row.total_salary || 0),
                 'Working Days': row.working_days || 0,
                 'Present Days': row.present_days || 0,
                 'LOP Days': row.full_absence_count || 0,
@@ -802,7 +801,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-20"
                                                         />
                                                     ) : (
-                                                        row.total_salary || 0
+                                                        Math.round(row.total_salary || 0)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
