@@ -124,6 +124,10 @@ Deno.serve(async (req) => {
             report_run_id: report_run_id
         }, null, 5000);
 
+        const existingSnapshotKeys = new Set(
+            existingSnapshots.map(s => String(s.attendance_id || s.hrms_id)).filter(Boolean)
+        );
+
         if (existingSnapshots.length > 0) {
             console.log(`[createSalarySnapshots] 🛑 IDEMPOTENCY GATE: ${existingSnapshots.length} snapshots already exist for report_run_id ${report_run_id}`);
             console.log(`[createSalarySnapshots] ⚠️ Request type: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}`);
@@ -176,8 +180,20 @@ Deno.serve(async (req) => {
                     message: `Snapshots already exist (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`,
                     current_batch: []
                 });
-            } else {
-                // Standard mode: Return standard response
+
+                if (changed) {
+                    await base44.asServiceRole.entities.SalaryReport.update(salaryReport.id, {
+                        snapshot_data: JSON.stringify(repairedData)
+                    });
+                    repairedSalaryReports++;
+                }
+            }
+
+            console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSalaryReports} salary reports`);
+
+            // Return early only for non-batch mode.
+            // In batch mode we must continue processing remaining employees, not stop at first partial batch.
+            if (!batch_mode) {
                 return Response.json({
                     success: true,
                     snapshots_created: 0,
@@ -186,6 +202,8 @@ Deno.serve(async (req) => {
                     message: `Snapshots already exist for this report (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`
                 });
             }
+
+            console.log(`[createSalarySnapshots] ✅ BATCH CONTINUE MODE: existing snapshots repaired; continuing with remaining employees`);
         }
         
         console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: No existing snapshots found - proceeding with creation`);
@@ -1133,6 +1151,13 @@ Deno.serve(async (req) => {
         for (const emp of employeesToProcess) {
             loopIterationCount++;
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
+
+            const employeeKey = String(emp.attendance_id || emp.hrms_id);
+            if (existingSnapshotKeys.has(employeeKey)) {
+                console.log(`[createSalarySnapshots] ⏭️ SKIP: Snapshot already exists for ${emp.name} (${employeeKey})`);
+                continue;
+            }
+
             // Find matching salary record (REQUIRED for salary snapshot)
             const baseSalary = salaries.find(s => 
                 String(s.employee_id) === String(emp.hrms_id) || 
@@ -1534,6 +1559,7 @@ Deno.serve(async (req) => {
                 attendance_source: attendanceSource
             });
             
+            existingSnapshotKeys.add(employeeKey);
             console.log(`[createSalarySnapshots] ✅ Snapshot added to array (${snapshots.length} total so far)`);
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE`);
         }
@@ -1561,7 +1587,7 @@ Deno.serve(async (req) => {
                 console.log(`[createSalarySnapshots] ⚠️ WARNING: No snapshots to create in this batch`);
             }
             
-            const currentPosition = batch_start + snapshots.length;
+            const currentPosition = batch_start + employeesToProcess.length;
             const hasMore = currentPosition < eligibleEmployees.length;
             
             console.log(`[createSalarySnapshots] ============================================`);
@@ -1577,6 +1603,7 @@ Deno.serve(async (req) => {
                 success: true,
                 batch_mode: true,
                 batch_completed: snapshots.length,
+                batch_processed: employeesToProcess.length,
                 total_employees: eligibleEmployees.length,
                 current_position: currentPosition,
                 has_more: hasMore,

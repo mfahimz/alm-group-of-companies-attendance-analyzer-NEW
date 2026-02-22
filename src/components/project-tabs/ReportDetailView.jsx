@@ -829,34 +829,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const baseEnrichedResults = React.useMemo(() => {
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
-            
-            // PERMANENT LOCK: For FINALIZED reports, use stored AnalysisResult values DIRECTLY
-            // NO recalculation, NO formula derivation - use finalized fields AS-IS
-            if (project.status === 'closed' || reportRun.is_final) {
-                return {
-                    ...result,
-                    name: employee?.name || 'Unknown',
-                    working_days: result.working_days,
-                    present_days: result.present_days,
-                    full_absence_count: result.full_absence_count,
-                    half_absence_count: result.half_absence_count,
-                    sick_leave_count: result.sick_leave_count || 0,
-                    annual_leave_count: result.annual_leave_count || 0,
-                    late_minutes: result.late_minutes || 0,
-                    early_checkout_minutes: result.early_checkout_minutes || 0,
-                    other_minutes: result.other_minutes || 0,
-                    approved_minutes: result.approved_minutes || 0,
-                    deductible_minutes: result.deductible_minutes || 0,
-                    grace_minutes: result.grace_minutes ?? 15,
-                    has_no_punches: false
-                };
-            }
-            
-            // For non-finalized open projects only: recalculate from live punch data
-            const attendanceIdStr = String(result.attendance_id);
-            const employeePunches = punches.filter(p => 
-                String(p.attendance_id) === attendanceIdStr &&
-                p.punch_date >= reportRun.date_from && 
+
+            // Always use stored AnalysisResult values as the source of truth for report rows.
+            // This keeps the attendance report stable before/after finalization and ensures
+            // what the user sees is exactly the finalized data persisted in backend.
+            const employeePunches = punches.filter(p =>
+                String(p.attendance_id) === String(result.attendance_id) &&
+                p.punch_date >= reportRun.date_from &&
                 p.punch_date <= reportRun.date_to
             );
             const hasNoPunches = employeePunches.length === 0;
@@ -886,20 +865,22 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return {
                 ...result,
                 name: employee?.name || 'Unknown',
-                working_days: workingDays,
-                present_days: presentDays,
-                full_absence_count: fullAbsenceCount,
-                half_absence_count: halfAbsenceCount,
-                sick_leave_count: sickLeaveCount,
-                annual_leave_count: annualLeaveCount,
-                late_minutes: Math.max(0, totalLateMinutes),
-                early_checkout_minutes: Math.max(0, totalEarlyCheckout),
-                other_minutes: Math.max(0, totalOtherMinutes),
-                deductible_minutes: dynamicDeductible,
+                working_days: result.working_days || 0,
+                present_days: result.manual_present_days ?? result.present_days ?? 0,
+                full_absence_count: result.manual_full_absence_count ?? result.full_absence_count ?? 0,
+                half_absence_count: result.half_absence_count || 0,
+                sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
+                annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
+                late_minutes: result.late_minutes || 0,
+                early_checkout_minutes: result.early_checkout_minutes || 0,
+                other_minutes: result.other_minutes || 0,
+                approved_minutes: result.approved_minutes || 0,
+                deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
+                grace_minutes: result.grace_minutes ?? 15,
                 has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, project.status]);
+    }, [results, employees, punches, reportRun]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
@@ -2365,7 +2346,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         <td className="p-2 align-middle">
                                             {(() => {
                                                 // Use stored deductible_minutes from AnalysisResult
-                                                // Formula: ((late + early) - grace) + other - approved
+                                                // Formula (stored in AnalysisResult): ((late + early) - grace) - approved, with other_minutes stored separately
                                                 const displayDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
 
                                                 return (
