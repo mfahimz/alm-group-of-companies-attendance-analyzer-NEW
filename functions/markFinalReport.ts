@@ -3,23 +3,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 /**
  * MARK FINAL REPORT
  * 
- * Marks a report as final and triggers salary snapshot creation.
- * 
- * VALIDATION REQUIREMENT:
- * After snapshot creation, validates that snapshots count equals eligible employee count.
- * If mismatch, the finalization is blocked with an error.
- * 
- * SALARY-ONLY EMPLOYEES:
- * - Employees without attendance_id (has_attendance_tracking=false) are NOT expected to have AnalysisResult
- * - Validation only checks employees WITH attendance_id AND has_attendance_tracking != false
+ * SIMPLE: Just marks the report as final. NO attendance recalculation.
+ * The frontend writes the exact UI values to AnalysisResult BEFORE calling this.
+ * createSalarySnapshots reads from AnalysisResult AS-IS.
  */
 
 Deno.serve(async (req) => {
     try {
-        console.log('[markFinalReport] ============================================');
-        console.log('[markFinalReport] FUNCTION ENTRY');
-        console.log('[markFinalReport] ============================================');
-        
         const base44 = createClientFromRequest(req);
         
         const user = await base44.auth.me();
@@ -27,34 +17,23 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // SECURITY: Only admin, supervisor, or ceo can mark final reports
         const userRole = user?.extended_role || user?.role || 'user';
         if (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'ceo') {
             return Response.json({ error: 'Access denied: Admin, Supervisor, or CEO role required' }, { status: 403 });
         }
 
         const { report_run_id, project_id } = await req.json();
-        
-        console.log('[markFinalReport] Parameters received:');
-        console.log('[markFinalReport]   project_id:', project_id);
-        console.log('[markFinalReport]   report_run_id:', report_run_id);
-        console.log('[markFinalReport]   user:', user.email);
-        console.log('[markFinalReport]   role:', userRole);
 
         if (!report_run_id || !project_id) {
             return Response.json({ error: 'report_run_id and project_id are required' }, { status: 400 });
         }
 
-        // Fetch project to get company and custom_employee_ids
         const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id });
         if (projects.length === 0) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
-        const project = projects[0];
 
-
-
-        // First, unmark all reports for this project
+        // Unmark all existing final reports for this project
         const allReports = await base44.asServiceRole.entities.ReportRun.filter({
             project_id: project_id
         }, null, 5000);
@@ -67,18 +46,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // ============================================================
-        // CRITICAL: Save Report Before Finalization
-        // This ensures all day_overrides are converted to exceptions
-        // and the report is in a clean state before marking final
-        // ============================================================
-        console.log('[markFinalReport] Step 1: User must save report before finalization');
-        console.log('[markFinalReport] Verifying report has been saved (checking exception timestamps)...');
-        
-        // No automatic consolidation - day_overrides are saved as exceptions via "Save Report" button
-        // Finalization simply marks the report as final without changing any data
-
-        // Mark the selected report as final with audit info
+        // Mark the selected report as final
         const nowUAE = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString();
         await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
             is_final: true,
@@ -87,50 +55,21 @@ Deno.serve(async (req) => {
             recalculation_version: 0
         });
 
-        // Update project.last_saved_report_id to point to the finalized report
         await base44.asServiceRole.entities.Project.update(project_id, {
             last_saved_report_id: report_run_id
         });
 
-        // Validate AnalysisResult count before marking as final
-        console.log(`[markFinalReport] Validating AnalysisResult data before finalization`);
-        
-        const [employees, salaries, analysisResults] = await Promise.all([
-            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
-            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
-            base44.asServiceRole.entities.AnalysisResult.filter({
-                project_id: project_id,
-                report_run_id: report_run_id
-            }, null, 5000)
-        ]);
-
-        // Filter to project's custom_employee_ids if specified
-        let eligibleEmployees = employees;
-        if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
-            const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
-            eligibleEmployees = employees.filter(emp => 
-                customIds.includes(String(emp.hrms_id)) || customIds.includes(String(emp.attendance_id))
-            );
-        }
-
-        // REMOVED: AnalysisResult validation
-        // New logic: createSalarySnapshots handles employees both with and without AnalysisResult
-        // Employees without AnalysisResult will get NO_ATTENDANCE_DATA snapshots with zero attendance
-        console.log(`[markFinalReport] ✅ Validation skipped - createSalarySnapshots handles all active employees with salary records`);
-
-        // Log audit (use try-catch to prevent blocking on logAudit 403 errors)
+        // Audit log
         try {
             await base44.asServiceRole.functions.invoke('logAudit', {
                 action: 'MARK_FINAL_REPORT',
                 entity_type: 'ReportRun',
                 entity_id: report_run_id,
-                details: `Marked report as final for project ${project_id}. Frontend will create salary snapshots.`
+                details: `Marked report as final for project ${project_id}. UI values already synced to AnalysisResult by frontend.`
             });
         } catch (auditError) {
-            console.warn('[markFinalReport] Audit log failed (non-blocking):', auditError.message);
+            console.warn('[markFinalReport] Audit log failed:', auditError.message);
         }
-
-        console.log(`[markFinalReport] Report marked as final successfully. Frontend will create snapshots in batches.`);
 
         return Response.json({ 
             success: true,
@@ -140,8 +79,6 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Mark final report error:', error);
-        return Response.json({ 
-            error: error.message 
-        }, { status: 500 });
+        return Response.json({ error: error.message }, { status: 500 });
     }
 });
