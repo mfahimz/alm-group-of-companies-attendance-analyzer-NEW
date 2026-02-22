@@ -839,6 +839,28 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 p.punch_date <= reportRun.date_to
             );
             const hasNoPunches = employeePunches.length === 0;
+            
+            const { 
+                totalLateMinutes, 
+                totalEarlyCheckout, 
+                totalOtherMinutes,
+                workingDays, 
+                presentDays, 
+                fullAbsenceCount, 
+                halfAbsenceCount, 
+                sickLeaveCount,
+                annualLeaveCount
+            } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
+
+            // DYNAMIC DEDUCTIBLE CALCULATION
+            // CRITICAL: For UI display - exclude other_minutes, apply grace then approved
+            // Other_minutes stays separate and is ONLY added when creating payroll snapshots
+            const baseMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
+            const graceMinutes = result.grace_minutes ?? 15;
+            const approvedMinutes = result.approved_minutes || 0;
+            const afterGrace = Math.max(0, baseMinutes - graceMinutes);
+            const dynamicDeductible = Math.max(0, afterGrace - approvedMinutes);
+            // OTHER_MINUTES: Kept separate, not included in deductible for UI display
 
             return {
                 ...result,
@@ -2347,9 +2369,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     </div>
                                                 );
                                             })()}
-                                        </td>
-                                        <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
-                                            {result.notes || '-'}
+                                            </td>
+                                            <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
+                                             {result.notes || '-'}
                                         </td>
                                         <td className="p-2 align-middle text-right">
                                               <Button
