@@ -127,8 +127,41 @@ Deno.serve(async (req) => {
         if (existingSnapshots.length > 0) {
             console.log(`[createSalarySnapshots] 🛑 IDEMPOTENCY GATE: ${existingSnapshots.length} snapshots already exist for report_run_id ${report_run_id}`);
             console.log(`[createSalarySnapshots] ⚠️ Request type: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}`);
-            console.log(`[createSalarySnapshots] ✅ Returning existing count - NO duplicates created`);
-            
+
+            // SELF-HEAL: Ensure existing snapshots preserve finalized attendance fields AS-IS.
+            // Legacy snapshots may have deductible_minutes polluted with other_minutes.
+            // We repair those fields from AnalysisResult without creating duplicates.
+            const analysisResultsForRepair = await base44.asServiceRole.entities.AnalysisResult.filter({
+                project_id: project_id,
+                report_run_id: report_run_id
+            }, null, 5000);
+
+            let repairedSnapshots = 0;
+            for (const snapshot of existingSnapshots) {
+                if (!snapshot.attendance_id) continue; // Salary-only employee (no AnalysisResult)
+
+                const analysisResult = analysisResultsForRepair.find(r =>
+                    String(r.attendance_id) === String(snapshot.attendance_id)
+                );
+                if (!analysisResult) continue;
+
+                const finalizedDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                const finalizedOtherMinutes = Math.max(0, analysisResult.other_minutes || 0);
+
+                if (
+                    Number(snapshot.deductible_minutes || 0) !== Number(finalizedDeductibleMinutes) ||
+                    Number(snapshot.other_minutes || 0) !== Number(finalizedOtherMinutes)
+                ) {
+                    await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
+                        deductible_minutes: finalizedDeductibleMinutes,
+                        other_minutes: finalizedOtherMinutes
+                    });
+                    repairedSnapshots++;
+                }
+            }
+
+            console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSnapshots} existing snapshots`);
+
             // Return appropriate response based on mode
             if (batch_mode) {
                 // Batch mode: Return batch-style response indicating completion
@@ -139,7 +172,8 @@ Deno.serve(async (req) => {
                     total_employees: existingSnapshots.length,
                     current_position: existingSnapshots.length,
                     has_more: false,
-                    message: `Snapshots already exist (${existingSnapshots.length} found). Idempotency gate prevented duplicates.`,
+                    repaired_snapshots: repairedSnapshots,
+                    message: `Snapshots already exist (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`,
                     current_batch: []
                 });
             } else {
@@ -148,7 +182,8 @@ Deno.serve(async (req) => {
                     success: true,
                     snapshots_created: 0,
                     existing_snapshots: existingSnapshots.length,
-                    message: `Snapshots already exist for this report (${existingSnapshots.length} found). No duplicates created.`
+                    repaired_snapshots: repairedSnapshots,
+                    message: `Snapshots already exist for this report (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`
                 });
             }
         }
