@@ -1404,9 +1404,12 @@ Deno.serve(async (req) => {
             // and are prorated if an exception partially overlaps the project date range.
             // Fallback to finalized annual leave count when no override is configured.
             const salaryLeaveDaysOverride = calculateSalaryLeaveDaysOverride(emp, project.date_from, project.date_to);
+            // annualLeaveDaysForSalary: the annual leave count used for salary calculations
+            const annualLeaveDaysForSalary = calculated.annualLeaveCount;
+            
             let salaryLeaveDays = salaryLeaveDaysOverride > 0
                 ? salaryLeaveDaysOverride
-                : calculated.annualLeaveCount;
+                : annualLeaveDaysForSalary;
 
             // Calculate derived salary values - ALL rounded to 2 decimal places
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
