@@ -187,7 +187,7 @@ export const PAGES_CONFIG = {
     },
     RulesSettings: {
         name: 'RulesSettings',
-        title: 'Rules Settings',
+        title: 'Attendance Rules',
         icon: Settings,
         category: 'Admin',
         showInNav: true,
@@ -195,6 +195,7 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
+
     RamadanSchedules: {
         name: 'RamadanSchedules',
         title: 'Ramadan Schedules',
