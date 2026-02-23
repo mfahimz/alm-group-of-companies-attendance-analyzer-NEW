@@ -1,17 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { usePageTitle } from '@/components/ui/PageTitle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar as CalendarIcon, Eye, CheckCircle2, Clock, AlertCircle, Plus } from 'lucide-react';
-import { toast } from 'sonner';
-import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
+import { format, parseISO, isAfter, addDays } from 'date-fns';
 import { nowInUAE, utcToUAE } from '@/components/ui/timezone';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from '../utils';
 import PreApprovalDialog from '@/components/departmenthead/PreApprovalDialog.jsx';
 import AllowedMinutesHistory from '@/components/departmenthead/AllowedMinutesHistory.jsx';
 

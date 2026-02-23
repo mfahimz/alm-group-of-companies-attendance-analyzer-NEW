@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Search, Save, RefreshCw, Edit2, AlertCircle, Trash2, CheckSquare } from 'lucide-react';
+import { Search, Save, RefreshCw, Edit2, AlertCircle, Trash2 } from 'lucide-react';
 import SortableTableHead from '@/components/ui/SortableTableHead';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
