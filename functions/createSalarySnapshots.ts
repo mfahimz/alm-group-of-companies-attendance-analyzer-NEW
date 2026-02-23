@@ -63,11 +63,56 @@ Deno.serve(async (req) => {
         }
 
         const project = projects[0];
+        
+        // ============================================================
+        // USE PROJECT-LEVEL DEFAULTS (Settings entity removed)
+        // ============================================================
+        const settings = null;
+        
         // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
-        const divisor = project.salary_calculation_days || 30;
+        let divisor = settings?.salary_divisor || project.salary_calculation_days || 30;
+        if (!divisor || divisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid salary_divisor from settings, using default 30');
+            divisor = 30;
+        }
+        
         // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
-        const otDivisor = project.ot_calculation_days || divisor;
+        let otDivisor = settings?.ot_divisor || project.ot_calculation_days || divisor;
+        if (!otDivisor || otDivisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_divisor from settings, using default divisor');
+            otDivisor = divisor;
+        }
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
+        
+        // OT Rates from settings
+        let otNormalRate = settings?.ot_normal_rate || 1.25;
+        let otSpecialRate = settings?.ot_special_rate || 1.5;
+        if (!otNormalRate || otNormalRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_normal_rate, using default 1.25');
+            otNormalRate = 1.25;
+        }
+        if (!otSpecialRate || otSpecialRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_special_rate, using default 1.5');
+            otSpecialRate = 1.5;
+        }
+        
+        // WPS Cap settings
+        const wpsCapEnabledGlobal = settings?.wps_cap_enabled ?? (isAlMaraghi ? true : false);
+        const wpsCapAmountGlobal = settings?.wps_cap_amount ?? 4900;
+        const balanceRoundingRule = settings?.balance_rounding_rule || 'EXACT';
+        
+        // Formula settings
+        const leavePayFormula = settings?.leave_pay_formula || 'TOTAL_SALARY';
+        const salaryLeaveFormula = settings?.salary_leave_formula || 'BASIC_PLUS_ALLOWANCES';
+        const assumedPresentLastDays = settings?.assumed_present_last_days ?? (isAlMaraghi ? 2 : 0);
+        
+        console.log('[createSalarySnapshots] ============================================');
+        console.log('[createSalarySnapshots] CALCULATION SETTINGS (from Project):');
+        console.log('[createSalarySnapshots]   Salary Divisor:', divisor);
+        console.log('[createSalarySnapshots]   OT Divisor:', otDivisor);
+        console.log('[createSalarySnapshots]   WPS Cap Enabled:', wpsCapEnabledGlobal);
+        console.log('[createSalarySnapshots]   Assumed Present Days:', assumedPresentLastDays);
+        console.log('[createSalarySnapshots] ============================================');
 
         // ============================================================
         // UNIVERSAL IDEMPOTENCY CHECK (BATCH & NON-BATCH)
@@ -121,49 +166,19 @@ Deno.serve(async (req) => {
 
             console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSnapshots} existing snapshots`);
 
-            // Also repair cached SalaryReport.snapshot_data rows for this finalized report,
-            // so UI screens reading snapshot_data immediately reflect corrected minute fields.
-            const salaryReportsForRepair = await base44.asServiceRole.entities.SalaryReport.filter({
-                project_id: project_id,
-                report_run_id: report_run_id
-            }, '-created_date', 5000);
-
-            let repairedSalaryReports = 0;
-            for (const salaryReport of salaryReportsForRepair) {
-                let parsedData = [];
-                try {
-                    parsedData = JSON.parse(salaryReport.snapshot_data || '[]');
-                } catch {
-                    parsedData = [];
-                }
-
-                if (!Array.isArray(parsedData) || parsedData.length === 0) continue;
-
-                let changed = false;
-                const repairedData = parsedData.map((row) => {
-                    if (!row?.attendance_id) return row;
-
-                    const analysisResult = analysisResultsForRepair.find(r =>
-                        String(r.attendance_id) === String(row.attendance_id)
-                    );
-                    if (!analysisResult) return row;
-
-                    const finalizedDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
-                    const finalizedOtherMinutes = Math.max(0, analysisResult.other_minutes || 0);
-
-                    if (
-                        Number(row.deductible_minutes || 0) !== Number(finalizedDeductibleMinutes) ||
-                        Number(row.other_minutes || 0) !== Number(finalizedOtherMinutes)
-                    ) {
-                        changed = true;
-                        return {
-                            ...row,
-                            deductible_minutes: finalizedDeductibleMinutes,
-                            other_minutes: finalizedOtherMinutes
-                        };
-                    }
-
-                    return row;
+            // Return appropriate response based on mode
+            if (batch_mode) {
+                // Batch mode: Return batch-style response indicating completion
+                return Response.json({
+                    success: true,
+                    batch_mode: true,
+                    batch_completed: 0,
+                    total_employees: existingSnapshots.length,
+                    current_position: existingSnapshots.length,
+                    has_more: false,
+                    repaired_snapshots: repairedSnapshots,
+                    message: `Snapshots already exist (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`,
+                    current_batch: []
                 });
 
                 if (changed) {
@@ -176,9 +191,26 @@ Deno.serve(async (req) => {
 
             console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSalaryReports} salary reports`);
 
-            // Continue processing for BOTH modes so partially-created reports can be completed
-            // in a single press even when some snapshots already exist.
-            console.log(`[createSalarySnapshots] ✅ CONTINUE MODE: existing snapshots repaired; continuing with remaining employees`);
+            // Return early only for non-batch mode.
+            // In batch mode we must continue processing remaining employees, not stop at first partial batch.
+            if (!batch_mode) {
+                return Response.json({
+                    success: true,
+                    snapshots_created: 0,
+                    existing_snapshots: existingSnapshots.length,
+                    repaired_snapshots: repairedSnapshots,
+                    message: `Snapshots already exist for this report (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`
+                });
+
+                if (changed) {
+                    await base44.asServiceRole.entities.SalaryReport.update(salaryReport.id, {
+                        snapshot_data: JSON.stringify(repairedData)
+                    });
+                    repairedSalaryReports++;
+                }
+            }
+
+            console.log(`[createSalarySnapshots] ✅ BATCH CONTINUE MODE: existing snapshots repaired; continuing with remaining employees`);
         }
         
         console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: proceeding with snapshot creation flow`);
@@ -215,17 +247,15 @@ Deno.serve(async (req) => {
             salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
             salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
 
-            // Calculate assumed present days: last 2 days of salary month
-            // Day before end of month (e.g., Jan 30)
-            const assumedDay1 = new Date(projectDateTo);
-            assumedDay1.setDate(assumedDay1.getDate() - 1);
-            // Last day of month (e.g., Jan 31)
-            const assumedDay2 = new Date(projectDateTo);
-            
-            assumedPresentDays = [
-                assumedDay1.toISOString().split('T')[0],
-                assumedDay2.toISOString().split('T')[0]
-            ];
+            // Calculate assumed present days based on settings
+            // assumedPresentLastDays = 2 means last 2 days, = 0 means none
+            if (assumedPresentLastDays > 0) {
+                for (let i = 0; i < assumedPresentLastDays; i++) {
+                    const assumedDay = new Date(projectDateTo);
+                    assumedDay.setDate(assumedDay.getDate() - i);
+                    assumedPresentDays.push(assumedDay.toISOString().split('T')[0]);
+                }
+            }
 
             // Extra previous month range
             const projectDateFrom = new Date(project.date_from);
@@ -445,7 +475,6 @@ Deno.serve(async (req) => {
             );
 
             let totalSalaryLeaveDays = 0;
-            let hasConfiguredOverride = false;
 
             for (const ex of annualLeaveExceptions) {
                 try {
@@ -468,15 +497,10 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
-                    const hasExplicitSalaryLeaveDays = ex.salary_leave_days !== null && ex.salary_leave_days !== undefined && ex.salary_leave_days !== '';
                     const configuredSalaryLeaveDays = Number(ex.salary_leave_days);
-                    const baseSalaryLeaveDays = hasExplicitSalaryLeaveDays && Number.isFinite(configuredSalaryLeaveDays)
+                    const baseSalaryLeaveDays = Number.isFinite(configuredSalaryLeaveDays)
                         ? configuredSalaryLeaveDays
                         : exceptionTotalDays;
-
-                    if (hasExplicitSalaryLeaveDays && Number.isFinite(configuredSalaryLeaveDays)) {
-                        hasConfiguredOverride = true;
-                    }
 
                     totalSalaryLeaveDays += (baseSalaryLeaveDays / exceptionTotalDays) * overlapDays;
                 } catch {
@@ -484,10 +508,7 @@ Deno.serve(async (req) => {
                 }
             }
 
-            return {
-                salaryLeaveDays: Math.round(totalSalaryLeaveDays * 100) / 100,
-                hasConfiguredOverride
-            };
+            return Math.round(totalSalaryLeaveDays * 100) / 100;
         };
 
         const recalculateEmployeeAttendance = (emp, dateFrom, dateTo, assumedDays = []) => {
@@ -1187,6 +1208,7 @@ Deno.serve(async (req) => {
         console.log(`[createSalarySnapshots] ============================================`);
         
         let loopIterationCount = 0;
+        let skippedCount = 0;
         for (const emp of employeesToProcess) {
             loopIterationCount++;
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
@@ -1207,6 +1229,7 @@ Deno.serve(async (req) => {
             if (!baseSalary) {
                 console.log(`[createSalarySnapshots] ⚠️ SKIP: ${emp.name} (${emp.attendance_id || emp.hrms_id}) - no salary record found`);
                 console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE (skipped - no salary)`);
+                skippedCount++;
                 continue;
             }
             
@@ -1380,34 +1403,38 @@ Deno.serve(async (req) => {
             // Salary leave days follow ANNUAL_LEAVE exception overrides (salary_leave_days)
             // and are prorated if an exception partially overlaps the project date range.
             // Fallback to finalized annual leave count when no override is configured.
-            const { salaryLeaveDays: salaryLeaveDaysOverride, hasConfiguredOverride } = calculateSalaryLeaveDaysOverride(emp, project.date_from, project.date_to);
-            const salaryLeaveDays = hasConfiguredOverride
-                ? salaryLeaveDaysOverride
-                : calculated.annualLeaveCount;
-            // Backward-safe alias: older in-flight deployments referenced this identifier.
-            // Keep it defined to avoid runtime ReferenceError if stale lines execute.
-            const annualLeaveDaysForSalary = salaryLeaveDays;
-
-            // Salary rule: Leave Days = salary_leave_days + LOP (full absence count).
-            // This keeps Annual Leave / Salary Leave Days aligned in salary context.
-            const leaveDays = salaryLeaveDays + calculated.fullAbsenceCount;
-            const leavePay = Math.round((leaveDays > 0 ? (totalSalaryAmount / divisor) * leaveDays : 0) * 100) / 100;
+            const salaryLeaveDaysOverride = calculateSalaryLeaveDaysOverride(emp, project.date_from, project.date_to);
+            // annualLeaveDaysForSalary: the annual leave count used for salary calculations
+            const annualLeaveDaysForSalary = calculated.annualLeaveCount;
             
-            // ============================================================
-            // SALARY LEAVE AMOUNT FORMULA (NON-NEGOTIABLE)
-            // Base = Basic Salary + Allowances ONLY (NO BONUS, NO allowances_with_bonus)
-            // Formula: (Basic + Allowances) / salary_divisor × salary_leave_days
-            // ============================================================
-            const salaryBaseForLeave = basicSalary + allowancesAmount;
-            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryBaseForLeave / divisor) * salaryLeaveDays : 0) * 100) / 100;
+            let salaryLeaveDays = salaryLeaveDaysOverride > 0
+                ? salaryLeaveDaysOverride
+                : annualLeaveDaysForSalary;
+
+            // Calculate derived salary values - ALL rounded to 2 decimal places
+            const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
+            
+            // Leave Pay Formula (configurable)
+            const leavePayBase = leavePayFormula === 'BASIC_PLUS_ALLOWANCES' 
+                ? (basicSalary + allowancesAmount)
+                : totalSalaryAmount;
+            const leavePay = Math.round((leaveDays > 0 ? (leavePayBase / divisor) * leaveDays : 0) * 100) / 100;
+            
+            // Salary Leave Amount Formula (configurable)
+            const salaryLeaveBase = salaryLeaveFormula === 'BASIC_PLUS_ALLOWANCES' 
+                ? (basicSalary + allowancesAmount)
+                : totalSalaryAmount;
+            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryLeaveBase / divisor) * salaryLeaveDays : 0) * 100) / 100;
             
             console.log(`[createSalarySnapshots] 💡 SALARY LEAVE CALCULATION for ${emp.name}:`);
+            console.log(`[createSalarySnapshots]    Formula: ${salaryLeaveFormula}`);
             console.log(`[createSalarySnapshots]    basicSalary = ${basicSalary}`);
             console.log(`[createSalarySnapshots]    allowancesAmount = ${allowancesAmount}`);
-            console.log(`[createSalarySnapshots]    salaryBaseForLeave = ${salaryBaseForLeave}`);
+            console.log(`[createSalarySnapshots]    salaryLeaveBase = ${salaryLeaveBase}`);
             console.log(`[createSalarySnapshots]    divisor = ${divisor}`);
+            console.log(`[createSalarySnapshots]    annualLeaveDaysForSalary = ${annualLeaveDaysForSalary}`);
             console.log(`[createSalarySnapshots]    salaryLeaveDays = ${salaryLeaveDays}`);
-            console.log(`[createSalarySnapshots]    salaryLeaveDaysOverride = ${salaryLeaveDaysOverride} (configured: ${hasConfiguredOverride ? 'YES' : 'NO'})`);
+            console.log(`[createSalarySnapshots]    salaryLeaveDaysOverride = ${salaryLeaveDaysOverride}`);
             console.log(`[createSalarySnapshots]    salaryLeaveAmount = ${salaryLeaveAmount}`);
             
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
@@ -1427,6 +1454,7 @@ Deno.serve(async (req) => {
             const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
             
             // Current month deductible hours pay (2 decimals)
+            // Uses combined deductible + other minutes for payroll
             const currentMonthDeductibleHoursPay = Math.round((hourlyRate * deductibleHours) * 100) / 100;
             
             // ============================================================
@@ -1496,13 +1524,12 @@ Deno.serve(async (req) => {
             );
             
             // OT calculations using previous month salary (for historical accuracy)
-            const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
             const otHourlyRate = prevMonthTotalSalary / otDivisor / workingHours;
             
             const normalOtHours = otRecord?.normalOtHours || 0;
             const specialOtHours = otRecord?.specialOtHours || 0;
-            const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours * 100) / 100;
-            const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours * 100) / 100;
+            const normalOtSalary = Math.round(otHourlyRate * otNormalRate * normalOtHours * 100) / 100;
+            const specialOtSalary = Math.round(otHourlyRate * otSpecialRate * specialOtHours * 100) / 100;
             const totalOtSalary = normalOtSalary + specialOtSalary;
             
             // Get adjustment values from OvertimeData
@@ -1516,11 +1543,36 @@ Deno.serve(async (req) => {
                 - netDeduction - totalDeductibleHoursPay - otherDeduction - advanceSalaryDeduction;
             
             // Recalculate WPS split with adjusted total
-            const {
-                wpsAmount: finalWpsAmount,
-                balanceAmount: finalBalanceAmount,
-                wpsCapApplied: finalWpsCapApplied
-            } = calculateWpsSplit(totalWithAdjustments, wpsCapAmount, wpsCapEnabled);
+            let finalWpsAmount = totalWithAdjustments;
+            let finalBalanceAmount = 0;
+            let finalWpsCapApplied = false;
+            
+            // Use global WPS settings (from SalaryCalculationSettings or employee-specific override)
+            const effectiveWpsCapEnabled = wpsCapEnabled !== undefined ? wpsCapEnabled : wpsCapEnabledGlobal;
+            const effectiveWpsCapAmount = wpsCapAmount !== undefined ? wpsCapAmount : wpsCapAmountGlobal;
+            
+            if (effectiveWpsCapEnabled) {
+                if (totalWithAdjustments <= 0) {
+                    finalWpsAmount = 0;
+                    finalBalanceAmount = 0;
+                    finalWpsCapApplied = false;
+                } else {
+                    const cap = effectiveWpsCapAmount;
+                    const rawExcess = Math.max(0, totalWithAdjustments - cap);
+                    
+                    if (balanceRoundingRule === 'NEAREST_100') {
+                        finalBalanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
+                    } else {
+                        finalBalanceAmount = Math.round(rawExcess * 100) / 100;
+                    }
+                    
+                    finalWpsAmount = Math.round((totalWithAdjustments - finalBalanceAmount) * 100) / 100;
+                    finalWpsCapApplied = rawExcess > 0;
+                }
+            } else if (totalWithAdjustments <= 0) {
+                finalWpsAmount = 0;
+                finalBalanceAmount = 0;
+            }
             
             console.log(`[createSalarySnapshots] 💾 Creating snapshot for ${emp.name} - Total: ${totalWithAdjustments}, WPS: ${finalWpsAmount}, Balance: ${finalBalanceAmount}, OT: ${totalOtSalary}`);
             
@@ -1542,7 +1594,7 @@ Deno.serve(async (req) => {
                 prev_month_divisor: extraPrevMonthData.prevMonthDivisor || 0,
                 present_days: calculated.presentDays,
                 full_absence_count: calculated.fullAbsenceCount,
-                annual_leave_count: salaryLeaveDays,
+                annual_leave_count: annualLeaveDaysForSalary,
                 sick_leave_count: calculated.sickLeaveCount,
                 late_minutes: calculated.lateMinutes,
                 early_checkout_minutes: calculated.earlyCheckoutMinutes,
@@ -1664,9 +1716,10 @@ Deno.serve(async (req) => {
         // INVARIANT CHECK: Verify ALL snapshots were created in STANDARD mode
         // This prevents silent partial completion
         // ============================================================
-        if (!batch_mode && totalSnapshotKeysAfterRun < eligibleEmployees.length) {
-            const missingCount = eligibleEmployees.length - totalSnapshotKeysAfterRun;
-            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} snapshots, but only ${totalSnapshotKeysAfterRun} total snapshot keys exist after run (${missingCount} missing)`;
+        // INVARIANT: snapshots + skipped (no salary record) must equal total eligible employees
+        if (!batch_mode && (snapshots.length + skippedCount) !== eligibleEmployees.length) {
+            const missingCount = eligibleEmployees.length - snapshots.length - skippedCount;
+            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} employees processed, but only ${snapshots.length} snapshots created + ${skippedCount} skipped (${missingCount} unaccounted for)`;
             console.error(`[createSalarySnapshots] ❌ ${errorMsg}`);
             throw new Error(errorMsg);
         }

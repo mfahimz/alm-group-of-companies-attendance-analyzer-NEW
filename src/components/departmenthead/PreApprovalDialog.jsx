@@ -7,8 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { parseISO, addDays, subDays, isAfter } from 'date-fns';
-import { nowInUAE, formatDateForInput } from '@/components/ui/timezone';
+import { parseISO, addDays, isAfter } from 'date-fns';
 
 export default function PreApprovalDialog({ 
     open, 
