@@ -29,6 +29,10 @@ export default function PreApprovalDialog({
 
     const queryClient = useQueryClient();
 
+    const todayUAE = nowInUAE();
+    const minAllowedDate = formatDateForInput(subDays(todayUAE, 5));
+    const maxAllowedDate = formatDateForInput(addDays(todayUAE, 5));
+
     // Check if company supports quarterly minutes
     const supportsQuarterlyMinutes = currentProject?.company === 'Al Maraghi Motors';
 
@@ -130,6 +134,11 @@ export default function PreApprovalDialog({
             return;
         }
 
+        if (formData.date_from < minAllowedDate || formData.date_from > maxAllowedDate) {
+            toast.error(`Date must be within ${minAllowedDate} to ${maxAllowedDate}`);
+            return;
+        }
+
         // Only check quarterly minutes balance for companies that support it
         if (supportsQuarterlyMinutes) {
             const availableMinutes = quarterlyMinutes?.remaining_minutes || 0;
@@ -217,8 +226,10 @@ export default function PreApprovalDialog({
                             type="date"
                             value={formData.date_from}
                             onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                            min={minAllowedDate}
+                            max={maxAllowedDate}
                         />
-                        <p className="text-xs text-slate-500 mt-1">Pre-approved minutes apply to a single day only</p>
+                        <p className="text-xs text-slate-500 mt-1">Pre-approved minutes apply to a single day only (allowed range: {minAllowedDate} to {maxAllowedDate})</p>
                     </div>
 
                     <div className="border-t pt-4 space-y-4">
