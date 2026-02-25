@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { formatInUAE } from '@/components/ui/timezone';
 import { useNavigate } from 'react-router-dom';
-
 import { usePermissions } from './components/hooks/usePermissions';
 import DesktopNav from './components/navigation/DesktopNav';
 import MobileNav from './components/navigation/MobileNav';
@@ -13,12 +12,10 @@ import { getPagesByCategory, NAV_CATEGORIES } from './components/config/pagesCon
 import { LogOut } from 'lucide-react';
 import { CompanyFilterProvider } from './components/context/CompanyContext';
 
-
 export default function Layout({ children, currentPageName }) {
     const navigate = useNavigate();
     const publicPages = ['Maintenance'];
     const isPublicPage = publicPages.includes(currentPageName);
-
 
     // Use permissions hook
     const { user: currentUser, isLoading, error, userRole, canAccessPage } = usePermissions();
