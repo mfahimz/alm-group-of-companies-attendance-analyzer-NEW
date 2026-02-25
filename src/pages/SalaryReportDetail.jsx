@@ -211,6 +211,7 @@ export default function SalaryReportDetail() {
         return editableData[row.hrms_id]?.[field] ?? row[field] ?? 0;
     };
 
+    const asNumber = (v) => Number(v) || 0;
     const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
     const calculateTotals = (row) => {
