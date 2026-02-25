@@ -274,12 +274,22 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                     newActiveShifts = [...activeShifts, shiftName];
                     
                     if (isFriday) {
-                        if (shiftName === 'day') {
-                            updatedShift.day_start = updatedShift.day_start || '9:00 AM';
-                            updatedShift.day_end = updatedShift.day_end || '12:00 PM';
-                        } else if (shiftName === 'night') {
-                            updatedShift.night_start = updatedShift.night_start || '8:00 PM';
-                            updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                        if (isAlMaraghiAutomotive) {
+                            if (shiftName === 'day') {
+                                updatedShift.day_start = updatedShift.day_start || '8:00 AM';
+                                updatedShift.day_end = updatedShift.day_end || '12:00 PM';
+                            } else if (shiftName === 'night') {
+                                updatedShift.night_start = updatedShift.night_start || '2:00 PM';
+                                updatedShift.night_end = updatedShift.night_end || '5:00 PM';
+                            }
+                        } else {
+                            if (shiftName === 'day') {
+                                updatedShift.day_start = updatedShift.day_start || '9:00 AM';
+                                updatedShift.day_end = updatedShift.day_end || '12:00 PM';
+                            } else if (shiftName === 'night') {
+                                updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                                updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                            }
                         }
                     } else {
                         if (shiftName === 'day') {
