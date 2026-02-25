@@ -217,12 +217,13 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         }));
     };
 
+    const isAlMaraghiAutomotive = companyData?.company_id === 3;
+
     const handleActiveShiftToggle = (attendanceId, weekNum, shiftName) => {
         const setter = weekNum === 1 ? setWeek1Shifts : weekNum === 2 ? setWeek2Shifts : setFridayShifts;
         const employee = employees.find(e => e.attendance_id === attendanceId);
         const hasDefaultShifts = ['Operations', 'Front Office', 'Bodyshop', 'Housekeeping'].includes(employee?.department);
         const isFriday = weekNum === 'friday';
-        const isAlMaraghiAutomotive = companyData?.company_id === 3;
         
         setter(prev => {
             const current = prev[attendanceId] || {};
@@ -231,37 +232,50 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             let newActiveShifts;
             let updatedShift = { ...current };
             
-            if (activeShifts.includes(shiftName)) {
-                // Remove shift
-                newActiveShifts = activeShifts.filter(s => s !== shiftName);
-            } else {
-                // Add shift - 'day' and 'night' can both be selected
-                newActiveShifts = [...activeShifts, shiftName];
-                
-                // Apply default times based on selection
-                if (isFriday) {
-                    // Friday defaults: 9am-12pm day, 8pm-12am night
-                    if (shiftName === 'day') {
-                        updatedShift.day_start = updatedShift.day_start || '9:00 AM';
-                        updatedShift.day_end = updatedShift.day_end || '12:00 PM';
-                    } else if (shiftName === 'night') {
-                        updatedShift.night_start = updatedShift.night_start || '8:00 PM';
-                        updatedShift.night_end = updatedShift.night_end || '12:00 AM';
-                    }
+            if (isAlMaraghiAutomotive && !isFriday) {
+                // Al Maraghi Automotive: S1 and S2 are mutually exclusive radio-style
+                if (activeShifts.includes(shiftName)) {
+                    // Uncheck - remove shift and clear times
+                    newActiveShifts = [];
+                    updatedShift.day_start = '';
+                    updatedShift.day_end = '';
                 } else {
-                    // Week 1 & 2 defaults
+                    // Select this shift (replace any existing)
+                    newActiveShifts = [shiftName];
                     if (shiftName === 'day') {
-                        const willHaveBoth = newActiveShifts.includes('night');
-                        
-                        if (willHaveBoth) {
-                            updatedShift.day_start = updatedShift.day_start || '1:00 PM';
-                            updatedShift.day_end = updatedShift.day_end || '4:00 PM';
-                        } else {
-                            if (isAlMaraghiAutomotive) {
-                                // Al Maraghi Automotive: Two shift types
-                                // Default to first shift type: 8AM-3PM
-                                updatedShift.day_start = updatedShift.day_start || '8:00 AM';
-                                updatedShift.day_end = updatedShift.day_end || '3:00 PM';
+                        // S1: 8:00 AM - 3:00 PM
+                        updatedShift.day_start = '8:00 AM';
+                        updatedShift.day_end = '3:00 PM';
+                    } else if (shiftName === 'night') {
+                        // S2: 10:00 AM - 5:00 PM
+                        updatedShift.day_start = '10:00 AM';
+                        updatedShift.day_end = '5:00 PM';
+                    }
+                    // Clear night columns (not used for Al Maraghi Automotive)
+                    updatedShift.night_start = '';
+                    updatedShift.night_end = '';
+                }
+            } else {
+                // Standard behavior for other companies
+                if (activeShifts.includes(shiftName)) {
+                    newActiveShifts = activeShifts.filter(s => s !== shiftName);
+                } else {
+                    newActiveShifts = [...activeShifts, shiftName];
+                    
+                    if (isFriday) {
+                        if (shiftName === 'day') {
+                            updatedShift.day_start = updatedShift.day_start || '9:00 AM';
+                            updatedShift.day_end = updatedShift.day_end || '12:00 PM';
+                        } else if (shiftName === 'night') {
+                            updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                            updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                        }
+                    } else {
+                        if (shiftName === 'day') {
+                            const willHaveBoth = newActiveShifts.includes('night');
+                            if (willHaveBoth) {
+                                updatedShift.day_start = updatedShift.day_start || '1:00 PM';
+                                updatedShift.day_end = updatedShift.day_end || '4:00 PM';
                             } else if (hasDefaultShifts) {
                                 updatedShift.day_start = updatedShift.day_start || '9:00 AM';
                                 updatedShift.day_end = updatedShift.day_end || '4:00 PM';
@@ -269,15 +283,15 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                 updatedShift.day_start = updatedShift.day_start || '';
                                 updatedShift.day_end = updatedShift.day_end || '';
                             }
-                        }
-                    } else if (shiftName === 'night') {
-                        if (hasDefaultShifts) {
-                            if (newActiveShifts.includes('day')) {
-                                updatedShift.day_start = '1:00 PM';
-                                updatedShift.day_end = '4:00 PM';
+                        } else if (shiftName === 'night') {
+                            if (hasDefaultShifts) {
+                                if (newActiveShifts.includes('day')) {
+                                    updatedShift.day_start = '1:00 PM';
+                                    updatedShift.day_end = '4:00 PM';
+                                }
+                                updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                                updatedShift.night_end = updatedShift.night_end || '12:00 AM';
                             }
-                            updatedShift.night_start = updatedShift.night_start || '8:00 PM';
-                            updatedShift.night_end = updatedShift.night_end || '12:00 AM';
                         }
                     }
                 }
