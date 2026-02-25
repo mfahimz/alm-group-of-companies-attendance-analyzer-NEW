@@ -72,7 +72,12 @@ Deno.serve(async (req) => {
                 company: project.company,
                 active: true
             });
-            employees = employees.filter(e => employeeIds.includes(e.hrms_id));
+            // hrms_id can be stored as number (1568.0) or string - normalize both sides for comparison
+            employees = employees.filter(e => {
+                const hrmsStr = String(e.hrms_id).replace('.0', '').trim();
+                return employeeIds.includes(hrmsStr);
+            });
+            console.log(`Custom employee filter: ${employeeIds.length} IDs requested, ${employees.length} matched`);
         } else {
             employees = await base44.asServiceRole.entities.Employee.filter({ 
                 company: project.company,
