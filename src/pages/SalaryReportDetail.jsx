@@ -233,10 +233,10 @@ export default function SalaryReportDetail() {
         const specialOtSalary = getValue(row, 'specialOtSalary') ?? round2(otHourlyRate * 1.5 * specialOtHours);
         const totalOtSalary = getValue(row, 'totalOtSalary') ?? round2(normalOtSalary + specialOtSalary);
 
-        const bonus = getValue(row, 'bonus') || 0;
-        const incentive = getValue(row, 'incentive') || 0;
-        const otherDeduction = getValue(row, 'otherDeduction') || 0;
-        const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
+        const bonus = asNumber(getValue(row, 'bonus'));
+        const incentive = asNumber(getValue(row, 'incentive'));
+        const otherDeduction = asNumber(getValue(row, 'otherDeduction'));
+        const advanceSalaryDeduction = asNumber(getValue(row, 'advanceSalaryDeduction'));
 
         // Get current attendance values (may be admin-edited)
         const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
@@ -249,15 +249,15 @@ export default function SalaryReportDetail() {
         // ALWAYS recalculate derived monetary amounts based on current attendance values
         // This ensures live updates when admin edits attendance fields
         const leavePay = (totalSalary / divisor) * leaveDays;
-        const basicSalary = row.basic_salary || 0;
-        const allowances = row.allowances || 0;
+        const basicSalary = asNumber(row.basic_salary);
+        const allowances = asNumber(row.allowances);
         const salaryLeaveAmount = ((basicSalary + allowances) / divisor) * salaryLeaveDays;
         const netDeduction = leavePay - salaryLeaveAmount;
         const deductibleHoursPay = (totalSalary / divisor / workingHours) * deductibleHours;
 
         // Previous month deductions (Al Maraghi Motors - calculated using OT divisor)
-        const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
-        const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
+        const extraPrevMonthLopPay = asNumber(row.extra_prev_month_lop_pay);
+        const extraPrevMonthDeductibleHoursPay = asNumber(row.extra_prev_month_deductible_hours_pay);
 
         // Business rule: if both OT and incentive exist, pay only the higher one.
         const effectiveOtOrIncentive = Math.max(round2(totalOtSalary), round2(incentive));
@@ -900,7 +900,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        (row.leavePay || 0).toFixed(2)
+                                                        (asNumber(row.leavePay)).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-amber-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -913,7 +913,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        (row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)
+                                                        (asNumber(row.salary_leave_days || row.salaryLeaveDays)).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -926,7 +926,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        (row.salaryLeaveAmount || 0).toFixed(2)
+                                                        (asNumber(row.salaryLeaveAmount)).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
