@@ -19,6 +19,7 @@ export default function Layout({ children, currentPageName }) {
     const publicPages = ['Maintenance'];
     const isPublicPage = publicPages.includes(currentPageName);
 
+
     // Use permissions hook
     const { user: currentUser, isLoading, error, userRole, canAccessPage } = usePermissions();
 
