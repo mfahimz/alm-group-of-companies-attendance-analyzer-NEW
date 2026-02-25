@@ -1,18 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { Toaster } from 'sonner';
 import NotificationCenter from './components/ui/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { formatInUAE } from '@/components/ui/timezone';
 import { useNavigate } from 'react-router-dom';
-
 import { usePermissions } from './components/hooks/usePermissions';
 import DesktopNav from './components/navigation/DesktopNav';
 import MobileNav from './components/navigation/MobileNav';
 import { getPagesByCategory, NAV_CATEGORIES } from './components/config/pagesConfig';
 import { LogOut } from 'lucide-react';
 import { CompanyFilterProvider } from './components/context/CompanyContext';
-
 
 export default function Layout({ children, currentPageName }) {
     const navigate = useNavigate();
@@ -128,6 +126,16 @@ export default function Layout({ children, currentPageName }) {
             }
         }
     }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName, navigate]);
+
+    // If auth failed (not logged in), redirect to login
+    if (error && !isLoading) {
+        base44.auth.redirectToLogin();
+        return (
+            <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
+                <div className="text-[#6B7280]">Redirecting to login...</div>
+            </div>
+        );
+    }
 
     if (isLoading || !currentUser) {
         return (

@@ -449,8 +449,8 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    const projectEndCutoff = currentProject ? addDays(utcToUAE(currentProject.date_to), -1) : null;
-    const approvalPeriodEnded = projectEndCutoff && isAfter(nowInUAE(), projectEndCutoff);
+    const projectEndDate = currentProject ? utcToUAE(currentProject.date_to) : null;
+    const approvalPeriodEnded = projectEndDate && isAfter(nowInUAE(), projectEndDate);
 
     return (
         <div className="max-w-7xl mx-auto p-6 space-y-6">

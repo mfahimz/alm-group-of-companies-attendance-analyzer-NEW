@@ -282,18 +282,7 @@ export default function SalaryReportDetail() {
         const wpsCapAmount = row.wps_cap_amount ?? 4900;
         const { wpsPay, balance, wpsCapApplied } = calculateWpsSplit(total, wpsCapEnabled, wpsCapAmount);
 
-        return {
-            total,
-            wpsPay,
-            balance,
-            wpsCapApplied,
-            normalOtSalary,
-            specialOtSalary,
-            totalOtSalary,
-            netAdditions,
-            netDeductions,
-            effectiveOtOrIncentive
-        };
+        return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary };
     };
 
     const handleSave = async () => {
