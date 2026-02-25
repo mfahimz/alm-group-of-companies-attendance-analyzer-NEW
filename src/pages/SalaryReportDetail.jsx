@@ -891,33 +891,9 @@ export default function SalaryReportDetail() {
                                                         (row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0)
                                                     )}
                                                 </td>
-                                                <td className="p-2 align-middle bg-amber-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0))).toFixed(2)}
-                                                            readOnly
-                                                            className="h-8 text-xs w-16 bg-slate-100"
-                                                        />
-                                                    ) : (
-                                                        (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0))).toFixed(2)
-                                                    )}
-                                                </td>
-                                                <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={getValue(row, 'leavePay')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)}
-                                                            className="h-8 text-xs w-16"
-                                                        />
-                                                    ) : (
-                                                        (asNumber(row.leavePay)).toFixed(2)
-                                                    )}
-                                                </td>
-                                                <td className="p-2 align-middle bg-amber-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                {/* ADDITIONS GROUP START */}
+                                                {/* Sal. Leave Days (addition) */}
+                                                <td className="p-2 align-middle bg-green-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
                                                             type="number"
@@ -930,7 +906,8 @@ export default function SalaryReportDetail() {
                                                         (asNumber(row.salary_leave_days || row.salaryLeaveDays)).toFixed(2)
                                                     )}
                                                 </td>
-                                                <td className="p-2 align-middle bg-amber-100 border-r-2 border-amber-200" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                {/* Sal. Leave Amount (addition) */}
+                                                <td className="p-2 align-middle bg-green-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
                                                             type="number"
@@ -943,7 +920,6 @@ export default function SalaryReportDetail() {
                                                         (asNumber(row.salaryLeaveAmount)).toFixed(2)
                                                     )}
                                                 </td>
-                                                {/* ADDITIONS GROUP START */}
                                                 <td className={`p-1 align-middle bg-green-50`}>
                                                     <Input
                                                         type="number"
@@ -1009,6 +985,35 @@ export default function SalaryReportDetail() {
                                                 </td>
                                                 <td className="p-2 align-middle bg-emerald-200 font-bold border-r-2 border-emerald-300">{netAdditions.toFixed(2)}</td>
                                                 {/* DEDUCTIONS GROUP START */}
+                                                {/* Leave Days (deduction) */}
+                                                <td className="p-2 align-middle bg-red-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0))).toFixed(2)}
+                                                            readOnly
+                                                            className="h-8 text-xs w-16 bg-slate-100"
+                                                        />
+                                                    ) : (
+                                                        (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0))).toFixed(2)
+                                                    )}
+                                                </td>
+                                                {/* Leave Pay (deduction) */}
+                                                <td className="p-2 align-middle bg-red-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'leavePay')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        (asNumber(row.leavePay)).toFixed(2)
+                                                    )}
+                                                </td>
+                                                {/* Leave Deduction (Net Deduction = leavePay - salaryLeaveAmount) */}
                                                 <td className="p-2 align-middle bg-red-50 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
