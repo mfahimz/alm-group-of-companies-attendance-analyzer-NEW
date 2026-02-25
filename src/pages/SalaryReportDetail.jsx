@@ -212,7 +212,6 @@ export default function SalaryReportDetail() {
     };
 
     const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
-    const asNumber = (value) => Number(value) || 0;
 
     const calculateTotals = (row) => {
         // DIVISOR_LEAVE_DEDUCTION: For leave/deduction calculations (stored in snapshot)
@@ -223,16 +222,16 @@ export default function SalaryReportDetail() {
         // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
         const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
 
-        const totalSalary = Math.round(asNumber(getValue(row, 'total_salary') ?? row.total_salary ?? 0));
+        const totalSalary = Math.round(getValue(row, 'total_salary') ?? row.total_salary ?? 0);
         const workingHours = row.working_hours || 9;
 
         // Recalculate OT salaries based on current edits using DIVISOR_OT
         const otHourlyRate = totalSalary / otDivisor / workingHours;
-        const normalOtHours = asNumber(getValue(row, 'normalOtHours'));
-        const specialOtHours = asNumber(getValue(row, 'specialOtHours'));
-        const normalOtSalary = asNumber(getValue(row, 'normalOtSalary') ?? round2(otHourlyRate * 1.25 * normalOtHours));
-        const specialOtSalary = asNumber(getValue(row, 'specialOtSalary') ?? round2(otHourlyRate * 1.5 * specialOtHours));
-        const totalOtSalary = asNumber(getValue(row, 'totalOtSalary') ?? round2(normalOtSalary + specialOtSalary));
+        const normalOtHours = getValue(row, 'normalOtHours') || 0;
+        const specialOtHours = getValue(row, 'specialOtHours') || 0;
+        const normalOtSalary = getValue(row, 'normalOtSalary') ?? round2(otHourlyRate * 1.25 * normalOtHours);
+        const specialOtSalary = getValue(row, 'specialOtSalary') ?? round2(otHourlyRate * 1.5 * specialOtHours);
+        const totalOtSalary = getValue(row, 'totalOtSalary') ?? round2(normalOtSalary + specialOtSalary);
 
         const bonus = asNumber(getValue(row, 'bonus'));
         const incentive = asNumber(getValue(row, 'incentive'));
@@ -240,12 +239,12 @@ export default function SalaryReportDetail() {
         const advanceSalaryDeduction = asNumber(getValue(row, 'advanceSalaryDeduction'));
 
         // Get current attendance values (may be admin-edited)
-        const salaryLeaveDays = asNumber(getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0);
+        const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
         // Salary context rule: Annual Leave must follow exception-configured salary leave days.
         const annualLeaveCount = salaryLeaveDays;
-        const fullAbsenceCount = asNumber(getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0);
+        const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
         const leaveDays = annualLeaveCount + fullAbsenceCount;
-        const deductibleHours = asNumber(getValue(row, 'deductibleHours') ?? row.deductibleHours ?? 0);
+        const deductibleHours = getValue(row, 'deductibleHours') ?? row.deductibleHours ?? 0;
         
         // ALWAYS recalculate derived monetary amounts based on current attendance values
         // This ensures live updates when admin edits attendance fields
@@ -283,18 +282,7 @@ export default function SalaryReportDetail() {
         const wpsCapAmount = row.wps_cap_amount ?? 4900;
         const { wpsPay, balance, wpsCapApplied } = calculateWpsSplit(total, wpsCapEnabled, wpsCapAmount);
 
-        return {
-            total,
-            wpsPay,
-            balance,
-            wpsCapApplied,
-            normalOtSalary,
-            specialOtSalary,
-            totalOtSalary,
-            netAdditions,
-            netDeductions,
-            effectiveOtOrIncentive
-        };
+        return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary };
     };
 
     const handleSave = async () => {
@@ -566,25 +554,25 @@ export default function SalaryReportDetail() {
                 'Working Days': row.working_days || 0,
                 'Present Days': row.present_days || 0,
                 'LOP Days': row.full_absence_count || 0,
-                'Annual Leave Days': parseFloat((asNumber(row.salary_leave_days || row.salaryLeaveDays)).toFixed(2)),
-                'Leave Days': parseFloat((asNumber(row.salary_leave_days || row.salaryLeaveDays) + asNumber(row.full_absence_count)).toFixed(2)),
-                'Leave Pay': parseFloat((asNumber(row.leavePay)).toFixed(2)),
-                'Salary Leave Days': parseFloat((asNumber(row.salary_leave_days || row.salaryLeaveDays)).toFixed(2)),
-                'Salary Leave Amount': parseFloat((asNumber(row.salaryLeaveAmount)).toFixed(2)),
-                'Net Deduction': parseFloat((asNumber(row.netDeduction)).toFixed(2)),
-                'Deductible Hours': parseFloat((asNumber(row.deductibleHours)).toFixed(2)),
-                'Deductible Hours Pay': parseFloat((asNumber(row.deductibleHoursPay)).toFixed(2)),
-                'Normal OT Hours': parseFloat((asNumber(row.normalOtHours)).toFixed(2)),
-                'Normal OT Salary': parseFloat((asNumber(row.normalOtSalary)).toFixed(2)),
-                'Special OT Hours': parseFloat((asNumber(row.specialOtHours)).toFixed(2)),
-                'Special OT Salary': parseFloat((asNumber(row.specialOtSalary)).toFixed(2)),
-                'Total OT Salary': parseFloat((asNumber(row.normalOtSalary) + asNumber(row.specialOtSalary)).toFixed(2)),
+                'Annual Leave Days': parseFloat(((row.salary_leave_days || row.salaryLeaveDays || 0)).toFixed(2)),
+                'Leave Days': parseFloat((((row.salary_leave_days || row.salaryLeaveDays || 0) + (row.full_absence_count || 0))).toFixed(2)),
+                'Leave Pay': parseFloat((row.leavePay || 0).toFixed(2)),
+                'Salary Leave Days': parseFloat((row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)),
+                'Salary Leave Amount': parseFloat((row.salaryLeaveAmount || 0).toFixed(2)),
+                'Net Deduction': parseFloat((row.netDeduction || 0).toFixed(2)),
+                'Deductible Hours': parseFloat((row.deductibleHours || 0).toFixed(2)),
+                'Deductible Hours Pay': parseFloat((row.deductibleHoursPay || 0).toFixed(2)),
+                'Normal OT Hours': parseFloat((row.normalOtHours || 0).toFixed(2)),
+                'Normal OT Salary': parseFloat((row.normalOtSalary || 0).toFixed(2)),
+                'Special OT Hours': parseFloat((row.specialOtHours || 0).toFixed(2)),
+                'Special OT Salary': parseFloat((row.specialOtSalary || 0).toFixed(2)),
+                'Total OT Salary': parseFloat(((row.normalOtSalary || 0) + (row.specialOtSalary || 0)).toFixed(2)),
                 'Effective OT/Incentive (Higher Only)': parseFloat((effectiveOtOrIncentive || 0).toFixed(2)),
                 'Net Additions': parseFloat((netAdditions || 0).toFixed(2)),
-                'Other Deduction': parseFloat((asNumber(row.otherDeduction)).toFixed(2)),
-                'Bonus': parseFloat((asNumber(row.bonus)).toFixed(2)),
-                'Incentive': parseFloat((asNumber(row.incentive)).toFixed(2)),
-                'Advance Salary Deduction': parseFloat((asNumber(row.advanceSalaryDeduction)).toFixed(2)),
+                'Other Deduction': parseFloat((row.otherDeduction || 0).toFixed(2)),
+                'Bonus': parseFloat((row.bonus || 0).toFixed(2)),
+                'Incentive': parseFloat((row.incentive || 0).toFixed(2)),
+                'Advance Salary Deduction': parseFloat((row.advanceSalaryDeduction || 0).toFixed(2)),
                 'Net Deductions': parseFloat((netDeductions || 0).toFixed(2)),
                 'Total': parseFloat(total.toFixed(2)),
                 'WPS Pay': parseFloat(wpsPay.toFixed(2)),
@@ -894,12 +882,12 @@ export default function SalaryReportDetail() {
                                                         <Input
                                                             type="number"
                                                             step="0.01"
-                                                            value={(asNumber(getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count')) + asNumber(getValue(row, 'full_absence_count') ?? row.full_absence_count)).toFixed(2)}
+                                                            value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0))).toFixed(2)}
                                                             readOnly
                                                             className="h-8 text-xs w-16 bg-slate-100"
                                                         />
                                                     ) : (
-                                                        (asNumber(row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count) + asNumber(row.full_absence_count)).toFixed(2)
+                                                        (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0))).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -951,7 +939,7 @@ export default function SalaryReportDetail() {
                                                     />
                                                 </td>
                                                 <td className="p-2 align-middle bg-blue-50 font-medium">
-                                                    {(asNumber(getValue(row, 'normalOtHours'))).toFixed(2)}
+                                                    {(getValue(row, 'normalOtHours') || 0).toFixed(2)}
                                                 </td>
                                                 <td className="p-2 align-middle bg-blue-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
@@ -967,7 +955,7 @@ export default function SalaryReportDetail() {
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-cyan-50 font-medium">
-                                                    {(asNumber(getValue(row, 'specialOtHours'))).toFixed(2)}
+                                                    {(getValue(row, 'specialOtHours') || 0).toFixed(2)}
                                                 </td>
                                                 <td className="p-2 align-middle bg-cyan-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
@@ -1015,7 +1003,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        (asNumber(row.netDeduction)).toFixed(2)
+                                                        (row.netDeduction || 0).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-purple-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -1028,7 +1016,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        (asNumber(row.deductibleHours)).toFixed(2)
+                                                        (row.deductibleHours || 0).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-purple-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -1041,7 +1029,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        (asNumber(row.deductibleHoursPay)).toFixed(2)
+                                                        (row.deductibleHoursPay || 0).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className={`p-1 align-middle bg-red-50 ${adminEditMode && isAdmin ? '' : ''}`}>

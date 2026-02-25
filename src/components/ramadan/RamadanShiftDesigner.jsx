@@ -103,16 +103,27 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
     const applyDefaultFridayShifts = () => {
         const defaultFridayShifts = {};
         employees.forEach(emp => {
-            defaultFridayShifts[emp.attendance_id] = {
-                active_shifts: ['day', 'night'],
-                day_start: '9:00 AM',
-                day_end: '12:00 PM',
-                night_start: '8:00 PM',
-                night_end: '12:00 AM'
-            };
+            if (isAlMaraghiAutomotive) {
+                defaultFridayShifts[emp.attendance_id] = {
+                    active_shifts: ['day', 'night'],
+                    day_start: '8:00 AM',
+                    day_end: '12:00 PM',
+                    night_start: '2:00 PM',
+                    night_end: '5:00 PM'
+                };
+            } else {
+                defaultFridayShifts[emp.attendance_id] = {
+                    active_shifts: ['day', 'night'],
+                    day_start: '9:00 AM',
+                    day_end: '12:00 PM',
+                    night_start: '8:00 PM',
+                    night_end: '12:00 AM'
+                };
+            }
         });
         setFridayShifts(defaultFridayShifts);
-        toast.success(`Default Friday shifts applied to all ${employees.length} employees`);
+        const timeLabel = isAlMaraghiAutomotive ? '8AM-12PM & 2PM-5PM' : '9AM-12PM & 8PM-12AM';
+        toast.success(`Default Friday shifts (${timeLabel}) applied to all ${employees.length} employees`);
     };
 
     // Copy individual employee shift from week 1 to week 2
@@ -217,12 +228,13 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         }));
     };
 
+    const isAlMaraghiAutomotive = companyData?.company_id === 3;
+
     const handleActiveShiftToggle = (attendanceId, weekNum, shiftName) => {
         const setter = weekNum === 1 ? setWeek1Shifts : weekNum === 2 ? setWeek2Shifts : setFridayShifts;
         const employee = employees.find(e => e.attendance_id === attendanceId);
         const hasDefaultShifts = ['Operations', 'Front Office', 'Bodyshop', 'Housekeeping'].includes(employee?.department);
         const isFriday = weekNum === 'friday';
-        const isAlMaraghiAutomotive = companyData?.company_id === 3;
         
         setter(prev => {
             const current = prev[attendanceId] || {};
@@ -231,37 +243,60 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             let newActiveShifts;
             let updatedShift = { ...current };
             
-            if (activeShifts.includes(shiftName)) {
-                // Remove shift
-                newActiveShifts = activeShifts.filter(s => s !== shiftName);
-            } else {
-                // Add shift - 'day' and 'night' can both be selected
-                newActiveShifts = [...activeShifts, shiftName];
-                
-                // Apply default times based on selection
-                if (isFriday) {
-                    // Friday defaults: 9am-12pm day, 8pm-12am night
-                    if (shiftName === 'day') {
-                        updatedShift.day_start = updatedShift.day_start || '9:00 AM';
-                        updatedShift.day_end = updatedShift.day_end || '12:00 PM';
-                    } else if (shiftName === 'night') {
-                        updatedShift.night_start = updatedShift.night_start || '8:00 PM';
-                        updatedShift.night_end = updatedShift.night_end || '12:00 AM';
-                    }
+            if (isAlMaraghiAutomotive && !isFriday) {
+                // Al Maraghi Automotive: S1 and S2 are mutually exclusive radio-style
+                if (activeShifts.includes(shiftName)) {
+                    // Uncheck - remove shift and clear times
+                    newActiveShifts = [];
+                    updatedShift.day_start = '';
+                    updatedShift.day_end = '';
                 } else {
-                    // Week 1 & 2 defaults
+                    // Select this shift (replace any existing)
+                    newActiveShifts = [shiftName];
                     if (shiftName === 'day') {
-                        const willHaveBoth = newActiveShifts.includes('night');
-                        
-                        if (willHaveBoth) {
-                            updatedShift.day_start = updatedShift.day_start || '1:00 PM';
-                            updatedShift.day_end = updatedShift.day_end || '4:00 PM';
-                        } else {
-                            if (isAlMaraghiAutomotive) {
-                                // Al Maraghi Automotive: Two shift types
-                                // Default to first shift type: 8AM-3PM
+                        // S1: 8:00 AM - 3:00 PM
+                        updatedShift.day_start = '8:00 AM';
+                        updatedShift.day_end = '3:00 PM';
+                    } else if (shiftName === 'night') {
+                        // S2: 10:00 AM - 5:00 PM
+                        updatedShift.day_start = '10:00 AM';
+                        updatedShift.day_end = '5:00 PM';
+                    }
+                    // Clear night columns (not used for Al Maraghi Automotive)
+                    updatedShift.night_start = '';
+                    updatedShift.night_end = '';
+                }
+            } else {
+                // Standard behavior for other companies
+                if (activeShifts.includes(shiftName)) {
+                    newActiveShifts = activeShifts.filter(s => s !== shiftName);
+                } else {
+                    newActiveShifts = [...activeShifts, shiftName];
+                    
+                    if (isFriday) {
+                        if (isAlMaraghiAutomotive) {
+                            if (shiftName === 'day') {
                                 updatedShift.day_start = updatedShift.day_start || '8:00 AM';
-                                updatedShift.day_end = updatedShift.day_end || '3:00 PM';
+                                updatedShift.day_end = updatedShift.day_end || '12:00 PM';
+                            } else if (shiftName === 'night') {
+                                updatedShift.night_start = updatedShift.night_start || '2:00 PM';
+                                updatedShift.night_end = updatedShift.night_end || '5:00 PM';
+                            }
+                        } else {
+                            if (shiftName === 'day') {
+                                updatedShift.day_start = updatedShift.day_start || '9:00 AM';
+                                updatedShift.day_end = updatedShift.day_end || '12:00 PM';
+                            } else if (shiftName === 'night') {
+                                updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                                updatedShift.night_end = updatedShift.night_end || '12:00 AM';
+                            }
+                        }
+                    } else {
+                        if (shiftName === 'day') {
+                            const willHaveBoth = newActiveShifts.includes('night');
+                            if (willHaveBoth) {
+                                updatedShift.day_start = updatedShift.day_start || '1:00 PM';
+                                updatedShift.day_end = updatedShift.day_end || '4:00 PM';
                             } else if (hasDefaultShifts) {
                                 updatedShift.day_start = updatedShift.day_start || '9:00 AM';
                                 updatedShift.day_end = updatedShift.day_end || '4:00 PM';
@@ -269,15 +304,15 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                 updatedShift.day_start = updatedShift.day_start || '';
                                 updatedShift.day_end = updatedShift.day_end || '';
                             }
-                        }
-                    } else if (shiftName === 'night') {
-                        if (hasDefaultShifts) {
-                            if (newActiveShifts.includes('day')) {
-                                updatedShift.day_start = '1:00 PM';
-                                updatedShift.day_end = '4:00 PM';
+                        } else if (shiftName === 'night') {
+                            if (hasDefaultShifts) {
+                                if (newActiveShifts.includes('day')) {
+                                    updatedShift.day_start = '1:00 PM';
+                                    updatedShift.day_end = '4:00 PM';
+                                }
+                                updatedShift.night_start = updatedShift.night_start || '8:00 PM';
+                                updatedShift.night_end = updatedShift.night_end || '12:00 AM';
                             }
-                            updatedShift.night_start = updatedShift.night_start || '8:00 PM';
-                            updatedShift.night_end = updatedShift.night_end || '12:00 AM';
                         }
                     }
                 }
@@ -399,7 +434,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             className="bg-green-50 text-green-700 hover:bg-green-100 border-green-300"
                         >
                             <Sparkles className="w-4 h-4 mr-2" />
-                            Apply Default to All (9AM-12PM & 8PM-12AM)
+                            {isAlMaraghiAutomotive ? 'Apply Default to All (8AM-12PM & 2PM-5PM)' : 'Apply Default to All (9AM-12PM & 8PM-12AM)'}
                         </Button>
                     )}
                     {weekNum !== 'friday' && (
@@ -453,24 +488,49 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     <TableCell>{emp.name}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-3 items-center">
-                                            <label className="flex items-center gap-1.5 text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(shift.active_shifts || []).includes('day')}
-                                                    onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'day')}
-                                                    className="w-4 h-4"
-                                                />
-                                                Day
-                                            </label>
-                                            <label className="flex items-center gap-1.5 text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(shift.active_shifts || []).includes('night')}
-                                                    onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'night')}
-                                                    className="w-4 h-4"
-                                                />
-                                                Night
-                                            </label>
+                                            {isAlMaraghiAutomotive && weekNum !== 'friday' ? (
+                                                <>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('day')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'day')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        S1
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('night')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'night')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        S2
+                                                    </label>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('day')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'day')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        Day
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('night')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'night')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        Night
+                                                    </label>
+                                                </>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -547,7 +607,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                 {companyData?.company_id === 3 && (
                                     <>
                                         <br />
-                                        <strong className="text-green-700">Al Maraghi Automotive:</strong> Default shift times are 8:00 AM - 3:00 PM (Shift Type 1) or 10:30 AM - 5:30 PM (Shift Type 2)
+                                        <strong className="text-green-700">Al Maraghi Automotive:</strong> S1 = 8:00 AM - 3:00 PM | S2 = 10:00 AM - 5:00 PM (select one per employee)
                                     </>
                                 )}
                             </p>

@@ -62,68 +62,6 @@ flowchart LR
 
 ---
 
-## 3.1 Critical Rules for External Developers and AI Agents
-
-This section is a **mandatory pre-change checklist**. If ignored, changes can break core platform behavior.
-
-### Never touch these without platform-level reason
-
-- `index.html` — platform-managed entrypoint; do not edit for regular feature work.
-- `index.css` — base shadcn/ui theme layer; edits can cascade across the entire app.
-- `tailwind.config.js` — platform-aligned configuration; changes may not apply as expected in hosted runtime.
-- `src/lib/` internals — treat as platform internals. Only customize `PageNotFound.jsx` when intentionally changing 404 behavior.
-- `@/api/base44Client` — pre-initialized Base44 SDK client; never recreate or replace with a custom client.
-- `src/components/ui/*` (shadcn primitives) — avoid editing unless absolutely necessary and impact is fully assessed.
-- Authentication/login pages — do not create custom login/signup flows; auth is platform-managed.
-- App routing ownership in `App.jsx` — routing is platform-generated from `pages/` and should not be manually re-wired.
-
-### File-structure and deployment rules
-
-- Pages must remain flat: `pages/MyPage.jsx` ✅, nested `pages/admin/MyPage.jsx` ❌.
-- Components may have subfolders: `components/dashboard/Chart.jsx` ✅.
-- Entity files are full schemas: `entities/MyEntity.json` must include the **entire schema** (never partial field edits only).
-- Functions are isolated Deno handlers (`functions/*.ts` / `functions/*.js`): no local imports between function files.
-- Function names must use camelCase (no spaces/hyphens/slashes).
-
-### SDK and security rules
-
-- Frontend SDK usage: `import { base44 } from '@/api/base44Client'` only.
-- Backend function client: `import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6'`.
-- Never expose API keys/tokens in frontend.
-- Never use `base44.asServiceRole` in frontend code (backend-only).
-
-### Layout and navigation rules
-
-- `Layout` receives `children` and `currentPageName`; do not import and embed `Layout` inside pages.
-- Use `createPageUrl('PageName')` for navigation; avoid hardcoded paths when internal navigation helpers are available.
-- Do not modify `Layout` to import pages directly; page rendering must stay via `children`.
-
-### Common pitfalls to check before merge
-
-- **Invalid hook call / white screen**: caused by duplicate React runtime paths, incorrect React wiring, or hook misuse.
-- **Infinite loops**: unstable `useEffect` dependencies (inline objects/arrays/functions) or incorrect React Query dependency behavior.
-- **Broken navigation**: manual route/layout rewiring that bypasses platform patterns.
-- **Entity data loss**: partial schema updates to entity JSON files.
-- **Function runtime failures**: cross-function local imports, or missing `npm:` package specifiers in Deno handlers.
-- **UI crash from icons**: use only valid `lucide-react` icon names.
-
-### What is safe to edit
-
-- `src/pages/*.jsx`
-- `src/components/**/*.jsx`
-- `functions/*.ts` / `functions/*.js`
-- `entities/*.json` (full schema updates only)
-- `agents/*.json`
-- `src/globals.css`
-- `src/Layout.jsx` (with caution and preserving platform contracts above)
-
-### Package policy
-
-- Prefer pre-installed ecosystem packages already used in this app (React, Tailwind, shadcn, lucide-react, recharts, date-fns, lodash, framer-motion, three, react-leaflet, @hello-pangea/dnd, @tanstack/react-query, etc.).
-- Do not add arbitrary packages without verifying platform support and runtime compatibility first.
-
----
-
 ## 4) Frontend Architecture
 
 ## 4.1 Bootstrapping and App Shell
@@ -326,14 +264,6 @@ flowchart TD
   D --> E[Export/Audit/Review]
 ```
 
-
-Business rules currently enforced in salary flows:
-
-- Salary report UI groups **additions first** and **deductions next**, with explicit `Net Additions` and `Net Deductions` columns for review clarity.
-- Overtime hours in salary report views are read-only and should come from overtime/adjustment workflows (not direct salary-table editing).
-- Snapshot calculation rule: if both overtime pay and incentive exist, pay **only the higher** amount (not both).
-- Bonus is added as entered (no forced pre-rounding), while aggregated net deductions are rounded to 2 decimals before totaling.
-
 ## 8.3 Operational correction lifecycle
 
 When inconsistencies appear (mismatch, missing snapshots, invalid IDs):
@@ -408,3 +338,4 @@ When modifying salary or attendance calculations:
 - Treat finalized snapshots/results as immutable source-of-truth unless performing controlled regeneration.
 - Ensure correction functions are idempotent and traceable.
 - Validate with reconciliation/audit functions before and after change.
+
