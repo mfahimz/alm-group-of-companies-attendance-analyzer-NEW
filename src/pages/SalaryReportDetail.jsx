@@ -779,7 +779,7 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Work Days</SortableTableHead>
                                         <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present</SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP</SortableTableHead>
-                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50 border-r-2 border-slate-300">Leave</SortableTableHead>
+                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50 border-r-2 border-slate-200">Leave</SortableTableHead>
                                         {/* Leave Details Group */}
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
                                         <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
@@ -880,7 +880,7 @@ export default function SalaryReportDetail() {
                                                         row.full_absence_count || 0
                                                     )}
                                                 </td>
-                                                <td className="p-2 align-middle text-blue-600" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                <td className="p-2 align-middle text-blue-600 border-r-2 border-slate-200" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
                                                             type="number"
@@ -932,7 +932,7 @@ export default function SalaryReportDetail() {
                                                         (asNumber(row.salary_leave_days || row.salaryLeaveDays)).toFixed(2)
                                                     )}
                                                 </td>
-                                                <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                <td className="p-2 align-middle bg-amber-100 border-r-2 border-amber-200" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
                                                             type="number"
@@ -945,7 +945,8 @@ export default function SalaryReportDetail() {
                                                         (asNumber(row.salaryLeaveAmount)).toFixed(2)
                                                     )}
                                                 </td>
-                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
+                                                {/* ADDITIONS GROUP START */}
+                                                <td className={`p-1 align-middle bg-green-50`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -999,7 +1000,7 @@ export default function SalaryReportDetail() {
                                                         totalOtSalary.toFixed(2)
                                                     )}
                                                 </td>
-                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
+                                                <td className={`p-1 align-middle bg-green-50`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -1008,7 +1009,8 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-emerald-100 font-semibold">{netAdditions.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-emerald-200 font-bold border-r-2 border-emerald-300">{netAdditions.toFixed(2)}</td>
+                                                {/* DEDUCTIONS GROUP START */}
                                                 <td className="p-2 align-middle bg-red-50 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
@@ -1066,7 +1068,8 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
-                                                <td className="p-2 align-middle bg-rose-100 font-semibold">{netDeductions.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-rose-200 font-bold border-r-2 border-rose-300">{netDeductions.toFixed(2)}</td>
+                                                {/* FINAL GROUP START */}
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-green-100 font-bold">{wpsPay.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-amber-100 font-bold">{Math.round(balance)}</td>
