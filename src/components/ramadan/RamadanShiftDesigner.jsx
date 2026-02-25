@@ -586,7 +586,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                 {companyData?.company_id === 3 && (
                                     <>
                                         <br />
-                                        <strong className="text-green-700">Al Maraghi Automotive:</strong> Default shift times are 8:00 AM - 3:00 PM (Shift Type 1) or 10:30 AM - 5:30 PM (Shift Type 2)
+                                        <strong className="text-green-700">Al Maraghi Automotive:</strong> S1 = 8:00 AM - 3:00 PM | S2 = 10:00 AM - 5:00 PM (select one per employee)
                                     </>
                                 )}
                             </p>
