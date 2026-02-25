@@ -762,7 +762,7 @@ export default function SalaryReportDetail() {
                                 <thead className="sticky top-0 z-10 bg-slate-50">
                                     {/* Group Header Row */}
                                     <tr className="border-b">
-                                        <th colSpan={8} className="p-1 text-center text-xs font-bold bg-slate-100 border-r-2 border-slate-300 sticky left-0 z-20">Employee Info</th>
+                                        <th colSpan={11} className="p-1 text-center text-xs font-bold bg-slate-100 border-r-2 border-slate-300 sticky left-0 z-20">Employee Info</th>
                                         <th colSpan={10} className="p-1 text-center text-xs font-bold bg-emerald-100 border-r-2 border-emerald-300">➕ Additions</th>
                                         <th colSpan={8} className="p-1 text-center text-xs font-bold bg-rose-100 border-r-2 border-rose-300">➖ Deductions</th>
                                         <th colSpan={4} className="p-1 text-center text-xs font-bold bg-indigo-100 border-r-2 border-indigo-300">Final</th>
@@ -774,7 +774,10 @@ export default function SalaryReportDetail() {
                                         <TableHead className="w-12 bg-slate-50 sticky left-0 z-20">✓</TableHead>
                                         <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[48px] z-20">ID</SortableTableHead>
                                         <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[148px] z-20">Name</SortableTableHead>
-                                        <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Total Salary</SortableTableHead>
+                                        <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Basic</SortableTableHead>
+                                        <SortableTableHead sortKey="allowances" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Allow.</SortableTableHead>
+                                        <SortableTableHead sortKey="allowances_with_bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Allow. w/B</SortableTableHead>
+                                        <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 font-bold">Total Salary</SortableTableHead>
                                         <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Work Days</SortableTableHead>
                                         <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present</SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP</SortableTableHead>
@@ -810,7 +813,7 @@ export default function SalaryReportDetail() {
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                     <tr className="border-b">
-                                    <td colSpan={31} className="text-center py-12">
+                                    <td colSpan={34} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
@@ -826,6 +829,9 @@ export default function SalaryReportDetail() {
                                                 </td>
                                                 <td className="p-2 align-middle font-medium sticky left-[48px] bg-white z-10">{row.attendance_id}</td>
                                                 <td className="p-2 align-middle font-medium sticky left-[148px] bg-white z-10">{row.name?.split(' ').slice(0, 2).join(' ')}</td>
+                                                <td className="p-2 align-middle text-slate-600">{Math.round(row.basic_salary || 0)}</td>
+                                                <td className="p-2 align-middle text-slate-600">{Math.round(row.allowances || 0)}</td>
+                                                <td className="p-2 align-middle text-slate-600">{Math.round(row.allowances_with_bonus || 0)}</td>
                                                 <td className="p-2 align-middle font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
