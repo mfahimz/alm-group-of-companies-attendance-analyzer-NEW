@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
     try {
@@ -21,6 +21,19 @@ Deno.serve(async (req) => {
 
         if (!project || !schedule) {
             return Response.json({ error: 'Project or schedule not found' }, { status: 404 });
+        }
+
+        // Detect if this is Al Maraghi Automotive (company_id=3)
+        // Al Maraghi Automotive uses S1/S2 format: active_shifts=['day'] or ['night'] 
+        // but BOTH store times in day_start/day_end (night_start/night_end are empty)
+        let isAlMaraghiAutomotive = false;
+        try {
+            const companies = await base44.asServiceRole.entities.Company.filter({ name: project.company });
+            if (companies.length > 0 && companies[0].company_id === 3) {
+                isAlMaraghiAutomotive = true;
+            }
+        } catch (e) {
+            console.log('Could not determine company_id, proceeding with standard logic');
         }
 
         // Calculate date overlap: Ramadan shifts apply ONLY to overlap dates
@@ -71,16 +84,18 @@ Deno.serve(async (req) => {
         const existingShifts = await base44.asServiceRole.entities.ShiftTiming.filter({ 
             project_id: projectId 
         });
+        // For idempotency, track attendance_id|date|shiftType to allow both day+night on same date
         const existingShiftMap = new Set();
         existingShifts.forEach(shift => {
             if (shift.applicable_days?.includes('Ramadan')) {
-                existingShiftMap.add(`${shift.attendance_id}|${shift.date}`);
+                existingShiftMap.add(`${shift.attendance_id}|${shift.date}|${shift.applicable_days}`);
             }
         });
 
         // Generate shift timings for Ramadan period
         const shiftsToCreate = [];
         const skippedDuplicates = [];
+        const debugLog = [];
 
         for (const employee of employees) {
             const attendanceId = String(employee.attendance_id);
@@ -104,13 +119,6 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
-                // Idempotency: check if shift already exists
-                const shiftKey = `${attendanceId}|${dateStr}`;
-                if (existingShiftMap.has(shiftKey)) {
-                    skippedDuplicates.push(shiftKey);
-                    continue; // Skip duplicate
-                }
-                
                 // Check if Friday has specific shifts configured - prioritize Friday shifts
                 const fridayShift = fridayShifts[attendanceId];
                 const weekShifts = isFriday && fridayShift ? fridayShift : (currentWeekIndex === 0 ? week1 : week2);
@@ -120,40 +128,86 @@ Deno.serve(async (req) => {
                 // Determine active shifts
                 const activeShifts = weekShifts.active_shifts || [];
 
-                // Create day shift if active
-                if (activeShifts.includes('day') && weekShifts.day_start && weekShifts.day_end) {
-                    shiftsToCreate.push({
-                        project_id: projectId,
-                        attendance_id: attendanceId,
-                        date: dateStr,
-                        effective_from: dateStr,
-                        effective_to: dateStr,
-                        is_friday_shift: isFriday,
-                        is_single_shift: true,
-                        applicable_days: isFriday ? 'Ramadan Friday Day Shift' : 'Ramadan Day Shift',
-                        am_start: weekShifts.day_start,
-                        am_end: '—',
-                        pm_start: '—',
-                        pm_end: weekShifts.day_end
-                    });
-                }
+                if (isAlMaraghiAutomotive && !isFriday) {
+                    // AL MARAGHI AUTOMOTIVE SPECIAL HANDLING (non-Friday)
+                    // S1 (active_shifts=['day']) and S2 (active_shifts=['night']) both store times in day_start/day_end
+                    // night_start/night_end are always empty for weekly shifts
+                    if ((activeShifts.includes('day') || activeShifts.includes('night')) && weekShifts.day_start && weekShifts.day_end) {
+                        const shiftLabel = activeShifts.includes('day') ? 'Ramadan S1 Shift' : 'Ramadan S2 Shift';
+                        const shiftKey = `${attendanceId}|${dateStr}|${shiftLabel}`;
+                        
+                        if (existingShiftMap.has(shiftKey)) {
+                            skippedDuplicates.push(shiftKey);
+                            continue;
+                        }
 
-                // Create night shift if active
-                if (activeShifts.includes('night') && weekShifts.night_start && weekShifts.night_end) {
-                    shiftsToCreate.push({
-                        project_id: projectId,
-                        attendance_id: attendanceId,
-                        date: dateStr,
-                        effective_from: dateStr,
-                        effective_to: dateStr,
-                        is_friday_shift: isFriday,
-                        is_single_shift: true,
-                        applicable_days: isFriday ? 'Ramadan Friday Night Shift' : 'Ramadan Night Shift',
-                        am_start: weekShifts.night_start,
-                        am_end: '—',
-                        pm_start: '—',
-                        pm_end: weekShifts.night_end
-                    });
+                        shiftsToCreate.push({
+                            project_id: projectId,
+                            attendance_id: attendanceId,
+                            date: dateStr,
+                            effective_from: dateStr,
+                            effective_to: dateStr,
+                            is_friday_shift: false,
+                            is_single_shift: true,
+                            applicable_days: shiftLabel,
+                            am_start: weekShifts.day_start,
+                            am_end: '—',
+                            pm_start: '—',
+                            pm_end: weekShifts.day_end
+                        });
+                    }
+                } else {
+                    // STANDARD LOGIC (all other companies, and Al Maraghi Friday shifts)
+                    
+                    // Create day shift if active
+                    if (activeShifts.includes('day') && weekShifts.day_start && weekShifts.day_end) {
+                        const label = isFriday ? 'Ramadan Friday Day Shift' : 'Ramadan Day Shift';
+                        const shiftKey = `${attendanceId}|${dateStr}|${label}`;
+                        
+                        if (existingShiftMap.has(shiftKey)) {
+                            skippedDuplicates.push(shiftKey);
+                        } else {
+                            shiftsToCreate.push({
+                                project_id: projectId,
+                                attendance_id: attendanceId,
+                                date: dateStr,
+                                effective_from: dateStr,
+                                effective_to: dateStr,
+                                is_friday_shift: isFriday,
+                                is_single_shift: true,
+                                applicable_days: label,
+                                am_start: weekShifts.day_start,
+                                am_end: '—',
+                                pm_start: '—',
+                                pm_end: weekShifts.day_end
+                            });
+                        }
+                    }
+
+                    // Create night shift if active
+                    if (activeShifts.includes('night') && weekShifts.night_start && weekShifts.night_end) {
+                        const label = isFriday ? 'Ramadan Friday Night Shift' : 'Ramadan Night Shift';
+                        const shiftKey = `${attendanceId}|${dateStr}|${label}`;
+                        
+                        if (existingShiftMap.has(shiftKey)) {
+                            skippedDuplicates.push(shiftKey);
+                        } else {
+                            shiftsToCreate.push({
+                                project_id: projectId,
+                                attendance_id: attendanceId,
+                                date: dateStr,
+                                effective_from: dateStr,
+                                effective_to: dateStr,
+                                is_friday_shift: isFriday,
+                                is_single_shift: true,
+                                applicable_days: label,
+                                am_start: weekShifts.night_start,
+                                am_end: '—',
+                                pm_start: '—',
+                                pm_end: weekShifts.night_end
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -171,8 +225,10 @@ Deno.serve(async (req) => {
 
         return Response.json({
             success: true,
+            isAlMaraghiAutomotive,
             shiftsCreated: createdCount,
             skippedDuplicates: skippedDuplicates.length,
+            employeesProcessed: employees.length,
             dateRange: {
                 from: startDate.toISOString().split('T')[0],
                 to: endDate.toISOString().split('T')[0]
