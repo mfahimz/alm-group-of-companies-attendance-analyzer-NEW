@@ -23,6 +23,12 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Project or schedule not found' }, { status: 404 });
         }
 
+        if (project.company !== schedule.company) {
+            return Response.json({
+                error: `Selected Ramadan schedule belongs to ${schedule.company} but project belongs to ${project.company}`
+            }, { status: 400 });
+        }
+
         // Calculate date overlap: Ramadan shifts apply ONLY to overlap dates
         const projectStart = new Date(project.date_from);
         const projectEnd = new Date(project.date_to);
@@ -54,12 +60,18 @@ Deno.serve(async (req) => {
         // Get all employees for this project (respect custom employee selection)
         let employees;
         if (project.custom_employee_ids) {
-            const employeeIds = project.custom_employee_ids.split(',').map(id => id.trim());
-            employees = await base44.asServiceRole.entities.Employee.filter({ 
+            const employeeIds = project.custom_employee_ids
+                .split(',')
+                .map(id => String(id).trim())
+                .filter(Boolean);
+
+            employees = await base44.asServiceRole.entities.Employee.filter({
                 company: project.company,
                 active: true
             });
-            employees = employees.filter(e => employeeIds.includes(e.hrms_id));
+
+            // project.custom_employee_ids stores HRMS IDs as strings; normalize both sides
+            employees = employees.filter(e => employeeIds.includes(String(e.hrms_id).trim()));
         } else {
             employees = await base44.asServiceRole.entities.Employee.filter({ 
                 company: project.company,

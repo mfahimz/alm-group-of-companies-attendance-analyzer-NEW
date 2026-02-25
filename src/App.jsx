@@ -67,6 +67,7 @@ const AuthenticatedApp = () => {
 
 
 function App() {
+  const shouldRenderVisualEditAgent = import.meta.env.DEV && typeof window !== 'undefined' && window.self !== window.top;
 
   return (
     <AuthProvider>
@@ -76,7 +77,7 @@ function App() {
           <AuthenticatedApp />
         </Router>
         <Toaster />
-        <VisualEditAgent />
+        {shouldRenderVisualEditAgent ? <VisualEditAgent /> : null}
       </QueryClientProvider>
     </AuthProvider>
   )

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Briefcase, Users, Shield, DollarSign, FileText, Settings, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -215,7 +215,11 @@ export default function BusinessDocumentation() {
                             </ul>
                         </li>
                         <li><strong>Net Leave Deduction:</strong> Leave Pay - Salary Leave Amount (minimum 0)</li>
-                        <li><strong>Final Salary:</strong> Total Salary - Net Leave Deduction + Other Adjustments</li>
+                        <li><strong>Final Salary:</strong> Total Salary + Net Additions - Net Deductions</li>
+                        <li><strong>Net Additions:</strong> Bonus + max(Total OT Salary, Incentive). OT and incentive are not paid together; only the higher one is paid.</li>
+                        <li><strong>Net Deductions:</strong> Net Leave Deduction + Deductible Hours Pay + Other Deduction + Advance Salary Deduction (rounded to 2 decimals).</li>
+                        <li><strong>Bonus Handling:</strong> Bonus amount is added as entered (no forced decimal rounding before addition).</li>
+                        <li><strong>Overtime Source of Truth:</strong> Overtime hours are managed from Adjustments/Overtime flow, not edited directly in salary report table.</li>
                         <li><strong>Grace Minutes:</strong> First 15 minutes late are forgiven (configurable)</li>
                         <li><strong>Approved Minutes:</strong> Department head approvals reduce deductible minutes</li>
                     </ul>
