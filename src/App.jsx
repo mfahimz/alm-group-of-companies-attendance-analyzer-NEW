@@ -40,6 +40,7 @@ const AppRoutes = () => (
 
 
 function App() {
+  const shouldRenderVisualEditAgent = import.meta.env.DEV && typeof window !== 'undefined' && window.self !== window.top;
 
   return (
     <QueryClientProvider client={queryClientInstance}>

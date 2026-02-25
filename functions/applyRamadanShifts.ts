@@ -67,8 +67,12 @@ Deno.serve(async (req) => {
         // Get all employees for this project (respect custom employee selection)
         let employees;
         if (project.custom_employee_ids) {
-            const employeeIds = project.custom_employee_ids.split(',').map(id => id.trim());
-            employees = await base44.asServiceRole.entities.Employee.filter({ 
+            const employeeIds = project.custom_employee_ids
+                .split(',')
+                .map(id => String(id).trim())
+                .filter(Boolean);
+
+            employees = await base44.asServiceRole.entities.Employee.filter({
                 company: project.company,
                 active: true
             });

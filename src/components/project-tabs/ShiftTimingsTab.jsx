@@ -100,28 +100,48 @@ export default function ShiftTimingsTab({ project }) {
         return `${hours}:${minutes} ${period}`;
     };
 
-    // Calculate Ramadan overlap
-    const ramadanOverlap = React.useMemo(() => {
+    // Resolve selected Ramadan schedule and overlap for this project
+    const selectedOrOverlappingSchedule = React.useMemo(() => {
         if (ramadanSchedules.length === 0) return null;
-        
-        const schedule = ramadanSchedules[0]; // Use first active schedule
+
+        if (selectedRamadanSchedule?.id) {
+            const selected = ramadanSchedules.find(s => s.id === selectedRamadanSchedule.id);
+            if (selected) return selected;
+        }
+
         const projectStart = new Date(project.date_from);
         const projectEnd = new Date(project.date_to);
-        const ramadanStart = new Date(schedule.ramadan_start_date);
-        const ramadanEnd = new Date(schedule.ramadan_end_date);
+
+        const overlapping = ramadanSchedules.find((schedule) => {
+            const ramadanStart = new Date(schedule.ramadan_start_date);
+            const ramadanEnd = new Date(schedule.ramadan_end_date);
+            return projectStart <= ramadanEnd && projectEnd >= ramadanStart;
+        });
+
+        return overlapping || ramadanSchedules[0];
+    }, [ramadanSchedules, selectedRamadanSchedule?.id, project.date_from, project.date_to]);
+
+    // Calculate Ramadan overlap for the resolved schedule
+    const ramadanOverlap = React.useMemo(() => {
+        if (!selectedOrOverlappingSchedule) return null;
+
+        const projectStart = new Date(project.date_from);
+        const projectEnd = new Date(project.date_to);
+        const ramadanStart = new Date(selectedOrOverlappingSchedule.ramadan_start_date);
+        const ramadanEnd = new Date(selectedOrOverlappingSchedule.ramadan_end_date);
 
         const overlapStart = new Date(Math.max(projectStart, ramadanStart));
         const overlapEnd = new Date(Math.min(projectEnd, ramadanEnd));
 
-        if (overlapStart > overlapEnd) return null; // No overlap
+        if (overlapStart > overlapEnd) return null;
 
         return {
-            schedule,
+            schedule: selectedOrOverlappingSchedule,
             from: overlapStart.toISOString().split('T')[0],
             to: overlapEnd.toISOString().split('T')[0],
-            ramadanStart: schedule.ramadan_start_date
+            ramadanStart: selectedOrOverlappingSchedule.ramadan_start_date
         };
-    }, [ramadanSchedules, project.date_from, project.date_to]);
+    }, [selectedOrOverlappingSchedule, project.date_from, project.date_to]);
 
     // Check if Ramadan shifts already applied
     const ramadanShiftsApplied = React.useMemo(() => {
@@ -134,12 +154,17 @@ export default function ShiftTimingsTab({ project }) {
         );
     }, [shifts, ramadanOverlap]);
 
-    // Auto-select Ramadan schedule if only one exists
+    // Keep selected schedule synced with available schedules and overlap context
     React.useEffect(() => {
-        if (ramadanSchedules.length === 1 && !selectedRamadanSchedule) {
-            setSelectedRamadanSchedule(ramadanSchedules[0]);
+        if (ramadanSchedules.length === 0) {
+            setSelectedRamadanSchedule(null);
+            return;
         }
-    }, [ramadanSchedules]);
+
+        if (!selectedRamadanSchedule || !ramadanSchedules.some(s => s.id === selectedRamadanSchedule.id)) {
+            setSelectedRamadanSchedule(selectedOrOverlappingSchedule || ramadanSchedules[0]);
+        }
+    }, [ramadanSchedules, selectedRamadanSchedule, selectedOrOverlappingSchedule]);
 
     const handlePreviewRamadan = () => {
         if (!ramadanOverlap || !selectedRamadanSchedule) return;

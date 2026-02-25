@@ -1531,16 +1531,32 @@ Deno.serve(async (req) => {
             const normalOtSalary = Math.round(otHourlyRate * otNormalRate * normalOtHours * 100) / 100;
             const specialOtSalary = Math.round(otHourlyRate * otSpecialRate * specialOtHours * 100) / 100;
             const totalOtSalary = normalOtSalary + specialOtSalary;
-            
+
             // Get adjustment values from OvertimeData
             const bonus = otRecord?.bonus || 0;
             const incentive = otRecord?.incentive || 0;
             const otherDeduction = otRecord?.otherDeduction || 0;
             const advanceSalaryDeduction = otRecord?.advanceSalaryDeduction || 0;
-            
-            // Recalculate final total with OT and adjustments
-            const totalWithAdjustments = totalSalaryAmount + totalOtSalary + bonus + incentive
-                - netDeduction - totalDeductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+
+            // Business rule: pay only the higher of OT vs incentive (not both together)
+            const effectiveOtOrIncentive = Math.max(
+                Math.round(totalOtSalary * 100) / 100,
+                Math.round(incentive * 100) / 100
+            );
+
+            // Business rule: bonus remains as-is (no forced decimal rounding).
+            const netAdditions = bonus + effectiveOtOrIncentive;
+
+            // Business rule: net deductions (all deductions combined) are rounded to 2 decimals.
+            const netDeductions = Math.round((
+                (netDeduction || 0) +
+                (totalDeductibleHoursPay || 0) +
+                (otherDeduction || 0) +
+                (advanceSalaryDeduction || 0)
+            ) * 100) / 100;
+
+            // Recalculate final total with grouped additions/deductions
+            const totalWithAdjustments = Math.round((totalSalaryAmount + netAdditions - netDeductions) * 100) / 100;
             
             // Recalculate WPS split with adjusted total
             let finalWpsAmount = totalWithAdjustments;
