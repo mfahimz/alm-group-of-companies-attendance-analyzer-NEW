@@ -283,7 +283,7 @@ export default function SalaryReportDetail() {
         const wpsCapAmount = row.wps_cap_amount ?? 4900;
         const { wpsPay, balance, wpsCapApplied } = calculateWpsSplit(total, wpsCapEnabled, wpsCapAmount);
 
-        return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary };
+        return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions, effectiveOtOrIncentive };
     };
 
     const handleSave = async () => {
@@ -760,37 +760,52 @@ export default function SalaryReportDetail() {
                         <div className="border rounded-lg relative overflow-x-auto overflow-y-auto max-h-[600px]">
                             <table className="w-full min-w-max caption-bottom text-sm">
                                 <thead className="sticky top-0 z-10 bg-slate-50">
+                                    {/* Group Header Row */}
                                     <tr className="border-b">
+                                        <th colSpan={8} className="p-1 text-center text-xs font-bold bg-slate-100 border-r-2 border-slate-300 sticky left-0 z-20">Employee Info</th>
+                                        <th colSpan={4} className="p-1 text-center text-xs font-bold bg-amber-100 border-r-2 border-amber-300">Leave Details</th>
+                                        <th colSpan={8} className="p-1 text-center text-xs font-bold bg-emerald-100 border-r-2 border-emerald-300">➕ Additions</th>
+                                        <th colSpan={6} className="p-1 text-center text-xs font-bold bg-rose-100 border-r-2 border-rose-300">➖ Deductions</th>
+                                        <th colSpan={4} className="p-1 text-center text-xs font-bold bg-indigo-100 border-r-2 border-indigo-300">Final</th>
+                                        <th colSpan={1} className="p-1 text-center text-xs font-bold bg-slate-50 sticky right-0 z-20"></th>
+                                    </tr>
+                                    {/* Column Header Row */}
+                                    <tr className="border-b">
+                                        {/* Employee Info Group */}
                                         <TableHead className="w-12 bg-slate-50 sticky left-0 z-20">✓</TableHead>
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[48px] z-20">Attendance ID</SortableTableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[48px] z-20">ID</SortableTableHead>
                                         <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 sticky left-[148px] z-20">Name</SortableTableHead>
                                         <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Total Salary</SortableTableHead>
-                                        <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Working Days</SortableTableHead>
-                                        <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present Days</SortableTableHead>
-                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP Days</SortableTableHead>
-                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50">Annual Leave</SortableTableHead>
+                                        <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Work Days</SortableTableHead>
+                                        <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present</SortableTableHead>
+                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP</SortableTableHead>
+                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50 border-r-2 border-slate-300">Leave</SortableTableHead>
+                                        {/* Leave Details Group */}
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
                                         <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days</SortableTableHead>
-                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Amount</SortableTableHead>
+                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Sal. Leave Days</SortableTableHead>
+                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50 border-r-2 border-amber-300">Sal. Leave Amt</SortableTableHead>
+                                        {/* Additions Group */}
                                         <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-blue-50">Normal OT Hours</TableHead>
-                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-cyan-50">Special OT Hours</TableHead>
-                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Salary</SortableTableHead>
-                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-100">Total OT Salary</SortableTableHead>
+                                        <TableHead className="whitespace-nowrap bg-blue-50">Norm OT Hrs</TableHead>
+                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Norm OT Sal</SortableTableHead>
+                                        <TableHead className="whitespace-nowrap bg-cyan-50">Spcl OT Hrs</TableHead>
+                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Spcl OT Sal</SortableTableHead>
+                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-100">Tot OT Sal</SortableTableHead>
                                         <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-emerald-100">Net Additions</TableHead>
-                                        <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduction</SortableTableHead>
-                                        <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Deduction</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-rose-100">Net Deductions</TableHead>
+                                        <TableHead className="whitespace-nowrap bg-emerald-200 font-bold border-r-2 border-emerald-300">Net Add.</TableHead>
+                                        {/* Deductions Group */}
+                                        <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Leave Ded.</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Ded. Hours</SortableTableHead>
+                                        <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Ded. Hrs Pay</SortableTableHead>
+                                        <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Ded.</SortableTableHead>
+                                        <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Ded.</SortableTableHead>
+                                        <TableHead className="whitespace-nowrap bg-rose-200 font-bold border-r-2 border-rose-300">Net Ded.</TableHead>
+                                        {/* Final Group */}
                                         <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-100 font-bold">WPS Pay</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-100 font-bold">Balance</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-slate-100 text-center">Cap</TableHead>
+                                        <TableHead className="whitespace-nowrap bg-slate-100 text-center border-r-2 border-indigo-300">Cap</TableHead>
                                         <TableHead className="whitespace-nowrap bg-slate-50 text-center sticky right-0 z-20">View</TableHead>
                                     </tr>
                                 </thead>
