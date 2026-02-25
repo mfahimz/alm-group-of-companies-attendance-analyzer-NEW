@@ -763,9 +763,8 @@ export default function SalaryReportDetail() {
                                     {/* Group Header Row */}
                                     <tr className="border-b">
                                         <th colSpan={8} className="p-1 text-center text-xs font-bold bg-slate-100 border-r-2 border-slate-300 sticky left-0 z-20">Employee Info</th>
-                                        <th colSpan={4} className="p-1 text-center text-xs font-bold bg-amber-100 border-r-2 border-amber-300">Leave Details</th>
-                                        <th colSpan={8} className="p-1 text-center text-xs font-bold bg-emerald-100 border-r-2 border-emerald-300">➕ Additions</th>
-                                        <th colSpan={6} className="p-1 text-center text-xs font-bold bg-rose-100 border-r-2 border-rose-300">➖ Deductions</th>
+                                        <th colSpan={10} className="p-1 text-center text-xs font-bold bg-emerald-100 border-r-2 border-emerald-300">➕ Additions</th>
+                                        <th colSpan={8} className="p-1 text-center text-xs font-bold bg-rose-100 border-r-2 border-rose-300">➖ Deductions</th>
                                         <th colSpan={4} className="p-1 text-center text-xs font-bold bg-indigo-100 border-r-2 border-indigo-300">Final</th>
                                         <th colSpan={1} className="p-1 text-center text-xs font-bold bg-slate-50 sticky right-0 z-20"></th>
                                     </tr>
@@ -780,12 +779,9 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50">Present</SortableTableHead>
                                         <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50">LOP</SortableTableHead>
                                         <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50 border-r-2 border-slate-200">Leave</SortableTableHead>
-                                        {/* Leave Details Group */}
-                                        <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Days</SortableTableHead>
-                                        <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Sal. Leave Days</SortableTableHead>
-                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50 border-r-2 border-amber-300">Sal. Leave Amt</SortableTableHead>
                                         {/* Additions Group */}
+                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Sal. Leave Days</SortableTableHead>
+                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Sal. Leave Amt</SortableTableHead>
                                         <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
                                         <TableHead className="whitespace-nowrap bg-blue-50">Norm OT Hrs</TableHead>
                                         <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Norm OT Sal</SortableTableHead>
@@ -795,6 +791,8 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
                                         <TableHead className="whitespace-nowrap bg-emerald-200 font-bold border-r-2 border-emerald-300">Net Add.</TableHead>
                                         {/* Deductions Group */}
+                                        <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Leave Days</SortableTableHead>
+                                        <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Leave Pay</SortableTableHead>
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Leave Ded.</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Ded. Hours</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Ded. Hrs Pay</SortableTableHead>
