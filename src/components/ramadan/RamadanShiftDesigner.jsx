@@ -103,16 +103,27 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
     const applyDefaultFridayShifts = () => {
         const defaultFridayShifts = {};
         employees.forEach(emp => {
-            defaultFridayShifts[emp.attendance_id] = {
-                active_shifts: ['day', 'night'],
-                day_start: '9:00 AM',
-                day_end: '12:00 PM',
-                night_start: '8:00 PM',
-                night_end: '12:00 AM'
-            };
+            if (isAlMaraghiAutomotive) {
+                defaultFridayShifts[emp.attendance_id] = {
+                    active_shifts: ['day', 'night'],
+                    day_start: '8:00 AM',
+                    day_end: '12:00 PM',
+                    night_start: '2:00 PM',
+                    night_end: '5:00 PM'
+                };
+            } else {
+                defaultFridayShifts[emp.attendance_id] = {
+                    active_shifts: ['day', 'night'],
+                    day_start: '9:00 AM',
+                    day_end: '12:00 PM',
+                    night_start: '8:00 PM',
+                    night_end: '12:00 AM'
+                };
+            }
         });
         setFridayShifts(defaultFridayShifts);
-        toast.success(`Default Friday shifts applied to all ${employees.length} employees`);
+        const timeLabel = isAlMaraghiAutomotive ? '8AM-12PM & 2PM-5PM' : '9AM-12PM & 8PM-12AM';
+        toast.success(`Default Friday shifts (${timeLabel}) applied to all ${employees.length} employees`);
     };
 
     // Copy individual employee shift from week 1 to week 2
