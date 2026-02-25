@@ -2,8 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { TableHead } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw, Eye, CheckCircle } from 'lucide-react';
@@ -111,6 +110,23 @@ export default function SalaryReportDetail() {
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
+    const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
+        if (totalAmount <= 0) {
+            return { wpsPay: 0, balance: 0, wpsCapApplied: false };
+        }
+
+        if (!(isAlMaraghi && isCapEnabled)) {
+            return { wpsPay: totalAmount, balance: 0, wpsCapApplied: false };
+        }
+
+        const cap = capAmount != null ? capAmount : 4900;
+        const rawExcess = Math.max(0, totalAmount - cap);
+        const balance = rawExcess > 0 ? Math.ceil(rawExcess / 100) * 100 : 0;
+        const wpsPay = totalAmount - balance;
+
+        return { wpsPay, balance, wpsCapApplied: rawExcess > 0 };
+    };
+
     
     // Can recalculate: Al Maraghi only, report finalized, project not closed, user has permission
     const canRecalculate = isAlMaraghi && 
@@ -181,11 +197,6 @@ export default function SalaryReportDetail() {
     // ============================================
     // HANDLERS
     // ============================================
-    // Check if bonus has decimal values
-    const hasDecimalBonus = (bonus) => {
-        return (bonus || 0) % 1 !== 0;
-    };
-
     const handleChange = (hrmsId, field, value) => {
         setEditableData(prev => ({
             ...prev,
@@ -200,6 +211,8 @@ export default function SalaryReportDetail() {
         return editableData[row.hrms_id]?.[field] ?? row[field] ?? 0;
     };
 
+    const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
     const calculateTotals = (row) => {
         // DIVISOR_LEAVE_DEDUCTION: For leave/deduction calculations (stored in snapshot)
         // [MERGE_NOTE: If merging, use single divisor for all]
@@ -209,16 +222,16 @@ export default function SalaryReportDetail() {
         // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
         const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
 
-        const totalSalary = getValue(row, 'total_salary') || row.total_salary || 0;
+        const totalSalary = Math.round(getValue(row, 'total_salary') ?? row.total_salary ?? 0);
         const workingHours = row.working_hours || 9;
 
         // Recalculate OT salaries based on current edits using DIVISOR_OT
         const otHourlyRate = totalSalary / otDivisor / workingHours;
         const normalOtHours = getValue(row, 'normalOtHours') || 0;
         const specialOtHours = getValue(row, 'specialOtHours') || 0;
-        const normalOtSalary = getValue(row, 'normalOtSalary') ?? Math.round(otHourlyRate * 1.25 * normalOtHours);
-        const specialOtSalary = getValue(row, 'specialOtSalary') ?? Math.round(otHourlyRate * 1.5 * specialOtHours);
-        const totalOtSalary = getValue(row, 'totalOtSalary') ?? Math.round(normalOtSalary + specialOtSalary);
+        const normalOtSalary = getValue(row, 'normalOtSalary') ?? round2(otHourlyRate * 1.25 * normalOtHours);
+        const specialOtSalary = getValue(row, 'specialOtSalary') ?? round2(otHourlyRate * 1.5 * specialOtHours);
+        const totalOtSalary = getValue(row, 'totalOtSalary') ?? round2(normalOtSalary + specialOtSalary);
 
         const bonus = getValue(row, 'bonus') || 0;
         const incentive = getValue(row, 'incentive') || 0;
@@ -226,10 +239,11 @@ export default function SalaryReportDetail() {
         const advanceSalaryDeduction = getValue(row, 'advanceSalaryDeduction') || 0;
 
         // Get current attendance values (may be admin-edited)
-        const annualLeaveCount = getValue(row, 'annual_leave_count') ?? row.annual_leave_count ?? 0;
-        const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
-        const leaveDays = getValue(row, 'leaveDays') ?? (annualLeaveCount + fullAbsenceCount);
         const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
+        // Salary context rule: Annual Leave must follow exception-configured salary leave days.
+        const annualLeaveCount = salaryLeaveDays;
+        const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
+        const leaveDays = annualLeaveCount + fullAbsenceCount;
         const deductibleHours = getValue(row, 'deductibleHours') ?? row.deductibleHours ?? 0;
         
         // ALWAYS recalculate derived monetary amounts based on current attendance values
@@ -245,39 +259,41 @@ export default function SalaryReportDetail() {
         const extraPrevMonthLopPay = row.extra_prev_month_lop_pay || 0;
         const extraPrevMonthDeductibleHoursPay = row.extra_prev_month_deductible_hours_pay || 0;
 
-        const total = totalSalary + totalOtSalary + bonus + incentive
-                      - Math.round(netDeduction) - Math.round(deductibleHoursPay) - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
-                      - otherDeduction - advanceSalaryDeduction;
+        // Business rule: if both OT and incentive exist, pay only the higher one.
+        const effectiveOtOrIncentive = Math.max(round2(totalOtSalary), round2(incentive));
+
+        // Bonus is added as-is (do not force-round bonus value itself).
+        const netAdditions = bonus + effectiveOtOrIncentive;
+
+        // Net deductions are rounded to 2 decimals.
+        const netDeductions = round2(
+            (netDeduction || 0) +
+            (deductibleHoursPay || 0) +
+            (extraPrevMonthLopPay || 0) +
+            (extraPrevMonthDeductibleHoursPay || 0) +
+            (otherDeduction || 0) +
+            (advanceSalaryDeduction || 0)
+        );
+
+        const total = round2(totalSalary + netAdditions - netDeductions);
 
         // WPS SPLIT LOGIC (Al Maraghi Motors only)
-        // Balance must always be a multiple of 100 (round down)
-        let wpsPay = total;
-        let balance = 0;
-        let wpsCapApplied = false;
         const wpsCapEnabled = row.wps_cap_enabled || false;
         const wpsCapAmount = row.wps_cap_amount ?? 4900;
+        const { wpsPay, balance, wpsCapApplied } = calculateWpsSplit(total, wpsCapEnabled, wpsCapAmount);
 
-        if (isAlMaraghi && wpsCapEnabled) {
-            if (total <= 0) {
-                wpsPay = 0;
-                balance = 0;
-                wpsCapApplied = false;
-            } else {
-                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                // Calculate raw excess over cap
-                const rawExcess = Math.max(0, total - cap);
-                // Round balance DOWN to nearest 100
-                balance = Math.floor(rawExcess / 100) * 100;
-                // WPS gets the rest (total - balance)
-                wpsPay = total - balance;
-                wpsCapApplied = rawExcess > 0;
-            }
-        } else if (total <= 0) {
-            wpsPay = 0;
-            balance = 0;
-        }
-
-        return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary };
+        return {
+            total,
+            wpsPay,
+            balance,
+            wpsCapApplied,
+            normalOtSalary,
+            specialOtSalary,
+            totalOtSalary,
+            netAdditions,
+            netDeductions,
+            effectiveOtOrIncentive
+        };
     };
 
     const handleSave = async () => {
@@ -323,8 +339,12 @@ export default function SalaryReportDetail() {
             
             // Recalculate derived monetary amounts based on current attendance values
             const currentTotalSalary = updated.total_salary;
-            const currentLeaveDays = updated.leaveDays || ((updated.annual_leave_count || 0) + (updated.full_absence_count || 0));
             const currentSalaryLeaveDays = updated.salary_leave_days || updated.salaryLeaveDays || 0;
+            // Salary context rule: keep annual_leave_count and leaveDays aligned to salary_leave_days + LOP.
+            const currentAnnualLeaveDays = currentSalaryLeaveDays;
+            updated.annual_leave_count = currentAnnualLeaveDays;
+            const currentLeaveDays = currentAnnualLeaveDays + (updated.full_absence_count || 0);
+            updated.leaveDays = currentLeaveDays;
             const currentDeductibleHours = updated.deductibleHours || 0;
             const basicSalary = updated.basic_salary || 0;
             const allowances = updated.allowances || 0;
@@ -338,11 +358,11 @@ export default function SalaryReportDetail() {
             // Apply edits using DIVISOR_OT for OT calculations
              if ('normalOtHours' in edits) {
                  updated.normalOtHours = edits.normalOtHours;
-                 updated.normalOtSalary = edits.normalOtSalary ?? Math.round(otHourlyRate * 1.25 * edits.normalOtHours);
+                 updated.normalOtSalary = edits.normalOtSalary ?? round2(otHourlyRate * 1.25 * edits.normalOtHours);
              }
              if ('specialOtHours' in edits) {
                  updated.specialOtHours = edits.specialOtHours;
-                 updated.specialOtSalary = edits.specialOtSalary ?? Math.round(otHourlyRate * 1.5 * edits.specialOtHours);
+                 updated.specialOtSalary = edits.specialOtSalary ?? round2(otHourlyRate * 1.5 * edits.specialOtHours);
              }
             if ('normalOtSalary' in edits) updated.normalOtSalary = edits.normalOtSalary;
             if ('specialOtSalary' in edits) updated.specialOtSalary = edits.specialOtSalary;
@@ -359,28 +379,29 @@ export default function SalaryReportDetail() {
              const extraPrevMonthLopPay = updated.extra_prev_month_lop_pay || 0;
              const extraPrevMonthDeductibleHoursPay = updated.extra_prev_month_deductible_hours_pay || 0;
 
-             const finalTotal = totalSalary + totalOtSalary + (updated.bonus || 0) + (updated.incentive || 0)
-                                 - netDeduction - deductibleHoursPay - extraPrevMonthLopPay - extraPrevMonthDeductibleHoursPay
-                                 - (updated.otherDeduction || 0) - (updated.advanceSalaryDeduction || 0);
+             const effectiveOtOrIncentive = Math.max(round2(totalOtSalary), round2(updated.incentive || 0));
+             const netAdditions = (updated.bonus || 0) + effectiveOtOrIncentive;
+             const netDeductions = round2(
+                 netDeduction +
+                 deductibleHoursPay +
+                 extraPrevMonthLopPay +
+                 extraPrevMonthDeductibleHoursPay +
+                 (updated.otherDeduction || 0) +
+                 (updated.advanceSalaryDeduction || 0)
+             );
 
-             updated.total = Math.round(finalTotal);
+             const finalTotal = round2(totalSalary + netAdditions - netDeductions);
+
+             updated.total = finalTotal;
 
             // WPS SPLIT LOGIC (Al Maraghi Motors only)
             const wpsCapEnabled = updated.wps_cap_enabled || false;
             const wpsCapAmount = updated.wps_cap_amount ?? 4900;
 
-            if (isAlMaraghi && wpsCapEnabled && finalTotal > 0) {
-                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                const rawExcess = Math.max(0, finalTotal - cap);
-                const balance = Math.floor(rawExcess / 100) * 100;
-                updated.wpsPay = Math.round(finalTotal - balance);
-                updated.balance = balance;
-                updated.wps_cap_applied = rawExcess > 0;
-            } else {
-                updated.wpsPay = Math.round(Math.max(0, finalTotal));
-                updated.balance = 0;
-                updated.wps_cap_applied = false;
-            }
+            const { wpsPay, balance, wpsCapApplied } = calculateWpsSplit(finalTotal, wpsCapEnabled, wpsCapAmount);
+            updated.wpsPay = Math.round(wpsPay * 100) / 100;
+            updated.balance = Math.round(balance);
+            updated.wps_cap_applied = wpsCapApplied;
 
             return updated;
             });
@@ -392,7 +413,14 @@ export default function SalaryReportDetail() {
 
              updatedData.forEach(row => {
                  totalSalaryAmount += row.total || 0;
-                 totalDeductions += (row.netDeduction || 0) + (row.deductibleHoursPay || 0) + (row.otherDeduction || 0) + (row.advanceSalaryDeduction || 0);
+                 totalDeductions += round2(
+                    (row.netDeduction || 0) +
+                    (row.deductibleHoursPay || 0) +
+                    (row.extra_prev_month_lop_pay || 0) +
+                    (row.extra_prev_month_deductible_hours_pay || 0) +
+                    (row.otherDeduction || 0) +
+                    (row.advanceSalaryDeduction || 0)
+                 );
                  totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
              });
 
@@ -528,18 +556,17 @@ export default function SalaryReportDetail() {
     const handleExportToExcel = () => {
         const exportData = filteredData.map(row => {
             // Calculate totals for export to get correct WPS values
-            const { total, wpsPay, balance, wpsCapApplied } = calculateTotals(row);
-            const shouldRound = !hasDecimalBonus(getValue(row, 'bonus'));
+            const { total, wpsPay, balance, wpsCapApplied, netAdditions, netDeductions, effectiveOtOrIncentive } = calculateTotals(row);
             return {
                 'Attendance ID': row.attendance_id,
                 'Name': row.name,
                 'Attendance Source': row.attendance_source || 'ANALYZED',
-                'Total Salary': row.total_salary || 0,
+                'Total Salary': Math.round(row.total_salary || 0),
                 'Working Days': row.working_days || 0,
                 'Present Days': row.present_days || 0,
                 'LOP Days': row.full_absence_count || 0,
-                'Annual Leave Days': row.annual_leave_count || 0,
-                'Leave Days': Math.round(row.leaveDays || 0),
+                'Annual Leave Days': parseFloat(((row.salary_leave_days || row.salaryLeaveDays || 0)).toFixed(2)),
+                'Leave Days': parseFloat((((row.salary_leave_days || row.salaryLeaveDays || 0) + (row.full_absence_count || 0))).toFixed(2)),
                 'Leave Pay': parseFloat((row.leavePay || 0).toFixed(2)),
                 'Salary Leave Days': parseFloat((row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)),
                 'Salary Leave Amount': parseFloat((row.salaryLeaveAmount || 0).toFixed(2)),
@@ -551,13 +578,16 @@ export default function SalaryReportDetail() {
                 'Special OT Hours': parseFloat((row.specialOtHours || 0).toFixed(2)),
                 'Special OT Salary': parseFloat((row.specialOtSalary || 0).toFixed(2)),
                 'Total OT Salary': parseFloat(((row.normalOtSalary || 0) + (row.specialOtSalary || 0)).toFixed(2)),
+                'Effective OT/Incentive (Higher Only)': parseFloat((effectiveOtOrIncentive || 0).toFixed(2)),
+                'Net Additions': parseFloat((netAdditions || 0).toFixed(2)),
                 'Other Deduction': parseFloat((row.otherDeduction || 0).toFixed(2)),
                 'Bonus': parseFloat((row.bonus || 0).toFixed(2)),
                 'Incentive': parseFloat((row.incentive || 0).toFixed(2)),
                 'Advance Salary Deduction': parseFloat((row.advanceSalaryDeduction || 0).toFixed(2)),
+                'Net Deductions': parseFloat((netDeductions || 0).toFixed(2)),
                 'Total': parseFloat(total.toFixed(2)),
                 'WPS Pay': parseFloat(wpsPay.toFixed(2)),
-                'Balance': parseFloat(balance.toFixed(2)),
+                'Balance': Math.round(balance),
                 'WPS Cap Applied': wpsCapApplied ? 'Yes' : 'No',
                 'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
             };
@@ -753,18 +783,20 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Leave Pay</SortableTableHead>
                                         <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Days</SortableTableHead>
                                         <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-50">Salary Leave Amount</SortableTableHead>
+                                        <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
+                                        <TableHead className="whitespace-nowrap bg-blue-50">Normal OT Hours</TableHead>
+                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
+                                        <TableHead className="whitespace-nowrap bg-cyan-50">Special OT Hours</TableHead>
+                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Salary</SortableTableHead>
+                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-100">Total OT Salary</SortableTableHead>
+                                        <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
+                                        <TableHead className="whitespace-nowrap bg-emerald-100">Net Additions</TableHead>
                                         <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Net Deduction</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours</SortableTableHead>
                                         <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-purple-50">Deductible Hours Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="normalOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Hours</SortableTableHead>
-                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-blue-50">Normal OT Salary</SortableTableHead>
-                                        <SortableTableHead sortKey="specialOtHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Hours</SortableTableHead>
-                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-50">Special OT Salary</SortableTableHead>
-                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-cyan-100">Total OT Salary</SortableTableHead>
                                         <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Other Deduction</SortableTableHead>
-                                        <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Bonus</SortableTableHead>
-                                        <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-50">Incentive</SortableTableHead>
                                         <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-red-50">Advance Deduction</SortableTableHead>
+                                        <TableHead className="whitespace-nowrap bg-rose-100">Net Deductions</TableHead>
                                         <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-100 font-bold">Total</SortableTableHead>
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-green-100 font-bold">WPS Pay</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-amber-100 font-bold">Balance</SortableTableHead>
@@ -775,13 +807,12 @@ export default function SalaryReportDetail() {
                                 <tbody className="[&_tr:last-child]:border-0">
                                     {filteredData.length === 0 ? (
                                     <tr className="border-b">
-                                    <td colSpan={29} className="text-center py-12">
+                                    <td colSpan={31} className="text-center py-12">
                                                 <p className="text-slate-600">No employees match your search</p>
                                             </td>
                                         </tr>
                                     ) : filteredData.map((row) => {
-                                        const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary } = calculateTotals(row);
-                                        const shouldRound = !hasDecimalBonus(getValue(row, 'bonus'));
+                                        const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions } = calculateTotals(row);
                                         return (
                                             <tr key={row.hrms_id} className="border-b transition-colors hover:bg-muted/50">
                                                 <td className="p-2 align-middle sticky left-0 bg-white z-10">
@@ -802,7 +833,7 @@ export default function SalaryReportDetail() {
                                                             className="h-8 text-xs w-20"
                                                         />
                                                     ) : (
-                                                        row.total_salary || 0
+                                                        Math.round(row.total_salary || 0)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -849,12 +880,12 @@ export default function SalaryReportDetail() {
                                                         <Input
                                                             type="number"
                                                             step="0.01"
-                                                            value={getValue(row, 'annual_leave_count')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'annual_leave_count', e.target.value)}
+                                                            value={getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)}
                                                             className="h-8 text-xs w-16"
                                                         />
                                                     ) : (
-                                                        row.annual_leave_count || 0
+                                                        (row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-amber-50" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -862,12 +893,12 @@ export default function SalaryReportDetail() {
                                                         <Input
                                                             type="number"
                                                             step="0.01"
-                                                            value={getValue(row, 'leaveDays')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'leaveDays', e.target.value)}
-                                                            className="h-8 text-xs w-16"
+                                                            value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0))).toFixed(2)}
+                                                            readOnly
+                                                            className="h-8 text-xs w-16 bg-slate-100"
                                                         />
                                                     ) : (
-                                                        (row.leaveDays || 0).toFixed(2)
+                                                        (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0))).toFixed(2)
                                                     )}
                                                 </td>
                                                 <td className="p-2 align-middle bg-amber-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
@@ -909,6 +940,70 @@ export default function SalaryReportDetail() {
                                                         (row.salaryLeaveAmount || 0).toFixed(2)
                                                     )}
                                                 </td>
+                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={getValue(row, 'bonus')}
+                                                        onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)}
+                                                        className="h-8 text-xs w-16"
+                                                    />
+                                                </td>
+                                                <td className="p-2 align-middle bg-blue-50 font-medium">
+                                                    {(getValue(row, 'normalOtHours') || 0).toFixed(2)}
+                                                </td>
+                                                <td className="p-2 align-middle bg-blue-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'normalOtSalary')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'normalOtSalary', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        normalOtSalary.toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-cyan-50 font-medium">
+                                                    {(getValue(row, 'specialOtHours') || 0).toFixed(2)}
+                                                </td>
+                                                <td className="p-2 align-middle bg-cyan-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'specialOtSalary')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'specialOtSalary', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        specialOtSalary.toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className="p-2 align-middle bg-cyan-200 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                    {adminEditMode && isAdmin ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={getValue(row, 'totalOtSalary')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'totalOtSalary', e.target.value)}
+                                                            className="h-8 text-xs w-16"
+                                                        />
+                                                    ) : (
+                                                        totalOtSalary.toFixed(2)
+                                                    )}
+                                                </td>
+                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={getValue(row, 'incentive')}
+                                                        onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)}
+                                                        className="h-8 text-xs w-16"
+                                                    />
+                                                </td>
+                                                <td className="p-2 align-middle bg-emerald-100 font-semibold">{netAdditions.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-red-50 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input
@@ -948,87 +1043,12 @@ export default function SalaryReportDetail() {
                                                         (row.deductibleHoursPay || 0).toFixed(2)
                                                     )}
                                                 </td>
-                                                <td className={`p-1 align-middle bg-blue-50 ${adminEditMode && isAdmin ? '' : ''}`}>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={getValue(row, 'normalOtHours')}
-                                                        onChange={(e) => handleChange(row.hrms_id, 'normalOtHours', e.target.value)}
-                                                        className="h-8 text-xs w-16"
-                                                    />
-                                                </td>
-                                                <td className="p-2 align-middle bg-blue-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={getValue(row, 'normalOtSalary')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'normalOtSalary', e.target.value)}
-                                                            className="h-8 text-xs w-16"
-                                                        />
-                                                    ) : (
-                                                        normalOtSalary.toFixed(2)
-                                                    )}
-                                                </td>
-                                                <td className={`p-1 align-middle bg-cyan-50 ${adminEditMode && isAdmin ? '' : ''}`}>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={getValue(row, 'specialOtHours')}
-                                                        onChange={(e) => handleChange(row.hrms_id, 'specialOtHours', e.target.value)}
-                                                        className="h-8 text-xs w-16"
-                                                    />
-                                                </td>
-                                                <td className="p-2 align-middle bg-cyan-100" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={getValue(row, 'specialOtSalary')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'specialOtSalary', e.target.value)}
-                                                            className="h-8 text-xs w-16"
-                                                        />
-                                                    ) : (
-                                                        specialOtSalary.toFixed(2)
-                                                    )}
-                                                </td>
-                                                <td className="p-2 align-middle bg-cyan-200 font-semibold" onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={getValue(row, 'totalOtSalary')}
-                                                            onChange={(e) => handleChange(row.hrms_id, 'totalOtSalary', e.target.value)}
-                                                            className="h-8 text-xs w-16"
-                                                        />
-                                                    ) : (
-                                                        totalOtSalary.toFixed(2)
-                                                    )}
-                                                </td>
                                                 <td className={`p-1 align-middle bg-red-50 ${adminEditMode && isAdmin ? '' : ''}`}>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
                                                         value={getValue(row, 'otherDeduction')}
                                                         onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
-                                                        className="h-8 text-xs w-16"
-                                                    />
-                                                </td>
-                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={getValue(row, 'bonus')}
-                                                        onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)}
-                                                        className="h-8 text-xs w-16"
-                                                    />
-                                                </td>
-                                                <td className={`p-1 align-middle bg-green-50 ${adminEditMode && isAdmin ? '' : ''}`}>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={getValue(row, 'incentive')}
-                                                        onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)}
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
@@ -1041,9 +1061,10 @@ export default function SalaryReportDetail() {
                                                         className="h-8 text-xs w-16"
                                                     />
                                                 </td>
+                                                <td className="p-2 align-middle bg-rose-100 font-semibold">{netDeductions.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-indigo-100 font-bold">{total.toFixed(2)}</td>
                                                 <td className="p-2 align-middle bg-green-100 font-bold">{wpsPay.toFixed(2)}</td>
-                                                <td className="p-2 align-middle bg-amber-100 font-bold">{balance.toFixed(2)}</td>
+                                                <td className="p-2 align-middle bg-amber-100 font-bold">{Math.round(balance)}</td>
                                                 <td className="p-2 align-middle bg-slate-50 text-center">
                                                     {wpsCapApplied ? (
                                                         <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded text-xs font-medium">

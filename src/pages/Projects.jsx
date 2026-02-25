@@ -5,7 +5,7 @@ import { usePageTitle } from '@/components/ui/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Copy, Trash2, Edit, Calendar, FolderKanban, TrendingUp, Clock, Filter, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Copy, Trash2, Edit, Calendar, FolderKanban, Clock, Filter, ArrowUpDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import CreateProjectDialog from '../components/projects/CreateProjectDialog';
