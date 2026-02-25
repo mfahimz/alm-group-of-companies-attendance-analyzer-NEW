@@ -424,7 +424,7 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             className="bg-green-50 text-green-700 hover:bg-green-100 border-green-300"
                         >
                             <Sparkles className="w-4 h-4 mr-2" />
-                            Apply Default to All (9AM-12PM & 8PM-12AM)
+                            {isAlMaraghiAutomotive ? 'Apply Default to All (8AM-12PM & 2PM-5PM)' : 'Apply Default to All (9AM-12PM & 8PM-12AM)'}
                         </Button>
                     )}
                     {weekNum !== 'friday' && (
