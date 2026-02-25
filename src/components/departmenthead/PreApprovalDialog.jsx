@@ -155,7 +155,7 @@ export default function PreApprovalDialog({
             return;
         }
 
-        const cutoffDate = addDays(parseISO(currentProject.date_to), -1);
+        const cutoffDate = parseISO(currentProject.date_to);
         if (isAfter(new Date(), cutoffDate)) {
             toast.error('Approval period has ended. Cannot add new approvals.');
             return;
