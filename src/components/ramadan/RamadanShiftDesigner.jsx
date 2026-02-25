@@ -467,24 +467,49 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                                     <TableCell>{emp.name}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-3 items-center">
-                                            <label className="flex items-center gap-1.5 text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(shift.active_shifts || []).includes('day')}
-                                                    onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'day')}
-                                                    className="w-4 h-4"
-                                                />
-                                                Day
-                                            </label>
-                                            <label className="flex items-center gap-1.5 text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(shift.active_shifts || []).includes('night')}
-                                                    onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'night')}
-                                                    className="w-4 h-4"
-                                                />
-                                                Night
-                                            </label>
+                                            {isAlMaraghiAutomotive && weekNum !== 'friday' ? (
+                                                <>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('day')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'day')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        S1
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('night')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'night')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        S2
+                                                    </label>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('day')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'day')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        Day
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(shift.active_shifts || []).includes('night')}
+                                                            onChange={() => handleActiveShiftToggle(emp.attendance_id, weekNum, 'night')}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        Night
+                                                    </label>
+                                                </>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
