@@ -129,6 +129,16 @@ export default function Layout({ children, currentPageName }) {
         }
     }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName, navigate]);
 
+    // If auth failed (not logged in), redirect to login
+    if (error && !isLoading) {
+        base44.auth.redirectToLogin();
+        return (
+            <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
+                <div className="text-[#6B7280]">Redirecting to login...</div>
+            </div>
+        );
+    }
+
     if (isLoading || !currentUser) {
         return (
             <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
