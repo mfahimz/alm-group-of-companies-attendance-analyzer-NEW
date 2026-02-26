@@ -748,6 +748,7 @@ Deno.serve(async (req) => {
                         // 2. "Day Shift" only (is_single_shift=true, has 2 time points)
                         // 3. "Night Shift" only (is_single_shift=true, has 2 time points)
                         ramadanShift = ramadanDateShifts[0];
+                        console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: Single record "${ramadanShift.applicable_days}", is_single_shift=${ramadanShift.is_single_shift}, times: ${ramadanShift.am_start}/${ramadanShift.am_end}/${ramadanShift.pm_start}/${ramadanShift.pm_end}`);
                     } else {
                         // Multiple Ramadan shifts on same day — merge day + night into 4-point shift
                         // This handles LEGACY data where day and night were stored as separate records
@@ -769,9 +770,11 @@ Deno.serve(async (req) => {
                                 _ramadan: true,
                                 _merged: true
                             };
+                            console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: MERGED day+night (legacy), is_single_shift=false, times: ${ramadanShift.am_start}/${ramadanShift.am_end}/${ramadanShift.pm_start}/${ramadanShift.pm_end}`);
                         } else {
                             // Only one type found among multiple records — use the first one
                             ramadanShift = ramadanDateShifts[0];
+                            console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: Multiple records but only one type found, using first: "${ramadanShift.applicable_days}"`);
                         }
                     }
                 }
