@@ -241,21 +241,40 @@ Deno.serve(async (req) => {
             }
         };
 
-        const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds = false) => {
+        const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds = false, nextDateStr = null) => {
             if (!shift || dayPunches.length === 0) return [];
             
-            const punchesWithTime = dayPunches.map(p => ({
-                ...p,
-                time: parseTime(p.timestamp_raw, includeSeconds)
-            })).filter(p => p.time).sort((a, b) => a.time - b.time);
+            const punchesWithTime = dayPunches.map(p => {
+                const time = parseTime(p.timestamp_raw, includeSeconds);
+                if (!time) return null;
+                
+                // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
+                // add 24 hours to its time so it sorts and matches correctly against PM_END
+                const isNextDayPunch = nextDateStr && p.punch_date === nextDateStr;
+                const adjustedTime = isNextDayPunch ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+                
+                return {
+                    ...p,
+                    time: adjustedTime,
+                    _originalTime: time,
+                    _isNextDayPunch: isNextDayPunch
+                };
+            }).filter(p => p).sort((a, b) => a.time - b.time);
             
             if (punchesWithTime.length === 0) return [];
+            
+            // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
+            const pmEndTime = parseTime(shift.pm_end);
+            let adjustedPmEnd = pmEndTime;
+            if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+                adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+            }
             
             const shiftPoints = [
                 { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
                 { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
                 { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
-                { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+                { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
             ].filter(sp => sp.time);
             
             const matches = [];
