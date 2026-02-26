@@ -12,8 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
-import EditDayRecordDialog from './EditDayRecordDialog';
 import InlineEditableCell from './InlineEditableCell';
+import DailyBreakdownDialog from './DailyBreakdownDialog';
 import * as XLSX from 'xlsx';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
