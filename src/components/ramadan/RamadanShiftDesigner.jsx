@@ -157,6 +157,37 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
         });
     };
 
+    const swapWeeksMutation = useMutation({
+        mutationFn: async () => {
+            // Save current state first, then swap via backend
+            await base44.entities.RamadanSchedule.update(schedule.id, {
+                week1_shifts: JSON.stringify(week1Shifts),
+                week2_shifts: JSON.stringify(week2Shifts),
+                friday_shifts: JSON.stringify(fridayShifts)
+            });
+            const response = await base44.functions.invoke('swapRamadanWeeks', { schedule_id: schedule.id });
+            return response.data;
+        },
+        onSuccess: () => {
+            // Swap local state to match
+            const oldWeek1 = { ...week1Shifts };
+            const oldWeek2 = { ...week2Shifts };
+            setWeek1Shifts(oldWeek2);
+            setWeek2Shifts(oldWeek1);
+            queryClient.invalidateQueries(['ramadanSchedules']);
+            toast.success('Week 1 and Week 2 shifts swapped successfully. Remember to re-apply Ramadan shifts in affected projects.');
+        },
+        onError: (err) => {
+            toast.error('Failed to swap weeks: ' + (err?.response?.data?.error || err.message));
+        }
+    });
+
+    const handleSwapWeeks = () => {
+        if (window.confirm('This will swap ALL Week 1 shifts with Week 2 shifts (and vice versa). Current unsaved changes will be saved first. Continue?')) {
+            swapWeeksMutation.mutate();
+        }
+    };
+
     const handleWeek1Change = (attendanceId, field, value) => {
         setWeek1Shifts(prev => ({
             ...prev,
