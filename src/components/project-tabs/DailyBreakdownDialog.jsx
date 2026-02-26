@@ -67,7 +67,7 @@ export default function DailyBreakdownDialog({
         return ts;
     };
 
-    const getDailyBreakdown = React.useMemo(() => {
+    const getDailyBreakdown = useMemo(() => {
         if (!selectedEmployee) return [];
 
         const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
