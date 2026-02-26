@@ -821,13 +821,7 @@ Deno.serve(async (req) => {
                     }
                 }
                 
-                // CRITICAL FIX: Log missing shift configuration for working days with punches
-                // This makes missing shift data visible instead of silently skipping calculations
-                if (!shift && filteredPunches.length > 0 && !dateException) {
-                    console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
-                    abnormal_dates_set.add(dateStr);
-                    critical_abnormal_dates_set.add(dateStr);
-                }
+                // CRITICAL FIX: Log missing shift will happen after filteredPunches is computed below
 
                 if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
                     try {
