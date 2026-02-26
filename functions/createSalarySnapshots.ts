@@ -1378,8 +1378,8 @@ Deno.serve(async (req) => {
             // CRITICAL: This is "allowances" field, NOT "allowances_with_bonus"
             const allowancesAmount = Number(salary?.allowances) || 0;
             
-            // COMPONENT 3: Allowances WITH bonus (stored but not used in calculations here)
-            // const allowancesWithBonus = Number(salary?.allowances_with_bonus) || 0;
+            // COMPONENT 3: Allowances WITH bonus (stored for display/reference)
+            const allowancesWithBonus = Number(salary?.allowances_with_bonus) || 0;
             
             // Total Salary = Component 1 + Component 2 + Component 3
             const totalSalaryAmount = salary?.total_salary || 0;
@@ -1602,6 +1602,7 @@ Deno.serve(async (req) => {
                 department: emp.department,
                 basic_salary: basicSalary,
                 allowances: allowancesAmount,
+                allowances_with_bonus: allowancesWithBonus,
                 total_salary: totalSalaryAmount,
                 working_hours: workingHours,
                 working_days: calculated.workingDays,
