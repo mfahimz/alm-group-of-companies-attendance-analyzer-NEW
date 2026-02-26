@@ -647,7 +647,14 @@ export default function DailyBreakdownDialog({
                                                 )}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-xs">{day.shift}</TableCell>
+                                        <TableCell className="text-xs">
+                                            <div className="flex items-center gap-1">
+                                                <span>{day.shift}</span>
+                                                {day.shiftEndsNearMidnight && (
+                                                    <span className="text-[8px] text-indigo-500" title="Shift ends near midnight - punches after 12AM are pulled into this day">🌙</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-xs">{day.exception}</TableCell>
                                         <TableCell>
                                             <div>
