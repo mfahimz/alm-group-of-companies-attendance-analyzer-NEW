@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
             // Base salary
             basic_salary: snap.basic_salary,
             allowances: snap.allowances,
+            allowances_with_bonus: snap.allowances_with_bonus || 0,
             total_salary: snap.total_salary,
             working_hours: snap.working_hours,
             
