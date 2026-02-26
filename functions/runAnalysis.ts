@@ -684,70 +684,111 @@ Deno.serve(async (req) => {
                     // If employee worked, continue normal analysis
                 }
 
-                // Check for Ramadan shift first
+                // Check for date-specific Ramadan ShiftTiming records FIRST
+                // applyRamadanShifts creates separate ShiftTiming records for day and night shifts
+                // We need to merge them into a single shift object for proper punch matching
                 let ramadanShift = null;
-                for (const scheduleId in ramadanShiftsLookup) {
-                    const ramadanData = ramadanShiftsLookup[scheduleId];
-                    if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
-                        // Calculate which week pattern to use (resets after Sunday)
-                        const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
-                        let weekNumber = 1;
-                        let dayCounter = 0;
+                const dateSpecificShifts = employeeShifts.filter(s => s.date === dateStr && isShiftEffective(s));
+                const ramadanDateShifts = dateSpecificShifts.filter(s => 
+                    s.applicable_days && s.applicable_days.includes('Ramadan')
+                );
+                
+                if (ramadanDateShifts.length > 0) {
+                    if (ramadanDateShifts.length === 1) {
+                        // Single Ramadan shift (day only OR night only OR Al Maraghi S1/S2)
+                        ramadanShift = ramadanDateShifts[0];
+                    } else {
+                        // Multiple Ramadan shifts on same day — merge day + night into 4-point shift
+                        // Convention: Day shift uses am_start/pm_end, Night shift uses am_start/pm_end
+                        // After merge: am_start=day_start, am_end=day_end, pm_start=night_start, pm_end=night_end
+                        const dayShift = ramadanDateShifts.find(s => 
+                            s.applicable_days?.includes('Day') || s.applicable_days?.includes('S1')
+                        );
+                        const nightShift = ramadanDateShifts.find(s => 
+                            s.applicable_days?.includes('Night') || s.applicable_days?.includes('S2')
+                        );
                         
-                        for (let i = 0; i <= daysSinceStart; i++) {
-                            const checkDate = new Date(ramadanData.start);
-                            checkDate.setDate(checkDate.getDate() + i);
-                            const checkDayOfWeek = checkDate.getUTCDay();
-                            
-                            if (checkDayOfWeek === 0 && i > 0) {
-                                weekNumber = weekNumber === 1 ? 2 : 1;
-                            }
+                        if (dayShift && nightShift) {
+                            ramadanShift = {
+                                am_start: dayShift.am_start,
+                                am_end: dayShift.pm_end,    // Day shift end (stored in pm_end for single shifts)
+                                pm_start: nightShift.am_start, // Night shift start (stored in am_start for single shifts)
+                                pm_end: nightShift.pm_end,   // Night shift end
+                                is_single_shift: false,
+                                is_friday_shift: dayShift.is_friday_shift,
+                                _ramadan: true,
+                                _merged: true
+                            };
+                        } else {
+                            // Fallback: just use the first one
+                            ramadanShift = ramadanDateShifts[0];
                         }
-                        
-                        const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
-                        const employeeShiftData = weekData[attendanceIdStr];
-                        
-                        if (employeeShiftData && employeeShiftData.active_shifts && employeeShiftData.active_shifts.length > 0) {
-                            // Build shift object from Ramadan configuration
-                            const activeShifts = employeeShiftData.active_shifts;
+                    }
+                }
+                
+                // Fallback: Build from raw Ramadan schedule JSON if no ShiftTiming records exist
+                if (!ramadanShift) {
+                    for (const scheduleId in ramadanShiftsLookup) {
+                        const ramadanData = ramadanShiftsLookup[scheduleId];
+                        if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
+                            const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
+                            let weekNumber = 1;
                             
-                            if (activeShifts.includes('day') && activeShifts.includes('night')) {
-                                // Both day and night shift
-                                ramadanShift = {
-                                    am_start: employeeShiftData.day_start || '',
-                                    am_end: employeeShiftData.day_end || '',
-                                    pm_start: employeeShiftData.night_start || '',
-                                    pm_end: employeeShiftData.night_end || '',
-                                    is_single_shift: false,
-                                    _ramadan: true
-                                };
-                            } else if (activeShifts.includes('day')) {
-                                // Day shift only (single shift format)
-                                ramadanShift = {
-                                    am_start: employeeShiftData.day_start || '',
-                                    am_end: employeeShiftData.day_end || '',
-                                    pm_start: '',
-                                    pm_end: '',
-                                    is_single_shift: true,
-                                    _ramadan: true
-                                };
-                            } else if (activeShifts.includes('night')) {
-                                // Night shift only (single shift format)
-                                ramadanShift = {
-                                    am_start: employeeShiftData.night_start || '',
-                                    am_end: employeeShiftData.night_end || '',
-                                    pm_start: '',
-                                    pm_end: '',
-                                    is_single_shift: true,
-                                    _ramadan: true
-                                };
+                            for (let i = 0; i <= daysSinceStart; i++) {
+                                const checkDate = new Date(ramadanData.start);
+                                checkDate.setDate(checkDate.getDate() + i);
+                                const checkDayOfWeek = checkDate.getUTCDay();
+                                
+                                if (checkDayOfWeek === 0 && i > 0) {
+                                    weekNumber = weekNumber === 1 ? 2 : 1;
+                                }
                             }
+                            
+                            const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
+                            const employeeShiftData = weekData[attendanceIdStr];
+                            
+                            if (employeeShiftData && employeeShiftData.active_shifts && employeeShiftData.active_shifts.length > 0) {
+                                const activeShifts = employeeShiftData.active_shifts;
+                                
+                                if (activeShifts.includes('day') && activeShifts.includes('night')) {
+                                    ramadanShift = {
+                                        am_start: employeeShiftData.day_start || '',
+                                        am_end: employeeShiftData.day_end || '',
+                                        pm_start: employeeShiftData.night_start || '',
+                                        pm_end: employeeShiftData.night_end || '',
+                                        is_single_shift: false,
+                                        _ramadan: true
+                                    };
+                                } else if (activeShifts.includes('day')) {
+                                    ramadanShift = {
+                                        am_start: employeeShiftData.day_start || '',
+                                        am_end: '—',
+                                        pm_start: '—',
+                                        pm_end: employeeShiftData.day_end || '',
+                                        is_single_shift: true,
+                                        _ramadan: true
+                                    };
+                                } else if (activeShifts.includes('night')) {
+                                    ramadanShift = {
+                                        am_start: employeeShiftData.night_start || '',
+                                        am_end: '—',
+                                        pm_start: '—',
+                                        pm_end: employeeShiftData.night_end || '',
+                                        is_single_shift: true,
+                                        _ramadan: true
+                                    };
+                                }
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
 
-                let shift = ramadanShift || employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
+                // Use Ramadan shift, or fall back to non-Ramadan date-specific shift
+                const nonRamadanDateShift = dateSpecificShifts.find(s => 
+                    !s.applicable_days || !s.applicable_days.includes('Ramadan')
+                );
+                let shift = ramadanShift || nonRamadanDateShift;
 
                 if (!shift) {
                     const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
