@@ -104,11 +104,16 @@ Deno.serve(async (req) => {
             
             console.log(`[applyRamadanShifts] forceResync: Deleting ${ramadanShiftsToDelete.length} existing Ramadan shifts`);
             
-            const deleteBatchSize = 50;
+            const deleteBatchSize = 10;
             for (let i = 0; i < ramadanShiftsToDelete.length; i += deleteBatchSize) {
                 const batch = ramadanShiftsToDelete.slice(i, i + deleteBatchSize);
-                for (const shift of batch) {
-                    await base44.asServiceRole.entities.ShiftTiming.delete(shift.id);
+                await Promise.all(batch.map(shift => 
+                    base44.asServiceRole.entities.ShiftTiming.delete(shift.id)
+                ));
+                console.log(`[applyRamadanShifts] Deleted batch ${Math.floor(i / deleteBatchSize) + 1}/${Math.ceil(ramadanShiftsToDelete.length / deleteBatchSize)}`);
+                // Delay between batches to avoid rate limiting
+                if (i + deleteBatchSize < ramadanShiftsToDelete.length) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
         }
