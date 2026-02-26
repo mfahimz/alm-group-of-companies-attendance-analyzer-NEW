@@ -318,7 +318,11 @@ export default function DailyBreakdownDialog({
             ].includes(dateException.type);
 
             const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
-            const shouldSkipPunchCalc = isFinalized || shouldSkipTimeCalc || hasExceptionMinutes;
+            // NOTE: isFinalized is intentionally NOT included here.
+            // This is a display-only breakdown — edit actions are already gated by project.status !== 'closed'.
+            // For closed/finalized projects, we still compute per-day late/early from punches so that
+            // department heads and admins can see *which day* the minutes came from, not just the stored total.
+            const shouldSkipPunchCalc = shouldSkipTimeCalc || hasExceptionMinutes;
 
             if (shift && punchMatches.length > 0 && !shouldSkipPunchCalc) {
                 let dayLateMinutes = 0;
