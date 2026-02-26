@@ -626,6 +626,15 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
                             <Save className="w-4 h-4 mr-2" />
                             {updateMutation.isPending ? 'Saving...' : 'Save Shifts'}
                         </Button>
+                        <Button 
+                            variant="outline" 
+                            onClick={handleSwapWeeks} 
+                            disabled={swapWeeksMutation.isPending}
+                            className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                        >
+                            <ArrowLeftRight className="w-4 h-4 mr-2" />
+                            {swapWeeksMutation.isPending ? 'Swapping...' : 'Swap Week 1 ↔ Week 2'}
+                        </Button>
                         <Button variant="outline" onClick={onClose}>
                             Close
                         </Button>
