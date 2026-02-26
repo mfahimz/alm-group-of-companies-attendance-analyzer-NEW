@@ -1023,6 +1023,263 @@ if (!isAdmin && !isCEO) {
                     </p>
                 </Section>
 
+                {/* Base44 Platform Rules */}
+                <Section id="base44-rules" title="7. Base44 Platform Rules for Developers" icon={AlertTriangle}>
+                    <div className="bg-red-50 border-2 border-red-600 rounded-lg p-4 mb-6">
+                        <h3 className="text-xl font-bold text-red-900 mb-3">⚠️ CRITICAL: READ BEFORE MAKING ANY CHANGES</h3>
+                        <p className="text-sm text-red-800">
+                            This application runs on the <strong>Base44 Backend-as-a-Service platform</strong>. Certain files and patterns
+                            are platform-managed and must NEVER be modified. Violating these rules will break the application.
+                        </p>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-0">NEVER Touch These (Will Break the App)</h3>
+                    <div className="space-y-3 mb-6">
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">1. index.html</h4>
+                            <p className="text-sm text-red-800">Platform-managed entry point. Do not edit.</p>
+                        </div>
+
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">2. index.css</h4>
+                            <p className="text-sm text-red-800">
+                                Base shadcn/ui theme configuration. Editing can break all UI components across the entire app.
+                            </p>
+                        </div>
+
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">3. tailwind.config.js</h4>
+                            <p className="text-sm text-red-800">
+                                Platform-configured. Changes may not take effect or can break global styling.
+                            </p>
+                        </div>
+
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">4. lib/ folder</h4>
+                            <p className="text-sm text-red-800">
+                                Contains platform internals (PageNotFound.jsx, utils, etc.). Only edit PageNotFound.jsx if customizing 404 page.
+                            </p>
+                        </div>
+
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">5. @/api/base44Client</h4>
+                            <p className="text-sm text-red-800">
+                                Pre-initialized SDK client. Never recreate or modify this client instance.
+                            </p>
+                        </div>
+
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">6. @/components/ui/ (shadcn components)</h4>
+                            <p className="text-sm text-red-800">
+                                These are pre-installed UI primitives. Editing them can break the entire UI system. Only customize if
+                                you fully understand ripple effects.
+                            </p>
+                        </div>
+
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">7. Authentication/Login pages</h4>
+                            <p className="text-sm text-red-800">
+                                Auth is handled by the platform. NEVER create custom login/signup pages.
+                            </p>
+                        </div>
+
+                        <div className="border-l-4 border-red-600 bg-red-50 p-3">
+                            <h4 className="font-semibold text-red-900">8. App.jsx / routing</h4>
+                            <p className="text-sm text-red-800">
+                                Platform-managed. Routes are auto-generated from pages/ folder. Do not manually configure routes.
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">File Structure Rules</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <table className="text-sm w-full">
+                            <thead>
+                                <tr className="border-b border-blue-300">
+                                    <th className="text-left py-2 font-semibold text-blue-900">Rule</th>
+                                    <th className="text-left py-2 font-semibold text-blue-900">Example</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-blue-800">
+                                <tr className="border-b border-blue-200">
+                                    <td className="py-2">Pages must be flat (no subfolders)</td>
+                                    <td className="py-2">
+                                        <code className="bg-green-100 text-green-800 px-1 rounded">pages/MyPage.js ✅</code><br/>
+                                        <code className="bg-red-100 text-red-800 px-1 rounded">pages/admin/MyPage.js ❌</code>
+                                    </td>
+                                </tr>
+                                <tr className="border-b border-blue-200">
+                                    <td className="py-2">Components CAN have subfolders</td>
+                                    <td className="py-2">
+                                        <code className="bg-green-100 text-green-800 px-1 rounded">components/dashboard/Chart.js ✅</code>
+                                    </td>
+                                </tr>
+                                <tr className="border-b border-blue-200">
+                                    <td className="py-2">Entity files are JSON schemas</td>
+                                    <td className="py-2">
+                                        <code className="bg-blue-100 text-blue-800 px-1 rounded">entities/MyEntity.json</code><br/>
+                                        <span className="text-xs text-red-600">Always provide FULL schema, no partial updates</span>
+                                    </td>
+                                </tr>
+                                <tr className="border-b border-blue-200">
+                                    <td className="py-2">Functions are Deno handlers</td>
+                                    <td className="py-2">
+                                        <code className="bg-blue-100 text-blue-800 px-1 rounded">functions/myFunc.js</code><br/>
+                                        <span className="text-xs text-red-600">Each is independently deployed (NO local imports between functions)</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="py-2">Function names must be camelCase</td>
+                                    <td className="py-2">
+                                        <code className="bg-green-100 text-green-800 px-1 rounded">runAnalysis ✅</code><br/>
+                                        <code className="bg-red-100 text-red-800 px-1 rounded">run-analysis ❌</code>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Common Pitfalls</h3>
+                    <div className="overflow-x-auto mb-6">
+                        <table className="text-xs w-full border-collapse">
+                            <thead>
+                                <tr className="bg-slate-200">
+                                    <th className="border border-slate-300 p-3 text-left font-semibold">Issue</th>
+                                    <th className="border border-slate-300 p-3 text-left font-semibold">Cause</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td className="border border-slate-300 p-3">"Invalid hook call" / white screen</td>
+                                    <td className="border border-slate-300 p-3">
+                                        Duplicate React imports, or importing React directly instead of using the bundled version
+                                    </td>
+                                </tr>
+                                <tr className="bg-slate-50">
+                                    <td className="border border-slate-300 p-3">Infinite loops</td>
+                                    <td className="border border-slate-300 p-3">
+                                        useEffect with unstable dependencies (objects/arrays created inline), or missing deps with React Query
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-slate-300 p-3">Broken navigation</td>
+                                    <td className="border border-slate-300 p-3">
+                                        Editing Layout to import pages directly instead of using children prop
+                                    </td>
+                                </tr>
+                                <tr className="bg-slate-50">
+                                    <td className="border border-slate-300 p-3">Entity data loss</td>
+                                    <td className="border border-slate-300 p-3">
+                                        Using write_file with partial entity schemas — always include ALL fields
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-slate-300 p-3">Functions failing</td>
+                                    <td className="border border-slate-300 p-3">
+                                        Using import between function files (each is isolated), or missing npm: prefix on packages
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">SDK Usage Rules</h3>
+                    <div className="space-y-3 mb-6">
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <h4 className="font-semibold text-green-900 mb-2">Frontend SDK Import</h4>
+                            <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto">
+{`import { base44 } from '@/api/base44Client';
+
+// Always use this instance, never create your own`}
+                            </pre>
+                        </div>
+
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                            <h4 className="font-semibold text-purple-900 mb-2">Backend Function SDK Import</h4>
+                            <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto">
+{`import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+
+Deno.serve(async (req) => {
+  const base44 = createClientFromRequest(req);
+  // Use base44.entities, base44.auth, etc.
+});
+
+// Always use this exact version`}
+                            </pre>
+                        </div>
+
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                            <h4 className="font-semibold text-red-900 mb-2">Security Rules</h4>
+                            <ul className="text-sm text-red-800 space-y-1">
+                                <li>❌ Never expose API keys/tokens in frontend code</li>
+                                <li>❌ Never use <code className="bg-red-100 px-1 rounded">base44.asServiceRole</code> in frontend — backend only</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Layout Rules</h3>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                        <ul className="text-sm text-amber-800 space-y-2">
+                            <li>
+                                <strong>Layout receives props:</strong> <code className="bg-amber-100 px-1 rounded">children</code> and
+                                <code className="bg-amber-100 px-1 rounded ml-1">currentPageName</code>
+                            </li>
+                            <li>
+                                <strong>NEVER import Layout inside page components</strong> — it's auto-wrapped by the platform
+                            </li>
+                            <li>
+                                <strong>Navigation:</strong> Use <code className="bg-amber-100 px-1 rounded">createPageUrl('PageName')</code> for
+                                links, not hardcoded paths
+                            </li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">What's Safe to Edit</h3>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                        <p className="text-sm text-green-900 font-semibold mb-3">You CAN freely edit these:</p>
+                        <ul className="text-sm text-green-800 space-y-1">
+                            <li>✅ <code className="bg-green-100 px-1 rounded">pages/*.js</code> — Your app pages</li>
+                            <li>✅ <code className="bg-green-100 px-1 rounded">components/**/*.js</code> — Your custom components</li>
+                            <li>✅ <code className="bg-green-100 px-1 rounded">functions/*.js</code> — Your backend functions</li>
+                            <li>✅ <code className="bg-green-100 px-1 rounded">entities/*.json</code> — Your data schemas (full schema only)</li>
+                            <li>✅ <code className="bg-green-100 px-1 rounded">agents/*.json</code> — AI agent configs</li>
+                            <li>✅ <code className="bg-green-100 px-1 rounded">globals.css</code> — Your custom global styles</li>
+                            <li>✅ <code className="bg-green-100 px-1 rounded">Layout.js</code> — App layout wrapper</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mt-6">Package Rules</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-800 mb-3">
+                            <strong>Only use pre-installed packages.</strong> Do NOT add arbitrary npm packages without verification.
+                        </p>
+                        <p className="text-sm text-blue-800 mb-2 font-semibold">Pre-installed packages include:</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
+                            <div>
+                                <ul className="space-y-1">
+                                    <li>• React, React DOM</li>
+                                    <li>• Tailwind CSS</li>
+                                    <li>• shadcn/ui components</li>
+                                    <li>• lucide-react (icons)</li>
+                                    <li>• recharts</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <ul className="space-y-1">
+                                    <li>• date-fns</li>
+                                    <li>• lodash</li>
+                                    <li>• framer-motion</li>
+                                    <li>• @tanstack/react-query</li>
+                                    <li>• @hello-pangea/dnd</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p className="text-xs text-red-600 mt-3 bg-red-50 border border-red-200 rounded p-2">
+                            <strong>Icon Warning:</strong> Only use lucide-react icons you've verified exist. Wrong icon names crash the app.
+                        </p>
+                    </div>
+                </Section>
+
                 {/* Known Constraints */}
                 <Section id="constraints" title="8. Known Constraints & Design Decisions" icon={AlertTriangle}>
                     <h3 className="text-xl font-semibold mt-0">Why Attendance ID is Number (Not String)</h3>
