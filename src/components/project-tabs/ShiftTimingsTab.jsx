@@ -1130,7 +1130,11 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                                             <TableCell>{employee?.weekly_off || 'Sunday'}</TableCell>
                                                         )}
                                                         <TableCell>
-                                                            {shift.is_single_shift ? (
+                                                            {shift.applicable_days?.includes('Ramadan') ? (
+                                                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
+                                                                    {shift.applicable_days.replace('Ramadan ', '')}
+                                                                </span>
+                                                            ) : shift.is_single_shift ? (
                                                                 <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Single Shift</span>
                                                             ) : (
                                                                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Regular</span>
