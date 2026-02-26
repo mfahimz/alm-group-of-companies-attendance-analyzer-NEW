@@ -110,23 +110,30 @@ Deno.serve(async (req) => {
 
                 const activeShifts = weekShifts.active_shifts || [];
 
-                if (isAlMaraghiAutomotive && !isFriday) {
-                    if ((activeShifts.includes('day') || activeShifts.includes('night')) && weekShifts.day_start && weekShifts.day_end) {
-                        const shiftLabel = activeShifts.includes('day') ? 'Ramadan S1 Shift' : 'Ramadan S2 Shift';
-                        shiftsToCreate.push({
-                            project_id: projectId, attendance_id: attendanceId, date: dateStr,
-                            effective_from: dateStr, effective_to: dateStr, is_friday_shift: false,
-                            is_single_shift: true, applicable_days: shiftLabel,
-                            am_start: weekShifts.day_start, am_end: '—', pm_start: '—', pm_end: weekShifts.day_end
-                        });
-                    }
-                } else {
+                // ================================================================
+                // UNIFIED LOGIC for ALL companies (including Al Maraghi Automotive)
+                // 
+                // KEY RULE: The Ramadan designer has day_start, day_end, night_start, night_end
+                // - If employee has BOTH day + night times filled → 2 shifts → Combined (4-point, NOT single)
+                // - If employee has ONLY day times filled → 1 shift → Single shift (2-point)
+                // - If employee has ONLY night times filled → 1 shift → Single shift (2-point)
+                //
+                // For Al Maraghi Automotive non-Friday:
+                //   "day" maps to S1 (first shift), "night" maps to S2 (second shift)
+                //   Both present → Combined shift with 4 time points
+                //   Only one present → Single shift with 2 time points
+                // ================================================================
+                {
                     const hasDayShift = activeShifts.includes('day') && weekShifts.day_start && weekShifts.day_end;
                     const hasNightShift = activeShifts.includes('night') && weekShifts.night_start && weekShifts.night_end;
                     const hasBothShifts = hasDayShift && hasNightShift;
 
                     if (hasBothShifts) {
-                        const label = isFriday ? 'Ramadan Friday Combined Shift' : 'Ramadan Combined Shift';
+                        // TWO shifts active → Create ONE combined 4-point shift record
+                        // am_start=day_start, am_end=day_end, pm_start=night_start, pm_end=night_end
+                        const label = isFriday 
+                            ? 'Ramadan Friday Combined Shift' 
+                            : (isAlMaraghiAutomotive ? 'Ramadan Combined Shift' : 'Ramadan Combined Shift');
                         shiftsToCreate.push({
                             project_id: projectId, attendance_id: attendanceId, date: dateStr,
                             effective_from: dateStr, effective_to: dateStr, is_friday_shift: isFriday,
@@ -134,25 +141,28 @@ Deno.serve(async (req) => {
                             am_start: weekShifts.day_start, am_end: weekShifts.day_end,
                             pm_start: weekShifts.night_start, pm_end: weekShifts.night_end
                         });
-                    } else {
-                        if (hasDayShift) {
-                            const label = isFriday ? 'Ramadan Friday Day Shift' : 'Ramadan Day Shift';
-                            shiftsToCreate.push({
-                                project_id: projectId, attendance_id: attendanceId, date: dateStr,
-                                effective_from: dateStr, effective_to: dateStr, is_friday_shift: isFriday,
-                                is_single_shift: true, applicable_days: label,
-                                am_start: weekShifts.day_start, am_end: '—', pm_start: '—', pm_end: weekShifts.day_end
-                            });
-                        }
-                        if (hasNightShift) {
-                            const label = isFriday ? 'Ramadan Friday Night Shift' : 'Ramadan Night Shift';
-                            shiftsToCreate.push({
-                                project_id: projectId, attendance_id: attendanceId, date: dateStr,
-                                effective_from: dateStr, effective_to: dateStr, is_friday_shift: isFriday,
-                                is_single_shift: true, applicable_days: label,
-                                am_start: weekShifts.night_start, am_end: '—', pm_start: '—', pm_end: weekShifts.night_end
-                            });
-                        }
+                    } else if (hasDayShift) {
+                        // ONLY day/S1 shift → Single shift (2 time points: punch in + punch out)
+                        const label = isFriday 
+                            ? 'Ramadan Friday Day Shift' 
+                            : (isAlMaraghiAutomotive ? 'Ramadan Day Shift' : 'Ramadan Day Shift');
+                        shiftsToCreate.push({
+                            project_id: projectId, attendance_id: attendanceId, date: dateStr,
+                            effective_from: dateStr, effective_to: dateStr, is_friday_shift: isFriday,
+                            is_single_shift: true, applicable_days: label,
+                            am_start: weekShifts.day_start, am_end: '—', pm_start: '—', pm_end: weekShifts.day_end
+                        });
+                    } else if (hasNightShift) {
+                        // ONLY night/S2 shift → Single shift (2 time points: punch in + punch out)
+                        const label = isFriday 
+                            ? 'Ramadan Friday Night Shift' 
+                            : (isAlMaraghiAutomotive ? 'Ramadan Night Shift' : 'Ramadan Night Shift');
+                        shiftsToCreate.push({
+                            project_id: projectId, attendance_id: attendanceId, date: dateStr,
+                            effective_from: dateStr, effective_to: dateStr, is_friday_shift: isFriday,
+                            is_single_shift: true, applicable_days: label,
+                            am_start: weekShifts.night_start, am_end: '—', pm_start: '—', pm_end: weekShifts.night_end
+                        });
                     }
                 }
             }
