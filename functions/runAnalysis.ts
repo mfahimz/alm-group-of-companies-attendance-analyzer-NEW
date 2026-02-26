@@ -925,8 +925,11 @@ Deno.serve(async (req) => {
                 const prevDateStr = prevDateObj.toISOString().split('T')[0];
                 
                 let prevShiftEndsNearMidnight = false;
-                if (prevDateStr >= date_from) {
+                {
                     // Check if previous day had a shift ending near midnight
+                    // NOTE: We check even if prevDateStr < date_from because the day BEFORE
+                    // the project start can still have a midnight-ending shift whose punch-out
+                    // bleeds into the first project day
                     // IMPORTANT: Check ALL shift types - date-specific (including Ramadan) AND general shifts
                     const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
                     const prevGeneralShifts = employeeShifts.filter(s => !s.date);
