@@ -189,10 +189,13 @@ Deno.serve(async (req) => {
                     }
                 } else {
                     // STANDARD LOGIC (all other companies, and Al Maraghi Friday shifts)
+                    const hasDayShift = activeShifts.includes('day') && weekShifts.day_start && weekShifts.day_end;
+                    const hasNightShift = activeShifts.includes('night') && weekShifts.night_start && weekShifts.night_end;
+                    const hasBothShifts = hasDayShift && hasNightShift;
                     
-                    // Create day shift if active
-                    if (activeShifts.includes('day') && weekShifts.day_start && weekShifts.day_end) {
-                        const label = isFriday ? 'Ramadan Friday Day Shift' : 'Ramadan Day Shift';
+                    if (hasBothShifts) {
+                        // BOTH day and night: Create a single combined 4-point shift record
+                        const label = isFriday ? 'Ramadan Friday Combined Shift' : 'Ramadan Combined Shift';
                         const shiftKey = `${attendanceId}|${dateStr}|${label}`;
                         
                         if (existingShiftMap.has(shiftKey)) {
@@ -205,38 +208,62 @@ Deno.serve(async (req) => {
                                 effective_from: dateStr,
                                 effective_to: dateStr,
                                 is_friday_shift: isFriday,
-                                is_single_shift: true,
+                                is_single_shift: false,
                                 applicable_days: label,
                                 am_start: weekShifts.day_start,
-                                am_end: '—',
-                                pm_start: '—',
-                                pm_end: weekShifts.day_end
-                            });
-                        }
-                    }
-
-                    // Create night shift if active
-                    if (activeShifts.includes('night') && weekShifts.night_start && weekShifts.night_end) {
-                        const label = isFriday ? 'Ramadan Friday Night Shift' : 'Ramadan Night Shift';
-                        const shiftKey = `${attendanceId}|${dateStr}|${label}`;
-                        
-                        if (existingShiftMap.has(shiftKey)) {
-                            skippedDuplicates.push(shiftKey);
-                        } else {
-                            shiftsToCreate.push({
-                                project_id: projectId,
-                                attendance_id: attendanceId,
-                                date: dateStr,
-                                effective_from: dateStr,
-                                effective_to: dateStr,
-                                is_friday_shift: isFriday,
-                                is_single_shift: true,
-                                applicable_days: label,
-                                am_start: weekShifts.night_start,
-                                am_end: '—',
-                                pm_start: '—',
+                                am_end: weekShifts.day_end,
+                                pm_start: weekShifts.night_start,
                                 pm_end: weekShifts.night_end
                             });
+                        }
+                    } else {
+                        // Only day OR only night: single shift
+                        if (hasDayShift) {
+                            const label = isFriday ? 'Ramadan Friday Day Shift' : 'Ramadan Day Shift';
+                            const shiftKey = `${attendanceId}|${dateStr}|${label}`;
+                            
+                            if (existingShiftMap.has(shiftKey)) {
+                                skippedDuplicates.push(shiftKey);
+                            } else {
+                                shiftsToCreate.push({
+                                    project_id: projectId,
+                                    attendance_id: attendanceId,
+                                    date: dateStr,
+                                    effective_from: dateStr,
+                                    effective_to: dateStr,
+                                    is_friday_shift: isFriday,
+                                    is_single_shift: true,
+                                    applicable_days: label,
+                                    am_start: weekShifts.day_start,
+                                    am_end: '—',
+                                    pm_start: '—',
+                                    pm_end: weekShifts.day_end
+                                });
+                            }
+                        }
+
+                        if (hasNightShift) {
+                            const label = isFriday ? 'Ramadan Friday Night Shift' : 'Ramadan Night Shift';
+                            const shiftKey = `${attendanceId}|${dateStr}|${label}`;
+                            
+                            if (existingShiftMap.has(shiftKey)) {
+                                skippedDuplicates.push(shiftKey);
+                            } else {
+                                shiftsToCreate.push({
+                                    project_id: projectId,
+                                    attendance_id: attendanceId,
+                                    date: dateStr,
+                                    effective_from: dateStr,
+                                    effective_to: dateStr,
+                                    is_friday_shift: isFriday,
+                                    is_single_shift: true,
+                                    applicable_days: label,
+                                    am_start: weekShifts.night_start,
+                                    am_end: '—',
+                                    pm_start: '—',
+                                    pm_end: weekShifts.night_end
+                                });
+                            }
                         }
                     }
                 }
