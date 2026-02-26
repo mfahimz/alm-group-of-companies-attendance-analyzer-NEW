@@ -89,17 +89,39 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Idempotency check: fetch existing Ramadan shifts for this project
+        // Fetch existing Ramadan shifts for this project
         const existingShifts = await base44.asServiceRole.entities.ShiftTiming.filter({ 
             project_id: projectId 
         });
+        
+        // If forceResync, delete ALL existing Ramadan shifts in the overlap range first
+        if (forceResync) {
+            const ramadanShiftsToDelete = existingShifts.filter(s => 
+                s.applicable_days?.includes('Ramadan') &&
+                s.date >= startDate.toISOString().split('T')[0] &&
+                s.date <= endDate.toISOString().split('T')[0]
+            );
+            
+            console.log(`[applyRamadanShifts] forceResync: Deleting ${ramadanShiftsToDelete.length} existing Ramadan shifts`);
+            
+            const deleteBatchSize = 50;
+            for (let i = 0; i < ramadanShiftsToDelete.length; i += deleteBatchSize) {
+                const batch = ramadanShiftsToDelete.slice(i, i + deleteBatchSize);
+                for (const shift of batch) {
+                    await base44.asServiceRole.entities.ShiftTiming.delete(shift.id);
+                }
+            }
+        }
+        
         // For idempotency, track attendance_id|date|shiftType to allow both day+night on same date
         const existingShiftMap = new Set();
-        existingShifts.forEach(shift => {
-            if (shift.applicable_days?.includes('Ramadan')) {
-                existingShiftMap.add(`${shift.attendance_id}|${shift.date}|${shift.applicable_days}`);
-            }
-        });
+        if (!forceResync) {
+            existingShifts.forEach(shift => {
+                if (shift.applicable_days?.includes('Ramadan')) {
+                    existingShiftMap.add(`${shift.attendance_id}|${shift.date}|${shift.applicable_days}`);
+                }
+            });
+        }
 
         // Generate shift timings for Ramadan period
         const shiftsToCreate = [];
