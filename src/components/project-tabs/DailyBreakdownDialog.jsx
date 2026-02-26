@@ -456,14 +456,21 @@ export default function DailyBreakdownDialog({
                 earlyCheckoutInfo = `${Math.abs(exceptionEarlyMinutes)} min (from exception)`;
             }
 
+            // Count punches that actually belong to THIS date (exclude crossover from next day)
+            const ownDatePunchCount = rawDayPunches.filter(p => p.punch_date === dateStr).length;
+            const crossoverPunchCount = rawDayPunches.filter(p => p.punch_date === nextDateStr).length;
+
             breakdown.push({
                 date: formatDate(dateStr),
                 dateStr,
-                punches: rawDayPunches.length,
+                punches: ownDatePunchCount,
+                crossoverPunches: crossoverPunchCount,
+                shiftEndsNearMidnight,
                 punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
                 punchTimesShort: dayPunches.map(p => extractTime(p.timestamp_raw)).join(', '),
                 allPunchTimes: rawDayPunches.map(p => p.timestamp_raw).join(', '),
                 punchObjects: dayPunches,
+                nextDateStr,
                 shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
                 exception: dateException ? dateException.type : '-',
                 status,
