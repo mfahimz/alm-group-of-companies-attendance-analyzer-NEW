@@ -400,7 +400,12 @@ Deno.serve(async (req) => {
                 }
             }
 
-            const sortedPunches = deduped.sort((a, b) => a.time - b.time);
+            // Sort punches - preserve the original order from dayPunches which already handles midnight crossover
+            const sortedPunches = deduped.sort((a, b) => {
+                const aIdx = punchList.findIndex(p => p.id === a.id);
+                const bIdx = punchList.findIndex(p => p.id === b.id);
+                return aIdx - bIdx;
+            });
             return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
         };
 
