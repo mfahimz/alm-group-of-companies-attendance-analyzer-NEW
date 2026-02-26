@@ -975,7 +975,7 @@ Deno.serve(async (req) => {
                 let punchMatches = [];
                 let hasUnmatchedPunch = false;
                 if (shift && filteredPunches.length > 0 && !hasSkipPunchApplied) {
-                    punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds);
+                    punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
                     hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 }
                 
