@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { projectId, ramadanScheduleId, ramadanFrom, ramadanTo } = await req.json();
+        const { projectId, ramadanScheduleId, ramadanFrom, ramadanTo, forceResync } = await req.json();
 
         if (!projectId || !ramadanScheduleId) {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
