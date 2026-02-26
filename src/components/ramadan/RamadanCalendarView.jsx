@@ -227,7 +227,7 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
                                                     <div className="grid grid-cols-7 gap-1">
                                                         {monthGroup.days.map((day, dayIdx) => {
                                                             const shift = getShiftForDay(emp.attendance_id, day.weekLabel, day.isFriday);
-                                                            const shiftText = formatShift(shift);
+                                                            const shiftText = formatShift(shift, day.isFriday);
                                                             
                                                             return (
                                                                 <div
