@@ -909,16 +909,6 @@ Deno.serve(async (req) => {
                 const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
                 
                 // ================================================================
-                const MIDNIGHT_BUFFER_MINUTES = 60; // 12:00 AM to 1:00 AM
-
-                const isWithinMidnightBuffer = (timestampRaw: string) => {
-                    const parsed = parseTime(timestampRaw, includeSeconds);
-                    if (!parsed) return false;
-
-                    const minutesSinceMidnight = (parsed.getHours() * 60) + parsed.getMinutes();
-                    return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
-                };
-
                 // MIDNIGHT SHIFT FIX: Collect punches for this date
                 // If shift ends at or near midnight (12:00 AM / 00:00), 
                 // also include early-morning punches from the NEXT day
