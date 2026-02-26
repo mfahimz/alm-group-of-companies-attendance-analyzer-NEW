@@ -1013,7 +1013,7 @@ Deno.serve(async (req) => {
                     
                     // Include next-day punches that are within 60 minutes of midnight
                     // (i.e., punches between 12:00 AM and 1:00 AM)
-                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw));
+                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
                     
                     if (midnightCrossoverPunches.length > 0) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Found ${midnightCrossoverPunches.length} crossover punch(es) from next day ${nextDateStr}`);
