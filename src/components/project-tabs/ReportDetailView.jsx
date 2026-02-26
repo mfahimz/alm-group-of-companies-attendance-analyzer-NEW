@@ -1939,172 +1939,22 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 </CardContent>
             </Card>
 
-            <Dialog open={showBreakdown} onOpenChange={setShowBreakdown}>
-                <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Daily Breakdown: {selectedEmployee?.attendance_id} - {selectedEmployee?.name}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="mt-4">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Punches</TableHead>
-                                    <TableHead>Punch Times</TableHead>
-                                    <TableHead>Shift</TableHead>
-                                    <TableHead>Exception</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Late Min</TableHead>
-                                     <TableHead>Early Min</TableHead>
-                                     <TableHead>Other Min</TableHead>
-                                     <TableHead>Abnormal</TableHead>
-                                     <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {getDailyBreakdown.map((day, idx) => (
-                                   <TableRow key={idx} className={`${day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
-                                        <TableCell className="font-medium">{day.date}</TableCell>
-                                        <TableCell>{day.punches}</TableCell>
-                                        <TableCell className="text-xs max-w-xs">
-                                            <div title={day.allPunchTimes || day.punchTimes}>
-                                                {day.punchMatches && day.punchMatches.length > 0 ? (
-                                                    <div className="space-y-0.5">
-                                                        {day.punchMatches.map((match, matchIdx) => {
-                                                           const extractTime = (ts) => {
-                                                               // For Al Maraghi Automotive: Handle seconds in timestamp (HH:MM:SS AM/PM)
-                                                               if (project.company === 'Al Maraghi Automotive') {
-                                                                   const matchWithSeconds = ts.match(/(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))/i);
-                                                                   if (matchWithSeconds) return matchWithSeconds[1];
-                                                               }
-                                                               // Standard format with AM/PM
-                                                               const timeMatch = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
-                                                               if (timeMatch) return timeMatch[1];
-                                                               
-                                                               // Handle format like "12/29/2025 8:41" (date + 24hr time)
-                                                               const dateTimeMatch = ts.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})/);
-                                                               if (dateTimeMatch) {
-                                                                   let hours = parseInt(dateTimeMatch[1]);
-                                                                   const minutes = dateTimeMatch[2];
-                                                                   const period = hours >= 12 ? 'PM' : 'AM';
-                                                                   if (hours > 12) hours -= 12;
-                                                                   if (hours === 0) hours = 12;
-                                                                   return `${hours}:${minutes} ${period}`;
-                                                               }
-                                                               
-                                                               return ts;
-                                                           };
-                                                           return (
-                                                                <div key={matchIdx} className="flex items-center gap-1">
-                                                                    <span className={match.matchedTo ? (match.isFarExtendedMatch ? 'text-red-600 font-bold' : match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') : 'text-red-600 font-bold'}>
-                                                                        {extractTime(match.punch.timestamp_raw)}
-                                                                    </span>
-                                                                    {match.matchedTo && (
-                                                                        <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : 'text-slate-500'}`}>
-                                                                            →{match.matchedTo.replace(/_/g, ' ')}
-                                                                            {match.isFarExtendedMatch && ' 🔴'}
-                                                                            {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
-                                                                        </span>
-                                                                    )}
-                                                                    {!match.matchedTo && (
-                                                                        <span className="text-[9px] text-red-600 font-bold">
-                                                                            🔴 NO MATCH
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                ) : (
-                                                    <>{day.punchTimesShort || '-'}</>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-xs">{day.shift}</TableCell>
-                                        <TableCell className="text-xs">{day.exception}</TableCell>
-                                        <TableCell>
-                                            <div>
-                                                <span className={`
-                                                    px-2 py-1 rounded text-xs font-medium
-                                                    ${day.status.includes('Present') && !day.status.includes('Half') ? 'bg-green-100 text-green-700' : ''}
-                                                    ${day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
-                                                    ${day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
-                                                    ${day.status.includes('Off') ? 'bg-slate-100 text-slate-700' : ''}
-                                                `}>
-                                                    {day.status}
-                                                </span>
-                                                {day.partialDayReason && (
-                                                    <span className="text-amber-600 block text-[10px] mt-1">
-                                                        {day.partialDayReason}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                           {day.lateMinutesTotal > 0 ? (
-                                               <span className="text-orange-600 font-medium">{Math.max(0, day.lateMinutesTotal)} min</span>
-                                           ) : (
-                                               <span className="text-slate-400">-</span>
-                                           )}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                           {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
-                                               <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
-                                           ) : (
-                                               <span className="text-slate-400">-</span>
-                                           )}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                           {day.otherMinutes > 0 ? (
-                                               <span className="text-purple-600 font-medium">{Math.max(0, day.otherMinutes)} min</span>
-                                           ) : (
-                                               <span className="text-slate-400">-</span>
-                                           )}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                            {day.abnormal && (
-                                                <span className="text-amber-600 font-medium">Yes</span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                           {project.status !== 'closed' && (
-                                               <Button
-                                                   size="sm"
-                                                   variant="ghost"
-                                                   onClick={() => setEditingDay(day)}
-                                               >
-                                                   <Edit className="w-4 h-4 text-indigo-600" />
-                                               </Button>
-                                           )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            <EditDayRecordDialog
-                open={!!editingDay}
-                onClose={() => setEditingDay(null)}
-                onSave={() => {
-                    queryClient.invalidateQueries(['results', reportRun.id]);
-                }}
-                dayRecord={editingDay}
+            <DailyBreakdownDialog
+                open={showBreakdown}
+                onOpenChange={setShowBreakdown}
+                selectedEmployee={selectedEmployee}
+                enrichedResults={enrichedResults}
+                punches={punches}
+                shifts={shifts}
+                exceptions={exceptions}
+                employees={employees}
+                reportRun={reportRun}
                 project={project}
-                attendanceId={selectedEmployee?.attendance_id}
-                analysisResult={selectedEmployee}
-                dailyBreakdownData={{ 
-                    [selectedEmployee?.attendance_id]: { 
-                        daily_details: getDailyBreakdown.reduce((acc, day) => ({ 
-                            ...acc, 
-                            [day.dateStr]: { punches: day.punchObjects || [] } 
-                        }), {}) 
-                    } 
-                }}
+                parseTime={parseTime}
+                formatTime={formatTime}
+                matchPunchesToShiftPoints={matchPunchesToShiftPoints}
+                detectPartialDay={detectPartialDay}
+                filterMultiplePunches={filterMultiplePunches}
             />
 
             <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && setEditingGraceMinutes(null)}>
