@@ -943,9 +943,12 @@ Deno.serve(async (req) => {
                 }
                 
                 // Determine if this shift ends near midnight
+                // For single shifts: end time is in pm_end (am_start → pm_end)
+                // For combined shifts: end time is in pm_end (night shift end)
                 let shiftEndsNearMidnight = false;
                 if (shift) {
-                    const pmEndTime = parseTime(shift.pm_end || shift.am_end, includeSeconds);
+                    const endTimeStr = shift.pm_end;
+                    const pmEndTime = parseTime(endTimeStr, includeSeconds);
                     if (pmEndTime) {
                         const endHour = pmEndTime.getHours();
                         const endMinute = pmEndTime.getMinutes();
