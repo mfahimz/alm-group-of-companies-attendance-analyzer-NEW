@@ -863,12 +863,73 @@ Deno.serve(async (req) => {
                 const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
                 const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
                 
-                const dayPunches = employeePunches
-                    .filter(p => p.punch_date === dateStr)
-                    .sort((a, b) => {
+                // ================================================================
+                // MIDNIGHT SHIFT FIX: Collect punches for this date
+                // If shift ends at or near midnight (12:00 AM / 00:00), 
+                // also include early-morning punches from the NEXT day
+                // that are actually the punch-out for THIS day's shift.
+                // ================================================================
+                const nextDateObj = new Date(currentDate);
+                nextDateObj.setDate(nextDateObj.getDate() + 1);
+                const nextDateStr = nextDateObj.toISOString().split('T')[0];
+                
+                // Determine if this shift ends near midnight
+                let shiftEndsNearMidnight = false;
+                if (shift) {
+                    const pmEndTime = parseTime(shift.pm_end || shift.am_end, includeSeconds);
+                    if (pmEndTime) {
+                        const endHour = pmEndTime.getHours();
+                        const endMinute = pmEndTime.getMinutes();
+                        // Shift ends near midnight if pm_end is 11:00 PM - 11:59 PM or exactly 12:00 AM (0:00)
+                        if (endHour === 23 || (endHour === 0 && endMinute === 0)) {
+                            shiftEndsNearMidnight = true;
+                        }
+                    }
+                }
+                
+                // Get punches for this date
+                let dayPunches = employeePunches
+                    .filter(p => p.punch_date === dateStr);
+                
+                // If shift ends near midnight, also grab early-morning punches from next day
+                // These are punch-outs that crossed midnight (e.g., 12:05 AM, 12:15 AM, 12:30 AM)
+                if (shiftEndsNearMidnight) {
+                    // Get punches from next day - check both main punches and next-day overflow
+                    const nextDayAllPunches = [
+                        ...employeePunches.filter(p => p.punch_date === nextDateStr),
+                        ...nextDayPunches.filter(p => p.punch_date === nextDateStr)
+                    ];
+                    
+                    // Deduplicate by punch id
+                    const seenIds = new Set(dayPunches.map(p => p.id));
+                    const uniqueNextDayPunches = nextDayAllPunches.filter(p => !seenIds.has(p.id));
+                    
+                    // Only include next-day punches that are within 60 minutes of midnight
+                    // (i.e., punches between 12:00 AM and 1:00 AM)
+                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => {
+                        const pTime = parseTime(p.timestamp_raw, includeSeconds);
+                        if (!pTime) return false;
+                        const pHour = pTime.getHours();
+                        // Include punches from 12:00 AM to 1:00 AM (hour 0)
+                        return pHour === 0;
+                    });
+                    
+                    if (midnightCrossoverPunches.length > 0) {
+                        console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Found ${midnightCrossoverPunches.length} crossover punch(es) from next day ${nextDateStr}`);
+                        dayPunches = [...dayPunches, ...midnightCrossoverPunches];
+                    }
+                }
+                
+                dayPunches = dayPunches.sort((a, b) => {
                         const timeA = parseTime(a.timestamp_raw, includeSeconds);
                         const timeB = parseTime(b.timestamp_raw, includeSeconds);
-                        return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                        // For midnight crossover, punches from next day (hour 0) should sort AFTER today's punches
+                        // We adjust by adding 24h offset if the punch is from the next day
+                        const aIsNextDay = a.punch_date === nextDateStr;
+                        const bIsNextDay = b.punch_date === nextDateStr;
+                        const aTime = (timeA?.getTime() || 0) + (aIsNextDay ? 24 * 60 * 60 * 1000 : 0);
+                        const bTime = (timeB?.getTime() || 0) + (bIsNextDay ? 24 * 60 * 60 * 1000 : 0);
+                        return aTime - bTime;
                     });
 
                 let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
