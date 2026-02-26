@@ -762,18 +762,19 @@ export default function SalaryReportDetail() {
                                 <thead className="sticky top-0 z-10">
                                     {/* Group Header Row */}
                                     <tr className="border-b border-slate-300">
-                                        <th colSpan={11} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
+                                        <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
+                                        <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                                         <th colSpan={10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
                                         <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                                         <th colSpan={4} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
-                                        <th className="px-2 py-1.5 bg-slate-100"></th>
+                                        <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                                     </tr>
                                     {/* Column Header Row */}
                                     <tr className="border-b border-slate-300 bg-slate-50">
-                                        {/* Employee Info Group */}
-                                        <TableHead className="w-8 bg-slate-50 px-1">✓</TableHead>
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">ID</SortableTableHead>
-                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Name</SortableTableHead>
+                                        {/* Sticky Left: Checkbox, ID, Name */}
+                                        <TableHead className="w-8 bg-slate-100 px-1 sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">✓</TableHead>
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[32px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">ID</SortableTableHead>
+                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[82px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-300">Name</SortableTableHead>
                                         <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Basic</SortableTableHead>
                                         <SortableTableHead sortKey="allowances" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.</SortableTableHead>
                                         <SortableTableHead sortKey="allowances_with_bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.+B</SortableTableHead>
@@ -807,7 +808,7 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">WPS</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Balance</SortableTableHead>
                                         <TableHead className="whitespace-nowrap bg-indigo-50 px-2 text-center border-r border-slate-300">Cap</TableHead>
-                                        <TableHead className="whitespace-nowrap bg-slate-50 px-1 text-center">👁</TableHead>
+                                        <TableHead className="whitespace-nowrap bg-slate-100 px-1 text-center sticky right-0 z-20 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">👁</TableHead>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -823,16 +824,16 @@ export default function SalaryReportDetail() {
                                         const cellBase = `px-2 py-1.5 align-middle text-xs tabular-nums`;
                                         return (
                                             <tr key={row.hrms_id} className={`border-b border-slate-100 hover:bg-blue-50/40 transition-colors ${stripe}`}>
-                                                {/* Employee Info */}
-                                                <td className={`${cellBase} px-1`}>
+                                                {/* Sticky Left: Checkbox, ID, Name */}
+                                                <td className={`${cellBase} px-1 sticky left-0 z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
                                                     <Checkbox
                                                         checked={row.isVerified}
                                                         onCheckedChange={() => toggleVerification(row.attendance_id)}
                                                         className="h-3.5 w-3.5"
                                                     />
                                                 </td>
-                                                <td className={`${cellBase} font-medium text-slate-700`}>{row.attendance_id}</td>
-                                                <td className={`${cellBase} font-medium text-slate-800`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
+                                                <td className={`${cellBase} font-medium text-slate-700 sticky left-[32px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
+                                                <td className={`${cellBase} font-medium text-slate-800 sticky left-[82px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
                                                 <td className={`${cellBase} text-slate-500`}>{Math.round(row.basic_salary || 0)}</td>
                                                 <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances || 0)}</td>
                                                 <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances_with_bonus || 0)}</td>
@@ -943,7 +944,7 @@ export default function SalaryReportDetail() {
                                                         <span className="text-slate-300">—</span>
                                                     )}
                                                 </td>
-                                                <td className={`${cellBase} text-center`}>
+                                                <td className={`${cellBase} text-center sticky right-0 z-10 ${stripe} shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
