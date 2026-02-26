@@ -993,14 +993,16 @@ Deno.serve(async (req) => {
                     const seenIds = new Set(dayPunches.map(p => p.id));
                     const uniqueNextDayPunches = nextDayAllPunches.filter(p => !seenIds.has(p.id));
                     
-                    // Only include next-day punches that are within 60 minutes of midnight
-                    // (i.e., punches between 12:00 AM and 1:00 AM)
+                    // Include next-day punches that are within ~90 minutes of midnight
+                    // (i.e., punches between 12:00 AM and 1:30 AM)
+                    // This covers late punch-outs like 12:15 AM, 12:30 AM, 12:45 AM, 1:00 AM
                     const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => {
                         const pTime = parseTime(p.timestamp_raw, includeSeconds);
                         if (!pTime) return false;
                         const pHour = pTime.getHours();
-                        // Include punches from 12:00 AM to 1:00 AM (hour 0)
-                        return pHour === 0;
+                        const pMin = pTime.getMinutes();
+                        // Include punches from 12:00 AM to 1:30 AM
+                        return pHour === 0 || (pHour === 1 && pMin <= 30);
                     });
                     
                     if (midnightCrossoverPunches.length > 0) {
