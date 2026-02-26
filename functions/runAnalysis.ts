@@ -952,6 +952,10 @@ Deno.serve(async (req) => {
                     }
                 }
                 
+                if (prevShiftEndsNearMidnight) {
+                    console.log(`[runAnalysis] MIDNIGHT DETECT: Employee ${attendanceIdStr}, Date ${dateStr}: Previous day (${prevDateStr}) shift ends near midnight → will exclude early AM punches`);
+                }
+                
                 // Determine if this shift ends near midnight
                 // For single shifts: end time is in pm_end (am_start → pm_end)
                 // For combined shifts: end time is in pm_end (night shift end)
