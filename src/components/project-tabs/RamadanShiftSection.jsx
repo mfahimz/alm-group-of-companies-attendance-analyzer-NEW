@@ -217,25 +217,23 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                             <Eye className="w-4 h-4 mr-2" />Preview
                         </Button>
 
-                        {!ramadanShiftsApplied ? (
+                        {ramadanShiftsApplied && (
                             <Button
-                                onClick={handleApply}
-                                disabled={!selectedRamadanSchedule || isBusy}
-                                className="bg-purple-600 hover:bg-purple-700"
+                                onClick={handleUndo}
+                                disabled={isBusy}
+                                variant="destructive"
                             >
-                                {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : <><Play className="w-4 h-4 mr-2" />Apply Ramadan Shifts</>}
+                                {undoing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Removing...</> : <><Undo2 className="w-4 h-4 mr-2" />Undo Ramadan Shifts ({ramadanShiftCount})</>}
                             </Button>
-                        ) : (
-                            <>
-                                <Button
-                                    onClick={handleUndo}
-                                    disabled={isBusy}
-                                    variant="destructive"
-                                >
-                                    {undoing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Removing...</> : <><Undo2 className="w-4 h-4 mr-2" />Undo Ramadan Shifts</>}
-                                </Button>
-                            </>
                         )}
+
+                        <Button
+                            onClick={handleApply}
+                            disabled={!selectedRamadanSchedule || isBusy || ramadanShiftsApplied}
+                            className={ramadanShiftsApplied ? "bg-green-600 hover:bg-green-700" : "bg-purple-600 hover:bg-purple-700"}
+                        >
+                            {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : ramadanShiftsApplied ? <><Play className="w-4 h-4 mr-2" />Already Applied</> : <><Play className="w-4 h-4 mr-2" />Apply Ramadan Shifts</>}
+                        </Button>
                     </div>
 
                     {/* Info box when applied */}
