@@ -111,8 +111,13 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
             });
             if (result.data.success) {
                 queryClient.invalidateQueries(['shifts', project.id]);
-                const action = forceResync ? 'Re-synced' : 'Applied';
-                toast.success(`${action}: ${result.data.shiftsCreated} shifts created`);
+                const d = result.data;
+                const parts = [];
+                if (d.shiftsCreated > 0) parts.push(`${d.shiftsCreated} created`);
+                if (d.shiftsUpdated > 0) parts.push(`${d.shiftsUpdated} updated`);
+                if (d.shiftsDeleted > 0) parts.push(`${d.shiftsDeleted} removed`);
+                if (d.shiftsUnchanged > 0) parts.push(`${d.shiftsUnchanged} unchanged`);
+                toast.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Ramadan shifts applied');
                 setShowRamadanPreview(false);
             } else {
                 toast.error('Failed to apply Ramadan shifts');
