@@ -743,12 +743,14 @@ Deno.serve(async (req) => {
                 
                 if (ramadanDateShifts.length > 0) {
                     if (ramadanDateShifts.length === 1) {
-                        // Single Ramadan shift (day only OR night only OR Al Maraghi S1/S2)
+                        // Single Ramadan shift record — could be:
+                        // 1. "Combined Shift" (is_single_shift=false, has 4 time points)
+                        // 2. "Day Shift" only (is_single_shift=true, has 2 time points)
+                        // 3. "Night Shift" only (is_single_shift=true, has 2 time points)
                         ramadanShift = ramadanDateShifts[0];
                     } else {
                         // Multiple Ramadan shifts on same day — merge day + night into 4-point shift
-                        // Convention: Day shift uses am_start/pm_end, Night shift uses am_start/pm_end
-                        // After merge: am_start=day_start, am_end=day_end, pm_start=night_start, pm_end=night_end
+                        // This handles LEGACY data where day and night were stored as separate records
                         const dayShift = ramadanDateShifts.find(s => 
                             s.applicable_days?.includes('Day') || s.applicable_days?.includes('S1')
                         );
@@ -768,7 +770,7 @@ Deno.serve(async (req) => {
                                 _merged: true
                             };
                         } else {
-                            // Fallback: just use the first one
+                            // Only one type found among multiple records — use the first one
                             ramadanShift = ramadanDateShifts[0];
                         }
                     }
