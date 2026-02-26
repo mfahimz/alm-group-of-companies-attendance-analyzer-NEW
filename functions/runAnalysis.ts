@@ -390,6 +390,16 @@ Deno.serve(async (req) => {
             return { isPartial: false, reason: null };
         };
 
+        // MIDNIGHT BUFFER: Helper to check if a punch timestamp falls within the midnight buffer window
+        // (i.e., between 12:00 AM and 1:00 AM = 60 minutes after midnight)
+        const MIDNIGHT_BUFFER_MINUTES = 60;
+        const isWithinMidnightBuffer = (timestampRaw, includeSecondsFlag) => {
+            const parsed = parseTime(timestampRaw, includeSecondsFlag);
+            if (!parsed) return false;
+            const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
+            return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
+        };
+
         const filterMultiplePunches = (punchList, shift, includeSeconds = false) => {
             if (punchList.length <= 1) return punchList;
 
