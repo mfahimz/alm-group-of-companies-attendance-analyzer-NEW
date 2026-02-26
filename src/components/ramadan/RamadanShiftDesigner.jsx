@@ -140,53 +140,12 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
 
     const updateMutation = useMutation({
         mutationFn: async (data) => {
-            // Update the Ramadan schedule
+            // Update the Ramadan schedule only - projects must use "Sync" button to re-apply
             await base44.entities.RamadanSchedule.update(schedule.id, data);
-            
-            // Also update any applied ShiftTiming records in projects
-            try {
-                const allShifts = await base44.entities.ShiftTiming.filter({});
-                const ramadanShifts = allShifts.filter(s => 
-                    s.applicable_days?.includes('Ramadan') &&
-                    s.date >= schedule.ramadan_start_date &&
-                    s.date <= schedule.ramadan_end_date
-                );
-                
-                // Group by project and re-apply
-                const projectIds = [...new Set(ramadanShifts.map(s => s.project_id))];
-                
-                for (const projectId of projectIds) {
-                    // Get project details
-                    const projects = await base44.entities.Project.filter({ id: projectId });
-                    if (projects.length === 0) continue;
-                    const project = projects[0];
-                    
-                    // Calculate overlap
-                    const projectStart = new Date(project.date_from);
-                    const projectEnd = new Date(project.date_to);
-                    const ramadanStart = new Date(schedule.ramadan_start_date);
-                    const ramadanEnd = new Date(schedule.ramadan_end_date);
-                    const overlapStart = new Date(Math.max(projectStart, ramadanStart));
-                    const overlapEnd = new Date(Math.min(projectEnd, ramadanEnd));
-                    
-                    if (overlapStart <= overlapEnd) {
-                        // Re-apply Ramadan shifts
-                        await base44.functions.invoke('applyRamadanShifts', {
-                            projectId,
-                            ramadanScheduleId: schedule.id,
-                            ramadanFrom: overlapStart.toISOString().split('T')[0],
-                            ramadanTo: overlapEnd.toISOString().split('T')[0]
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error updating applied shifts:', error);
-            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['ramadanSchedules']);
-            queryClient.invalidateQueries(['shifts']);
-            toast.success('Ramadan shifts updated across all projects');
+            toast.success('Ramadan schedule saved. Use "Sync from Ramadan Schedule" in each project to apply changes.');
         }
     });
 
