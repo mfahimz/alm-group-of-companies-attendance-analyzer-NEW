@@ -100,16 +100,26 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
         return days;
     }, [schedule]);
 
-    const formatShift = (shift) => {
+    const formatShift = (shift, isFriday = false) => {
         if (!shift) return '—';
         const activeShifts = shift.active_shifts || [];
         const parts = [];
         
-        if (activeShifts.includes('day') && shift.day_start && shift.day_end) {
-            parts.push(`D: ${shift.day_start}-${shift.day_end}`);
-        }
-        if (activeShifts.includes('night') && shift.night_start && shift.night_end) {
-            parts.push(`N: ${shift.night_start}-${shift.night_end}`);
+        if (isAlMaraghiAutomotive && !isFriday) {
+            // Al Maraghi Automotive non-Friday: S1 and S2 both store times in day_start/day_end
+            if (activeShifts.includes('day') && shift.day_start && shift.day_end) {
+                parts.push(`S1: ${shift.day_start}-${shift.day_end}`);
+            } else if (activeShifts.includes('night') && shift.day_start && shift.day_end) {
+                parts.push(`S2: ${shift.day_start}-${shift.day_end}`);
+            }
+        } else {
+            // Standard companies (and Al Maraghi Friday): day in day_start/day_end, night in night_start/night_end
+            if (activeShifts.includes('day') && shift.day_start && shift.day_end) {
+                parts.push(`D: ${shift.day_start}-${shift.day_end}`);
+            }
+            if (activeShifts.includes('night') && shift.night_start && shift.night_end) {
+                parts.push(`N: ${shift.night_start}-${shift.night_end}`);
+            }
         }
         
         return parts.length > 0 ? parts.join(' | ') : '—';
