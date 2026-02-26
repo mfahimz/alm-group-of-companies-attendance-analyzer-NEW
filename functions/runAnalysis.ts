@@ -1041,11 +1041,16 @@ Deno.serve(async (req) => {
                     hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 }
                 
+                // SINGLE SHIFT DETECTION: Check both the flag AND the actual time fields
+                // A shift is single if:
+                //   1. is_single_shift flag is true, OR
+                //   2. The middle time fields (am_end, pm_start) are empty/dash (only 2 time points exist)
                 const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
-                                       shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+                                       String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
                                        shift.am_end !== '—' && shift.pm_start !== '—' &&
-                                       shift.am_end !== '-' && shift.pm_start !== '-';
-                const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
+                                       shift.am_end !== '-' && shift.pm_start !== '-' &&
+                                       shift.am_end !== 'null' && shift.pm_start !== 'null';
+                const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
 
                 // Skip partial day detection if SKIP_PUNCH is applied
                 // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches
