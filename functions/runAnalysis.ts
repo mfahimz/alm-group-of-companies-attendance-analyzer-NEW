@@ -429,15 +429,22 @@ Deno.serve(async (req) => {
             dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
             const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
             
+            // MIDNIGHT FIX: Include punches from 1 day BEFORE and 1 day AFTER the range
+            // - Day before: needed to check if previous day's shift ended near midnight
+            //   (those punches from 12:00-1:30 AM on the first day belong to the previous day)
+            // - Day after: needed to grab midnight crossover punch-outs from the last day
+            const dayBeforeStart = new Date(date_from);
+            dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+            const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
+            
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr && 
-                p.punch_date >= date_from && 
-                p.punch_date <= date_to
+                p.punch_date >= dayBeforeStartStr && 
+                p.punch_date <= dayAfterEndStr
             );
             
-            // Also fetch punches from the day after project end (for midnight crossover)
-            const nextDayPunches = punches.filter(p =>
-                String(p.attendance_id) === attendanceIdStr &&
+            // Separate the core-range punches (used for main iteration) and overflow punches
+            const nextDayPunches = employeePunches.filter(p =>
                 p.punch_date === dayAfterEndStr
             );
             
