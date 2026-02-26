@@ -992,7 +992,7 @@ Deno.serve(async (req) => {
                 // because those belong to the previous day's shift as punch-outs
                 if (prevShiftEndsNearMidnight) {
                     const beforeFilter = dayPunches.length;
-                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
+                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
                     if (dayPunches.length < beforeFilter) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Excluded ${beforeFilter - dayPunches.length} early AM punch(es) that belong to prev day ${prevDateStr}`);
                     }
