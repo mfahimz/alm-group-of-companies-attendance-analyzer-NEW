@@ -17,6 +17,7 @@ import TablePagination from '../ui/TablePagination';
 import BulkEditShiftDialog from '../shifts/BulkEditShiftDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import TimePicker from '../ui/TimePicker';
+import RamadanShiftSection from './RamadanShiftSection';
 
 export default function ShiftTimingsTab({ project }) {
      const [file, setFile] = useState(null);
@@ -51,11 +52,6 @@ export default function ShiftTimingsTab({ project }) {
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showCopyDialog, setShowCopyDialog] = useState(false);
     const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '' });
-    const [selectedRamadanSchedule, setSelectedRamadanSchedule] = useState(null);
-    const [showRamadanPreview, setShowRamadanPreview] = useState(false);
-    const [ramadanPreviewData, setRamadanPreviewData] = useState([]);
-    const [ramadanApplying, setRamadanApplying] = useState(false);
-    const [showRamadanShiftsView, setShowRamadanShiftsView] = useState(false);
 
     const [formData, setFormData] = useState({
         attendance_id: '',
