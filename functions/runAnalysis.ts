@@ -388,11 +388,26 @@ Deno.serve(async (req) => {
         // Analyze employee function
         const analyzeEmployee = async (attendance_id) => {
             const attendanceIdStr = String(attendance_id);
+            
+            // MIDNIGHT SHIFT FIX: Include punches from the day AFTER the project end date
+            // because shifts ending at/near midnight (e.g., 12:00 AM) will have punch-outs
+            // recorded on the next calendar day (e.g., 12:05 AM, 12:15 AM, 12:20 AM)
+            const dayAfterEnd = new Date(date_to);
+            dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+            const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
+            
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr && 
                 p.punch_date >= date_from && 
                 p.punch_date <= date_to
             );
+            
+            // Also fetch punches from the day after project end (for midnight crossover)
+            const nextDayPunches = punches.filter(p =>
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date === dayAfterEndStr
+            );
+            
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
             const employeeExceptions = exceptions.filter(e => {
                 try {
