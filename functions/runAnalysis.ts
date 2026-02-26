@@ -920,11 +920,13 @@ Deno.serve(async (req) => {
                 let prevShiftEndsNearMidnight = false;
                 if (prevDateStr >= date_from) {
                     // Check if previous day had a shift ending near midnight
+                    // IMPORTANT: Check ALL shift types - date-specific (including Ramadan) AND general shifts
                     const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
                     const prevGeneralShifts = employeeShifts.filter(s => !s.date);
+                    // Prefer date-specific shifts (which includes Ramadan shifts), fall back to general
                     const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
                     for (const ps of prevShiftCandidates) {
-                        const pEndTime = parseTime(ps.pm_end || ps.am_end, includeSeconds);
+                        const pEndTime = parseTime(ps.pm_end, includeSeconds);
                         if (pEndTime) {
                             const pEndHour = pEndTime.getHours();
                             if (pEndHour === 23 || (pEndHour === 0 && pEndTime.getMinutes() === 0)) {
