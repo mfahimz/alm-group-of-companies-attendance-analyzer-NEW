@@ -858,6 +858,13 @@ Deno.serve(async (req) => {
 
                 let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
                 
+                // Log missing shift AFTER filteredPunches is computed
+                if (!shift && filteredPunches.length > 0 && !dateException) {
+                    console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
+                    abnormal_dates_set.add(dateStr);
+                    critical_abnormal_dates_set.add(dateStr);
+                }
+                
                 // CRITICAL FIX: If SKIP_PUNCH exception exists (and not on leave), 
                 // add a fake punch so employee is NOT marked as absent or partial
                 let hasSkipPunchApplied = false;
