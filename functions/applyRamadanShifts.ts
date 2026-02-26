@@ -141,11 +141,12 @@ Deno.serve(async (req) => {
                 const dayActive = activeShifts.includes('day');
                 const nightActive = activeShifts.includes('night');
                 
-                // Primary: TIME FIELDS determine single vs combined
-                // A shift is "active" if its times are filled AND (no active_shifts array OR it's in active_shifts)
-                const hasDayShift = hasDayTimes && (activeShifts.length === 0 || dayActive);
-                const hasNightShift = hasNightTimes && (activeShifts.length === 0 || nightActive);
-                const hasBothShifts = hasDayShift && hasNightShift;
+                // Primary: TIME FIELDS are the source of truth
+                // If all 4 time fields are filled → combined shift, regardless of active_shifts checkboxes
+                // active_shifts only matters when deciding between day-only vs night-only (when only 2 fields filled)
+                const hasBothShifts = hasDayTimes && hasNightTimes;
+                const hasDayShift = hasDayTimes && !hasBothShifts && (activeShifts.length === 0 || dayActive);
+                const hasNightShift = hasNightTimes && !hasBothShifts && (activeShifts.length === 0 || nightActive);
 
                 console.log(`[applyRamadanShifts] Employee ${attendanceId}, Date ${dateStr}: dayTimes=${hasDayTimes}(${weekShifts.day_start}|${weekShifts.day_end}), nightTimes=${hasNightTimes}(${weekShifts.night_start}|${weekShifts.night_end}), activeShifts=${JSON.stringify(activeShifts)}, hasBoth=${hasBothShifts}`);
 
