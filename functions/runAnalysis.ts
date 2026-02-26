@@ -350,13 +350,17 @@ Deno.serve(async (req) => {
             return matches;
         };
 
-        const detectPartialDay = (dayPunches, shift, includeSeconds = false) => {
+        const detectPartialDay = (dayPunches, shift, includeSeconds = false, nextDateStr = null) => {
             if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
             
-            const punchesWithTime = dayPunches.map(p => ({
-                ...p,
-                time: parseTime(p.timestamp_raw, includeSeconds)
-            })).filter(p => p.time).sort((a, b) => a.time - b.time);
+            const punchesWithTime = dayPunches.map(p => {
+                const time = parseTime(p.timestamp_raw, includeSeconds);
+                if (!time) return null;
+                // MIDNIGHT FIX: Adjust time for next-day crossover punches
+                const isNextDay = nextDateStr && p.punch_date === nextDateStr;
+                const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+                return { ...p, time: adjustedTime };
+            }).filter(p => p).sort((a, b) => a.time - b.time);
             
             if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
             
@@ -364,9 +368,14 @@ Deno.serve(async (req) => {
             const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
             
             const amStart = parseTime(shift.am_start);
-            const pmEnd = parseTime(shift.pm_end);
+            let pmEnd = parseTime(shift.pm_end);
             
             if (!amStart || !pmEnd) return { isPartial: false, reason: null };
+            
+            // MIDNIGHT FIX: If shift ends at midnight, adjust to 24:00
+            if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) {
+                pmEnd = new Date(pmEnd.getTime() + 24 * 60 * 60 * 1000);
+            }
             
             const expectedMinutes = (pmEnd - amStart) / (1000 * 60);
             const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
