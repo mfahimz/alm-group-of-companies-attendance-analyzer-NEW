@@ -1032,9 +1032,10 @@ Deno.serve(async (req) => {
                 const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
                 // Skip partial day detection if SKIP_PUNCH is applied
+                // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches
                 const partialDayResult = hasSkipPunchApplied 
                     ? { isPartial: false, reason: '' } 
-                    : detectPartialDay(filteredPunches, shift, includeSeconds);
+                    : detectPartialDay(filteredPunches, shift, includeSeconds, nextDateStr);
 
                 if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
                     if (filteredPunches.length === 0) {
