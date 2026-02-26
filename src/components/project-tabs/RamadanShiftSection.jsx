@@ -7,14 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Eye, RefreshCw } from 'lucide-react';
+import { Eye, Undo2, Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function RamadanShiftSection({ project, shifts, employees }) {
     const [selectedRamadanSchedule, setSelectedRamadanSchedule] = useState(null);
     const [showRamadanPreview, setShowRamadanPreview] = useState(false);
     const [ramadanPreviewData, setRamadanPreviewData] = useState([]);
-    const [ramadanApplying, setRamadanApplying] = useState(false);
+    const [applying, setApplying] = useState(false);
+    const [undoing, setUndoing] = useState(false);
     const [showRamadanShiftsView, setShowRamadanShiftsView] = useState(false);
     const queryClient = useQueryClient();
 
@@ -55,14 +56,16 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         };
     }, [selectedOrOverlappingSchedule, project.date_from, project.date_to]);
 
-    const ramadanShiftsApplied = React.useMemo(() => {
-        if (!ramadanOverlap) return false;
-        return shifts.some(s =>
+    const ramadanShiftCount = React.useMemo(() => {
+        if (!ramadanOverlap) return 0;
+        return shifts.filter(s =>
             s.applicable_days?.includes('Ramadan') &&
             s.date >= ramadanOverlap.from &&
             s.date <= ramadanOverlap.to
-        );
+        ).length;
     }, [shifts, ramadanOverlap]);
+
+    const ramadanShiftsApplied = ramadanShiftCount > 0;
 
     React.useEffect(() => {
         if (ramadanSchedules.length === 0) { setSelectedRamadanSchedule(null); return; }
@@ -98,38 +101,69 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         setShowRamadanPreview(true);
     };
 
-    const handleApplyRamadan = async (forceResync = false) => {
+    // UNDO: Remove all Ramadan shifts from project
+    const handleUndo = async () => {
+        if (!ramadanOverlap) return;
+        if (!confirm(`Remove all ${ramadanShiftCount} Ramadan shifts from this project? This cannot be undone.`)) return;
+        
+        setUndoing(true);
+        try {
+            const result = await base44.functions.invoke('undoRamadanShifts', {
+                projectId: project.id,
+                dateFrom: ramadanOverlap.from,
+                dateTo: ramadanOverlap.to
+            });
+            const d = result.data;
+            if (d.success) {
+                queryClient.invalidateQueries(['shifts', project.id]);
+                if (d.partial) {
+                    toast.warning(`Partially removed ${d.deletedCount}/${d.totalToDelete} shifts. Click Undo again to continue.`);
+                } else {
+                    toast.success(`Removed ${d.deletedCount} Ramadan shifts`);
+                }
+            } else {
+                toast.error('Failed to undo');
+            }
+        } catch (error) {
+            toast.error('Error: ' + error.message);
+        } finally {
+            setUndoing(false);
+        }
+    };
+
+    // APPLY: Create fresh Ramadan shifts (requires undo first if already applied)
+    const handleApply = async () => {
         if (!ramadanOverlap || !selectedRamadanSchedule) return;
-        setRamadanApplying(true);
+        setApplying(true);
         try {
             const result = await base44.functions.invoke('applyRamadanShifts', {
                 projectId: project.id,
                 ramadanScheduleId: selectedRamadanSchedule.id,
                 ramadanFrom: ramadanOverlap.from,
-                ramadanTo: ramadanOverlap.to,
-                forceResync
+                ramadanTo: ramadanOverlap.to
             });
-            if (result.data.success) {
+            const d = result.data;
+            if (d.success) {
                 queryClient.invalidateQueries(['shifts', project.id]);
-                const d = result.data;
-                const parts = [];
-                if (d.shiftsCreated > 0) parts.push(`${d.shiftsCreated} created`);
-                if (d.shiftsUpdated > 0) parts.push(`${d.shiftsUpdated} updated`);
-                if (d.shiftsDeleted > 0) parts.push(`${d.shiftsDeleted} removed`);
-                if (d.shiftsUnchanged > 0) parts.push(`${d.shiftsUnchanged} unchanged`);
-                toast.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Ramadan shifts applied');
+                toast.success(`Applied ${d.shiftsCreated} Ramadan shifts for ${d.employeesProcessed} employees`);
                 setShowRamadanPreview(false);
+            } else if (d.error) {
+                toast.error(d.error);
             } else {
                 toast.error('Failed to apply Ramadan shifts');
             }
         } catch (error) {
-            toast.error('Error: ' + error.message);
+            // Backend returns 400 if shifts already exist
+            const msg = error?.response?.data?.error || error.message;
+            toast.error(msg);
         } finally {
-            setRamadanApplying(false);
+            setApplying(false);
         }
     };
 
     if (!ramadanOverlap) return null;
+
+    const isBusy = applying || undoing;
 
     return (
         <>
@@ -146,7 +180,9 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                             </div>
                         </div>
                         {ramadanShiftsApplied && (
-                            <div className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium text-sm flex items-center gap-2">✓ Ramadan Shifts Active</div>
+                            <div className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium text-sm flex items-center gap-2">
+                                ✓ {ramadanShiftCount} Ramadan Shifts Active
+                            </div>
                         )}
                     </div>
                 </CardHeader>
@@ -175,34 +211,41 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         <p className="text-xs text-purple-600 mt-2">Sundays are excluded as weekly holidays.</p>
                     </div>
 
-                    <div className="flex gap-3">
-                        <Button onClick={handlePreviewRamadan} variant="outline" disabled={!selectedRamadanSchedule}>
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 flex-wrap">
+                        <Button onClick={handlePreviewRamadan} variant="outline" disabled={!selectedRamadanSchedule || isBusy}>
                             <Eye className="w-4 h-4 mr-2" />Preview
                         </Button>
-                        <Button
-                            onClick={() => handleApplyRamadan(false)}
-                            disabled={!selectedRamadanSchedule || ramadanShiftsApplied || ramadanApplying}
-                            className="bg-purple-600 hover:bg-purple-700"
-                        >
-                            {ramadanApplying ? 'Applying...' : ramadanShiftsApplied ? 'Already Applied' : 'Apply Ramadan Shifts'}
-                        </Button>
-                        {ramadanShiftsApplied && (
+
+                        {!ramadanShiftsApplied ? (
                             <Button
-                                onClick={() => handleApplyRamadan(true)}
-                                disabled={ramadanApplying}
-                                variant="outline"
-                                className="text-purple-700 border-purple-300 hover:bg-purple-100"
+                                onClick={handleApply}
+                                disabled={!selectedRamadanSchedule || isBusy}
+                                className="bg-purple-600 hover:bg-purple-700"
                             >
-                                <RefreshCw className={`w-4 h-4 mr-2 ${ramadanApplying ? 'animate-spin' : ''}`} />
-                                {ramadanApplying ? 'Syncing...' : 'Sync from Ramadan Schedule'}
+                                {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : <><Play className="w-4 h-4 mr-2" />Apply Ramadan Shifts</>}
                             </Button>
+                        ) : (
+                            <>
+                                <Button
+                                    onClick={handleUndo}
+                                    disabled={isBusy}
+                                    variant="destructive"
+                                >
+                                    {undoing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Removing...</> : <><Undo2 className="w-4 h-4 mr-2" />Undo Ramadan Shifts</>}
+                                </Button>
+                            </>
                         )}
                     </div>
 
+                    {/* Info box when applied */}
                     {ramadanShiftsApplied && (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                             <div className="flex items-center justify-between">
-                                <p className="text-sm text-green-800">✓ Ramadan shifts active. Use "Sync from Ramadan Schedule" to re-apply after changes in the designer.</p>
+                                <div>
+                                    <p className="text-sm text-green-800 font-medium">✓ Ramadan shifts active ({ramadanShiftCount} shifts)</p>
+                                    <p className="text-xs text-green-700 mt-1">To update from Ramadan Schedule: click "Undo" first, then "Apply" again with latest schedule.</p>
+                                </div>
                                 {Object.keys(parsedRamadanShifts.week1).length > 0 && (
                                     <Button size="sm" variant="outline" onClick={() => setShowRamadanShiftsView(!showRamadanShiftsView)} className="text-purple-700 border-purple-300 hover:bg-purple-50">
                                         <Eye className="w-4 h-4 mr-2" />{showRamadanShiftsView ? 'Hide' : 'View'} Shifts
@@ -212,6 +255,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         </div>
                     )}
 
+                    {/* Shift details view */}
                     {ramadanShiftsApplied && showRamadanShiftsView && Object.keys(parsedRamadanShifts.week1).length > 0 && (
                         <div className="mt-4 space-y-3">
                             <p className="text-sm font-medium text-purple-900">Ramadan Shift Schedule</p>
@@ -289,8 +333,8 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         </div>
                         <div className="flex gap-3 pt-4 border-t mt-4">
                             <Button variant="outline" onClick={() => setShowRamadanPreview(false)}>Close</Button>
-                            <Button onClick={() => handleApplyRamadan(false)} disabled={ramadanShiftsApplied || ramadanApplying} className="bg-purple-600 hover:bg-purple-700">
-                                {ramadanApplying ? 'Applying...' : ramadanShiftsApplied ? 'Already Applied' : 'Apply Ramadan Shifts'}
+                            <Button onClick={handleApply} disabled={ramadanShiftsApplied || applying} className="bg-purple-600 hover:bg-purple-700">
+                                {applying ? 'Applying...' : ramadanShiftsApplied ? 'Already Applied' : 'Apply Ramadan Shifts'}
                             </Button>
                         </div>
                     </div>
