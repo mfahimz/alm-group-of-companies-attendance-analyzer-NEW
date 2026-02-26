@@ -926,10 +926,15 @@ Deno.serve(async (req) => {
                     // Prefer date-specific shifts (which includes Ramadan shifts), fall back to general
                     const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
                     for (const ps of prevShiftCandidates) {
-                        const pEndTime = parseTime(ps.pm_end, includeSeconds);
+                        // For single shifts, the end time is in pm_end
+                        // For combined shifts, pm_end is the night shift end
+                        const endTimeStr = ps.pm_end;
+                        const pEndTime = parseTime(endTimeStr, includeSeconds);
                         if (pEndTime) {
                             const pEndHour = pEndTime.getHours();
-                            if (pEndHour === 23 || (pEndHour === 0 && pEndTime.getMinutes() === 0)) {
+                            const pEndMin = pEndTime.getMinutes();
+                            // Shift ends near midnight: 11 PM (hour 23) or exactly 12:00 AM (hour 0, minute 0)
+                            if (pEndHour === 23 || (pEndHour === 0 && pEndMin === 0)) {
                                 prevShiftEndsNearMidnight = true;
                                 break;
                             }
