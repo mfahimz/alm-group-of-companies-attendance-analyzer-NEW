@@ -603,28 +603,44 @@ export default function DailyBreakdownDialog({
                                 {getDailyBreakdown.map((day, idx) => (
                                     <TableRow key={idx} className={`${day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">{day.date}</TableCell>
-                                        <TableCell>{day.punches}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1">
+                                                <span>{day.punches}</span>
+                                                {day.crossoverPunches > 0 && (
+                                                    <span className="text-[9px] text-indigo-600 font-medium" title={`+${day.crossoverPunches} punch(es) from next day (midnight crossover)`}>
+                                                        +{day.crossoverPunches}🌙
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-xs max-w-xs">
                                             <div title={day.allPunchTimes || day.punchTimes}>
                                                 {day.punchMatches && day.punchMatches.length > 0 ? (
                                                     <div className="space-y-0.5">
-                                                        {day.punchMatches.map((match, matchIdx) => (
-                                                            <div key={matchIdx} className="flex items-center gap-1">
-                                                                <span className={match.matchedTo ? (match.isFarExtendedMatch ? 'text-red-600 font-bold' : match.isExtendedMatch ? 'text-amber-600 font-semibold' : '') : 'text-red-600 font-bold'}>
-                                                                    {extractTime(match.punch.timestamp_raw)}
-                                                                </span>
-                                                                {match.matchedTo && (
-                                                                    <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : 'text-slate-500'}`}>
-                                                                        →{match.matchedTo.replace(/_/g, ' ')}
-                                                                        {match.isFarExtendedMatch && ' 🔴'}
-                                                                        {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
+                                                        {day.punchMatches.map((match, matchIdx) => {
+                                                            const isNextDayPunch = match.punch._isNextDayPunch;
+                                                            return (
+                                                                <div key={matchIdx} className="flex items-center gap-1">
+                                                                    {isNextDayPunch && (
+                                                                        <span className="text-[8px] text-indigo-500 font-semibold" title="This punch is from the next calendar day (midnight crossover)">🌙</span>
+                                                                    )}
+                                                                    <span className={match.matchedTo ? (match.isFarExtendedMatch ? 'text-red-600 font-bold' : match.isExtendedMatch ? 'text-amber-600 font-semibold' : isNextDayPunch ? 'text-indigo-600 font-medium' : '') : 'text-red-600 font-bold'}>
+                                                                        {extractTime(match.punch.timestamp_raw)}
                                                                     </span>
-                                                                )}
-                                                                {!match.matchedTo && (
-                                                                    <span className="text-[9px] text-red-600 font-bold">🔴 NO MATCH</span>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                                                    {match.matchedTo && (
+                                                                        <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : isNextDayPunch ? 'text-indigo-500' : 'text-slate-500'}`}>
+                                                                            →{match.matchedTo.replace(/_/g, ' ')}
+                                                                            {isNextDayPunch && ' (next day)'}
+                                                                            {match.isFarExtendedMatch && ' 🔴'}
+                                                                            {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
+                                                                        </span>
+                                                                    )}
+                                                                    {!match.matchedTo && (
+                                                                        <span className="text-[9px] text-red-600 font-bold">🔴 NO MATCH</span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 ) : (
                                                     <>{day.punchTimesShort || '-'}</>
