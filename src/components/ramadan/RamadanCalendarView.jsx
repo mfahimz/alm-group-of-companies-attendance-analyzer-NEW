@@ -12,7 +12,18 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [departmentFilter, setDepartmentFilter] = useState('all');
-    const itemsPerPage = 10; // Safe limit for rendering
+    const itemsPerPage = 10;
+
+    // Detect Al Maraghi Automotive (company_id=3)
+    const { data: companyData } = useQuery({
+        queryKey: ['company', schedule.company],
+        queryFn: async () => {
+            const companies = await base44.entities.Company.filter({ name: schedule.company });
+            return companies[0] || null;
+        },
+        staleTime: 10 * 60 * 1000
+    });
+    const isAlMaraghiAutomotive = companyData?.company_id === 3;
 
     // Parse shift data once
     const { week1Shifts, week2Shifts, fridayShifts } = useMemo(() => {
