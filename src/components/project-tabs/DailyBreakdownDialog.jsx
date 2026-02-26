@@ -265,7 +265,12 @@ export default function DailyBreakdownDialog({
                 }
             }
 
-            const dayPunches = filterMultiplePunches(rawDayPunches, shift);
+            // filterMultiplePunches may lose _isNextDayPunch info, so tag punches first
+            const taggedRawPunches = rawDayPunches.map(p => ({
+                ...p,
+                _isNextDayPunch: p.punch_date === nextDateStr
+            }));
+            const dayPunches = filterMultiplePunches(taggedRawPunches, shift);
 
             const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
                 String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
