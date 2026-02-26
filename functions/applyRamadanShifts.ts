@@ -275,14 +275,30 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Bulk create shifts
+        // Bulk create shifts with rate limit protection
         let createdCount = 0;
         if (shiftsToCreate.length > 0) {
-            const batchSize = 50;
+            const batchSize = 25;
             for (let i = 0; i < shiftsToCreate.length; i += batchSize) {
                 const batch = shiftsToCreate.slice(i, i + batchSize);
-                await base44.asServiceRole.entities.ShiftTiming.bulkCreate(batch);
-                createdCount += batch.length;
+                let retries = 3;
+                while (retries > 0) {
+                    try {
+                        await base44.asServiceRole.entities.ShiftTiming.bulkCreate(batch);
+                        createdCount += batch.length;
+                        break;
+                    } catch (err) {
+                        retries--;
+                        if (retries === 0) throw err;
+                        console.warn(`[applyRamadanShifts] Create batch failed (${err.message}), retrying in 2s... (${retries} left)`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                }
+                console.log(`[applyRamadanShifts] Created batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(shiftsToCreate.length / batchSize)} (${createdCount}/${shiftsToCreate.length})`);
+                // Delay between batches to avoid rate limiting
+                if (i + batchSize < shiftsToCreate.length) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
             }
         }
 
