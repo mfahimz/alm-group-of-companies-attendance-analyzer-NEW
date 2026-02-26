@@ -909,6 +909,16 @@ Deno.serve(async (req) => {
                 const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
                 
                 // ================================================================
+                const MIDNIGHT_BUFFER_MINUTES = 60; // 12:00 AM to 1:00 AM
+
+                const isWithinMidnightBuffer = (timestampRaw: string) => {
+                    const parsed = parseTime(timestampRaw, includeSeconds);
+                    if (!parsed) return false;
+
+                    const minutesSinceMidnight = (parsed.getHours() * 60) + parsed.getMinutes();
+                    return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
+                };
+
                 // MIDNIGHT SHIFT FIX: Collect punches for this date
                 // If shift ends at or near midnight (12:00 AM / 00:00), 
                 // also include early-morning punches from the NEXT day
@@ -978,18 +988,11 @@ Deno.serve(async (req) => {
                     .filter(p => p.punch_date === dateStr);
                 
                 // MIDNIGHT FIX: If PREVIOUS day's shift ended near midnight,
-                // exclude early-morning punches (12:00 AM - 1:30 AM) from THIS day's punches
+                // exclude early-morning punches (12:00 AM - 1:00 AM) from THIS day's punches
                 // because those belong to the previous day's shift as punch-outs
                 if (prevShiftEndsNearMidnight) {
                     const beforeFilter = dayPunches.length;
-                    dayPunches = dayPunches.filter(p => {
-                        const pTime = parseTime(p.timestamp_raw, includeSeconds);
-                        if (!pTime) return true;
-                        const pHour = pTime.getHours();
-                        const pMin = pTime.getMinutes();
-                        // Exclude punches from 12:00 AM to 1:30 AM (these belong to prev day's shift)
-                        return !(pHour === 0 || (pHour === 1 && pMin <= 30));
-                    });
+                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
                     if (dayPunches.length < beforeFilter) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Excluded ${beforeFilter - dayPunches.length} early AM punch(es) that belong to prev day ${prevDateStr}`);
                     }
@@ -1008,17 +1011,9 @@ Deno.serve(async (req) => {
                     const seenIds = new Set(dayPunches.map(p => p.id));
                     const uniqueNextDayPunches = nextDayAllPunches.filter(p => !seenIds.has(p.id));
                     
-                    // Include next-day punches that are within ~90 minutes of midnight
-                    // (i.e., punches between 12:00 AM and 1:30 AM)
-                    // This covers late punch-outs like 12:15 AM, 12:30 AM, 12:45 AM, 1:00 AM
-                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => {
-                        const pTime = parseTime(p.timestamp_raw, includeSeconds);
-                        if (!pTime) return false;
-                        const pHour = pTime.getHours();
-                        const pMin = pTime.getMinutes();
-                        // Include punches from 12:00 AM to 1:30 AM
-                        return pHour === 0 || (pHour === 1 && pMin <= 30);
-                    });
+                    // Include next-day punches that are within 60 minutes of midnight
+                    // (i.e., punches between 12:00 AM and 1:00 AM)
+                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw));
                     
                     if (midnightCrossoverPunches.length > 0) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Found ${midnightCrossoverPunches.length} crossover punch(es) from next day ${nextDateStr}`);
