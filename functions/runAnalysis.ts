@@ -1337,9 +1337,13 @@ Deno.serve(async (req) => {
                 abnormal_dates: [...abnormal_dates_set].sort().join(', '),
                 notes: criticalDatesFormatted,
                 auto_resolutions: autoResolutionNotes,
-                _otherMinutesDetails: otherMinutes > 0 ? {
+                // CRITICAL: Only include other minutes that did NOT come from existing exceptions.
+                // Other minutes from existing exceptions are already in the DB — do NOT re-create them.
+                // otherMinutesByDate = from NON-exception sources (should be created as new exceptions)
+                // otherMinutesFromExceptions = from existing exceptions (already exist, skip)
+                _otherMinutesDetails: (Object.keys(otherMinutesByDate).length > 0) ? {
                     attendance_id: attendanceIdStr,
-                    other_minutes: Math.max(0, otherMinutes),
+                    other_minutes: Object.values(otherMinutesByDate).reduce((sum, v) => sum + v, 0),
                     employee_name: employee?.name || attendanceIdStr,
                     breakdown: otherMinutesByDate
                 } : null
