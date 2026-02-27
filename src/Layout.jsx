@@ -12,7 +12,7 @@ import { getPagesByCategory, NAV_CATEGORIES } from './components/config/pagesCon
 import { LogOut } from 'lucide-react';
 import { CompanyFilterProvider } from './components/context/CompanyContext';
 
-// Layout v4 - rebuild trigger
+// Layout v5 - rebuild trigger
 export default function Layout({ children, currentPageName }) {
     const navigate = useNavigate();
     const publicPages = ['Maintenance'];
