@@ -1254,22 +1254,22 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 for (const group of Object.values(datesByType)) {
                     const sortedDates = group.dates.sort();
                     
-                    let currentRange = { start: sortedDates[0], end: sortedDates[0] };
+                    // CRITICAL FIX: Time-based exceptions (late/early/other min) must be per-date,
+                    // not spanning ranges — otherwise minutes apply to every day in the range.
+                    const hasTimeMins = (group.data.lateMinutes > 0) || (group.data.earlyCheckoutMinutes > 0) || (group.data.otherMinutes > 0);
                     const ranges = [];
                     
-                    for (let i = 1; i < sortedDates.length; i++) {
-                        const prevDate = new Date(sortedDates[i - 1]);
-                        const currDate = new Date(sortedDates[i]);
-                        const dayDiff = (currDate - prevDate) / (1000 * 60 * 60 * 24);
-                        
-                        if (dayDiff === 1) {
-                            currentRange.end = sortedDates[i];
-                        } else {
-                            ranges.push({ ...currentRange });
-                            currentRange = { start: sortedDates[i], end: sortedDates[i] };
+                    if (hasTimeMins) {
+                        sortedDates.forEach(d => ranges.push({ start: d, end: d }));
+                    } else {
+                        let currentRange = { start: sortedDates[0], end: sortedDates[0] };
+                        for (let i = 1; i < sortedDates.length; i++) {
+                            const dayDiff = (new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / (1000 * 60 * 60 * 24);
+                            if (dayDiff === 1) { currentRange.end = sortedDates[i]; }
+                            else { ranges.push({ ...currentRange }); currentRange = { start: sortedDates[i], end: sortedDates[i] }; }
                         }
+                        ranges.push(currentRange);
                     }
-                    ranges.push(currentRange);
 
                     for (const range of ranges) {
                         // Edits from reports need department head approval
