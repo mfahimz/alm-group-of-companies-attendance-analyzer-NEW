@@ -1551,10 +1551,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const saveRamadanGift = async (row, value) => {
         const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
         const newValue = Math.max(0, Number(value || 0));
-        const base = Math.max(0, (row.late_minutes||0) + (row.early_checkout_minutes||0) - (row.grace_minutes??15));
-        const newDeductible = Math.max(0, base - newValue);
-        await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: newDeductible });
-        if (oldValue !== newValue) { base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} deductible=${newDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, new_deductible: newDeductible }) }).catch(()=>{}); }
+        // Store raw deductible (late + early - grace). Display layer subtracts gift separately.
+        const rawDeductible = Math.max(0, (row.late_minutes||0) + (row.early_checkout_minutes||0) - (row.grace_minutes??15));
+        await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: rawDeductible });
+        if (oldValue !== newValue) { base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} rawDeductible=${rawDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, raw_deductible: rawDeductible }) }).catch(()=>{}); }
         await queryClient.invalidateQueries({ queryKey: ['results', reportRun.id] });
         await queryClient.refetchQueries({ queryKey: ['results', reportRun.id] });
         toast.success('Ramadan gift saved & deductible recalculated');
