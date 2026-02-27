@@ -149,7 +149,9 @@ Deno.serve(async (req) => {
                 );
                 if (!analysisResult) continue;
 
-                const finalizedDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                const rawDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                const ramadanGiftMinutes = Math.max(0, analysisResult.ramadan_gift_minutes || 0);
+                const finalizedDeductibleMinutes = Math.max(0, rawDeductibleMinutes - ramadanGiftMinutes);
                 const finalizedOtherMinutes = Math.max(0, analysisResult.other_minutes || 0);
 
                 if (
@@ -158,6 +160,7 @@ Deno.serve(async (req) => {
                 ) {
                     await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
                         deductible_minutes: finalizedDeductibleMinutes,
+                        ramadan_gift_minutes: ramadanGiftMinutes,
                         other_minutes: finalizedOtherMinutes
                     });
                     repairedSnapshots++;
@@ -1341,6 +1344,7 @@ Deno.serve(async (req) => {
                     otherMinutes: analysisResult.other_minutes || 0,
                     approvedMinutes: analysisResult.approved_minutes || 0,
                     deductibleMinutes: analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0,
+                    ramadanGiftMinutes: Math.max(0, analysisResult.ramadan_gift_minutes || 0),
                     graceMinutes: analysisResult.grace_minutes ?? 15
                 };
                 attendanceSource = 'ANALYZED';
@@ -1361,6 +1365,7 @@ Deno.serve(async (req) => {
                     otherMinutes: 0,
                     approvedMinutes: 0,
                     deductibleMinutes: 0,
+                    ramadanGiftMinutes: 0,
                     graceMinutes: 0
                 };
                 attendanceSource = 'NO_ATTENDANCE_DATA';
@@ -1442,7 +1447,7 @@ Deno.serve(async (req) => {
             // Use finalized attendance fields from AnalysisResult AS-IS.
             // IMPORTANT: never merge other_minutes into deductible_minutes.
             // Snapshot must persist both fields separately exactly as finalized.
-            const finalizedDeductibleMinutes = Math.max(0, calculated.deductibleMinutes || 0);
+            const finalizedDeductibleMinutes = Math.max(0, (calculated.deductibleMinutes || 0) - (calculated.ramadanGiftMinutes || 0));
             const finalizedOtherMinutes = Math.max(0, calculated.otherMinutes || 0);
 
             // Payroll deduction uses both finalized deductible + finalized other minutes,
@@ -1619,6 +1624,7 @@ Deno.serve(async (req) => {
                 approved_minutes: calculated.approvedMinutes,
                 grace_minutes: calculated.graceMinutes,
                 deductible_minutes: finalizedDeductibleMinutes,
+                ramadan_gift_minutes: Math.max(0, calculated.ramadanGiftMinutes || 0),
                 extra_prev_month_deductible_minutes: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_days: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_pay: 0,  // DISABLED - no longer used
