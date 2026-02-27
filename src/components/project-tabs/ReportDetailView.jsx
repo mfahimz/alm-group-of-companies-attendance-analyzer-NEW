@@ -36,7 +36,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         currentEmployee: '',
         status: 'Processing...'
     });
-
+    const [ramadanGiftOverrides, setRamadanGiftOverrides] = useState({});
 
     const queryClient = useQueryClient();
 
@@ -919,7 +919,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, project]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, project, getEffectiveRamadanGiftMinutes]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
