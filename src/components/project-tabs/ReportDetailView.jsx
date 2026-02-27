@@ -1560,7 +1560,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         entity_id: row.id,
                         project_id: project.id,
                         company: project.company,
-                        context: `RAMADAN_GIFT_MINUTES_UPDATE employee=${row.attendance_id || row.name} old=${oldValue} new=${newValue} user=${currentUser?.email || 'unknown'}`,
+                        context: `RAMADAN_GIFT_MINUTES_UPDATE employee=${row.attendance_id || row.name} old=${oldValue} new=${newValue} user=${currentUser?.email || 'unknown'}` ,
                         changes: JSON.stringify({
                             field: 'ramadan_gift_minutes',
                             attendance_id: row.attendance_id || null,
@@ -1574,13 +1574,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     console.warn('[ReportDetailView] Ramadan gift audit log failed:', auditError?.message || auditError);
                 }
             }
-
-            return { rowId: row.id, newValue };
         },
-        onSuccess: ({ rowId, newValue }) => {
-            queryClient.setQueryData(['results', reportRun.id], (prev = []) =>
-                prev.map(item => item.id === rowId ? { ...item, ramadan_gift_minutes: newValue } : item)
-            );
+        onSuccess: () => {
             queryClient.invalidateQueries(['results', reportRun.id]);
             toast.success('Ramadan gift minutes updated');
         },
@@ -1964,7 +1959,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     value={Math.max(0, result.ramadan_gift_minutes || 0)}
                                                     onSave={(value) => updateRamadanGiftMinutesMutation.mutateAsync({ row: result, value: Math.max(0, value) })}
                                                     isEditable={canEditRamadanGift && !reportRun.is_final && project.status !== 'closed'}
-                                                    alwaysInputWithSave
+                                                    alwaysInput
+                                                    autoSaveOnBlur
                                                     min={0}
                                                     className="font-medium text-amber-700"
                                                 />
