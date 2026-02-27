@@ -1170,7 +1170,9 @@ Deno.serve(async (req) => {
                     }
                     if (dateException.other_minutes && dateException.other_minutes > 0) {
                         otherMinutes += Math.abs(dateException.other_minutes);
-                        otherMinutesByDate[dateStr] = Math.abs(dateException.other_minutes);
+                        // Track that these other minutes came FROM an existing exception
+                        // so we do NOT re-create them at the end of analysis
+                        otherMinutesFromExceptions[dateStr] = Math.abs(dateException.other_minutes);
                     }
                 } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !hasSkipPunchApplied) {
                     let dayLateMinutes = 0;
