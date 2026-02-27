@@ -1936,15 +1936,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         </td>
                                         {showRamadanGiftColumn && (
                                             <td className="p-2 align-middle">
-                                                <InlineEditableCell
-                                                    value={Math.max(0, result.ramadan_gift_minutes || 0)}
-                                                    onSave={(value) => updateRamadanGiftMinutesMutation.mutateAsync({ row: result, value: Math.max(0, value) })}
-                                                    isEditable={canEditRamadanGift && !reportRun.is_final && project.status !== 'closed'}
-                                                    alwaysInput
-                                                    autoSaveOnBlur
-                                                    min={0}
-                                                    className="font-medium text-amber-700"
-                                                />
+                                                {/* RamadanGiftCell: inline input with Save button that recalculates deductible */}
+                                                {(() => {
+                                                    const isEdit = canEditRamadanGift && !reportRun.is_final && project.status !== 'closed';
+                                                    if (!isEdit) return <span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span>;
+                                                    const storedGift = Math.max(0, result.ramadan_gift_minutes || 0);
+                                                    const cellKey = `rgift-${result.id}`;
+                                                    return <RamadanGiftCellInline key={cellKey} result={result} storedGift={storedGift} onSave={(row, val) => updateRamadanGiftMinutesMutation.mutateAsync({ row, value: val })} />;
+                                                })()}
                                             </td>
                                         )}
                                         <td className="p-2 align-middle">
