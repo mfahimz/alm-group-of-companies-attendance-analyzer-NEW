@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
-import InlineEditableCell from './InlineEditableCell';
+import InlineEditableCell from './InlineEditableCell'; import RamadanGiftCellWidget from './RamadanGiftCell';
 import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
 import * as XLSX from 'xlsx';
@@ -851,12 +851,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     }, [ramadanSchedules, reportRun?.date_from, reportRun?.date_to]);
     const showRamadanGiftColumn = isAlMaraghiMotors && hasRamadanSchedule && (isAdmin || isCEO || isHRManager);
 
-    const getEffectiveRamadanGiftMinutes = React.useCallback((result) => {
-        const override = ramadanGiftOverrides[result.id];
-        if (override !== undefined) return Math.max(0, Number(override));
-        return Math.max(0, Number(result.ramadan_gift_minutes || 0));
-    }, [ramadanGiftOverrides]);
-
     // For FINALIZED reports: use stored AnalysisResult values (immutable).
     // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
     // so the summary table matches the daily breakdown the user sees.
@@ -889,8 +883,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     other_minutes: result.other_minutes || 0,
                     approved_minutes: result.approved_minutes || 0,
                     deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
-                    ramadan_gift_minutes: getEffectiveRamadanGiftMinutes(result),
-                    effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? result.deductible_minutes ?? 0) - getEffectiveRamadanGiftMinutes(result)),
+                    ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
+                    effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? result.deductible_minutes ?? 0) - Math.max(0, result.ramadan_gift_minutes || 0)),
                     grace_minutes: result.grace_minutes ?? 15,
                     has_no_punches: hasNoPunches
                 };
@@ -920,8 +914,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
                 approved_minutes: result.approved_minutes || 0, deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
-                ramadan_gift_minutes: getEffectiveRamadanGiftMinutes(result),
-                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - getEffectiveRamadanGiftMinutes(result)),
+                ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
+                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - Math.max(0, result.ramadan_gift_minutes || 0)),
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
@@ -1551,50 +1545,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    const updateRamadanGiftMinutesMutation = useMutation({
-        mutationFn: async ({ row, value }) => {
-            const oldValue = getEffectiveRamadanGiftMinutes(row);
-            const newValue = Math.max(0, Number(value || 0));
-
-            await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
-
-            if (oldValue !== newValue) {
-                try {
-                    await base44.functions.invoke('logAudit', {
-                        action_type: 'update',
-                        entity_name: 'AnalysisResult',
-                        entity_id: row.id,
-                        project_id: project.id,
-                        company: project.company,
-                        context: `RAMADAN_GIFT_MINUTES_UPDATE employee=${row.attendance_id || row.name} old=${oldValue} new=${newValue} user=${currentUser?.email || 'unknown'}`,
-                        changes: JSON.stringify({
-                            field: 'ramadan_gift_minutes',
-                            attendance_id: row.attendance_id || null,
-                            project_id: project.id,
-                            old_value: oldValue,
-                            new_value: newValue,
-                            changed_by: currentUser?.email || null
-                        })
-                    });
-                } catch (auditError) {
-                    console.warn('[ReportDetailView] Ramadan gift audit log failed:', auditError?.message || auditError);
-                }
-            }
-
-            return { rowId: row.id, newValue };
-        },
-        onSuccess: ({ rowId, newValue }) => {
-            setRamadanGiftOverrides(prev => ({ ...prev, [rowId]: newValue }));
-            queryClient.setQueryData(['results', reportRun.id], (prev = []) =>
-                prev.map(item => item.id === rowId ? { ...item, ramadan_gift_minutes: newValue } : item)
-            );
-            queryClient.invalidateQueries(['results', reportRun.id]);
-            toast.success('Ramadan gift minutes updated');
-        },
-        onError: () => {
-            toast.error('Failed to update Ramadan gift minutes');
+    // RamadanGiftCellWidget import is at top of file (RamadanGiftCell.jsx)
+    const saveRamadanGift = async (row, value) => {
+        const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
+        const newValue = Math.max(0, Number(value || 0));
+        const base = Math.max(0, (row.late_minutes||0) + (row.early_checkout_minutes||0) - (row.grace_minutes??15));
+        const newDeductible = Math.max(0, base - newValue);
+        await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: newDeductible });
+        if (oldValue !== newValue) {
+            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} deductible=${newDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, new_deductible: newDeductible }) }).catch(()=>{});
         }
-    });
+        queryClient.invalidateQueries(['results', reportRun.id]);
+        toast.success('Ramadan gift saved & deductible recalculated');
+    };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
     const verifiedCount = verifiedEmployees.length;
@@ -1965,22 +1928,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 )}
                                             </div>
                                         </td>
-                                        {showRamadanGiftColumn && (
-                                            <td className="p-2 align-middle">
-                                                <InlineEditableCell
-                                                    value={getEffectiveRamadanGiftMinutes(result)}
-                                                    onSave={(value) => updateRamadanGiftMinutesMutation.mutateAsync({ row: result, value: Math.max(0, value) })}
-                                                    isEditable={canEditRamadanGift && !reportRun.is_final && project.status !== 'closed'}
-                                                    alwaysInputWithSave
-                                                    min={0}
-                                                    className="font-medium text-amber-700"
-                                                />
-                                            </td>
-                                        )}
+                                        {showRamadanGiftColumn && (() => {
+                                            const canEdit = !reportRun.is_final && project.status !== 'closed';
+                                            if (!canEdit) return <td className="p-2 align-middle"><span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span></td>;
+                                            return <td className="p-2 align-middle"><RamadanGiftCellWidget result={result} onSave={saveRamadanGift} isEditable={true} /></td>;
+                                        })()}
                                         <td className="p-2 align-middle">
                                             {(() => {
                                                 const rawDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
-                                                const giftMinutes = getEffectiveRamadanGiftMinutes(result);
+                                                const giftMinutes = Math.max(0, result.ramadan_gift_minutes || 0);
                                                 const displayDeductible = Math.max(0, rawDeductible - giftMinutes);
 
                                                 return (
