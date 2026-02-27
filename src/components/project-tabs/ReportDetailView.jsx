@@ -1564,52 +1564,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     return (
         <div className="space-y-6">
             {/* Finalization Progress Dialog */}
-            <Dialog open={finalizationProgress.open} onOpenChange={() => {}}>
-                <DialogContent 
-                    className="sm:max-w-md" 
-                    onPointerDownOutside={(e) => e.preventDefault()} 
-                    onEscapeKeyDown={(e) => e.preventDefault()}
-                    onInteractOutside={(e) => e.preventDefault()}
-                >
-                    <DialogHeader>
-                        <DialogTitle>Creating Salary Snapshots</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>Progress</span>
-                                <span className="font-medium">{finalizationProgress.current} / {finalizationProgress.total}</span>
-                            </div>
-                            <div className="w-full bg-slate-200 rounded-full h-2">
-                                <div 
-                                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${finalizationProgress.total > 0 ? (finalizationProgress.current / finalizationProgress.total) * 100 : 0}%` }}
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="text-sm font-medium text-slate-700">
-                                {finalizationProgress.status}
-                            </div>
-                            {finalizationProgress.currentEmployee && (
-                                <div className="text-xs text-slate-500">
-                                    {finalizationProgress.currentEmployee}
-                                </div>
-                            )}
-                        </div>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
-                            <div className="flex items-start gap-2 text-xs text-amber-800">
-                                <div className="animate-spin h-3 w-3 border-2 border-amber-300 border-t-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
-                                <div>
-                                    <strong>Creating salary snapshots...</strong> This takes ~2-3 seconds per 20 employees.
-                                    <br />
-                                    <span className="text-amber-700">⚠️ Do NOT navigate away or close this dialog until complete!</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <FinalizationProgressDialog progress={finalizationProgress} />
 
             {saveProgress && (
                 <Card className="border-0 shadow-sm bg-green-50 border-green-200">
