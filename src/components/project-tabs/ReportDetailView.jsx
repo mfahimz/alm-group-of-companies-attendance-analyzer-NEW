@@ -1892,9 +1892,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         })()}
                                         <td className="p-2 align-middle">
                                             {(() => {
-                                                const rawDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
+                                                // Use pre-computed effective_deductible_minutes from enriched result
+                                                // This already accounts for: (late+early-grace) - ramadan_gift
                                                 const giftMinutes = Math.max(0, result.ramadan_gift_minutes || 0);
-                                                const displayDeductible = Math.max(0, rawDeductible - giftMinutes);
+                                                const displayDeductible = result.effective_deductible_minutes ?? Math.max(0, (result.deductible_minutes ?? 0) - giftMinutes);
 
                                                 return (
                                                     <div className="flex flex-col">
