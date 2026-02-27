@@ -1305,12 +1305,15 @@ Deno.serve(async (req) => {
             // ============================================================================
             // RULE: Other minutes are COMPLETELY EXCLUDED from deductible calculation
             // RULE: Grace minutes reduce ONLY late+early
-            // RULE: Approved minutes reduce the final deductible (after grace is applied)
+            // RULE: Approved minutes are ALREADY applied per-day during punch calculation
+            //       (reducing late/early minutes for the specific day). They are NOT subtracted
+            //       again from the final total — that would be double-dipping.
+            //       totalApprovedMinutes is tracked for REPORTING/DISPLAY purposes only.
             // 
             // FORMULA:
             //   1. base = lateMinutes + earlyCheckoutMinutes (EXCLUDE other_minutes)
-            //   2. baseAfterGrace = max(0, base - totalGraceMinutes)
-            //   3. deductibleMinutes = max(0, baseAfterGrace - totalApprovedMinutes)
+            //      NOTE: lateMinutes/earlyCheckoutMinutes already have per-day approved offsets applied
+            //   2. deductibleMinutes = max(0, base - totalGraceMinutes)
             // 
             // CRITICAL FIX: Force positive values at EVERY step to prevent negative data corruption
             // Grace = baseGrace + carriedGrace
@@ -1318,10 +1321,9 @@ Deno.serve(async (req) => {
             // ============================================================================
             const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
             const baseMinutes = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);  // EXCLUDE other_minutes
-            const baseAfterGrace = Math.max(0, baseMinutes - totalGraceMinutes);
-            const deductibleMinutes = Math.max(0, baseAfterGrace - Math.max(0, totalApprovedMinutes));
+            const deductibleMinutes = Math.max(0, baseMinutes - totalGraceMinutes);
             
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes} (NO other minutes), BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${totalGraceMinutes}, After Grace=${baseAfterGrace}, Approved=${totalApprovedMinutes}, Final Deductible=${deductibleMinutes}, Other Minutes=${otherMinutes} (NOT in deductible)`);
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes} (NO other minutes), BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${totalGraceMinutes}, Deductible=${deductibleMinutes} (approved ${totalApprovedMinutes} already applied per-day), Other Minutes=${otherMinutes} (NOT in deductible)`);
 
             return {
                 attendance_id,
