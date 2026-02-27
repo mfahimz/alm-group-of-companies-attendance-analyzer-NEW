@@ -1934,18 +1934,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 )}
                                             </div>
                                         </td>
-                                        {showRamadanGiftColumn && (
-                                            <td className="p-2 align-middle">
-                                                {/* RamadanGiftCell: inline input with Save button that recalculates deductible */}
-                                                {(() => {
-                                                    const isEdit = canEditRamadanGift && !reportRun.is_final && project.status !== 'closed';
-                                                    if (!isEdit) return <span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span>;
-                                                    const storedGift = Math.max(0, result.ramadan_gift_minutes || 0);
-                                                    const cellKey = `rgift-${result.id}`;
-                                                    return <RamadanGiftCellInline key={cellKey} result={result} storedGift={storedGift} onSave={(row, val) => updateRamadanGiftMinutesMutation.mutateAsync({ row, value: val })} />;
-                                                })()}
-                                            </td>
-                                        )}
+                                        {showRamadanGiftColumn && (() => {
+                                            const isEdit = canEditRamadanGift && !reportRun.is_final && project.status !== 'closed';
+                                            if (!isEdit) return <td className="p-2 align-middle"><span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span></td>;
+                                            return <td className="p-2 align-middle"><RamadanGiftCellWidget result={result} onSave={(row, val) => updateRamadanGiftMinutesMutation.mutateAsync({ row, value: val })} /></td>;
+                                        })()}
                                         <td className="p-2 align-middle">
                                             {(() => {
                                                 const rawDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
