@@ -886,6 +886,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     approved_minutes: result.approved_minutes || 0,
                     deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
                     ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
+                    // effective = raw deductible (after grace) minus ramadan gift
                     effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? result.deductible_minutes ?? 0) - Math.max(0, result.ramadan_gift_minutes || 0)),
                     grace_minutes: result.grace_minutes ?? 15,
                     has_no_punches: hasNoPunches
