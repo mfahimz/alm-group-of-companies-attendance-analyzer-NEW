@@ -1999,78 +1999,21 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 filterMultiplePunches={filterMultiplePunches}
             />
 
-            <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && setEditingGraceMinutes(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Edit Grace Minutes</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Label>Grace Minutes</Label>
-                        <Input
-                            type="number"
-                            defaultValue={editingGraceMinutes?.grace_minutes ?? 15}
-                            id="grace-minutes-input"
-                            className="mt-2"
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setEditingGraceMinutes(null)}>Cancel</Button>
-                        <Button onClick={() => {
-                            const val = document.getElementById('grace-minutes-input').value;
-                            updateGraceMinutesMutation.mutate({
-                                id: editingGraceMinutes.id,
-                                grace_minutes: parseInt(val)
-                            });
-                        }}>Save</Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <GraceMinutesDialog
+                editingGraceMinutes={editingGraceMinutes}
+                onClose={() => setEditingGraceMinutes(null)}
+                onSave={(data) => updateGraceMinutesMutation.mutate(data)}
+                isPending={updateGraceMinutesMutation.isPending}
+            />
 
-            <Dialog open={showSaveConfirmation} onOpenChange={setShowSaveConfirmation}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Confirm Save Report</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <p className="text-slate-700">
-                            Are you sure you want to save this report?
-                        </p>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                            <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
-                            <ul className="text-sm text-amber-700 space-y-1">
-                                <li>• All manual edits in daily breakdowns will be converted to exceptions</li>
-                                {(isUser && !isSupervisor) ? (
-                                    <li>• Your edits will be marked as pending and require admin approval</li>
-                                ) : (
-                                    <li>• Admin/supervisor edits will be automatically approved and used in future analysis</li>
-                                )}
-                                <li>• Verification status will be saved for all marked employees</li>
-                                <li>• This action cannot be easily undone</li>
-                            </ul>
-                        </div>
-                        {hasEdits && (
-                            <p className="text-sm text-slate-600">
-                                You have made edits to this report. These will be permanently saved as exceptions.
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setShowSaveConfirmation(false)}>
-                            Cancel
-                        </Button>
-                        <Button 
-                            onClick={() => {
-                                setShowSaveConfirmation(false);
-                                saveReportMutation.mutate();
-                            }}
-                            className="bg-green-600 hover:bg-green-700"
-                        >
-                            Confirm & Save
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
+            <SaveConfirmationDialog
+                open={showSaveConfirmation}
+                onClose={() => setShowSaveConfirmation(false)}
+                onConfirm={() => { setShowSaveConfirmation(false); saveReportMutation.mutate(); }}
+                hasEdits={hasEdits}
+                isUser={isUser}
+                isSupervisor={isSupervisor}
+            />
 
         </div>
     );
