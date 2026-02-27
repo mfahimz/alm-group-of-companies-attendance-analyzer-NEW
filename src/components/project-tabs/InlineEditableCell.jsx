@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Check, X, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,14 +7,21 @@ export default function InlineEditableCell({
     value, 
     onSave, 
     isEditable = true,
-    className = ''
+    className = '',
+    alwaysInput = false,
+    autoSaveOnBlur = false,
+    min = undefined
 }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(value || 0);
     const [isSaving, setIsSaving] = useState(false);
 
+    useEffect(() => {
+        setEditValue(value || 0);
+    }, [value]);
+
     const handleSave = async () => {
-        if (editValue === value) {
+        if (Number(editValue) === Number(value)) {
             setIsEditing(false);
             return;
         }
@@ -47,17 +54,42 @@ export default function InlineEditableCell({
         return <span className={className}>{value || 0}</span>;
     }
 
+    if (alwaysInput) {
+        return (
+            <Input
+                type="number"
+                min={min}
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={() => {
+                    if (autoSaveOnBlur) {
+                        handleSave();
+                    }
+                }}
+                className={`h-8 w-24 text-sm ${className}`}
+                disabled={isSaving}
+            />
+        );
+    }
+
     if (isEditing) {
         return (
             <div className="flex items-center gap-1">
                 <Input
                     type="number"
+                    min={min}
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     className="h-7 w-20 text-sm"
                     autoFocus
                     disabled={isSaving}
+                    onBlur={() => {
+                        if (autoSaveOnBlur) {
+                            handleSave();
+                        }
+                    }}
                 />
                 <Button
                     size="sm"
