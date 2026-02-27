@@ -368,6 +368,8 @@ Deno.serve(async (req) => {
             const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
             
             const amStart = parseTime(shift.am_start);
+            const amEnd = parseTime(shift.am_end);
+            const pmStart = parseTime(shift.pm_start);
             let pmEnd = parseTime(shift.pm_end);
             
             if (!amStart || !pmEnd) return { isPartial: false, reason: null };
@@ -377,10 +379,31 @@ Deno.serve(async (req) => {
                 pmEnd = new Date(pmEnd.getTime() + 24 * 60 * 60 * 1000);
             }
             
-            const expectedMinutes = (pmEnd - amStart) / (1000 * 60);
+            // CRITICAL FIX: For split/two-shift schedules (e.g., Ramadan day+night),
+            // calculate expected working time as sum of ACTUAL shift blocks, NOT span from first to last.
+            // Otherwise a long break between shifts (e.g., 12PM-8PM gap) inflates expected time
+            // and causes false partial-day detection.
+            const hasMiddleTimes = amEnd && pmStart && 
+                                   String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' &&
+                                   shift.am_end !== '—' && shift.pm_start !== '—' &&
+                                   shift.am_end !== '-' && shift.pm_start !== '-';
+            const isSingleShift = shift.is_single_shift === true || !hasMiddleTimes;
+            
+            let expectedMinutes;
+            if (isSingleShift) {
+                // Single shift: expected = pm_end - am_start (full span)
+                expectedMinutes = (pmEnd - amStart) / (1000 * 60);
+            } else {
+                // Two-shift / split shift: expected = (am block) + (pm block)
+                // This avoids counting the break between shifts
+                const amBlock = amEnd ? (amEnd - amStart) / (1000 * 60) : 0;
+                const pmBlock = pmStart ? (pmEnd - pmStart) / (1000 * 60) : 0;
+                expectedMinutes = amBlock + pmBlock;
+            }
+            
             const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
             
-            if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
+            if (expectedMinutes > 0 && actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
                 return { 
                     isPartial: true, 
                     reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)` 
