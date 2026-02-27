@@ -1894,10 +1894,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         })()}
                                         <td className="p-2 align-middle">
                                             {(() => {
-                                                // Use pre-computed effective_deductible_minutes from enriched result
-                                                // This already accounts for: (late+early-grace) - ramadan_gift
-                                                const giftMinutes = Math.max(0, result.ramadan_gift_minutes || 0);
-                                                const displayDeductible = result.effective_deductible_minutes ?? Math.max(0, (result.deductible_minutes ?? 0) - giftMinutes);
+                                                // deductible_minutes is already final (gift already subtracted by saveRamadanGift)
+                                                const displayDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
 
                                                 return (
                                                     <div className="flex flex-col">
@@ -1906,7 +1904,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                             onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                                 id: result.id, 
                                                                 field: 'manual_deductible_minutes', 
-                                                                value: Math.max(0, value + giftMinutes)
+                                                                value: Math.max(0, value)
                                                             })}
                                                             isEditable={isAdmin && !reportRun.is_final}
                                                             className={`font-bold ${displayDeductible > 0 ? 'text-red-600' : 'text-green-600'}`}
