@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import InlineEditableCell from './InlineEditableCell';
+import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
 import * as XLSX from 'xlsx';
 
@@ -48,6 +49,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const isUser = userRole === 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
+    const isCEO = userRole === 'ceo';
+    const isHRManager = userRole === 'hr_manager';
+    const canEditRamadanGift = isAdmin || isCEO || isHRManager;
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id],
@@ -63,6 +67,31 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company }),
         staleTime: 15 * 60 * 1000, // Cache for 15 minutes
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const { data: companyRecord = null } = useQuery({
+        queryKey: ['companyByName', project.company],
+        queryFn: async () => {
+            const companies = await base44.entities.Company.filter({ name: project.company }, null, 10);
+            return companies[0] || null;
+        },
+        enabled: !!project?.company,
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
+    const { data: ramadanSchedules = [] } = useQuery({
+        queryKey: ['ramadanSchedules', project.company],
+        queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 500),
+        enabled: !!project?.company,
+        staleTime: 15 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -808,6 +837,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         };
     };
 
+    const isAlMaraghiMotors = Number(companyRecord?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
+    const hasRamadanSchedule = React.useMemo(() => {
+        if (!reportRun?.date_from || !reportRun?.date_to) return false;
+        const projectStart = new Date(reportRun.date_from);
+        const projectEnd = new Date(reportRun.date_to);
+
+        return ramadanSchedules.some(schedule => {
+            const start = new Date(schedule.ramadan_start_date);
+            const end = new Date(schedule.ramadan_end_date);
+            return start <= projectEnd && end >= projectStart;
+        });
+    }, [ramadanSchedules, reportRun?.date_from, reportRun?.date_to]);
+    const showRamadanGiftColumn = isAlMaraghiMotors && hasRamadanSchedule && (isAdmin || isCEO || isHRManager);
+
     // For FINALIZED reports: use stored AnalysisResult values (immutable).
     // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
     // so the summary table matches the daily breakdown the user sees.
@@ -840,6 +883,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     other_minutes: result.other_minutes || 0,
                     approved_minutes: result.approved_minutes || 0,
                     deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
+                    ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
+                    effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? result.deductible_minutes ?? 0) - Math.max(0, result.ramadan_gift_minutes || 0)),
                     grace_minutes: result.grace_minutes ?? 15,
                     has_no_punches: hasNoPunches
                 };
@@ -869,6 +914,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
                 approved_minutes: result.approved_minutes || 0, deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
+                ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
+                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - Math.max(0, result.ramadan_gift_minutes || 0)),
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
@@ -913,10 +960,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 let aVal = a[sort.key];
                 let bVal = b[sort.key];
                 
-                // For deductible sorting, use late + early (before grace deduction)
+                // For deductible sorting, use effective deductible if available
                 if (sort.key === 'deductible_minutes') {
-                    aVal = (a.late_minutes || 0) + (a.early_checkout_minutes || 0);
-                    bVal = (b.late_minutes || 0) + (b.early_checkout_minutes || 0);
+                    aVal = a.effective_deductible_minutes ?? a.deductible_minutes ?? 0;
+                    bVal = b.effective_deductible_minutes ?? b.deductible_minutes ?? 0;
                 }
                 
                 // Handle null/undefined values - push them to the end
@@ -1424,7 +1471,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const rows = filteredResults.map(r => {
             // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
             // For non-finalized reports, use the recalculated values from enrichedResults
-            const deductible = r.deductible_minutes || 0;
+            const deductible = (r.effective_deductible_minutes ?? r.deductible_minutes) || 0;
             const late = r.late_minutes || 0;
             const early = r.early_checkout_minutes || 0;
             const grace = r.grace_minutes ?? 15;
@@ -1495,6 +1542,50 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         },
         onError: () => {
             toast.error('Failed to update value');
+        }
+    });
+
+    const updateRamadanGiftMinutesMutation = useMutation({
+        mutationFn: async ({ row, value }) => {
+            const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
+            const newValue = Math.max(0, Number(value || 0));
+
+            await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
+
+            if (oldValue !== newValue) {
+                try {
+                    await base44.functions.invoke('logAudit', {
+                        action_type: 'update',
+                        entity_name: 'AnalysisResult',
+                        entity_id: row.id,
+                        project_id: project.id,
+                        company: project.company,
+                        context: `RAMADAN_GIFT_MINUTES_UPDATE employee=${row.attendance_id || row.name} old=${oldValue} new=${newValue} user=${currentUser?.email || 'unknown'}`,
+                        changes: JSON.stringify({
+                            field: 'ramadan_gift_minutes',
+                            attendance_id: row.attendance_id || null,
+                            project_id: project.id,
+                            old_value: oldValue,
+                            new_value: newValue,
+                            changed_by: currentUser?.email || null
+                        })
+                    });
+                } catch (auditError) {
+                    console.warn('[ReportDetailView] Ramadan gift audit log failed:', auditError?.message || auditError);
+                }
+            }
+
+            return { rowId: row.id, newValue };
+        },
+        onSuccess: ({ rowId, newValue }) => {
+            queryClient.setQueryData(['results', reportRun.id], (prev = []) =>
+                prev.map(item => item.id === rowId ? { ...item, ramadan_gift_minutes: newValue } : item)
+            );
+            queryClient.invalidateQueries(['results', reportRun.id]);
+            toast.success('Ramadan gift minutes updated');
+        },
+        onError: () => {
+            toast.error('Failed to update Ramadan gift minutes');
         }
     });
 
@@ -1742,6 +1833,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         Other Minutes
                                     </SortableTableHead>
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>
+                                    {showRamadanGiftColumn && (
+                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Ramadan Gift (min)</th>
+                                    )}
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Deductible</th>
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Notes</th>
                                     <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground bg-slate-50">Actions</th>
@@ -1864,11 +1958,23 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 )}
                                             </div>
                                         </td>
+                                        {showRamadanGiftColumn && (
+                                            <td className="p-2 align-middle">
+                                                <InlineEditableCell
+                                                    value={Math.max(0, result.ramadan_gift_minutes || 0)}
+                                                    onSave={(value) => updateRamadanGiftMinutesMutation.mutateAsync({ row: result, value: Math.max(0, value) })}
+                                                    isEditable={canEditRamadanGift && !reportRun.is_final && project.status !== 'closed'}
+                                                    alwaysInputWithSave
+                                                    min={0}
+                                                    className="font-medium text-amber-700"
+                                                />
+                                            </td>
+                                        )}
                                         <td className="p-2 align-middle">
                                             {(() => {
-                                                // Use stored deductible_minutes from AnalysisResult
-                                                // Formula (stored in AnalysisResult): ((late + early) - grace) - approved, with other_minutes stored separately
-                                                const displayDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
+                                                const rawDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
+                                                const giftMinutes = Math.max(0, result.ramadan_gift_minutes || 0);
+                                                const displayDeductible = Math.max(0, rawDeductible - giftMinutes);
 
                                                 return (
                                                     <div className="flex flex-col">
@@ -1877,7 +1983,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                             onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                                 id: result.id, 
                                                                 field: 'manual_deductible_minutes', 
-                                                                value: Math.max(0, value)
+                                                                value: Math.max(0, value + giftMinutes)
                                                             })}
                                                             isEditable={isAdmin && !reportRun.is_final}
                                                             className={`font-bold ${displayDeductible > 0 ? 'text-red-600' : 'text-green-600'}`}
