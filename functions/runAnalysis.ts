@@ -1136,6 +1136,9 @@ Deno.serve(async (req) => {
                 }
 
                 // Check for approved minutes (foundation for all companies, currently enabled for Al Maraghi Motors only)
+                // NOTE: approvedMinutesForDay is applied PER-DAY in the punch time calculation below
+                // (reducing late/early for that specific day). totalApprovedMinutes is tracked for REPORTING
+                // purposes only — it is NOT used to reduce deductible again (that would be double-dipping).
                 let approvedMinutesForDay = 0;
                 try {
                     if (rules.approved_minutes_enabled && 
