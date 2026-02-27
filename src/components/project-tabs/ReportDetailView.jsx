@@ -319,35 +319,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const detectPartialDay = (dayPunches, shift) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-        
-        // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive';
-        
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw, includeSeconds)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
-        
-        if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
-        
-        const firstPunch = punchesWithTime[0].time;
-        const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
-        
-        const amStart = parseTime(shift.am_start);
-        const pmEnd = parseTime(shift.pm_end);
-        
+        const incSec = project.company === 'Al Maraghi Automotive';
+        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw, incSec) })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        if (pts.length < 2) return { isPartial: false, reason: null };
+        const amStart = parseTime(shift.am_start), amEnd = parseTime(shift.am_end), pmStart = parseTime(shift.pm_start);
+        let pmEnd = parseTime(shift.pm_end);
         if (!amStart || !pmEnd) return { isPartial: false, reason: null };
-        
-        const expectedMinutes = (pmEnd - amStart) / (1000 * 60);
-        const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
-        
-        if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
-            return { 
-                isPartial: true, 
-                reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)` 
-            };
-        }
-        
+        if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
+        const mid = amEnd && pmStart && String(shift.am_end||'').trim() !== '' && String(shift.pm_start||'').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
+        const single = shift.is_single_shift === true || !mid;
+        const expected = single ? (pmEnd - amStart) / 60000 : ((amEnd ? (amEnd - amStart) / 60000 : 0) + (pmStart ? (pmEnd - pmStart) / 60000 : 0));
+        const actual = (pts[pts.length - 1].time - pts[0].time) / 60000;
+        if (expected > 0 && actual < expected * 0.5 && actual > 0) return { isPartial: true, reason: `Worked ${Math.round(actual)} min (expected ${Math.round(expected)} min)` };
         return { isPartial: false, reason: null };
     };
 
