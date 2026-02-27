@@ -1545,25 +1545,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    const updateRamadanGiftMinutesMutation = useMutation({
-        mutationFn: async ({ row, value }) => {
-            const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
-            const newValue = Math.max(0, Number(value || 0));
-            const lateMinutes = Math.max(0, row.late_minutes || 0);
-            const earlyMinutes = Math.max(0, row.early_checkout_minutes || 0);
-            const graceMinutes = Math.max(0, row.grace_minutes ?? 15);
-            const baseDeductible = Math.max(0, lateMinutes + earlyMinutes - graceMinutes);
-            const newEffectiveDeductible = Math.max(0, baseDeductible - newValue);
-            await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: newEffectiveDeductible });
-            if (oldValue !== newValue) {
-                try {
-                    await base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT_MINUTES_UPDATE employee=${row.attendance_id || row.name} old=${oldValue} new=${newValue} newDeductible=${newEffectiveDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, new_deductible: newEffectiveDeductible }) });
-                } catch (auditError) { console.warn('[ReportDetailView] Ramadan gift audit log failed:', auditError?.message || auditError); }
-            }
-        },
-        onSuccess: () => { queryClient.invalidateQueries(['results', reportRun.id]); toast.success('Ramadan gift saved & deductible recalculated'); },
-        onError: () => { toast.error('Failed to update Ramadan gift minutes'); }
-    });
+    // RamadanGiftCellWidget import is at top of file (RamadanGiftCell.jsx)
+    const saveRamadanGift = async (row, value) => {
+        const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
+        const newValue = Math.max(0, Number(value || 0));
+        const base = Math.max(0, (row.late_minutes||0) + (row.early_checkout_minutes||0) - (row.grace_minutes??15));
+        const newDeductible = Math.max(0, base - newValue);
+        await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: newDeductible });
+        if (oldValue !== newValue) {
+            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} deductible=${newDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, new_deductible: newDeductible }) }).catch(()=>{});
+        }
+        queryClient.invalidateQueries(['results', reportRun.id]);
+        toast.success('Ramadan gift saved & deductible recalculated');
+    };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
     const verifiedCount = verifiedEmployees.length;
