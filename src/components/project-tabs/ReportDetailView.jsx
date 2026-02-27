@@ -919,7 +919,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, project, getEffectiveRamadanGiftMinutes]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, project]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
