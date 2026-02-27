@@ -9,7 +9,6 @@ export default function InlineEditableCell({
     isEditable = true,
     className = '',
     alwaysInput = false,
-    alwaysInputWithSave = false,
     autoSaveOnBlur = false,
     min = undefined
 }) {
@@ -53,33 +52,6 @@ export default function InlineEditableCell({
 
     if (!isEditable) {
         return <span className={className}>{value || 0}</span>;
-    }
-
-
-    if (alwaysInputWithSave) {
-        return (
-            <div className="flex items-center gap-1">
-                <Input
-                    type="number"
-                    min={min}
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className={`h-8 w-24 text-sm ${className}`}
-                    disabled={isSaving}
-                />
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 p-0 border border-slate-200"
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    title="Save"
-                >
-                    <Check className="w-3 h-3 text-green-600" />
-                </Button>
-            </div>
-        );
     }
 
     if (alwaysInput) {
