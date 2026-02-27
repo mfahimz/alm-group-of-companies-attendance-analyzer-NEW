@@ -1929,9 +1929,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             </div>
                                         </td>
                                         {showRamadanGiftColumn && (() => {
-                                            const isEdit = canEditRamadanGift && !reportRun.is_final && project.status !== 'closed';
-                                            if (!isEdit) return <td className="p-2 align-middle"><span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span></td>;
-                                            return <td className="p-2 align-middle"><RamadanGiftCellWidget result={result} onSave={saveRamadanGift} isEditable={!isReadOnly} /></td>;
+                                            const canEdit = !reportRun.is_final && project.status !== 'closed';
+                                            if (!canEdit) return <td className="p-2 align-middle"><span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span></td>;
+                                            return <td className="p-2 align-middle"><RamadanGiftCellWidget result={result} onSave={saveRamadanGift} isEditable={true} /></td>;
                                         })()}
                                         <td className="p-2 align-middle">
                                             {(() => {
