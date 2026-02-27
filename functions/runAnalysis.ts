@@ -1421,29 +1421,34 @@ Deno.serve(async (req) => {
         }
 
         // Create MANUAL_OTHER_MINUTES exceptions for employees with other minutes
+        // CRITICAL FIX: Create PER-DATE exceptions, not spanning the entire project range.
+        // Each date with other minutes gets its own exception with the correct minutes for that day.
         if (otherMinutesExceptionsToCreate.length > 0) {
-            console.log(`[runAnalysis] Creating ${otherMinutesExceptionsToCreate.length} MANUAL_OTHER_MINUTES exceptions`);
+            console.log(`[runAnalysis] Creating MANUAL_OTHER_MINUTES exceptions (per-date) for ${otherMinutesExceptionsToCreate.length} employees`);
             
             for (const detail of otherMinutesExceptionsToCreate) {
                 try {
-                    // Format breakdown for details field
-                    const breakdownText = Object.entries(detail.breakdown || {})
-                        .map(([date, minutes]) => `${new Date(date).toLocaleDateString()}: ${minutes} min`)
-                        .join(' | ');
+                    const breakdown = detail.breakdown || {};
+                    const dates = Object.keys(breakdown);
                     
-                    await base44.asServiceRole.entities.Exception.create({
-                        project_id,
-                        attendance_id: detail.attendance_id,
-                        date_from: date_from,
-                        date_to: date_to,
-                        type: 'MANUAL_OTHER_MINUTES',
-                        other_minutes: detail.other_minutes,
-                        details: `Total: ${detail.other_minutes} min | Breakdown: ${breakdownText}`,
-                        created_from_report: true,
-                        report_run_id: reportRun.id,
-                        use_in_analysis: true,
-                        approval_status: 'pending_dept_head'
-                    });
+                    for (const dateStr of dates) {
+                        const minutesForDate = breakdown[dateStr];
+                        if (!minutesForDate || minutesForDate <= 0) continue;
+                        
+                        await base44.asServiceRole.entities.Exception.create({
+                            project_id,
+                            attendance_id: detail.attendance_id,
+                            date_from: dateStr,
+                            date_to: dateStr,
+                            type: 'MANUAL_OTHER_MINUTES',
+                            other_minutes: minutesForDate,
+                            details: `Other minutes: ${minutesForDate} min on ${new Date(dateStr).toLocaleDateString()}`,
+                            created_from_report: true,
+                            report_run_id: reportRun.id,
+                            use_in_analysis: true,
+                            approval_status: 'pending_dept_head'
+                        });
+                    }
                 } catch (exError) {
                     console.warn(`[runAnalysis] Failed to create other minutes exception for ${detail.attendance_id}:`, exError.message);
                 }
