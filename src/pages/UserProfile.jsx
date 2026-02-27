@@ -58,12 +58,26 @@ export default function UserProfile() {
                             <Shield className="w-5 h-5 text-slate-400" />
                             <div>
                                 <p className="text-sm text-slate-600">Role</p>
-                                <span className={`
-                                    inline-block px-2 py-1 rounded-full text-xs font-medium mt-1
-                                    ${user?.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}
-                                `}>
-                                    {user?.role === 'admin' ? 'Admin' : 'User'}
-                                </span>
+                                {(() => {
+                                    const displayRole = user?.extended_role || user?.role || 'user';
+                                    const roleStyles = {
+                                        admin: 'bg-purple-100 text-purple-700',
+                                        ceo: 'bg-indigo-100 text-indigo-700',
+                                        hr_manager: 'bg-teal-100 text-teal-700',
+                                        supervisor: 'bg-blue-100 text-blue-700',
+                                        department_head: 'bg-green-100 text-green-700',
+                                        user: 'bg-slate-100 text-slate-700'
+                                    };
+                                    const roleLabels = {
+                                        admin: 'Admin', ceo: 'CEO', hr_manager: 'HR Manager',
+                                        supervisor: 'Supervisor', department_head: 'Dept Head', user: 'User'
+                                    };
+                                    return (
+                                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${roleStyles[displayRole] || roleStyles.user}`}>
+                                            {roleLabels[displayRole] || 'User'}
+                                        </span>
+                                    );
+                                })()}
                             </div>
                         </div>
                         <div className="flex items-center gap-3">

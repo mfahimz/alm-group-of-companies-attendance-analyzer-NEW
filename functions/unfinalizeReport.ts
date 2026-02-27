@@ -14,10 +14,10 @@ Deno.serve(async (req) => {
         }
 
         const userRole = user?.extended_role || user?.role || 'user';
-        
-        // Only admins can un-finalize
-        if (userRole !== 'admin') {
-            return Response.json({ error: 'Only admins can un-finalize reports' }, { status: 403 });
+
+        // Admin and HR Manager can un-finalize
+        if (userRole !== 'admin' && userRole !== 'hr_manager') {
+            return Response.json({ error: 'Only Admin or HR Manager can un-finalize reports' }, { status: 403 });
         }
 
         const { report_run_id, project_id } = await req.json();

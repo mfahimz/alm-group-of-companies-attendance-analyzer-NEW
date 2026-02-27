@@ -22,11 +22,11 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // PERMISSION CHECK: ADMIN ONLY
+        // PERMISSION CHECK: Admin, CEO, and HR Manager can override day values
         const userRole = user?.extended_role || user?.role || 'user';
-        if (userRole !== 'admin') {
-            return Response.json({ 
-                error: 'Access denied: Only Admin can override day values' 
+        if (userRole !== 'admin' && userRole !== 'ceo' && userRole !== 'hr_manager') {
+            return Response.json({
+                error: 'Access denied: Admin, CEO, or HR Manager role required to override day values'
             }, { status: 403 });
         }
 
