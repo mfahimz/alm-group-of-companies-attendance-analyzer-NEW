@@ -1552,10 +1552,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const base = Math.max(0, (row.late_minutes||0) + (row.early_checkout_minutes||0) - (row.grace_minutes??15));
         const newDeductible = Math.max(0, base - newValue);
         await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: newDeductible });
-        if (oldValue !== newValue) {
-            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} deductible=${newDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, new_deductible: newDeductible }) }).catch(()=>{});
-        }
-        queryClient.invalidateQueries(['results', reportRun.id]);
+        if (oldValue !== newValue) { base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} deductible=${newDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, new_deductible: newDeductible }) }).catch(()=>{}); }
+        await queryClient.invalidateQueries({ queryKey: ['results', reportRun.id] });
+        await queryClient.refetchQueries({ queryKey: ['results', reportRun.id] });
         toast.success('Ramadan gift saved & deductible recalculated');
     };
 
