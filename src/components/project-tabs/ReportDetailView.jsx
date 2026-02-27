@@ -858,28 +858,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annualLeaveCount
             } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
 
-            // Dynamic deductible: (late + early) - grace - approved (other_minutes excluded)
-            const baseMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
+            // Deductible: (late + early) - grace. Approved minutes already applied per-day in punch calc.
             const graceMinutes = result.grace_minutes ?? 15;
-            const approvedMinutes = result.approved_minutes || 0;
-            const dynamicDeductible = Math.max(0, Math.max(0, baseMinutes - graceMinutes) - approvedMinutes);
+            const dynamicDeductible = Math.max(0, Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout) - graceMinutes);
 
             return {
-                ...result,
-                name: employee?.name || 'Unknown',
-                working_days: workingDays,
-                present_days: result.manual_present_days ?? presentDays,
-                full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
-                half_absence_count: halfAbsenceCount,
-                sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
-                annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount,
-                late_minutes: Math.max(0, totalLateMinutes),
-                early_checkout_minutes: Math.max(0, totalEarlyCheckout),
-                other_minutes: Math.max(0, totalOtherMinutes),
-                approved_minutes: approvedMinutes,
-                deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
-                grace_minutes: graceMinutes,
-                has_no_punches: hasNoPunches
+                ...result, name: employee?.name || 'Unknown', working_days: workingDays,
+                present_days: result.manual_present_days ?? presentDays, full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
+                half_absence_count: halfAbsenceCount, sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
+                annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
+                early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
+                approved_minutes: result.approved_minutes || 0, deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
+                grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
     }, [results, employees, punches, shifts, exceptions, reportRun, project]);
