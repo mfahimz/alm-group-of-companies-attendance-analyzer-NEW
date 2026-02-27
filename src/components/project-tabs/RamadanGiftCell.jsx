@@ -10,7 +10,7 @@ import { Check, Loader2 } from 'lucide-react';
  * On save, it recalculates and persists deductible_minutes =
  *   max(0, lateMinutes + earlyMinutes - graceMinutes) - giftMinutes
  */
-export default function RamadanGiftCell({ result, onSave, isEditable }) {
+export default function RamadanGiftCellWidget({ result, onSave, isEditable }) {
     const storedGift = Math.max(0, result.ramadan_gift_minutes || 0);
     const [inputVal, setInputVal] = useState(storedGift);
     const [isSaving, setIsSaving] = useState(false);
