@@ -165,11 +165,17 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
-                    // Step 3: Get allocated grace minutes (AttendanceRules department-based, plus per-employee carried grace if applicable)
-                    const dept = employee.department || 'Admin';
-                    const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
-                    const carriedGrace = project.use_carried_grace_minutes ? (employee.carried_grace_minutes || 0) : 0;
-                    const graceMinutesAllocated = baseGrace + carriedGrace;
+                    // Step 3: Get grace allocation used for this employee
+                    // If carry-forward was enabled, read effectiveGrace from AnalysisResult.grace_minutes
+                    // (the exact value runAnalysis computed and used, not recomputed).
+                    // If carry-forward was NOT enabled, use defaultGraceMinutes from AttendanceRules.
+                    let graceMinutesAllocated;
+                    if (project.use_carried_grace_minutes) {
+                        graceMinutesAllocated = result.grace_minutes || 0;
+                    } else {
+                        const dept = employee.department || 'Admin';
+                        graceMinutesAllocated = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
+                    }
 
                     // Step 4: Compute unusedGrace — only late + early checkout, NOT otherMinutes
                     const lateMinutes = result.late_minutes || 0;
