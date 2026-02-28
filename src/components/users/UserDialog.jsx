@@ -320,7 +320,8 @@ export default function UserDialog({ open, onClose, user }) {
         }
 
         // Validate company assignment for roles that require it
-        const rolesRequiringCompany = ['user', 'department_head', 'ceo', 'hr_manager'];
+        // HR Manager does NOT require a company - they have access to all companies
+        const rolesRequiringCompany = ['user', 'department_head', 'ceo'];
         if (rolesRequiringCompany.includes(formData.extended_role) && !formData.company) {
             toast.error('Please assign a company to this user');
             return;
