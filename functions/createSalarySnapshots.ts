@@ -1577,6 +1577,8 @@ Deno.serve(async (req) => {
             // Get adjustment values from OvertimeData
             const bonus = otRecord?.bonus || 0;
             const incentive = otRecord?.incentive || 0;
+            const openLeaveSalary = isAlMaraghi ? (otRecord?.open_leave_salary || 0) : 0;
+            const variableSalary = isAlMaraghi ? (otRecord?.variable_salary || 0) : 0;
             const otherDeduction = otRecord?.otherDeduction || 0;
             const advanceSalaryDeduction = otRecord?.advanceSalaryDeduction || 0;
             const openLeaveSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.open_leave_salary || 0)) : 0;
