@@ -83,9 +83,9 @@ export default function UserDialog({ open, onClose, user }) {
         return deptMap;
     }, [formData.company, formData.extended_role, deptHeads, employees]);
 
-    // Get available DepartmentHead records for linking to CEO only
+    // Get available DepartmentHead records for linking to CEO and HR Manager
     const availableDeptHeadLinks = React.useMemo(() => {
-        if (formData.extended_role !== 'ceo') return [];
+        if (formData.extended_role !== 'ceo' && formData.extended_role !== 'hr_manager') return [];
 
         const activeDeptHeads = deptHeads.filter(dh => dh.active && dh.employee_id);
 
