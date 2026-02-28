@@ -45,11 +45,14 @@ export const CompanyFilterProvider = ({ children }) => {
         localStorage.removeItem('selectedCompany');
     };
 
-    // For privileged roles (admin, ceo, supervisor), allow company switching
-    const canSwitchCompany = currentUser?.role === 'admin' || 
-                            currentUser?.role === 'ceo' || 
-                            currentUser?.role === 'supervisor' ||
-                            currentUser?.role === 'hr_manager';
+    // Use extended_role for accurate role checks
+    const userRole = currentUser?.extended_role || currentUser?.role;
+
+    // HR Manager, admin, ceo, supervisor can access all companies (switch freely)
+    const canSwitchCompany = userRole === 'admin' || 
+                            userRole === 'ceo' || 
+                            userRole === 'supervisor' ||
+                            userRole === 'hr_manager';
 
     // Effective company for filtering (for non-privileged users, always use their assigned company)
     const effectiveCompany = canSwitchCompany ? selectedCompany : currentUser?.company;
