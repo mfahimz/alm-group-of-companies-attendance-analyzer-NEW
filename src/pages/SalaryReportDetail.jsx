@@ -914,8 +914,12 @@ export default function SalaryReportDetail() {
                                                 <td className={`${cellBase} bg-emerald-50/50 px-1`}>
                                                     <Input type="number" step="0.01" value={getValue(row, 'incentive')} onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)} className="h-6 text-xs w-14 px-1" />
                                                 </td>
-                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50`}>{asNumber(row.open_leave_salary).toFixed(2)}</td>}
-                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50`}>{asNumber(row.variable_salary).toFixed(2)}</td>}
+                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
+                                                    <Input type="number" step="0.01" value={getValue(row, 'open_leave_salary')} onChange={(e) => handleChange(row.hrms_id, 'open_leave_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
+                                                </td>}
+                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
+                                                    <Input type="number" step="0.01" value={getValue(row, 'variable_salary')} onChange={(e) => handleChange(row.hrms_id, 'variable_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
+                                                </td>}
                                                 <td className={`${cellBase} bg-emerald-100 font-bold border-r border-slate-200`}>{netAdditions.toFixed(2)}</td>
 
                                                 {/* Deductions */}
