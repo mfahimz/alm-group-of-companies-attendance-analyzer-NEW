@@ -55,7 +55,7 @@ export default function UserDialog({ open, onClose, user }) {
     const { data: allUsers = [] } = useQuery({
         queryKey: ['allUsersForDeptHeadLink'],
         queryFn: () => base44.entities.User.list(),
-        enabled: (formData.extended_role === 'ceo' || formData.extended_role === 'hr_manager')
+        enabled: formData.extended_role === 'ceo'
     });
 
     const { data: companiesData = [] } = useQuery({
