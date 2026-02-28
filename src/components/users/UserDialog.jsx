@@ -544,22 +544,16 @@ export default function UserDialog({ open, onClose, user }) {
                             </>
                         )}
 
-                        {/* HR Manager info notice */}
-                        {formData.extended_role === 'hr_manager' && (
-                            <div className="border border-teal-200 rounded-lg p-3 bg-teal-50">
-                                <p className="text-sm text-teal-800 font-medium">HR Manager — All Companies Access</p>
-                                <p className="text-xs text-teal-600 mt-1">
-                                    HR Managers have unrestricted access to all companies. No company assignment needed.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Optional Department Head linking for CEO only */}
-                        {formData.extended_role === 'ceo' && (
+                        {/* Department Head linking for CEO and HR Manager */}
+                        {(formData.extended_role === 'ceo' || formData.extended_role === 'hr_manager') && (
                             <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                                <Label className="text-sm font-medium">Link Department Head Role (Optional)</Label>
+                                <Label className="text-sm font-medium">
+                                    {formData.extended_role === 'hr_manager' ? 'Link Department Head Role (Optional)' : 'Link Department Head Role (Optional)'}
+                                </Label>
                                 <p className="text-xs text-slate-500 mb-2">
-                                    Optionally link to an existing department head record to enable team management via the Department Head Dashboard
+                                    {formData.extended_role === 'hr_manager'
+                                        ? 'Optionally link to an existing department head record to assign a company and department for this HR Manager'
+                                        : 'Optionally link to an existing department head record to enable team management via the Department Head Dashboard'}
                                 </p>
                                 <Select
                                     value={formData.linked_dept_head_id || 'none'}
@@ -579,7 +573,7 @@ export default function UserDialog({ open, onClose, user }) {
                                 </Select>
                                 {formData.linked_dept_head_id && (
                                     <p className="text-xs text-green-600 mt-1">
-                                        Will be linked to department head record. This grants access to the Department Head Dashboard.
+                                        Linked to: {availableDeptHeadLinks.find(dh => dh.id === formData.linked_dept_head_id)?.department}, {availableDeptHeadLinks.find(dh => dh.id === formData.linked_dept_head_id)?.company}
                                     </p>
                                 )}
                             </div>
