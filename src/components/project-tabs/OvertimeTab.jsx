@@ -78,7 +78,7 @@ export default function OvertimeTab({ project }) {
     // DERIVED VALUES
     // ============================================
     const hasFinalReport = !!finalizedReport;
-    const isAlMaraghiMotors = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
+    const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
     const isProjectClosed = project?.status === 'closed';
     const canEditAdjustments = hasFinalReport && !isProjectClosed;
 
