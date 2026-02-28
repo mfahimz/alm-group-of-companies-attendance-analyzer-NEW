@@ -1915,30 +1915,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             return <td className="p-2 align-middle"><RamadanGiftCellWidget result={result} onSave={saveRamadanGift} isEditable={true} /></td>;
                                         })()}
                                         <td className="p-2 align-middle">
-                                            {(() => {
-                                                // deductible_minutes is already final (gift already subtracted by saveRamadanGift)
-                                                const displayDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
-
-                                                return (
-                                                    <div className="flex flex-col">
-                                                        <InlineEditableCell
-                                                            value={displayDeductible}
-                                                            onSave={(value) => updateManualOverrideMutation.mutate({ 
-                                                                id: result.id, 
-                                                                field: 'manual_deductible_minutes', 
-                                                                value: Math.max(0, value + giftMinutes)
-                                                            })}
-                                                            isEditable={isAdmin && !reportRun.is_final}
-                                                            className={`font-bold ${displayDeductible > 0 ? 'text-red-600' : 'text-green-600'}`}
-                                                        />
-                                                        {reportRun.is_final && (
-                                                            <span className="text-[10px] text-purple-600">
-                                                                Finalized
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
+                                            <DeductibleCell
+                                                result={result}
+                                                isEditable={isAdmin && !reportRun.is_final}
+                                                isFinalized={reportRun.is_final}
+                                                onSave={(storeValue) => updateManualOverrideMutation.mutate({
+                                                    id: result.id,
+                                                    field: 'manual_deductible_minutes',
+                                                    value: storeValue
+                                                })}
+                                            />
                                             </td>
                                             <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate">
                                              {result.notes || '-'}
