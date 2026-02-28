@@ -108,22 +108,40 @@ Deno.serve(async (req) => {
         await Promise.all(updates);
 
         // ============================================================================
-        // GRACE MINUTES CARRY-FORWARD (Al Maraghi Auto Repairs only)
+        // GRACE MINUTES CARRY-FORWARD (Al Maraghi Motors only — identified by stable company_id)
         // ============================================================================
-        let graceCarryForwardResults = { processed: 0, skipped: 0, already_exists: 0 };
+        const AL_MARAGHI_MOTORS_COMPANY_ID = 2;
+        let graceCarryForwardResults = { processed: 0, skipped: 0 };
 
-        if (carry_forward_grace_minutes === true && (project.company === 'Al Maraghi Auto Repairs' || project.company === 'Al Maraghi Motors')) {
-            console.log('[closeProject] Grace carry-forward requested');
+        // Step 1: Check if this project belongs to Al Maraghi Motors by company_id
+        let isAlMaraghiMotors = false;
+        try {
+            const companyRecords = await base44.asServiceRole.entities.Company.filter({ name: project.company }, null, 5);
+            if (companyRecords.length > 0 && companyRecords[0].company_id === AL_MARAGHI_MOTORS_COMPANY_ID) {
+                isAlMaraghiMotors = true;
+            }
+        } catch (e) {
+            console.warn('[closeProject] Could not resolve company_id, skipping grace logic');
+        }
 
-            if (project.grace_carried_forward === true) {
-                console.log('[closeProject] Grace carry-forward already completed, skipping');
-                graceCarryForwardResults.already_exists = 1;
-            } else {
+        if (isAlMaraghiMotors) {
+            console.log('[closeProject] Al Maraghi Motors detected (company_id=2), running grace carry-forward');
+
+            // Step 2: Fetch the single finalized ReportRun for this project
+            let reportRun = null;
+            try {
                 const reportRuns = await base44.asServiceRole.entities.ReportRun.filter({
                     id: project.last_saved_report_id
                 }, null, 10);
-                const reportRun = reportRuns.length > 0 ? reportRuns[0] : null;
+                reportRun = reportRuns.length > 0 ? reportRuns[0] : null;
+            } catch (e) {
+                console.warn('[closeProject] Failed to fetch ReportRun:', e.message);
+            }
 
+            if (!reportRun || !reportRun.is_final) {
+                console.warn('[closeProject] No finalized report found for project, skipping grace update');
+            } else {
+                // Fetch AttendanceRules for the company
                 const rulesData = await base44.asServiceRole.entities.AttendanceRules.filter({
                     company: project.company
                 }, null, 10);
@@ -132,96 +150,62 @@ Deno.serve(async (req) => {
                     try {
                         rules = JSON.parse(rulesData[0].rules_json);
                     } catch (e) {
-                        console.warn('[closeProject] Failed to parse rules');
+                        console.warn('[closeProject] Failed to parse AttendanceRules');
                     }
                 }
 
-                const nowUAE = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString();
-                const periodFrom = reportRun?.date_from || project?.date_from || '2025-01-01';
-                const periodTo = reportRun?.date_to || project?.date_to || '2025-01-31';
-
+                // Steps 3–6: Process each employee in the finalized report
                 for (const result of results) {
                     const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
+                    // Step 6: If employee has no matching record, skip silently and log
                     if (!employee || !employee.hrms_id || !employee.attendance_id) {
-                        console.warn(`[closeProject] Skip invalid employee: ${result.attendance_id}`);
+                        console.warn(`[closeProject] No employee record for attendance_id=${result.attendance_id}, skipping`);
                         graceCarryForwardResults.skipped++;
                         continue;
                     }
 
+                    // Step 3: Get allocated grace minutes (AttendanceRules department-based, plus per-employee carried grace if applicable)
                     const dept = employee.department || 'Admin';
                     const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
                     const carriedGrace = project.use_carried_grace_minutes ? (employee.carried_grace_minutes || 0) : 0;
-                    const graceMinutesAvailable = baseGrace + carriedGrace;
+                    const graceMinutesAllocated = baseGrace + carriedGrace;
 
+                    // Step 4: Compute unusedGrace — only late + early checkout, NOT otherMinutes
                     const lateMinutes = result.late_minutes || 0;
                     const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-                    const ramadanGiftMinutes = result.ramadan_gift_minutes || 0;
-                    const timeIssues = Math.max(0, lateMinutes + earlyCheckoutMinutes - ramadanGiftMinutes);
-                    const unusedGraceMinutes = Math.max(0, graceMinutesAvailable - timeIssues);
+                    const totalLateAndEarlyMinutes = lateMinutes + earlyCheckoutMinutes;
+                    const unusedGrace = Math.max(0, graceMinutesAllocated - totalLateAndEarlyMinutes);
 
-                    // SKIP if no grace to carry
-                    if (unusedGraceMinutes <= 0) {
-                        console.log(`[closeProject] No grace to carry for ${employee.name}`);
-                        continue;
-                    }
-
-                    // IDEMPOTENCY: Check if already carried
-                    const existingRecord = await base44.asServiceRole.entities.EmployeeGraceHistory.filter({
-                        employee_id: String(employee.hrms_id),
-                        source_project_id: String(project_id)
-                    }, null, 10);
-
-                    if (existingRecord.length > 0) {
-                        console.log(`[closeProject] Already carried for ${employee.name}, skipping`);
-                        graceCarryForwardResults.already_exists++;
-                        continue;
-                    }
+                    // Step 5: Replace carried_grace_minutes entirely (write 0 explicitly if unusedGrace is 0)
+                    const oldCarriedGrace = employee.carried_grace_minutes || 0;
 
                     try {
-                        // WRITE 1: Create EmployeeGraceHistory (audit-only)
-                        await base44.asServiceRole.entities.EmployeeGraceHistory.create({
-                            employee_id: String(employee.hrms_id).trim(),
-                            attendance_id: String(employee.attendance_id).trim(),
-                            employee_name: String(employee.name || 'Unknown').trim(),
-                            company: String(project.company).trim(),
-                            source_project_id: String(project_id).trim(),
-                            source_project_name: String(project.name || '').trim(),
-                            report_run_id: String(project.last_saved_report_id).trim(),
-                            period_from: String(periodFrom).trim(),
-                            period_to: String(periodTo).trim(),
-                            grace_minutes_available: Math.max(0, Number(graceMinutesAvailable)),
-                            late_minutes: Math.max(0, Number(lateMinutes)),
-                            early_checkout_minutes: Math.max(0, Number(earlyCheckoutMinutes)),
-                            time_issues: Math.max(0, Number(timeIssues)),
-                            unused_grace_minutes: Math.max(0, Number(unusedGraceMinutes)),
-                            carried_at: String(nowUAE).trim(),
-                            carried_by: 'system@closeProject'
-                        });
-
-                        // WRITE 2: Update Employee.carried_grace_minutes (operational field)
-                        const currentCarried = employee.carried_grace_minutes || 0;
-                        const newCarried = currentCarried + unusedGraceMinutes;
                         await base44.asServiceRole.entities.Employee.update(employee.id, {
                             hrms_id: String(employee.hrms_id).trim(),
                             attendance_id: String(employee.attendance_id).trim(),
-                            carried_grace_minutes: newCarried
+                            carried_grace_minutes: unusedGrace
                         });
 
-                        console.log(`[closeProject] Synced: ${employee.name} → ${newCarried}m`);
-                        graceCarryForwardResults.processed++;
+                        // Step 7: logAudit for each employee updated
+                        await base44.asServiceRole.functions.invoke('logAudit', {
+                            action_type: 'GRACE_CARRY_FORWARD',
+                            entity_name: 'Employee',
+                            entity_id: String(employee.hrms_id),
+                            changes: JSON.stringify({
+                                carried_grace_minutes: { old: oldCarriedGrace, new: unusedGrace }
+                            }),
+                            project_id: project_id,
+                            company: project.company,
+                            context: `closeProject grace carry-forward. Acting user: ${user.email}`
+                        });
 
+                        console.log(`[closeProject] Grace updated: ${employee.name} — old=${oldCarriedGrace}, new=${unusedGrace}`);
+                        graceCarryForwardResults.processed++;
                     } catch (err) {
-                        console.error(`[closeProject] Failed for ${employee.name}:`, err.message);
+                        console.error(`[closeProject] Failed to update grace for ${employee.name}:`, err.message);
                         graceCarryForwardResults.skipped++;
                     }
-                }
-
-                // Set flag only after all processed
-                if (graceCarryForwardResults.processed > 0) {
-                    await base44.asServiceRole.entities.Project.update(project_id, {
-                        grace_carried_forward: true
-                    });
                 }
             }
         }
