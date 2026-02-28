@@ -1355,6 +1355,18 @@ Deno.serve(async (req) => {
             };
         };
 
+        // Preserve Ramadan gift minutes when re-running analysis for an existing report
+        const existingResultsForReport = await base44.asServiceRole.entities.AnalysisResult.filter({
+            project_id,
+            report_run_id: reportRun.id
+        }, null, 5000);
+
+        const existingRamadanGiftMinutesByAttendanceId = new Map(
+            existingResultsForReport
+                .filter(r => r.attendance_id !== null && r.attendance_id !== undefined)
+                .map(r => [String(r.attendance_id), Math.max(0, Number(r.ramadan_gift_minutes || 0))])
+        );
+
         // Process all employees and build results array
         // Using smaller batches with delays to handle database load issues
         const allResults = [];
@@ -1379,9 +1391,12 @@ Deno.serve(async (req) => {
                 
                 processedAttendanceIds.add(idStr);
                 const result = await analyzeEmployee(attendance_id);
+                const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
+
                 allResults.push({
                     project_id,
                     report_run_id: reportRun.id,
+                    ramadan_gift_minutes: preservedRamadanGiftMinutes,
                     ...result
                 });
                 
@@ -1402,6 +1417,15 @@ Deno.serve(async (req) => {
         
         console.log('[runAnalysis] Processed employees:', allResults.length);
         console.log('[runAnalysis] Unique attendance IDs processed:', processedAttendanceIds.size);
+
+        // Replace existing AnalysisResult rows for this report run so reruns are deterministic
+        // while preserving ramadan_gift_minutes values copied above.
+        if (existingResultsForReport.length > 0) {
+            await base44.asServiceRole.entities.AnalysisResult.deleteMany({
+                project_id,
+                report_run_id: reportRun.id
+            });
+        }
 
         // Save results in smaller batches with longer delays
         const SAVE_BATCH_SIZE = 10; // Save 10 results at a time (reduced from 50)
