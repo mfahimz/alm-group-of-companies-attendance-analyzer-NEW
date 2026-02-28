@@ -30,7 +30,7 @@ export default function SalarySnapshotDialog({
 
     if (!snapshot) return null;
 
-    const isAlMaraghi = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
+    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
 
     // Check if bonus has decimal values
     const hasDecimalBonus = () => {
