@@ -83,7 +83,8 @@ Deno.serve(async (req) => {
 
             const lateMinutes = result.late_minutes || 0;
             const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-            const timeIssues = lateMinutes + earlyCheckoutMinutes;
+            const ramadanGiftMinutes = result.ramadan_gift_minutes || 0;
+            const timeIssues = Math.max(0, lateMinutes + earlyCheckoutMinutes - ramadanGiftMinutes);
             const unusedGraceMinutes = Math.max(0, graceMinutesAvailable - timeIssues);
 
             if (unusedGraceMinutes <= 0) {

@@ -91,10 +91,12 @@ Deno.serve(async (req) => {
                 : 0;
             const graceMinutesAvailable = baseGrace + carriedGrace;
             
-            // CALCULATION: time_issues = late + early (NO other_minutes, NO approved_minutes)
+            // CALCULATION: time_issues = late + early - ramadan_gift_minutes
+            // Ramadan gift reduces the minutes counted against grace (same as how it reduces deductible_minutes)
             const lateMinutes = result.late_minutes || 0;
             const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-            const timeIssues = lateMinutes + earlyCheckoutMinutes;
+            const ramadanGiftMinutes = result.ramadan_gift_minutes || 0;
+            const timeIssues = Math.max(0, lateMinutes + earlyCheckoutMinutes - ramadanGiftMinutes);
             const unusedGraceMinutes = Math.max(0, graceMinutesAvailable - timeIssues);
             
             preview.push({
