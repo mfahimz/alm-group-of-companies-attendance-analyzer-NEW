@@ -922,7 +922,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, project]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, project, ramadanGiftOverrides]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
@@ -1448,8 +1448,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return;
         }
         
-        // CRITICAL FIX: For finalized reports, use stored values WITHOUT recalculation
-        const isFinalized = reportRun.is_final || project.status === 'closed';
+        const includeRamadanGiftInExport = showRamadanGiftColumn;
 
         // Build headers matching the visible table columns - using Hours instead of Minutes
         const headers = [
@@ -1467,6 +1466,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
             'Other (Hours)',
             'Grace (Hours)',
+            ...(includeRamadanGiftInExport ? ['Ramadan Gift (min)'] : []),
             'Deductible (Hours)',
             'Notes'
         ];
@@ -1500,7 +1500,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             baseRow.push(
                 minutesToHours(Math.max(0, r.other_minutes || 0)),
-                minutesToHours(Math.max(0, grace)),
+                minutesToHours(Math.max(0, grace))
+            );
+
+            if (includeRamadanGiftInExport) {
+                baseRow.push(Math.max(0, giftMinutes));
+            }
+
+            baseRow.push(
                 minutesToHours(Math.max(0, deductible)),
                 r.notes || ''
             );
@@ -1904,7 +1911,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                             onSave={(value) => updateManualOverrideMutation.mutate({ 
                                                                 id: result.id, 
                                                                 field: 'manual_deductible_minutes', 
-                                                                value: Math.max(0, value)
+                                                                value: Math.max(0, value + giftMinutes)
                                                             })}
                                                             isEditable={isAdmin && !reportRun.is_final}
                                                             className={`font-bold ${displayDeductible > 0 ? 'text-red-600' : 'text-green-600'}`}
