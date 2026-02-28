@@ -1516,7 +1516,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             );
 
             if (includeRamadanGiftInExport) {
-                baseRow.push(Math.max(0, giftMinutes));
+                baseRow.push(Math.max(0, r.ramadan_gift_minutes || 0));
             }
 
             baseRow.push(
