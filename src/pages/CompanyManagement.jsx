@@ -10,8 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Pencil, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermissions } from '@/components/hooks/usePermissions';
 
 export default function CompanyManagement() {
+    const { userRole } = usePermissions();
+    const isViewOnly = userRole === 'hr_manager';
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState(null);
     const [formData, setFormData] = useState({ name: '', departments: '', active: true });
@@ -81,10 +84,12 @@ export default function CompanyManagement() {
                     <h1 className="text-3xl font-bold text-[#1F2937]">Company Management</h1>
                     <p className="text-[#6B7280] mt-1">Manage companies with stable IDs - connected to existing app data</p>
                 </div>
-                <Button onClick={() => syncMutation.mutate()} disabled={syncing}>
-                    <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                    Sync Companies
-                </Button>
+                {!isViewOnly && (
+                    <Button onClick={() => syncMutation.mutate()} disabled={syncing}>
+                        <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                        Sync Companies
+                    </Button>
+                )}
             </div>
 
             {companies.length === 0 && !isLoading && (
@@ -137,13 +142,15 @@ export default function CompanyManagement() {
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleEdit(company)}
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
+                                            {!isViewOnly && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleEdit(company)}
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}

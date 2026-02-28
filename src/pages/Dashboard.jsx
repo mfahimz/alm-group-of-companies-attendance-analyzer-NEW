@@ -55,7 +55,7 @@ export default function Dashboard() {
     const projects = React.useMemo(() => {
         if (!currentUser) return [];
         const userRole = currentUser.extended_role || currentUser.role || 'user';
-        const canAccessAll = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo';
+        const canAccessAll = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo' || userRole === 'hr_manager';
         if (canAccessAll) return allProjects;
         return allProjects.filter(p => p.company === currentUser.company);
     }, [allProjects, currentUser]);
@@ -63,7 +63,7 @@ export default function Dashboard() {
     const employees = React.useMemo(() => {
         if (!currentUser) return [];
         const userRole = currentUser.extended_role || currentUser.role || 'user';
-        const canAccessAll = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo';
+        const canAccessAll = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo' || userRole === 'hr_manager';
         if (canAccessAll) return allEmployees;
         return allEmployees.filter(e => e.company === currentUser.company);
     }, [allEmployees, currentUser]);
@@ -72,7 +72,8 @@ export default function Dashboard() {
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
-    const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO;
+    const isHRManager = userRole === 'hr_manager';
+    const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO || isHRManager;
 
     const stats = [
         {
