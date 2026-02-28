@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
             }
 
             if (!reportRun || !reportRun.is_final) {
-                console.warn('[closeProject] No finalized report found for project, skipping grace update');
+                console.warn(`[closeProject] No finalized report found for project_id=${project_id}, skipping grace update`);
             } else {
                 // Fetch AttendanceRules for the company
                 const rulesData = await base44.asServiceRole.entities.AttendanceRules.filter({
