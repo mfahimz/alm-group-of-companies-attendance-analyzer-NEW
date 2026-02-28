@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import { Label } from '@/components/ui/label';
-import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
+
 
 export default function SalaryTab({ project }) {
     const queryClient = useQueryClient();

@@ -23,7 +23,7 @@ import PINLock from '../components/ui/PINLock';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import SalarySnapshotDialog from '../components/salary/SalarySnapshotDialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
+
 
 export default function SalaryReportDetail() {
     const queryClient = useQueryClient();
