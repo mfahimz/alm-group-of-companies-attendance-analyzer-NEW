@@ -46,6 +46,18 @@ Deno.serve(async (req) => {
             }
         }
 
+        // Resolve company_id for stable company identification
+        const AL_MARAGHI_MOTORS_COMPANY_ID = 2;
+        let isAlMaraghiMotors = false;
+        try {
+            const companyRecords = await base44.asServiceRole.entities.Company.filter({ name: project.company }, null, 5);
+            if (companyRecords.length > 0 && companyRecords[0].company_id === AL_MARAGHI_MOTORS_COMPANY_ID) {
+                isAlMaraghiMotors = true;
+            }
+        } catch (e) {
+            console.warn('[runAnalysis] Could not resolve company_id, carried grace will not apply');
+        }
+
         // Fetch all required data
         const [punches, shifts, exceptions, allEmployees, rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
             base44.asServiceRole.entities.Punch.filter({ project_id }),
@@ -1285,18 +1297,16 @@ Deno.serve(async (req) => {
             const dept = employee?.department || 'Admin';
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
             
-            // CRITICAL: Fetch carried_grace_minutes from Employee entity for Al Maraghi Motors ONLY
+            // Fetch carried_grace_minutes from Employee entity for Al Maraghi Motors ONLY (by stable company_id)
             let carriedGrace = 0;
-            if (project.use_carried_grace_minutes === true && project.company === 'Al Maraghi Motors') {
-                // For Al Maraghi Motors, read from Employee.carried_grace_minutes
-                // This value is managed via Grace Minutes Management page and syncs bi-directionally
+            if (project.use_carried_grace_minutes === true && isAlMaraghiMotors) {
                 const freshEmployee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-                if (freshEmployee && typeof freshEmployee.carried_grace_minutes === 'number') {
+                if (freshEmployee && typeof freshEmployee.carried_grace_minutes === 'number' && freshEmployee.carried_grace_minutes > 0) {
                     carriedGrace = freshEmployee.carried_grace_minutes;
                     console.log(`[runAnalysis] [Al Maraghi Motors] Employee ${attendanceIdStr}: Loaded carried grace = ${carriedGrace} minutes from Employee.carried_grace_minutes`);
                 } else {
                     carriedGrace = 0;
-                    console.log(`[runAnalysis] [Al Maraghi Motors] Employee ${attendanceIdStr}: No carried grace found, defaulting to 0`);
+                    console.log(`[runAnalysis] [Al Maraghi Motors] Employee ${attendanceIdStr}: No carried grace found or value is 0, using defaultGraceMinutes only`);
                 }
             }
             
