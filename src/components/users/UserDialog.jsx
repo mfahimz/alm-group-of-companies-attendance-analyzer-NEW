@@ -159,14 +159,16 @@ export default function UserDialog({ open, onClose, user }) {
     }, [user?.id, employees.length, deptHeads.length]);
 
     // Auto-unassign department if no longer has active department head
+    // Use a ref to avoid triggering on formData.department itself (loop risk)
+    const prevDeptRef = React.useRef('');
     useEffect(() => {
-        if (formData.extended_role === 'department_head' && formData.company && formData.department) {
-            const deptHasHead = Object.keys(availableDepartments).includes(formData.department);
-            if (!deptHasHead && formData.department) {
-                setFormData(prev => ({ ...prev, department: '' }));
-            }
+        if (formData.extended_role !== 'department_head' || !formData.company || !formData.department) return;
+        const deptHasHead = Object.keys(availableDepartments).includes(formData.department);
+        if (!deptHasHead && formData.department !== prevDeptRef.current) {
+            prevDeptRef.current = formData.department;
+            setFormData(prev => ({ ...prev, department: '' }));
         }
-    }, [availableDepartments, formData.extended_role, formData.company]);
+    }, [availableDepartments, formData.extended_role, formData.company, formData.department]);
 
     // When a dept head link is selected for CEO/HR Manager, auto-fill company/department/hrms_id
     const handleDeptHeadLinkChange = (deptHeadId) => {
