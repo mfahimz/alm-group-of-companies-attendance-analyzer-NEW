@@ -346,15 +346,19 @@ Deno.serve(async (req) => {
         // Total OT Salary
         const totalOtSalary = normalOtSalary + specialOtSalary;
 
-        // Final Total = Total Salary + OT + Bonus + Incentive 
+        // Final Total = Total Salary + OT + Bonus + max(OT, Incentive) + OpenLeave + Variable
         //             - Net Deduction (current month leave)
         //             - Current Month Deductible Hours Pay
         //             - Other Deduction - Advance
         // NO PREVIOUS MONTH DEDUCTIONS
+        // Business rule: pay only the higher of OT vs incentive (not both)
+        const effectiveOtOrIncentive = Math.max(
+            Math.round(totalOtSalary * 100) / 100,
+            Math.round(adjustmentValues.incentive * 100) / 100
+        );
         let finalTotal = totalSalary 
-            + totalOtSalary 
+            + effectiveOtOrIncentive 
             + adjustmentValues.bonus 
-            + adjustmentValues.incentive
             + adjustmentValues.open_leave_salary
             + adjustmentValues.variable_salary
             - netDeduction 
