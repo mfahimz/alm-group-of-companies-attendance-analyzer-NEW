@@ -124,12 +124,10 @@ export default function Layout({ children, currentPageName }) {
         if (currentUser && currentPageName === 'Dashboard') {
             if (isDepartmentHead) {
                 navigate('/DepartmentHeadDashboard', { replace: true });
-            } else if (isHRManager) {
-                navigate('/HRManagerDashboard', { replace: true });
             }
-            // CEO stays on Dashboard (admin-like access)
+            // HR Manager, CEO, admin, supervisor all stay on the main Dashboard
         }
-    }, [currentUser, isDepartmentHead, isHRManager, currentPageName, navigate]);
+    }, [currentUser, isDepartmentHead, currentPageName, navigate]);
 
     // If auth failed (not logged in), redirect to login
     if (error && !isLoading) {
