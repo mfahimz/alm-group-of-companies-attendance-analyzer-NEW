@@ -109,7 +109,7 @@ export default function SalaryReportDetail() {
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
     const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
-    const isAlMaraghi = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
+    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
     const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
         if (totalAmount <= 0) {

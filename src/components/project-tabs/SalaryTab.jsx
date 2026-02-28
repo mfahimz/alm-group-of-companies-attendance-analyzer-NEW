@@ -111,7 +111,7 @@ export default function SalaryTab({ project }) {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo' || userRole === 'hr_manager';
     // Allow access to Salary tab for Al Maraghi Motors projects for all users with project access
-    const isAlMaraghi = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
+    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryTab = isAdminOrCEO || isAlMaraghi;
     const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
         if (totalAmount <= 0) {
