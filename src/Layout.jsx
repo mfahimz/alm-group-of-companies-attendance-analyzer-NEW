@@ -153,7 +153,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     // Validation checks
-    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'hr_manager' || userRole === 'ceo')) {
+    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'ceo')) {
         return (
             <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
                       <div className="text-[#4B5563] text-center">
