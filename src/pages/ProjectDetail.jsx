@@ -313,7 +313,7 @@ export default function ProjectDetail() {
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
                             Exceptions {isReadOnly && '🔒'}
                         </TabsTrigger>
-                        {Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID &&
+                        {isAlMaraghiMotors &&
             <TabsTrigger
               value="overtime"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600 data-[state=active]:to-orange-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
