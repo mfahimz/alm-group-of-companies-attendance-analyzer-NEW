@@ -66,6 +66,12 @@ Deno.serve(async (req) => {
             if ('incentive' in employeeEdits) {
                 updateData.incentive = employeeEdits.incentive;
             }
+            if ('open_leave_salary' in employeeEdits) {
+                updateData.open_leave_salary = Math.max(0, Number(employeeEdits.open_leave_salary) || 0);
+            }
+            if ('variable_salary' in employeeEdits) {
+                updateData.variable_salary = Math.max(0, Number(employeeEdits.variable_salary) || 0);
+            }
             if ('otherDeduction' in employeeEdits) {
                 updateData.otherDeduction = employeeEdits.otherDeduction;
             }
@@ -102,6 +108,8 @@ Deno.serve(async (req) => {
                 const finalTotal = snapshot.total_salary + updateData.totalOtSalary
                                    + (updateData.bonus ?? snapshot.bonus ?? 0)
                                    + (updateData.incentive ?? snapshot.incentive ?? 0)
+                                   + (updateData.open_leave_salary ?? snapshot.open_leave_salary ?? 0)
+                                   + (updateData.variable_salary ?? snapshot.variable_salary ?? 0)
                                    - snapshot.netDeduction
                                    - snapshot.deductibleHoursPay
                                    - (updateData.otherDeduction ?? snapshot.otherDeduction ?? 0)
@@ -115,6 +123,8 @@ Deno.serve(async (req) => {
                 const finalTotal = snapshot.total_salary + totalOtSalary
                                    + (updateData.bonus ?? snapshot.bonus ?? 0)
                                    + (updateData.incentive ?? snapshot.incentive ?? 0)
+                                   + (updateData.open_leave_salary ?? snapshot.open_leave_salary ?? 0)
+                                   + (updateData.variable_salary ?? snapshot.variable_salary ?? 0)
                                    - snapshot.netDeduction
                                    - snapshot.deductibleHoursPay
                                    - (updateData.otherDeduction ?? snapshot.otherDeduction ?? 0)

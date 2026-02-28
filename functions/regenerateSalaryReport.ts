@@ -90,6 +90,8 @@ Deno.serve(async (req) => {
             otherDeduction: s.otherDeduction,
             bonus: s.bonus,
             incentive: s.incentive,
+            open_leave_salary: s.open_leave_salary || 0,
+            variable_salary: s.variable_salary || 0,
             advanceSalaryDeduction: s.advanceSalaryDeduction,
             total: s.total,
             wpsPay: s.wpsPay,

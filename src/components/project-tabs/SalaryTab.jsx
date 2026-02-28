@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import { Label } from '@/components/ui/label';
+import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 
 export default function SalaryTab({ project }) {
     const queryClient = useQueryClient();
@@ -110,7 +111,7 @@ export default function SalaryTab({ project }) {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo' || userRole === 'hr_manager';
     // Allow access to Salary tab for Al Maraghi Motors projects for all users with project access
-    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
+    const isAlMaraghi = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
     const canAccessSalaryTab = isAdminOrCEO || isAlMaraghi;
     const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
         if (totalAmount <= 0) {
@@ -320,6 +321,10 @@ export default function SalaryTab({ project }) {
                 'Other Deduction': row.otherDeduction || 0,
                 'Bonus': row.bonus || 0,
                 'Incentive': row.incentive || 0,
+                ...(isAlMaraghi ? {
+                    'Open Leave Salary': Number(row.open_leave_salary || 0).toFixed(2),
+                    'Variable Salary': Number(row.variable_salary || 0).toFixed(2)
+                } : {}),
                 'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
                 'Total': row.total,
                 'WPS Pay': row.wpsPay,

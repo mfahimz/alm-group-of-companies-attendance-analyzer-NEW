@@ -9,6 +9,7 @@ import { Clock, Search, Save, Upload, Download, FileSpreadsheet, Users, DollarSi
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import SortableTableHead from '../ui/SortableTableHead';
+import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 
 export default function OvertimeTab({ project }) {
     const queryClient = useQueryClient();
@@ -77,6 +78,7 @@ export default function OvertimeTab({ project }) {
     // DERIVED VALUES
     // ============================================
     const hasFinalReport = !!finalizedReport;
+    const isAlMaraghiMotors = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
     const isProjectClosed = project?.status === 'closed';
     const canEditAdjustments = hasFinalReport && !isProjectClosed;
 
@@ -93,7 +95,7 @@ export default function OvertimeTab({ project }) {
         }
 
         // For Al Maraghi Motors, exclude employees without attendance_id
-        if (project?.company === 'Al Maraghi Motors') {
+        if (isAlMaraghiMotors) {
             filteredEmployees = filteredEmployees.filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '');
         }
 
@@ -120,11 +122,13 @@ export default function OvertimeTab({ project }) {
                 attendanceSource: snapshot?.attendance_source || null,
                 bonus: editableAdjustments[emp.attendance_id]?.bonus ?? otRecord?.bonus ?? snapshot?.bonus ?? 0,
                 incentive: editableAdjustments[emp.attendance_id]?.incentive ?? otRecord?.incentive ?? snapshot?.incentive ?? 0,
+                open_leave_salary: editableAdjustments[emp.attendance_id]?.open_leave_salary ?? otRecord?.open_leave_salary ?? snapshot?.open_leave_salary ?? 0,
+                variable_salary: editableAdjustments[emp.attendance_id]?.variable_salary ?? otRecord?.variable_salary ?? snapshot?.variable_salary ?? 0,
                 otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? otRecord?.otherDeduction ?? snapshot?.otherDeduction ?? 0,
                 advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? otRecord?.advanceSalaryDeduction ?? snapshot?.advanceSalaryDeduction ?? 0
             };
         });
-    }, [employees, overtimeRecords, editableData, editableAdjustments, salarySnapshots, project?.custom_employee_ids]);
+    }, [employees, overtimeRecords, editableData, editableAdjustments, salarySnapshots, project?.custom_employee_ids, isAlMaraghiMotors]);
 
     // Filter and sort
     const filteredData = useMemo(() => {
@@ -176,8 +180,15 @@ export default function OvertimeTab({ project }) {
         const numValue = value === '' ? 0 : parseFloat(value) || 0;
         
         // Validation: bonus and incentive must be >= 0
-        if ((field === 'bonus' || field === 'incentive') && numValue < 0) {
-            toast.error(`${field === 'bonus' ? 'Bonus' : 'Incentive'} cannot be negative`);
+        if ((field === 'bonus' || field === 'incentive' || field === 'open_leave_salary' || field === 'variable_salary') && numValue < 0) {
+            const label = field === 'bonus'
+                ? 'Bonus'
+                : field === 'incentive'
+                    ? 'Incentive'
+                    : field === 'open_leave_salary'
+                        ? 'Open Leave Salary'
+                        : 'Variable Salary';
+            toast.error(`${label} cannot be negative`);
             return;
         }
 
@@ -220,6 +231,8 @@ export default function OvertimeTab({ project }) {
                     // Preserve existing adjustment values when saving OT
                     bonus: employee.bonus ?? 0,
                     incentive: employee.incentive ?? 0,
+                    open_leave_salary: employee.open_leave_salary ?? 0,
+                    variable_salary: employee.variable_salary ?? 0,
                     otherDeduction: employee.otherDeduction ?? 0,
                     advanceSalaryDeduction: employee.advanceSalaryDeduction ?? 0
                 };
@@ -330,6 +343,8 @@ export default function OvertimeTab({ project }) {
                 const adjustmentData = {
                     bonus: edits.bonus ?? employee.bonus ?? 0,
                     incentive: edits.incentive ?? employee.incentive ?? 0,
+                    open_leave_salary: edits.open_leave_salary ?? employee.open_leave_salary ?? 0,
+                    variable_salary: edits.variable_salary ?? employee.variable_salary ?? 0,
                     otherDeduction: edits.otherDeduction ?? employee.otherDeduction ?? 0,
                     advanceSalaryDeduction: edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction ?? 0
                 };
@@ -565,7 +580,7 @@ export default function OvertimeTab({ project }) {
                         <div className="flex flex-wrap gap-2">
                             <Button
                                 onClick={handleSaveAdjustments}
-                                disabled={isSavingAdjustments || Object.keys(editableAdjustments).length === 0}
+                                disabled={!canEditAdjustments || isSavingAdjustments || Object.keys(editableAdjustments).length === 0}
                                 className="bg-green-600 hover:bg-green-700"
                             >
                                 <Save className="w-4 h-4 mr-2" />
@@ -613,6 +628,8 @@ export default function OvertimeTab({ project }) {
                                     <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
                                     <TableHead className="bg-green-50 text-green-700">Bonus (+)</TableHead>
                                     <TableHead className="bg-green-50 text-green-700">Incentive (+)</TableHead>
+                                    {isAlMaraghiMotors && <TableHead className="bg-green-50 text-green-700">Open Leave Salary (+)</TableHead>}
+                                    {isAlMaraghiMotors && <TableHead className="bg-green-50 text-green-700">Variable Salary (+)</TableHead>}
                                     <TableHead className="bg-red-50 text-red-700">Other Deduction (-)</TableHead>
                                     <TableHead className="bg-red-50 text-red-700">Advance Salary Deduction (-)</TableHead>
                                 </TableRow>
@@ -620,7 +637,7 @@ export default function OvertimeTab({ project }) {
                             <TableBody>
                                 {filteredData.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-12">
+                                        <TableCell colSpan={isAlMaraghiMotors ? 9 : 7} className="text-center py-12">
                                             <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto mb-2" />
                                             <p className="text-slate-500">No employees found</p>
                                         </TableCell>
@@ -640,6 +657,7 @@ export default function OvertimeTab({ project }) {
                                                    value={getAdjustmentValue(row, 'bonus')}
                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'bonus', e.target.value)}
                                                    className="h-8 text-sm w-20"
+                                                   disabled={!canEditAdjustments}
                                                />
                                             </TableCell>
                                             <TableCell className="bg-green-50 p-1">
@@ -650,8 +668,35 @@ export default function OvertimeTab({ project }) {
                                                    value={getAdjustmentValue(row, 'incentive')}
                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'incentive', e.target.value)}
                                                    className="h-8 text-sm w-20"
+                                                   disabled={!canEditAdjustments}
                                                />
                                             </TableCell>
+                                            {isAlMaraghiMotors && (
+                                                <TableCell className="bg-green-50 p-1">
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={getAdjustmentValue(row, 'open_leave_salary')}
+                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'open_leave_salary', e.target.value)}
+                                                        className="h-8 text-sm w-24"
+                                                        disabled={!canEditAdjustments}
+                                                    />
+                                                </TableCell>
+                                            )}
+                                            {isAlMaraghiMotors && (
+                                                <TableCell className="bg-green-50 p-1">
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={getAdjustmentValue(row, 'variable_salary')}
+                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'variable_salary', e.target.value)}
+                                                        className="h-8 text-sm w-24"
+                                                        disabled={!canEditAdjustments}
+                                                    />
+                                                </TableCell>
+                                            )}
                                             <TableCell className="bg-red-50 p-1">
                                                <Input
                                                    type="number"
@@ -659,6 +704,7 @@ export default function OvertimeTab({ project }) {
                                                    value={getAdjustmentValue(row, 'otherDeduction')}
                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', e.target.value)}
                                                    className="h-8 text-sm w-20"
+                                                   disabled={!canEditAdjustments}
                                                />
                                             </TableCell>
                                             <TableCell className="bg-red-50 p-1">
@@ -668,6 +714,7 @@ export default function OvertimeTab({ project }) {
                                                    value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
                                                    onChange={(e) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', e.target.value)}
                                                    className="h-8 text-sm w-20"
+                                                   disabled={!canEditAdjustments}
                                                />
                                             </TableCell>
                                         </TableRow>
