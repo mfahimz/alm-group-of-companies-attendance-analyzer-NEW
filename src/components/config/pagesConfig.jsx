@@ -71,17 +71,6 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['department_head', 'ceo', 'hr_manager']
     },
-    HRManagerDashboard: {
-        name: 'HRManagerDashboard',
-        title: 'HR Manager Dashboard',
-        icon: ClipboardCheck,
-        category: 'Leadership',
-        showInNav: false,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['hr_manager']
-    },
-
     // Projects Menu
     Projects: {
         name: 'Projects',
