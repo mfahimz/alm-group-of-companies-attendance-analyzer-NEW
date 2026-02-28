@@ -115,19 +115,11 @@ export default function UserDialog({ open, onClose, user }) {
             });
     }, [formData.extended_role, deptHeads, employees, allUsers, user?.id]);
 
+    // Only re-initialize form when the dialog opens (user prop changes identity or open changes)
+    // Do NOT depend on employees/deptHeads to avoid resetting form on every data fetch
     useEffect(() => {
+        if (!open) return;
         if (user) {
-            // Check if user is already linked to a dept head
-            let linkedDhId = '';
-            if (user.hrms_id && (user.extended_role === 'ceo' || user.extended_role === 'hr_manager' ||
-                                  user.role === 'ceo' || user.role === 'hr_manager')) {
-                const emp = employees.find(e => e.hrms_id === user.hrms_id);
-                if (emp) {
-                    const dh = deptHeads.find(d => d.active && d.employee_id === emp.id);
-                    if (dh) linkedDhId = dh.id;
-                }
-            }
-
             setFormData({
                 full_name: user.full_name || '',
                 email: user.email || '',
@@ -136,7 +128,7 @@ export default function UserDialog({ open, onClose, user }) {
                 company: user.company || '',
                 department: user.department || '',
                 hrms_id: user.hrms_id || '',
-                linked_dept_head_id: linkedDhId
+                linked_dept_head_id: ''
             });
         } else {
             setFormData({
@@ -150,7 +142,21 @@ export default function UserDialog({ open, onClose, user }) {
                 linked_dept_head_id: ''
             });
         }
-    }, [user, employees, deptHeads]);
+    }, [user?.id, open]);
+
+    // Separately resolve linked_dept_head_id once employees/deptHeads load (without resetting rest of form)
+    useEffect(() => {
+        if (!user?.hrms_id) return;
+        const role = user.extended_role || user.role || '';
+        if (role !== 'ceo' && role !== 'hr_manager') return;
+        if (employees.length === 0 || deptHeads.length === 0) return;
+        const emp = employees.find(e => e.hrms_id === user.hrms_id);
+        if (!emp) return;
+        const dh = deptHeads.find(d => d.active && d.employee_id === emp.id);
+        if (dh) {
+            setFormData(prev => ({ ...prev, linked_dept_head_id: dh.id }));
+        }
+    }, [user?.id, employees.length, deptHeads.length]);
 
     // Auto-unassign department if no longer has active department head
     useEffect(() => {
