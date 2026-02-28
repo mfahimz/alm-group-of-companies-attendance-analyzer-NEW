@@ -221,7 +221,7 @@ export default function ProjectDetail() {
 
                             {/* DIVISOR SETTINGS - Al Maraghi Motors only */}
                             {/* [MERGE_NOTE: If merging divisors in future, remove the OT divisor section and update label] */}
-                            {Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID && isAdmin && (
+                            {isAlMaraghiMotors && isAdmin && (
                             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* DIVISOR_LEAVE_DEDUCTION */}
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
