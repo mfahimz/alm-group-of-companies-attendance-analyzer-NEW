@@ -80,7 +80,11 @@ export default function InlineEditableCell({
                     type="number"
                     min={min}
                     value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
+                    onChange={(e) => {
+                        const next = e.target.value;
+                        setEditValue(next);
+                        onValueChange?.(Number(next));
+                    }}
                     onKeyDown={handleKeyDown}
                     className="h-7 w-20 text-sm"
                     autoFocus

@@ -132,6 +132,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         );
     }, [allResults, isDepartmentHead, deptHeadVerification, employees]);
 
+    // Source of truth for UI display/editing: AnalysisResult.ramadan_gift_minutes per row
+    React.useEffect(() => {
+        if (!results || results.length === 0) return;
+        const seeded = {};
+        results.forEach(r => {
+            seeded[r.id] = Math.max(0, Number(r.ramadan_gift_minutes ?? 0));
+        });
+        setRamadanGiftOverrides(seeded);
+    }, [results]);
+
     // Fetch punches and shifts for daily breakdown (needed even for closed projects)
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
@@ -1443,10 +1453,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const exportToExcel = () => {
-        if (filteredResults.length === 0) {
-            toast.error('No data to export');
-            return;
-        }
+        try {
+            if (filteredResults.length === 0) {
+                toast.error('No data to export');
+                return;
+            }
         
         const includeRamadanGiftInExport = showRamadanGiftColumn;
 
@@ -1519,8 +1530,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const ws = XLSX.utils.aoa_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
-        XLSX.writeFile(wb, `attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
-        toast.success('Attendance report exported');
+            XLSX.writeFile(wb, `attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
+            toast.success('Attendance report exported');
+        } catch (error) {
+            console.error('[ReportDetailView] Export failed:', error);
+            toast.error('Failed to export attendance report. Please try again.');
+        }
     };
 
     const showDailyBreakdown = (result) => {
