@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 
 export default function PendingApprovals({ userRole }) {
-    const isAdminOrSupervisor = userRole === 'admin' || userRole === 'supervisor';
+    const isAdminOrSupervisor = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo' || userRole === 'hr_manager';
 
     const { data: pendingCount = 0 } = useQuery({
         queryKey: ['pendingExceptionsCount'],

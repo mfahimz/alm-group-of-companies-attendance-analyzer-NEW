@@ -12,7 +12,7 @@ import { getPagesByCategory, NAV_CATEGORIES } from './components/config/pagesCon
 import { LogOut } from 'lucide-react';
 import { CompanyFilterProvider } from './components/context/CompanyContext';
 
-// Layout v5 - rebuild trigger
+// Layout v6 - rebuild trigger
 export default function Layout({ children, currentPageName }) {
     const navigate = useNavigate();
     const publicPages = ['Maintenance'];
@@ -122,11 +122,12 @@ export default function Layout({ children, currentPageName }) {
     // Redirect to appropriate default dashboard on first load
     useEffect(() => {
         if (currentUser && currentPageName === 'Dashboard') {
-            if (isDepartmentHead || isCEO || isHRManager) {
+            if (isDepartmentHead) {
                 navigate('/DepartmentHeadDashboard', { replace: true });
             }
+            // HR Manager, CEO, admin, supervisor all stay on the main Dashboard
         }
-    }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName, navigate]);
+    }, [currentUser, isDepartmentHead, currentPageName, navigate]);
 
     // If auth failed (not logged in), redirect to login
     if (error && !isLoading) {
@@ -152,7 +153,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     // Validation checks
-    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'hr_manager' || userRole === 'ceo')) {
+    if (!currentUser.company && (userRole === 'user' || userRole === 'department_head' || userRole === 'ceo')) {
         return (
             <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
                       <div className="text-[#4B5563] text-center">

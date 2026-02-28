@@ -9,10 +9,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // SECURITY: Only admin or CEO can save salary edits
+        // SECURITY: Admin, CEO, or HR Manager can save salary edits
         const userRole = user?.extended_role || user?.role || 'user';
-        if (userRole !== 'admin' && userRole !== 'ceo') {
-            return Response.json({ error: 'Access denied: Admin or CEO role required' }, { status: 403 });
+        if (userRole !== 'admin' && userRole !== 'ceo' && userRole !== 'hr_manager') {
+            return Response.json({ error: 'Access denied: Admin, CEO, or HR Manager role required' }, { status: 403 });
         }
 
         const { project_id, report_run_id, edits } = await req.json();

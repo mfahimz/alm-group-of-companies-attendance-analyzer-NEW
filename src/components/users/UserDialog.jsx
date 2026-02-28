@@ -8,6 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
+const ROLE_OPTIONS = [
+    { value: 'user', label: 'User', description: 'Company-specific access only' },
+    { value: 'department_head', label: 'Department Head', description: 'Department approval access only' },
+    { value: 'hr_manager', label: 'HR Manager', description: 'HR operations, salary increments, and team management' },
+    { value: 'supervisor', label: 'Supervisor', description: 'All projects & employees, no system settings' },
+    { value: 'ceo', label: 'CEO', description: 'Executive access with optional department head role' },
+    { value: 'admin', label: 'Admin', description: 'Full system access' }
+];
+
 export default function UserDialog({ open, onClose, user }) {
     const [formData, setFormData] = useState({
         full_name: '',
@@ -16,7 +25,8 @@ export default function UserDialog({ open, onClose, user }) {
         extended_role: 'user',
         company: '',
         department: '',
-        hrms_id: ''
+        hrms_id: '',
+        linked_dept_head_id: ''
     });
     const queryClient = useQueryClient();
 
@@ -26,37 +36,88 @@ export default function UserDialog({ open, onClose, user }) {
         enabled: open
     });
 
+    const needsDeptHeadData = formData.extended_role === 'department_head' ||
+                               formData.extended_role === 'ceo' ||
+                               formData.extended_role === 'hr_manager';
+
     const { data: deptHeads = [] } = useQuery({
         queryKey: ['deptHeads'],
         queryFn: () => base44.entities.DepartmentHead.list(),
-        enabled: formData.extended_role === 'department_head' && !!formData.company
+        enabled: needsDeptHeadData
     });
 
     const { data: employees = [] } = useQuery({
-        queryKey: ['employees', formData.company],
+        queryKey: ['employees'],
         queryFn: () => base44.entities.Employee.list(),
-        enabled: formData.extended_role === 'department_head' && !!formData.company
+        enabled: needsDeptHeadData
     });
 
-    // Get departments that have active department heads in this company
+    const { data: allUsers = [] } = useQuery({
+        queryKey: ['allUsersForDeptHeadLink'],
+        queryFn: () => base44.entities.User.list(),
+        enabled: formData.extended_role === 'ceo' || formData.extended_role === 'hr_manager'
+    });
+
+    const { data: companiesData = [] } = useQuery({
+        queryKey: ['companies'],
+        queryFn: () => base44.entities.Company.list(),
+        enabled: open
+    });
+
+    const companies = companiesData.filter(c => c.active).map(c => c.name);
+
+    // Get departments that have active department heads in this company (for department_head role)
     const availableDepartments = React.useMemo(() => {
         if (!formData.company || formData.extended_role !== 'department_head') return [];
-        
-        const activeDeptHeads = deptHeads.filter(dh => 
+
+        const activeDeptHeads = deptHeads.filter(dh =>
             dh.company === formData.company && dh.active
         );
-        
-        // Create mapping of department → department head name
+
         const deptMap = {};
         activeDeptHeads.forEach(dh => {
             const empName = employees.find(e => e.id === dh.employee_id)?.name || 'Unknown';
             deptMap[dh.department] = empName;
         });
-        
+
         return deptMap;
     }, [formData.company, formData.extended_role, deptHeads, employees]);
 
+    // Get available DepartmentHead records for linking to CEO and HR Manager
+    const availableDeptHeadLinks = React.useMemo(() => {
+        if (formData.extended_role !== 'ceo' && formData.extended_role !== 'hr_manager') return [];
+
+        const activeDeptHeads = deptHeads.filter(dh => dh.active && dh.employee_id);
+
+        // Find which dept heads are already linked to users via hrms_id
+        const linkedEmployeeIds = new Set();
+        allUsers.forEach(u => {
+            if (u.hrms_id && u.id !== user?.id) {
+                const emp = employees.find(e => e.hrms_id === u.hrms_id);
+                if (emp) linkedEmployeeIds.add(emp.id);
+            }
+        });
+
+        return activeDeptHeads
+            .filter(dh => !linkedEmployeeIds.has(dh.employee_id))
+            .map(dh => {
+                const emp = employees.find(e => e.id === dh.employee_id);
+                return {
+                    id: dh.id,
+                    company: dh.company,
+                    department: dh.department,
+                    employee_id: dh.employee_id,
+                    employee_name: emp?.name || 'Unknown',
+                    employee_hrms_id: emp?.hrms_id || '',
+                    managed_count: dh.managed_employee_ids ? dh.managed_employee_ids.split(',').filter(Boolean).length : 0
+                };
+            });
+    }, [formData.extended_role, deptHeads, employees, allUsers, user?.id]);
+
+    // Only re-initialize form when the dialog opens (user prop changes identity or open changes)
+    // Do NOT depend on employees/deptHeads to avoid resetting form on every data fetch
     useEffect(() => {
+        if (!open) return;
         if (user) {
             setFormData({
                 full_name: user.full_name || '',
@@ -65,7 +126,8 @@ export default function UserDialog({ open, onClose, user }) {
                 extended_role: user.extended_role || user.role || 'user',
                 company: user.company || '',
                 department: user.department || '',
-                hrms_id: user.hrms_id || ''
+                hrms_id: user.hrms_id || '',
+                linked_dept_head_id: ''
             });
         } else {
             setFormData({
@@ -75,56 +137,94 @@ export default function UserDialog({ open, onClose, user }) {
                 extended_role: 'user',
                 company: '',
                 department: '',
-                hrms_id: ''
+                hrms_id: '',
+                linked_dept_head_id: ''
             });
         }
-    }, [user]);
+    }, [user?.id, open]);
+
+    // Separately resolve linked_dept_head_id once employees/deptHeads load (without resetting rest of form)
+    useEffect(() => {
+        if (!user?.hrms_id) return;
+        const role = user.extended_role || user.role || '';
+        if (role !== 'ceo' && role !== 'hr_manager' && role !== 'department_head') return;
+        if (employees.length === 0 || deptHeads.length === 0) return;
+        const emp = employees.find(e => e.hrms_id === user.hrms_id);
+        if (!emp) return;
+        const dh = deptHeads.find(d => d.active && d.employee_id === emp.id);
+        if (dh) {
+            setFormData(prev => ({ ...prev, linked_dept_head_id: dh.id }));
+        }
+    }, [user?.id, employees.length, deptHeads.length]);
 
     // Auto-unassign department if no longer has active department head
+    // Use a ref to avoid triggering on formData.department itself (loop risk)
+    const prevDeptRef = React.useRef('');
     useEffect(() => {
-        if (formData.extended_role === 'department_head' && formData.company && formData.department) {
-            const deptHasHead = Object.keys(availableDepartments).includes(formData.department);
-            if (!deptHasHead && formData.department) {
-                setFormData(prev => ({ ...prev, department: '' }));
-            }
+        if (formData.extended_role !== 'department_head' || !formData.company || !formData.department) return;
+        const deptHasHead = Object.keys(availableDepartments).includes(formData.department);
+        if (!deptHasHead && formData.department !== prevDeptRef.current) {
+            prevDeptRef.current = formData.department;
+            setFormData(prev => ({ ...prev, department: '' }));
         }
-    }, [availableDepartments, formData.extended_role, formData.company]);
+    }, [availableDepartments, formData.extended_role, formData.company, formData.department]);
+
+    // When a dept head link is selected for CEO/HR Manager, auto-fill company/department/hrms_id
+    const handleDeptHeadLinkChange = (deptHeadId) => {
+        if (!deptHeadId || deptHeadId === 'none') {
+            setFormData(prev => ({
+                ...prev,
+                linked_dept_head_id: '',
+                company: '',
+                department: '',
+                hrms_id: ''
+            }));
+            return;
+        }
+
+        const selectedDh = availableDeptHeadLinks.find(dh => dh.id === deptHeadId);
+        if (selectedDh) {
+            setFormData(prev => ({
+                ...prev,
+                linked_dept_head_id: deptHeadId,
+                company: selectedDh.company,
+                department: selectedDh.department,
+                hrms_id: selectedDh.employee_hrms_id
+            }));
+        }
+    };
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data, previousUser }) => {
             // Update user record
             await base44.entities.User.update(id, data);
-            
+
             // If setting as department_head, create/update DepartmentHead record
             if (data.extended_role === 'department_head' && data.hrms_id && data.company && data.department) {
                 try {
-                    // First, fetch the Employee record to get its database ID
-                             const empRecords = await base44.entities.Employee.filter({
-                                 hrms_id: data.hrms_id
-                             });
+                    const empRecords = await base44.entities.Employee.filter({
+                        hrms_id: data.hrms_id
+                    });
 
-                             if (empRecords.length === 0) {
-                                 throw new Error('Employee record not found for this HRMS ID');
-                             }
+                    if (empRecords.length === 0) {
+                        throw new Error('Employee record not found for this HRMS ID');
+                    }
 
-                             const employeeId = empRecords[0].id;
+                    const employeeId = empRecords[0].id;
 
-                             // Check if DepartmentHead record exists for this employee
-                             const existingDeptHeads = await base44.entities.DepartmentHead.filter({
-                                 employee_id: employeeId
-                             });
-                    
-                    const existingRecord = existingDeptHeads.find(dh => 
+                    const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                        employee_id: employeeId
+                    });
+
+                    const existingRecord = existingDeptHeads.find(dh =>
                         dh.company === data.company && dh.department === data.department
                     );
-                    
+
                     if (existingRecord) {
-                        // Update existing to active
                         await base44.entities.DepartmentHead.update(existingRecord.id, {
                             active: true
                         });
                     } else {
-                        // Create new DepartmentHead record
                         await base44.entities.DepartmentHead.create({
                             company: data.company,
                             department: data.department,
@@ -137,35 +237,59 @@ export default function UserDialog({ open, onClose, user }) {
                     throw new Error('Failed to setup department head assignment: ' + err.message);
                 }
             }
-            
+
             // If removing department_head role, deactivate DepartmentHead record
             if (data.extended_role !== 'department_head' && previousUser?.hrms_id) {
-                try {
-                    // Fetch the Employee record to get its database ID
-                    const empRecords = await base44.entities.Employee.filter({
-                        hrms_id: previousUser.hrms_id
-                    });
-                    
-                    if (empRecords.length > 0) {
-                        const employeeId = empRecords[0].id;
-                        const existingDeptHeads = await base44.entities.DepartmentHead.filter({
-                            employee_id: employeeId,
-                            active: true
+                // Only deactivate if the previous role was department_head
+                const prevRole = previousUser.extended_role || previousUser.role || 'user';
+                if (prevRole === 'department_head') {
+                    try {
+                        const empRecords = await base44.entities.Employee.filter({
+                            hrms_id: previousUser.hrms_id
                         });
-                    
-                        for (const dh of existingDeptHeads) {
-                            await base44.entities.DepartmentHead.update(dh.id, { active: false });
+
+                        if (empRecords.length > 0) {
+                            const employeeId = empRecords[0].id;
+                            const existingDeptHeads = await base44.entities.DepartmentHead.filter({
+                                employee_id: employeeId,
+                                active: true
+                            });
+
+                            for (const dh of existingDeptHeads) {
+                                await base44.entities.DepartmentHead.update(dh.id, { active: false });
+                            }
                         }
+                    } catch (err) {
+                        console.error('Failed to deactivate DepartmentHead record:', err);
                     }
-                } catch (err) {
-                    console.error('Failed to deactivate DepartmentHead record:', err);
                 }
+            }
+
+            // Log audit for role changes
+            try {
+                const prevRole = previousUser?.extended_role || previousUser?.role || 'user';
+                if (prevRole !== data.extended_role) {
+                    await base44.entities.AuditLog.create({
+                        user_email: data.email || previousUser?.email,
+                        action: 'role_change',
+                        entity_type: 'User',
+                        entity_id: id,
+                        details: JSON.stringify({
+                            previous_role: prevRole,
+                            new_role: data.extended_role,
+                            linked_dept_head: data.hrms_id || null
+                        })
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to log audit:', err);
             }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['currentUser'] });
             queryClient.invalidateQueries({ queryKey: ['deptHeadVerification'] });
+            queryClient.invalidateQueries({ queryKey: ['allUsersForDeptHeadLink'] });
             toast.success('User updated successfully.');
             onClose();
         },
@@ -188,15 +312,17 @@ export default function UserDialog({ open, onClose, user }) {
         if (allowedDomainsSetting && allowedDomainsSetting.setting_value) {
             const domains = allowedDomainsSetting.setting_value.split(',').map(d => d.trim().toLowerCase());
             const userDomain = '@' + formData.email.split('@')[1]?.toLowerCase();
-            
+
             if (!domains.some(d => userDomain === d.toLowerCase())) {
                 toast.error(`Email domain not allowed. Allowed domains: ${allowedDomainsSetting.setting_value}`);
                 return;
             }
         }
 
-        // Validate company assignment for user and department_head roles
-        if ((formData.extended_role === 'user' || formData.extended_role === 'department_head') && !formData.company) {
+        // Validate company assignment for roles that require it
+        // HR Manager does NOT require a company - they have access to all companies
+        const rolesRequiringCompany = ['user', 'department_head', 'ceo'];
+        if (rolesRequiringCompany.includes(formData.extended_role) && !formData.company) {
             toast.error('Please assign a company to this user');
             return;
         }
@@ -213,27 +339,45 @@ export default function UserDialog({ open, onClose, user }) {
             return;
         }
 
-        // Validate that admin/supervisor don't have company/department/hrms_id set
-        if ((formData.extended_role === 'admin' || formData.extended_role === 'supervisor' || formData.extended_role === 'ceo') && formData.hrms_id) {
+        // Validate that admin/supervisor don't have employee link set
+        if ((formData.extended_role === 'admin' || formData.extended_role === 'supervisor') && formData.hrms_id) {
             toast.error(`${formData.extended_role} users should not have an employee link`);
             return;
         }
 
-        // Only submit fields that should be updated
+        // Build submission data
         const dataToSubmit = {
             full_name: formData.full_name,
             display_name: formData.display_name,
             extended_role: formData.extended_role
         };
-        
-        // Only include company field based on role
+
         if (formData.extended_role === 'user' || formData.extended_role === 'department_head') {
             dataToSubmit.company = formData.company;
-            // Include department and hrms_id only for department_head role
             if (formData.extended_role === 'department_head') {
                 dataToSubmit.department = formData.department;
                 dataToSubmit.hrms_id = formData.hrms_id;
             } else {
+                dataToSubmit.department = null;
+                dataToSubmit.hrms_id = null;
+            }
+        } else if (formData.extended_role === 'ceo') {
+            dataToSubmit.company = formData.company;
+            if (formData.linked_dept_head_id && formData.hrms_id) {
+                dataToSubmit.department = formData.department;
+                dataToSubmit.hrms_id = formData.hrms_id;
+            } else {
+                dataToSubmit.department = null;
+                dataToSubmit.hrms_id = null;
+            }
+        } else if (formData.extended_role === 'hr_manager') {
+            // HR Manager: linked to a dept head record (company/department/hrms_id come from that)
+            if (formData.linked_dept_head_id && formData.hrms_id) {
+                dataToSubmit.company = formData.company;
+                dataToSubmit.department = formData.department;
+                dataToSubmit.hrms_id = formData.hrms_id;
+            } else {
+                dataToSubmit.company = null;
                 dataToSubmit.department = null;
                 dataToSubmit.hrms_id = null;
             }
@@ -251,6 +395,8 @@ export default function UserDialog({ open, onClose, user }) {
             onClose();
         }
     };
+
+    const currentRoleInfo = ROLE_OPTIONS.find(r => r.value === formData.extended_role);
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
@@ -297,49 +443,60 @@ export default function UserDialog({ open, onClose, user }) {
                             <Label htmlFor="role">Role *</Label>
                             <Select
                                 value={formData.extended_role}
-                                onValueChange={(value) => setFormData({ ...formData, extended_role: value })}
+                                onValueChange={(value) => setFormData({
+                                    ...formData,
+                                    extended_role: value,
+                                    linked_dept_head_id: '',
+                                    // Clear department/hrms_id when switching roles
+                                    ...(value !== formData.extended_role ? { department: '', hrms_id: '' } : {})
+                                })}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select role" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="user">User</SelectItem>
-                                    <SelectItem value="department_head">Department Head</SelectItem>
-                                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
+                                    {ROLE_OPTIONS.map(role => (
+                                        <SelectItem key={role.value} value={role.value}>
+                                            {role.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-slate-500 mt-1">
-                                {formData.extended_role === 'admin' && 'Full system access'}
-                                {formData.extended_role === 'supervisor' && 'All projects & employees, no system settings'}
-                                {formData.extended_role === 'department_head' && 'Department approval access only'}
-                                {formData.extended_role === 'user' && 'Company-specific access only'}
+                                {currentRoleInfo?.description}
                             </p>
                         </div>
 
-                        {(formData.extended_role === 'user' || formData.extended_role === 'department_head') && (
+                        {/* Company field for user, department_head, ceo only. HR Manager = all companies */}
+                        {['user', 'department_head', 'ceo'].includes(formData.extended_role) && (
                             <div>
                                 <Label htmlFor="company">Assigned Company *</Label>
                                 <Select
                                     value={formData.company}
-                                    onValueChange={(value) => setFormData({ ...formData, company: value, department: '' })}
+                                    onValueChange={(value) => setFormData({ ...formData, company: value, department: '', linked_dept_head_id: '' })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select company" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
-                                        <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
-                                        <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
-                                        <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                                        {companies.map(c => (
+                                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {formData.extended_role === 'department_head' ? 'Department head will only see data from this company' : 'User will only see data from this company'}
+                                    {formData.extended_role === 'department_head'
+                                        ? 'Department head will only see data from this company'
+                                        : formData.extended_role === 'ceo'
+                                        ? 'CEO will be associated with this company'
+                                        : formData.extended_role === 'hr_manager'
+                                        ? 'HR Manager will be associated with this company'
+                                        : 'User will only see data from this company'}
                                 </p>
                             </div>
                         )}
 
+                        {/* Department head specific fields */}
                         {formData.extended_role === 'department_head' && formData.company && (
                             <>
                                 <div>
@@ -352,12 +509,12 @@ export default function UserDialog({ open, onClose, user }) {
                                             <SelectValue placeholder="Select department" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                                             {Object.entries(availableDepartments).map(([dept, headName]) => (
-                                                                 <SelectItem key={dept} value={dept}>
-                                                                     {dept} → {headName}
-                                                                 </SelectItem>
-                                                             ))}
-                                                         </SelectContent>
+                                            {Object.entries(availableDepartments).map(([dept, headName]) => (
+                                                <SelectItem key={dept} value={dept}>
+                                                    {dept} → {headName}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
                                     </Select>
                                     <p className="text-xs text-slate-500 mt-1">
                                         Only employees in this department will be visible to this department head
@@ -388,12 +545,47 @@ export default function UserDialog({ open, onClose, user }) {
                             </>
                         )}
 
+                        {/* Department Head linking for CEO and HR Manager */}
+                        {(formData.extended_role === 'ceo' || formData.extended_role === 'hr_manager') && (
+                            <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                                <Label className="text-sm font-medium">
+                                    {formData.extended_role === 'hr_manager' ? 'Link Department Head Role (Optional)' : 'Link Department Head Role (Optional)'}
+                                </Label>
+                                <p className="text-xs text-slate-500 mb-2">
+                                    {formData.extended_role === 'hr_manager'
+                                        ? 'Optionally link to an existing department head record to assign a company and department for this HR Manager'
+                                        : 'Optionally link to an existing department head record to enable team management via the Department Head Dashboard'}
+                                </p>
+                                <Select
+                                    value={formData.linked_dept_head_id || 'none'}
+                                    onValueChange={handleDeptHeadLinkChange}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="No department head link" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No department head link</SelectItem>
+                                        {availableDeptHeadLinks.map(dh => (
+                                            <SelectItem key={dh.id} value={dh.id}>
+                                                {dh.employee_name} — {dh.department}, {dh.company} ({dh.managed_count} subordinates)
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {formData.linked_dept_head_id && (
+                                    <p className="text-xs text-green-600 mt-1">
+                                        Linked to: {availableDeptHeadLinks.find(dh => dh.id === formData.linked_dept_head_id)?.department}, {availableDeptHeadLinks.find(dh => dh.id === formData.linked_dept_head_id)?.company}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         <div className="flex justify-end gap-3 pt-4">
                             <Button type="button" variant="outline" onClick={onClose}>
                                 Cancel
                             </Button>
-                            <Button 
-                                type="submit" 
+                            <Button
+                                type="submit"
                                 className="bg-indigo-600 hover:bg-indigo-700"
                                 disabled={updateMutation.isPending}
                             >

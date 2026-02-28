@@ -64,15 +64,19 @@ export default function CompanySelection() {
         );
     }
 
-    // Get assigned companies from user
+    const userRole = currentUser?.extended_role || currentUser?.role;
+    const isPrivilegedRole = ['admin', 'ceo', 'supervisor', 'hr_manager'].includes(userRole);
+
+    // Privileged roles see ALL companies; others see their assigned companies
+    const allCompanyNames = companySettings?.map(s => s.company) || [];
+
     const assignedCompanies = currentUser?.assigned_companies 
         ? currentUser.assigned_companies.split(',').map(c => c.trim()).filter(Boolean)
         : [];
 
-    // If user has no assigned companies but has a current company, use that
-    const availableCompanies = assignedCompanies.length > 0 
-        ? assignedCompanies 
-        : (currentUser?.company ? [currentUser.company] : []);
+    const availableCompanies = isPrivilegedRole
+        ? (allCompanyNames.length > 0 ? allCompanyNames : (currentUser?.company ? [currentUser.company] : []))
+        : (assignedCompanies.length > 0 ? assignedCompanies : (currentUser?.company ? [currentUser.company] : []));
 
     // If only one company, redirect automatically
     if (availableCompanies.length === 1 && currentUser?.company === availableCompanies[0]) {

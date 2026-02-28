@@ -18,8 +18,8 @@ Deno.serve(async (req) => {
         }
 
         const userRole = user?.extended_role || user?.role || 'user';
-        if (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'ceo') {
-            return Response.json({ error: 'Access denied: Admin, Supervisor, or CEO role required' }, { status: 403 });
+        if (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'ceo' && userRole !== 'hr_manager') {
+            return Response.json({ error: 'Access denied: Admin, Supervisor, CEO, or HR Manager role required' }, { status: 403 });
         }
 
         const { report_run_id, project_id } = await req.json();

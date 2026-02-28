@@ -198,13 +198,7 @@ Deno.serve(async (req) => {
                     await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
                         deductible_minutes: finalizedDeductibleMinutes,
                         ramadan_gift_minutes: ramadanGiftMinutes,
-                        other_minutes: finalizedOtherMinutes,
-                        open_leave_salary: openLeaveSalary,
-                        variable_salary: variableSalary,
-                        total: repairedTotal,
-                        wpsPay: repairedWpsPay,
-                        balance: repairedBalance,
-                        wps_cap_applied: repairedWpsCapApplied
+                        other_minutes: finalizedOtherMinutes
                     });
                     repairedSnapshots++;
                 }

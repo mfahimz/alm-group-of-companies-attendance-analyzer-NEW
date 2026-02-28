@@ -51,17 +51,17 @@ Deno.serve(async (req) => {
             // Project data - company scoped
             'Project': {
                 create: ['admin', 'supervisor'],
-                read: ['admin', 'supervisor', 'ceo', 'user'],
+                read: ['admin', 'supervisor', 'ceo', 'user', 'hr_manager'],
                 update: ['admin', 'supervisor'],
                 delete: ['admin'],
                 companyScoped: true,
                 departmentScoped: false
             },
-            
+
             // Punch data - company scoped (via project)
             'Punch': {
                 create: ['admin', 'supervisor'],
-                read: ['admin', 'supervisor', 'ceo', 'user'],
+                read: ['admin', 'supervisor', 'ceo', 'user', 'hr_manager'],
                 update: ['admin', 'supervisor'],
                 delete: ['admin', 'supervisor'],
                 companyScoped: false, // Scoped via project_id

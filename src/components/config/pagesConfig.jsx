@@ -58,7 +58,7 @@ export const PAGES_CONFIG = {
         showInNav: false,  // Hidden - accessible via Home button
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'hr_manager']
     },
     // Leadership Dashboards (Hidden - accessed via Home smart routing)
     DepartmentHeadDashboard: {
@@ -69,19 +69,8 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['department_head']
+        defaultRoles: ['department_head', 'ceo', 'hr_manager']
     },
-    HRManagerDashboard: {
-        name: 'HRManagerDashboard',
-        title: 'HR Manager Dashboard',
-        icon: ClipboardCheck,
-        category: 'Leadership',
-        showInNav: false,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['hr_manager']
-    },
-
     // Projects Menu
     Projects: {
         name: 'Projects',
@@ -111,7 +100,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'ceo']
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
     },
     SalaryIncrements: {
         name: 'SalaryIncrements',
@@ -121,7 +110,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor']
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
     },
     QuarterlyMinutesManagement: {
         name: 'QuarterlyMinutesManagement',
@@ -161,7 +150,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
+        defaultRoles: ['admin', 'ceo', 'hr_manager']
     },
 
     // Admin Menu
@@ -204,7 +193,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
+        defaultRoles: ['admin', 'ceo', 'hr_manager']
     },
     MaintenanceSettings: {
         name: 'MaintenanceSettings',
@@ -234,7 +223,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'ceo', 'supervisor']
+        defaultRoles: ['admin', 'ceo', 'supervisor', 'hr_manager']
     },
     AuditLogs: {
         name: 'AuditLogs',

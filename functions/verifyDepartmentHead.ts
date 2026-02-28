@@ -14,12 +14,12 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Check if user has department_head role
+        // Check if user has department_head, ceo, or hr_manager role (CEO/HR Manager can optionally have dept head link)
         const userRole = user.extended_role || user.role || 'user';
-        if (userRole !== 'department_head') {
-            return Response.json({ 
+        if (userRole !== 'department_head' && userRole !== 'ceo' && userRole !== 'hr_manager') {
+            return Response.json({
                 error: 'Access denied: Not a department head',
-                verified: false 
+                verified: false
             }, { status: 403 });
         }
 

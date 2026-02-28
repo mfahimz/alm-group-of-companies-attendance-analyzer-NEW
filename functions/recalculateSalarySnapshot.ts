@@ -309,8 +309,10 @@ Deno.serve(async (req) => {
         // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
         const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
 
-        // Deductible Hours = Deductible Minutes / 60 (from stored attendance value - current month only)
-        const deductibleHours = Math.round((attendanceValues.deductible_minutes / 60) * 100) / 100;
+        // Deductible Hours = (Deductible Minutes + Other Minutes) / 60
+        // CRITICAL: other_minutes must be included in deductible calculation (same as createSalarySnapshots)
+        const payrollDeductibleMinutes = (attendanceValues.deductible_minutes || 0) + (attendanceValues.other_minutes || 0);
+        const deductibleHours = Math.round((payrollDeductibleMinutes / 60) * 100) / 100;
         
         // Current month hourly rate (uses salary divisor)
         const hourlyRateDeduction = totalSalary / divisor / workingHours;
