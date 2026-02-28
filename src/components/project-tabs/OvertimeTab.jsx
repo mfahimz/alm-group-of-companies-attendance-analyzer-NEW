@@ -220,21 +220,25 @@ export default function OvertimeTab({ project }) {
                 const employee = overtimeData.find(e => String(e.attendance_id) === String(attendanceId));
                 if (!employee) return;
 
+                // Get the persisted OT record to preserve the field NOT being edited
+                const persistedOtRecord = overtimeRecords.find(ot => String(ot.attendance_id) === String(attendanceId));
+
                 const data = {
                     project_id: project.id,
                     attendance_id: String(attendanceId),
                     hrms_id: String(employee.hrms_id || ''),
                     name: employee.name,
                     department: employee.department || '',
-                    normalOtHours: edits.normalOtHours ?? 0,
-                    specialOtHours: edits.specialOtHours ?? 0,
+                    // Use edited value if present, else fall back to persisted record, else 0
+                    normalOtHours: edits.normalOtHours !== undefined ? edits.normalOtHours : (persistedOtRecord?.normalOtHours ?? 0),
+                    specialOtHours: edits.specialOtHours !== undefined ? edits.specialOtHours : (persistedOtRecord?.specialOtHours ?? 0),
                     // Preserve existing adjustment values when saving OT
-                    bonus: employee.bonus ?? 0,
-                    incentive: employee.incentive ?? 0,
-                    open_leave_salary: employee.open_leave_salary ?? 0,
-                    variable_salary: employee.variable_salary ?? 0,
-                    otherDeduction: employee.otherDeduction ?? 0,
-                    advanceSalaryDeduction: employee.advanceSalaryDeduction ?? 0
+                    bonus: persistedOtRecord?.bonus ?? employee.bonus ?? 0,
+                    incentive: persistedOtRecord?.incentive ?? employee.incentive ?? 0,
+                    open_leave_salary: persistedOtRecord?.open_leave_salary ?? employee.open_leave_salary ?? 0,
+                    variable_salary: persistedOtRecord?.variable_salary ?? employee.variable_salary ?? 0,
+                    otherDeduction: persistedOtRecord?.otherDeduction ?? employee.otherDeduction ?? 0,
+                    advanceSalaryDeduction: persistedOtRecord?.advanceSalaryDeduction ?? employee.advanceSalaryDeduction ?? 0
                 };
 
                 if (employee.otRecordId) {
