@@ -1570,19 +1570,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    // RamadanGiftCellWidget import is at top of file (RamadanGiftCell.jsx)
+    // Save only ramadan_gift_minutes. deductible_minutes (raw) stays untouched.
+    // The deductible column computes: max(0, deductible_minutes - ramadan_gift_minutes) at render time.
     const saveRamadanGift = async (row, value) => {
         const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
         const newValue = Math.max(0, Number(value || 0));
-        // Compute final deductible = (late + early - grace) - gift, stored directly so UI reads it correctly
-        const rawDeductible = Math.max(0, (row.late_minutes||0) + (row.early_checkout_minutes||0) - (row.grace_minutes??15));
-        const finalDeductible = Math.max(0, rawDeductible - newValue);
-        await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: finalDeductible });
-        if (oldValue !== newValue) { base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} finalDeductible=${finalDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, final_deductible: finalDeductible }) }).catch(()=>{}); }
-        // Force refetch by removing the cache first
+        await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
+        if (oldValue !== newValue) {
+            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(()=>{});
+        }
+        // Remove stale cache and force fresh fetch so new value is reflected immediately
         queryClient.removeQueries({ queryKey: ['results', reportRun.id] });
         await queryClient.fetchQuery({ queryKey: ['results', reportRun.id], queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000) });
-        toast.success('Ramadan gift saved & deductible recalculated');
+        toast.success('Ramadan gift saved');
     };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
