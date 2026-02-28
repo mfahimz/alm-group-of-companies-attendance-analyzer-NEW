@@ -13,7 +13,6 @@ import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
 import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
-import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Input } from '@/components/ui/input';
