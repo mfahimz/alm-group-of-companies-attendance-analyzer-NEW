@@ -370,10 +370,16 @@ export default function UserDialog({ open, onClose, user }) {
                 dataToSubmit.hrms_id = null;
             }
         } else if (formData.extended_role === 'hr_manager') {
-            // HR Manager has access to all companies - no company restriction
-            dataToSubmit.company = null;
-            dataToSubmit.department = null;
-            dataToSubmit.hrms_id = null;
+            // HR Manager: linked to a dept head record (company/department/hrms_id come from that)
+            if (formData.linked_dept_head_id && formData.hrms_id) {
+                dataToSubmit.company = formData.company;
+                dataToSubmit.department = formData.department;
+                dataToSubmit.hrms_id = formData.hrms_id;
+            } else {
+                dataToSubmit.company = null;
+                dataToSubmit.department = null;
+                dataToSubmit.hrms_id = null;
+            }
         } else if (formData.extended_role === 'admin' || formData.extended_role === 'supervisor') {
             dataToSubmit.company = null;
             dataToSubmit.department = null;
