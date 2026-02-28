@@ -122,11 +122,14 @@ export default function Layout({ children, currentPageName }) {
     // Redirect to appropriate default dashboard on first load
     useEffect(() => {
         if (currentUser && currentPageName === 'Dashboard') {
-            if (isDepartmentHead || isCEO || isHRManager) {
+            if (isDepartmentHead) {
                 navigate('/DepartmentHeadDashboard', { replace: true });
+            } else if (isHRManager) {
+                navigate('/HRManagerDashboard', { replace: true });
             }
+            // CEO stays on Dashboard (admin-like access)
         }
-    }, [currentUser, isDepartmentHead, isHRManager, isCEO, currentPageName, navigate]);
+    }, [currentUser, isDepartmentHead, isHRManager, currentPageName, navigate]);
 
     // If auth failed (not logged in), redirect to login
     if (error && !isLoading) {

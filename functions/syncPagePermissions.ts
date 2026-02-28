@@ -14,43 +14,51 @@ Deno.serve(async (req) => {
         const allPages = [
             // Main Navigation
             { name: 'Home', description: 'Smart dashboard router', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
-            { name: 'Dashboard', description: 'Main dashboard with project overview', defaultRoles: 'admin,supervisor,user,ceo' },
-            
+            { name: 'Dashboard', description: 'Main dashboard with project overview', defaultRoles: 'admin,supervisor,user,ceo,hr_manager' },
+
             // Leadership Dashboards
-            { name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', defaultRoles: 'department_head,ceo' },
+            { name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', defaultRoles: 'department_head,ceo,hr_manager' },
             { name: 'HRManagerDashboard', description: 'HR Manager dashboard', defaultRoles: 'hr_manager' },
-            
+
             // Projects
             { name: 'Projects', description: 'Project management and listing', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
             { name: 'ProjectDetail', description: 'Individual project details and management', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
             { name: 'Reports', description: 'Reports and analytics', defaultRoles: 'admin,supervisor,ceo' },
             { name: 'ReportDetail', description: 'Detailed attendance report view', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
-            
+
             // HR Management
             { name: 'Employees', description: 'Employee master data management', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
-            { name: 'Salaries', description: 'Employee salary management', defaultRoles: 'admin,supervisor,ceo' },
+            { name: 'Salaries', description: 'Employee salary management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
             { name: 'SalaryIncrements', description: 'Salary increment management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
             { name: 'QuarterlyMinutesManagement', description: 'Quarterly minutes management', defaultRoles: 'admin,ceo' },
             { name: 'GraceMinutesManagement', description: 'Grace minutes management', defaultRoles: 'admin,ceo' },
             { name: 'AnnualLeaveManagement', description: 'Annual leave calendar management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
-            { name: 'RamadanSchedules', description: 'Ramadan shift schedule management', defaultRoles: 'admin,ceo' },
-            
+            { name: 'RamadanSchedules', description: 'Ramadan shift schedule management', defaultRoles: 'admin,ceo,hr_manager' },
+
             // Admin
-            { name: 'CompanyManagement', description: 'Company settings and management', defaultRoles: 'admin,ceo' },
+            { name: 'CompanyManagement', description: 'Company settings and management', defaultRoles: 'admin,ceo,hr_manager' },
             { name: 'Users', description: 'User management and permissions', defaultRoles: 'admin,ceo' },
             { name: 'DepartmentHeadSettings', description: 'Department head configuration', defaultRoles: 'admin,ceo' },
             { name: 'RulesSettings', description: 'Attendance rules configuration', defaultRoles: 'admin,ceo' },
             { name: 'MaintenanceSettings', description: 'System maintenance mode settings', defaultRoles: 'admin,ceo' },
+            { name: 'CompanyBranding', description: 'Company branding settings', defaultRoles: 'admin,ceo' },
+            { name: 'AIPayrollInsights', description: 'AI Payroll Insights', defaultRoles: 'admin,ceo,supervisor,hr_manager' },
+            { name: 'AuditLogs', description: 'Audit logs', defaultRoles: 'admin' },
             { name: 'SecurityAudit', description: 'Security and audit logs', defaultRoles: 'admin' },
             { name: 'SystemHealth', description: 'System health monitoring', defaultRoles: 'admin' },
             { name: 'SalaryDataIntegrityRepair', description: 'Salary data repair tools', defaultRoles: 'admin' },
             { name: 'MigrationTools', description: 'Data migration utilities', defaultRoles: 'admin' },
             { name: 'Documentation', description: 'System documentation', defaultRoles: 'admin,ceo' },
             { name: 'Training', description: 'Training guides and videos', defaultRoles: 'admin,ceo' },
-            
+
+            // Developer Tools (admin only)
+            { name: 'DevelopmentLog', description: 'Development log', defaultRoles: 'admin' },
+            { name: 'AppDocumentation', description: 'App documentation', defaultRoles: 'admin' },
+            { name: 'FeatureRequests', description: 'Feature requests', defaultRoles: 'admin' },
+
             // Calendar Payroll
             { name: 'Calendar', description: 'Calendar payroll system', defaultRoles: 'admin' },
-            
+
             // Hidden Pages (No navigation but need permissions)
             { name: 'EmployeeProfile', description: 'Employee profile details', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
             { name: 'UserProfile', description: 'User profile settings', defaultRoles: 'admin,supervisor,user,ceo,department_head,hr_manager' },

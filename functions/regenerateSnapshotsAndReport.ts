@@ -15,9 +15,10 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
         
-        // Auth check
+        // Auth check - use extended_role with fallback to role
         const user = await base44.auth.me();
-        if (!user || !['admin', 'supervisor', 'ceo'].includes(user.role)) {
+        const userRole = user?.extended_role || user?.role || 'user';
+        if (!user || !['admin', 'supervisor', 'ceo'].includes(userRole)) {
             return Response.json({ error: 'Unauthorized' }, { status: 403 });
         }
 

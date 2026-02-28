@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import InlineEditableCell from './InlineEditableCell';
+import RamadanGiftCellWidget from './RamadanGiftCell';
+import { GraceMinutesDialog, SaveConfirmationDialog, FinalizationProgressDialog } from './ReportDetailDialogs';
 import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
 import * as XLSX from 'xlsx';
@@ -851,12 +853,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     }, [ramadanSchedules, reportRun?.date_from, reportRun?.date_to]);
     const showRamadanGiftColumn = isAlMaraghiMotors && hasRamadanSchedule && (isAdmin || isCEO || isHRManager);
 
-    function getEffectiveRamadanGiftMinutes(result) {
-        const override = ramadanGiftOverrides[result.id];
-        if (override !== undefined) return Math.max(0, Number(override));
-        return Math.max(0, Number(result.ramadan_gift_minutes || 0));
-    }
-
     // For FINALIZED reports: use stored AnalysisResult values (immutable).
     // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
     // so the summary table matches the daily breakdown the user sees.
@@ -889,8 +885,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     other_minutes: result.other_minutes || 0,
                     approved_minutes: result.approved_minutes || 0,
                     deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
-                    ramadan_gift_minutes: getEffectiveRamadanGiftMinutes(result),
-                    effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? result.deductible_minutes ?? 0) - getEffectiveRamadanGiftMinutes(result)),
+                    ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
+                    // effective = raw deductible (after grace) minus ramadan gift
+                    effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? result.deductible_minutes ?? 0) - Math.max(0, result.ramadan_gift_minutes || 0)),
                     grace_minutes: result.grace_minutes ?? 15,
                     has_no_punches: hasNoPunches
                 };
@@ -920,8 +917,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
                 approved_minutes: result.approved_minutes || 0, deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
-                ramadan_gift_minutes: getEffectiveRamadanGiftMinutes(result),
-                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - getEffectiveRamadanGiftMinutes(result)),
+                ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
+                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - Math.max(0, result.ramadan_gift_minutes || 0)),
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
@@ -1477,9 +1474,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const rows = filteredResults.map(r => {
             // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
             // For non-finalized reports, use the recalculated values from enrichedResults
-            const giftMinutes = getEffectiveRamadanGiftMinutes(r);
-            const rawDeductible = Math.max(0, r.manual_deductible_minutes ?? r.deductible_minutes ?? 0);
-            const deductible = Math.max(0, rawDeductible - giftMinutes);
+            const deductible = (r.effective_deductible_minutes ?? r.deductible_minutes) || 0;
             const late = r.late_minutes || 0;
             const early = r.early_checkout_minutes || 0;
             const grace = r.grace_minutes ?? 15;
@@ -1560,50 +1555,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    const updateRamadanGiftMinutesMutation = useMutation({
-        mutationFn: async ({ row, value }) => {
-            const oldValue = getEffectiveRamadanGiftMinutes(row);
-            const newValue = Math.max(0, Number(value || 0));
-
-            await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
-
-            if (oldValue !== newValue) {
-                try {
-                    await base44.functions.invoke('logAudit', {
-                        action_type: 'update',
-                        entity_name: 'AnalysisResult',
-                        entity_id: row.id,
-                        project_id: project.id,
-                        company: project.company,
-                        context: `RAMADAN_GIFT_MINUTES_UPDATE employee=${row.attendance_id || row.name} old=${oldValue} new=${newValue} user=${currentUser?.email || 'unknown'}`,
-                        changes: JSON.stringify({
-                            field: 'ramadan_gift_minutes',
-                            attendance_id: row.attendance_id || null,
-                            project_id: project.id,
-                            old_value: oldValue,
-                            new_value: newValue,
-                            changed_by: currentUser?.email || null
-                        })
-                    });
-                } catch (auditError) {
-                    console.warn('[ReportDetailView] Ramadan gift audit log failed:', auditError?.message || auditError);
-                }
-            }
-
-            return { rowId: row.id, newValue };
-        },
-        onSuccess: ({ rowId, newValue }) => {
-            setRamadanGiftOverrides(prev => ({ ...prev, [rowId]: newValue }));
-            queryClient.setQueryData(['results', reportRun.id], (prev = []) =>
-                prev.map(item => item.id === rowId ? { ...item, ramadan_gift_minutes: newValue } : item)
-            );
-            queryClient.invalidateQueries(['results', reportRun.id]);
-            toast.success('Ramadan gift minutes updated');
-        },
-        onError: () => {
-            toast.error('Failed to update Ramadan gift minutes');
-        }
-    });
+    // RamadanGiftCellWidget import is at top of file (RamadanGiftCell.jsx)
+    const saveRamadanGift = async (row, value) => {
+        const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
+        const newValue = Math.max(0, Number(value || 0));
+        // Compute final deductible = (late + early - grace) - gift, stored directly so UI reads it correctly
+        const rawDeductible = Math.max(0, (row.late_minutes||0) + (row.early_checkout_minutes||0) - (row.grace_minutes??15));
+        const finalDeductible = Math.max(0, rawDeductible - newValue);
+        await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue, deductible_minutes: finalDeductible });
+        if (oldValue !== newValue) { base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue} finalDeductible=${finalDeductible}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue, final_deductible: finalDeductible }) }).catch(()=>{}); }
+        // Force refetch by removing the cache first
+        queryClient.removeQueries({ queryKey: ['results', reportRun.id] });
+        await queryClient.fetchQuery({ queryKey: ['results', reportRun.id], queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000) });
+        toast.success('Ramadan gift saved & deductible recalculated');
+    };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
     const verifiedCount = verifiedEmployees.length;
@@ -1611,52 +1576,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     return (
         <div className="space-y-6">
             {/* Finalization Progress Dialog */}
-            <Dialog open={finalizationProgress.open} onOpenChange={() => {}}>
-                <DialogContent 
-                    className="sm:max-w-md" 
-                    onPointerDownOutside={(e) => e.preventDefault()} 
-                    onEscapeKeyDown={(e) => e.preventDefault()}
-                    onInteractOutside={(e) => e.preventDefault()}
-                >
-                    <DialogHeader>
-                        <DialogTitle>Creating Salary Snapshots</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>Progress</span>
-                                <span className="font-medium">{finalizationProgress.current} / {finalizationProgress.total}</span>
-                            </div>
-                            <div className="w-full bg-slate-200 rounded-full h-2">
-                                <div 
-                                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${finalizationProgress.total > 0 ? (finalizationProgress.current / finalizationProgress.total) * 100 : 0}%` }}
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="text-sm font-medium text-slate-700">
-                                {finalizationProgress.status}
-                            </div>
-                            {finalizationProgress.currentEmployee && (
-                                <div className="text-xs text-slate-500">
-                                    {finalizationProgress.currentEmployee}
-                                </div>
-                            )}
-                        </div>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
-                            <div className="flex items-start gap-2 text-xs text-amber-800">
-                                <div className="animate-spin h-3 w-3 border-2 border-amber-300 border-t-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
-                                <div>
-                                    <strong>Creating salary snapshots...</strong> This takes ~2-3 seconds per 20 employees.
-                                    <br />
-                                    <span className="text-amber-700">⚠️ Do NOT navigate away or close this dialog until complete!</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <FinalizationProgressDialog progress={finalizationProgress} />
 
             {saveProgress && (
                 <Card className="border-0 shadow-sm bg-green-50 border-green-200">
@@ -1974,23 +1894,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 )}
                                             </div>
                                         </td>
-                                        {showRamadanGiftColumn && (
-                                            <td className="p-2 align-middle">
-                                                <InlineEditableCell
-                                                    value={getEffectiveRamadanGiftMinutes(result)}
-                                                    onSave={(value) => updateRamadanGiftMinutesMutation.mutateAsync({ row: result, value: Math.max(0, value) })}
-                                                    isEditable={canEditRamadanGift && !reportRun.is_final && project.status !== 'closed'}
-                                                    alwaysInputWithSave
-                                                    min={0}
-                                                    className="font-medium text-amber-700"
-                                                />
-                                            </td>
-                                        )}
+                                        {showRamadanGiftColumn && (() => {
+                                            const canEdit = !reportRun.is_final && project.status !== 'closed';
+                                            if (!canEdit) return <td className="p-2 align-middle"><span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span></td>;
+                                            return <td className="p-2 align-middle"><RamadanGiftCellWidget result={result} onSave={saveRamadanGift} isEditable={true} /></td>;
+                                        })()}
                                         <td className="p-2 align-middle">
                                             {(() => {
-                                                const rawDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
-                                                const giftMinutes = getEffectiveRamadanGiftMinutes(result);
-                                                const displayDeductible = Math.max(0, rawDeductible - giftMinutes);
+                                                // deductible_minutes is already final (gift already subtracted by saveRamadanGift)
+                                                const displayDeductible = Math.max(0, result.manual_deductible_minutes ?? result.deductible_minutes ?? 0);
 
                                                 return (
                                                     <div className="flex flex-col">
@@ -2052,78 +1964,21 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 filterMultiplePunches={filterMultiplePunches}
             />
 
-            <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && setEditingGraceMinutes(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Edit Grace Minutes</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Label>Grace Minutes</Label>
-                        <Input
-                            type="number"
-                            defaultValue={editingGraceMinutes?.grace_minutes ?? 15}
-                            id="grace-minutes-input"
-                            className="mt-2"
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setEditingGraceMinutes(null)}>Cancel</Button>
-                        <Button onClick={() => {
-                            const val = document.getElementById('grace-minutes-input').value;
-                            updateGraceMinutesMutation.mutate({
-                                id: editingGraceMinutes.id,
-                                grace_minutes: parseInt(val)
-                            });
-                        }}>Save</Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <GraceMinutesDialog
+                editingGraceMinutes={editingGraceMinutes}
+                onClose={() => setEditingGraceMinutes(null)}
+                onSave={(data) => updateGraceMinutesMutation.mutate(data)}
+                isPending={updateGraceMinutesMutation.isPending}
+            />
 
-            <Dialog open={showSaveConfirmation} onOpenChange={setShowSaveConfirmation}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Confirm Save Report</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <p className="text-slate-700">
-                            Are you sure you want to save this report?
-                        </p>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                            <p className="text-sm text-amber-800 font-medium mb-2">⚠️ Important:</p>
-                            <ul className="text-sm text-amber-700 space-y-1">
-                                <li>• All manual edits in daily breakdowns will be converted to exceptions</li>
-                                {(isUser && !isSupervisor) ? (
-                                    <li>• Your edits will be marked as pending and require admin approval</li>
-                                ) : (
-                                    <li>• Admin/supervisor edits will be automatically approved and used in future analysis</li>
-                                )}
-                                <li>• Verification status will be saved for all marked employees</li>
-                                <li>• This action cannot be easily undone</li>
-                            </ul>
-                        </div>
-                        {hasEdits && (
-                            <p className="text-sm text-slate-600">
-                                You have made edits to this report. These will be permanently saved as exceptions.
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setShowSaveConfirmation(false)}>
-                            Cancel
-                        </Button>
-                        <Button 
-                            onClick={() => {
-                                setShowSaveConfirmation(false);
-                                saveReportMutation.mutate();
-                            }}
-                            className="bg-green-600 hover:bg-green-700"
-                        >
-                            Confirm & Save
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
+            <SaveConfirmationDialog
+                open={showSaveConfirmation}
+                onClose={() => setShowSaveConfirmation(false)}
+                onConfirm={() => { setShowSaveConfirmation(false); saveReportMutation.mutate(); }}
+                hasEdits={hasEdits}
+                isUser={isUser}
+                isSupervisor={isSupervisor}
+            />
 
         </div>
     );
