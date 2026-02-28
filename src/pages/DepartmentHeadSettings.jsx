@@ -146,13 +146,16 @@ export default function DepartmentHeadSettings() {
                     active: true
                 });
 
-                // Update user role to CEO
-                const ceoUser = users.find(u => u.email === selectedCEOUser);
-                if (ceoUser) {
-                    await base44.entities.User.update(ceoUser.id, {
-                        extended_role: 'ceo',
-                        company: selectedCompany
-                    });
+                // Update user role and company - preserve existing role if already ceo or hr_manager
+                const selectedUser = users.find(u => u.email === selectedCEOUser);
+                if (selectedUser) {
+                    const currentRole = selectedUser.extended_role || selectedUser.role || 'user';
+                    const updateData = { company: selectedCompany };
+                    // Only set to ceo if user is not already ceo or hr_manager
+                    if (currentRole !== 'ceo' && currentRole !== 'hr_manager') {
+                        updateData.extended_role = 'ceo';
+                    }
+                    await base44.entities.User.update(selectedUser.id, updateData);
                 }
             } else {
                 // Regular department head - require employee selection
@@ -469,15 +472,18 @@ export default function DepartmentHeadSettings() {
                         <SelectValue placeholder="Select user for CEO role" />
                         </SelectTrigger>
                         <SelectContent>
-                        {users.filter(u => (u.extended_role || u.role) === 'admin' || (u.extended_role || u.role) === 'ceo').map(u => (
+                        {users.filter(u => {
+                            const role = u.extended_role || u.role;
+                            return role === 'admin' || role === 'ceo' || role === 'hr_manager';
+                        }).map(u => (
                             <SelectItem key={u.id} value={u.email}>
-                                👑 {u.full_name} ({u.email})
+                                {(u.extended_role || u.role) === 'hr_manager' ? '📋' : '👑'} {u.full_name} ({u.email})
                             </SelectItem>
                         ))}
                         </SelectContent>
                         </Select>
                         <p className="text-xs text-slate-500 mt-1">
-                        CEO does not require an employee profile - select admin/CEO user
+                        Select admin, CEO, or HR Manager user for the executive role
                         </p>
                         </div>
                         ) : (

@@ -38,9 +38,9 @@ Deno.serve(async (req) => {
         const project = projects[0];
 
         const userRole = user?.extended_role || user?.role || 'user';
-        
-        // Security: Verify access (User and Supervisor have full project access)
-        if (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'ceo' && userRole !== 'user') {
+
+        // Security: Verify access - privileged roles have full project access, others need company match
+        if (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'ceo' && userRole !== 'user' && userRole !== 'hr_manager') {
             if (project.company !== user.company) {
                 return Response.json({ error: 'Access denied' }, { status: 403 });
             }

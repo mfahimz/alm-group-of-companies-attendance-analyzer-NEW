@@ -105,15 +105,15 @@ export default function Users() {
         }
     }, [currentUser, permissions, navigate]);
 
-    // SECURITY: Only admins can query User entity with pagination
+    // SECURITY: Only admins and CEO can query User entity with pagination
     const { data: usersData = { items: [], total: 0 }, isLoading } = useQuery({
         queryKey: ['users', currentPage, rowsPerPage],
         queryFn: async () => {
             const user = await base44.auth.me();
             const userRole = user?.extended_role || user?.role || 'user';
-            
-            if (userRole !== 'admin') {
-                throw new Error('Access denied: Admin role required');
+
+            if (userRole !== 'admin' && userRole !== 'ceo') {
+                throw new Error('Access denied: Admin or CEO role required');
             }
             
             const skip = (currentPage - 1) * rowsPerPage;
@@ -163,6 +163,10 @@ export default function Users() {
         const currentRole = user.extended_role || user.role || 'user';
         let newRole;
         if (currentRole === 'admin') {
+            newRole = 'ceo';
+        } else if (currentRole === 'ceo') {
+            newRole = 'hr_manager';
+        } else if (currentRole === 'hr_manager') {
             newRole = 'supervisor';
         } else if (currentRole === 'supervisor') {
             newRole = 'department_head';
@@ -171,7 +175,7 @@ export default function Users() {
         } else {
             newRole = 'admin';
         }
-        
+
         if (window.confirm(`Change ${user.full_name}'s role to ${newRole}?`)) {
             updateUserMutation.mutate({
                 id: user.id,
@@ -378,16 +382,21 @@ export default function Users() {
                                                 return (
                                                     <span className={`
                                                         px-2 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1
-                                                        ${displayRole === 'admin' ? 'bg-purple-100 text-purple-700' : 
-                                                          displayRole === 'supervisor' ? 'bg-blue-100 text-blue-700' : 
+                                                        ${displayRole === 'admin' ? 'bg-purple-100 text-purple-700' :
+                                                          displayRole === 'ceo' ? 'bg-indigo-100 text-indigo-700' :
+                                                          displayRole === 'hr_manager' ? 'bg-teal-100 text-teal-700' :
+                                                          displayRole === 'supervisor' ? 'bg-blue-100 text-blue-700' :
                                                           displayRole === 'department_head' ? 'bg-green-100 text-green-700' :
                                                           'bg-slate-100 text-slate-700'}
                                                     `}>
-                                                        {displayRole === 'admin' ? <Shield className="w-3 h-3" /> : 
+                                                        {displayRole === 'admin' ? <Shield className="w-3 h-3" /> :
+                                                         displayRole === 'ceo' ? <Shield className="w-3 h-3" /> :
                                                          displayRole === 'department_head' ? <Shield className="w-3 h-3" /> :
                                                          <UserIcon className="w-3 h-3" />}
-                                                        {displayRole === 'admin' ? 'Admin' : 
-                                                         displayRole === 'supervisor' ? 'Supervisor' : 
+                                                        {displayRole === 'admin' ? 'Admin' :
+                                                         displayRole === 'ceo' ? 'CEO' :
+                                                         displayRole === 'hr_manager' ? 'HR Manager' :
+                                                         displayRole === 'supervisor' ? 'Supervisor' :
                                                          displayRole === 'department_head' ? 'Dept Head' :
                                                          'User'}
                                                     </span>
@@ -410,7 +419,7 @@ export default function Users() {
                                                     variant="outline"
                                                     onClick={() => handleToggleRole(user)}
                                                     disabled={updateUserMutation.isPending}
-                                                    title="Toggle role (Admin → Supervisor → Dept Head → User → Admin)"
+                                                    title="Toggle role (Admin → CEO → HR Manager → Supervisor → Dept Head → User → Admin)"
                                                 >
                                                     <Shield className="w-4 h-4" />
                                                 </Button>

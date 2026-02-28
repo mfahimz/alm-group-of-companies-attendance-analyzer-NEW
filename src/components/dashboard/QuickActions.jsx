@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 
 export default function QuickActions({ userRole }) {
-    const isAdminOrSupervisor = userRole === 'admin' || userRole === 'supervisor';
+    const isAdminOrSupervisor = userRole === 'admin' || userRole === 'supervisor' || userRole === 'ceo' || userRole === 'hr_manager';
     
     const actions = [
         {

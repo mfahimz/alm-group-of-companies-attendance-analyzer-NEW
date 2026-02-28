@@ -33,19 +33,23 @@ export default function DepartmentHeadDashboard() {
     // SECURITY: Verify department head assignment via backend
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isDepartmentHead = userRole === 'department_head';
+    const isCEO = userRole === 'ceo';
+    const isHRManager = userRole === 'hr_manager';
+    // CEO/HR Manager can access if they have hrms_id (linked to dept head record)
+    const hasDeptHeadLink = (isCEO || isHRManager) && !!currentUser?.hrms_id;
+    const canVerifyDeptHead = isDepartmentHead || hasDeptHeadLink;
 
     const { data: deptHeadVerification, isLoading: verificationLoading } = useQuery({
-        queryKey: ['deptHeadVerification', isDepartmentHead, currentUser?.email],
+        queryKey: ['deptHeadVerification', canVerifyDeptHead, currentUser?.email],
         queryFn: async () => {
-            // Only call if user role is department_head
-            if (!isDepartmentHead) {
-                console.log('[DeptHeadDashboard] Skipping verification - not a department head role');
+            if (!canVerifyDeptHead) {
+                console.log('[DeptHeadDashboard] Skipping verification - not a department head role or no dept head link');
                 return null;
             }
             const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
             return data;
         },
-        enabled: !!currentUser && isDepartmentHead,
+        enabled: !!currentUser && canVerifyDeptHead,
         retry: false,
         staleTime: 10 * 60 * 1000, // Cache for 10 minutes
         gcTime: 15 * 60 * 1000,
