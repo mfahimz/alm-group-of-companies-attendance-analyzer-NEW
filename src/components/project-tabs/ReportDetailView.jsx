@@ -17,6 +17,7 @@ import RamadanGiftCellWidget from './RamadanGiftCell';
 import { GraceMinutesDialog, SaveConfirmationDialog, FinalizationProgressDialog } from './ReportDetailDialogs';
 import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
+import DeductibleCell from './DeductibleCell';
 import * as XLSX from 'xlsx';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
