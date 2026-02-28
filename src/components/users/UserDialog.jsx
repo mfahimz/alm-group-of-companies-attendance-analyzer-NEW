@@ -37,8 +37,7 @@ export default function UserDialog({ open, onClose, user }) {
     });
 
     const needsDeptHeadData = formData.extended_role === 'department_head' ||
-                               formData.extended_role === 'ceo' ||
-                               formData.extended_role === 'hr_manager';
+                               formData.extended_role === 'ceo';
 
     const { data: deptHeads = [] } = useQuery({
         queryKey: ['deptHeads'],
