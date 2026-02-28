@@ -23,6 +23,7 @@ import PINLock from '../components/ui/PINLock';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import SalarySnapshotDialog from '../components/salary/SalarySnapshotDialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 
 export default function SalaryReportDetail() {
     const queryClient = useQueryClient();
@@ -108,7 +109,7 @@ export default function SalaryReportDetail() {
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
     const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
-    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
+    const isAlMaraghi = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
     const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
     const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
         if (totalAmount <= 0) {
@@ -156,6 +157,8 @@ export default function SalaryReportDetail() {
                     otherDeduction: editableData[row.hrms_id]?.otherDeduction ?? liveSnapshot?.otherDeduction ?? row.otherDeduction ?? 0,
                     bonus: editableData[row.hrms_id]?.bonus ?? liveSnapshot?.bonus ?? row.bonus ?? 0,
                     incentive: editableData[row.hrms_id]?.incentive ?? liveSnapshot?.incentive ?? row.incentive ?? 0,
+                    open_leave_salary: editableData[row.hrms_id]?.open_leave_salary ?? liveSnapshot?.open_leave_salary ?? row.open_leave_salary ?? 0,
+                    variable_salary: editableData[row.hrms_id]?.variable_salary ?? liveSnapshot?.variable_salary ?? row.variable_salary ?? 0,
                     advanceSalaryDeduction: editableData[row.hrms_id]?.advanceSalaryDeduction ?? liveSnapshot?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0,
                     isVerified: verifiedEmployees.includes(String(row.attendance_id))
                 };
@@ -238,6 +241,8 @@ export default function SalaryReportDetail() {
         const incentive = asNumber(getValue(row, 'incentive'));
         const otherDeduction = asNumber(getValue(row, 'otherDeduction'));
         const advanceSalaryDeduction = asNumber(getValue(row, 'advanceSalaryDeduction'));
+        const openLeaveSalary = isAlMaraghi ? asNumber(getValue(row, 'open_leave_salary')) : 0;
+        const variableSalary = isAlMaraghi ? asNumber(getValue(row, 'variable_salary')) : 0;
 
         // Get current attendance values (may be admin-edited)
         const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
@@ -264,7 +269,7 @@ export default function SalaryReportDetail() {
         const effectiveOtOrIncentive = Math.max(round2(totalOtSalary), round2(incentive));
 
         // Bonus is added as-is (do not force-round bonus value itself).
-        const netAdditions = bonus + effectiveOtOrIncentive;
+        const netAdditions = bonus + effectiveOtOrIncentive + openLeaveSalary + variableSalary;
 
         // Net deductions are rounded to 2 decimals.
         const netDeductions = round2(
@@ -360,6 +365,8 @@ export default function SalaryReportDetail() {
             if ('otherDeduction' in edits) updated.otherDeduction = edits.otherDeduction;
             if ('bonus' in edits) updated.bonus = edits.bonus;
             if ('incentive' in edits) updated.incentive = edits.incentive;
+            if ('open_leave_salary' in edits) updated.open_leave_salary = edits.open_leave_salary;
+            if ('variable_salary' in edits) updated.variable_salary = edits.variable_salary;
             if ('advanceSalaryDeduction' in edits) updated.advanceSalaryDeduction = edits.advanceSalaryDeduction;
 
             // Recalculate total (include previous month deductions)
@@ -370,7 +377,9 @@ export default function SalaryReportDetail() {
              const extraPrevMonthDeductibleHoursPay = updated.extra_prev_month_deductible_hours_pay || 0;
 
              const effectiveOtOrIncentive = Math.max(round2(totalOtSalary), round2(updated.incentive || 0));
-             const netAdditions = (updated.bonus || 0) + effectiveOtOrIncentive;
+             const openLeaveSalary = isAlMaraghi ? asNumber(updated.open_leave_salary || 0) : 0;
+             const variableSalary = isAlMaraghi ? asNumber(updated.variable_salary || 0) : 0;
+             const netAdditions = (updated.bonus || 0) + effectiveOtOrIncentive + openLeaveSalary + variableSalary;
              const netDeductions = round2(
                  netDeduction +
                  deductibleHoursPay +
@@ -438,6 +447,8 @@ export default function SalaryReportDetail() {
                     if ('otherDeduction' in edits) updatePayload.otherDeduction = edits.otherDeduction;
                     if ('bonus' in edits) updatePayload.bonus = edits.bonus;
                     if ('incentive' in edits) updatePayload.incentive = edits.incentive;
+                    if ('open_leave_salary' in edits) updatePayload.open_leave_salary = edits.open_leave_salary;
+                    if ('variable_salary' in edits) updatePayload.variable_salary = edits.variable_salary;
                     if ('advanceSalaryDeduction' in edits) updatePayload.advanceSalaryDeduction = edits.advanceSalaryDeduction;
                     
                     if (Object.keys(updatePayload).length > 0) {
@@ -573,6 +584,10 @@ export default function SalaryReportDetail() {
                 'Other Deduction': parseFloat((row.otherDeduction || 0).toFixed(2)),
                 'Bonus': parseFloat((row.bonus || 0).toFixed(2)),
                 'Incentive': parseFloat((row.incentive || 0).toFixed(2)),
+                ...(isAlMaraghi ? {
+                    'Open Leave Salary': parseFloat((asNumber(row.open_leave_salary)).toFixed(2)),
+                    'Variable Salary': parseFloat((asNumber(row.variable_salary)).toFixed(2))
+                } : {}),
                 'Advance Salary Deduction': parseFloat((row.advanceSalaryDeduction || 0).toFixed(2)),
                 'Net Deductions': parseFloat((netDeductions || 0).toFixed(2)),
                 'Total': parseFloat(total.toFixed(2)),
@@ -764,7 +779,7 @@ export default function SalaryReportDetail() {
                                     <tr className="border-b border-slate-300">
                                         <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                                         <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
-                                        <th colSpan={10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
+                                        <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
                                         <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                                         <th colSpan={4} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                                         <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
@@ -793,6 +808,8 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">S.OT Sal</SortableTableHead>
                                         <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Tot OT</SortableTableHead>
                                         <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Incentive</SortableTableHead>
+                                        {isAlMaraghi && <SortableTableHead sortKey="open_leave_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Open Leave Salary</SortableTableHead>}
+                                        {isAlMaraghi && <SortableTableHead sortKey="variable_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Variable Salary</SortableTableHead>}
                                         <TableHead className="whitespace-nowrap bg-emerald-200 px-2 font-bold border-r border-slate-300">Net Add.</TableHead>
                                         {/* Deductions Group */}
                                         <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Days</SortableTableHead>
@@ -897,6 +914,8 @@ export default function SalaryReportDetail() {
                                                 <td className={`${cellBase} bg-emerald-50/50 px-1`}>
                                                     <Input type="number" step="0.01" value={getValue(row, 'incentive')} onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)} className="h-6 text-xs w-14 px-1" />
                                                 </td>
+                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50`}>{asNumber(row.open_leave_salary).toFixed(2)}</td>}
+                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50`}>{asNumber(row.variable_salary).toFixed(2)}</td>}
                                                 <td className={`${cellBase} bg-emerald-100 font-bold border-r border-slate-200`}>{netAdditions.toFixed(2)}</td>
 
                                                 {/* Deductions */}

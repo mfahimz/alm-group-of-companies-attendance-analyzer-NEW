@@ -13,6 +13,7 @@ import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
 import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
+import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Input } from '@/components/ui/input';
@@ -219,7 +220,7 @@ export default function ProjectDetail() {
 
                             {/* DIVISOR SETTINGS - Al Maraghi Motors only */}
                             {/* [MERGE_NOTE: If merging divisors in future, remove the OT divisor section and update label] */}
-                            {project.company === 'Al Maraghi Motors' && isAdmin && (
+                            {Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID && isAdmin && (
                             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* DIVISOR_LEAVE_DEDUCTION */}
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -311,7 +312,7 @@ export default function ProjectDetail() {
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
                             Exceptions {isReadOnly && '🔒'}
                         </TabsTrigger>
-                        {project.company === 'Al Maraghi Motors' &&
+                        {Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID &&
             <TabsTrigger
               value="overtime"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600 data-[state=active]:to-orange-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
@@ -323,7 +324,7 @@ export default function ProjectDetail() {
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-indigo-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
                             Attendance {isReadOnly && '🔒'}
                         </TabsTrigger>
-                        {project.company === 'Al Maraghi Motors' &&
+                        {Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID &&
             <TabsTrigger
               value="salary"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-green-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">

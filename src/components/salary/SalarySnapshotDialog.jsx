@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, DollarSign, Clock, TrendingDown, Info } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 
 /**
  * SalarySnapshotDialog - Read-only view of a single SalarySnapshot
@@ -30,7 +31,7 @@ export default function SalarySnapshotDialog({
 
     if (!snapshot) return null;
 
-    const isAlMaraghi = project?.company === 'Al Maraghi Motors';
+    const isAlMaraghi = Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
 
     // Check if bonus has decimal values
     const hasDecimalBonus = () => {
@@ -167,6 +168,8 @@ export default function SalarySnapshotDialog({
                         <DataRow label="OT Amount" value={snapshot.totalOtSalary || ((snapshot.normalOtSalary || 0) + (snapshot.specialOtSalary || 0))} />
                         <DataRow label="Bonus" value={snapshot.bonus} />
                         <DataRow label="Incentive" value={snapshot.incentive} />
+                        {isAlMaraghi && <DataRow label="Open Leave Salary" value={(Number(snapshot.open_leave_salary || 0)).toFixed(2) + ' AED'} />}
+                        {isAlMaraghi && <DataRow label="Variable Salary" value={(Number(snapshot.variable_salary || 0)).toFixed(2) + ' AED'} />}
                     </div>
                 </div>
 

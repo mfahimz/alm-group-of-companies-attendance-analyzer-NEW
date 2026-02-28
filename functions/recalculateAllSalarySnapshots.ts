@@ -177,6 +177,8 @@ Deno.serve(async (req) => {
                 const specialOtHours = snapshot.specialOtHours || 0;
                 const bonus = snapshot.bonus || 0;
                 const incentive = snapshot.incentive || 0;
+                const openLeaveSalary = Math.max(0, Number(snapshot.open_leave_salary || 0));
+                const variableSalary = Math.max(0, Number(snapshot.variable_salary || 0));
                 const otherDeduction = snapshot.otherDeduction || 0;
                 const advanceSalaryDeduction = snapshot.advanceSalaryDeduction || 0;
 
@@ -219,6 +221,8 @@ Deno.serve(async (req) => {
                     + totalOtSalary 
                     + bonus 
                     + incentive
+                    + openLeaveSalary
+                    + variableSalary
                     - netDeduction 
                     - deductibleHoursPay
                     - otherDeduction 

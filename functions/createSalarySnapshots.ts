@@ -139,6 +139,9 @@ Deno.serve(async (req) => {
                 project_id: project_id,
                 report_run_id: report_run_id
             }, null, 5000);
+            const overtimeDataForRepair = await base44.asServiceRole.entities.OvertimeData.filter({
+                project_id: project_id
+            }, null, 5000);
 
             let repairedSnapshots = 0;
             for (const snapshot of existingSnapshots) {
@@ -149,16 +152,59 @@ Deno.serve(async (req) => {
                 );
                 if (!analysisResult) continue;
 
-                const finalizedDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                const rawDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                const ramadanGiftMinutes = Math.max(0, analysisResult.ramadan_gift_minutes || 0);
+                const finalizedDeductibleMinutes = Math.max(0, rawDeductibleMinutes - ramadanGiftMinutes);
                 const finalizedOtherMinutes = Math.max(0, analysisResult.other_minutes || 0);
+
+                const otRecord = overtimeDataForRepair.find(ot =>
+                    String(ot.attendance_id || '') === String(snapshot.attendance_id || '') ||
+                    String(ot.hrms_id || '') === String(snapshot.hrms_id || '')
+                );
+                const openLeaveSalary = Math.max(0, Number(otRecord?.open_leave_salary ?? snapshot.open_leave_salary ?? 0));
+                const variableSalary = Math.max(0, Number(otRecord?.variable_salary ?? snapshot.variable_salary ?? 0));
 
                 if (
                     Number(snapshot.deductible_minutes || 0) !== Number(finalizedDeductibleMinutes) ||
-                    Number(snapshot.other_minutes || 0) !== Number(finalizedOtherMinutes)
+                    Number(snapshot.other_minutes || 0) !== Number(finalizedOtherMinutes) ||
+                    Number(snapshot.open_leave_salary || 0) !== Number(openLeaveSalary) ||
+                    Number(snapshot.variable_salary || 0) !== Number(variableSalary)
                 ) {
+                    const previousOpenLeaveSalary = Math.max(0, Number(snapshot.open_leave_salary || 0));
+                    const previousVariableSalary = Math.max(0, Number(snapshot.variable_salary || 0));
+                    const repairedTotal = Math.round(((Number(snapshot.total || 0) - previousOpenLeaveSalary - previousVariableSalary + openLeaveSalary + variableSalary) * 100)) / 100;
+
+                    const wpsCapEnabled = snapshot.wps_cap_enabled || false;
+                    const wpsCapAmount = snapshot.wps_cap_amount ?? 4900;
+                    let repairedWpsPay = repairedTotal;
+                    let repairedBalance = 0;
+                    let repairedWpsCapApplied = false;
+
+                    if (wpsCapEnabled) {
+                        if (repairedTotal <= 0) {
+                            repairedWpsPay = 0;
+                            repairedBalance = 0;
+                        } else {
+                            const rawExcess = Math.max(0, repairedTotal - wpsCapAmount);
+                            repairedBalance = rawExcess > 0 ? Math.ceil(rawExcess / 100) * 100 : 0;
+                            repairedWpsPay = Math.round((repairedTotal - repairedBalance) * 100) / 100;
+                            repairedWpsCapApplied = rawExcess > 0;
+                        }
+                    } else if (repairedTotal <= 0) {
+                        repairedWpsPay = 0;
+                        repairedBalance = 0;
+                    }
+
                     await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
                         deductible_minutes: finalizedDeductibleMinutes,
-                        other_minutes: finalizedOtherMinutes
+                        ramadan_gift_minutes: ramadanGiftMinutes,
+                        other_minutes: finalizedOtherMinutes,
+                        open_leave_salary: openLeaveSalary,
+                        variable_salary: variableSalary,
+                        total: repairedTotal,
+                        wpsPay: repairedWpsPay,
+                        balance: repairedBalance,
+                        wps_cap_applied: repairedWpsCapApplied
                     });
                     repairedSnapshots++;
                 }
@@ -1341,6 +1387,7 @@ Deno.serve(async (req) => {
                     otherMinutes: analysisResult.other_minutes || 0,
                     approvedMinutes: analysisResult.approved_minutes || 0,
                     deductibleMinutes: analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0,
+                    ramadanGiftMinutes: Math.max(0, analysisResult.ramadan_gift_minutes || 0),
                     graceMinutes: analysisResult.grace_minutes ?? 15
                 };
                 attendanceSource = 'ANALYZED';
@@ -1361,6 +1408,7 @@ Deno.serve(async (req) => {
                     otherMinutes: 0,
                     approvedMinutes: 0,
                     deductibleMinutes: 0,
+                    ramadanGiftMinutes: 0,
                     graceMinutes: 0
                 };
                 attendanceSource = 'NO_ATTENDANCE_DATA';
@@ -1442,7 +1490,7 @@ Deno.serve(async (req) => {
             // Use finalized attendance fields from AnalysisResult AS-IS.
             // IMPORTANT: never merge other_minutes into deductible_minutes.
             // Snapshot must persist both fields separately exactly as finalized.
-            const finalizedDeductibleMinutes = Math.max(0, calculated.deductibleMinutes || 0);
+            const finalizedDeductibleMinutes = Math.max(0, (calculated.deductibleMinutes || 0) - (calculated.ramadanGiftMinutes || 0));
             const finalizedOtherMinutes = Math.max(0, calculated.otherMinutes || 0);
 
             // Payroll deduction uses both finalized deductible + finalized other minutes,
@@ -1537,6 +1585,8 @@ Deno.serve(async (req) => {
             const incentive = otRecord?.incentive || 0;
             const otherDeduction = otRecord?.otherDeduction || 0;
             const advanceSalaryDeduction = otRecord?.advanceSalaryDeduction || 0;
+            const openLeaveSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.open_leave_salary || 0)) : 0;
+            const variableSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.variable_salary || 0)) : 0;
 
             // Business rule: pay only the higher of OT vs incentive (not both together)
             const effectiveOtOrIncentive = Math.max(
@@ -1545,7 +1595,7 @@ Deno.serve(async (req) => {
             );
 
             // Business rule: bonus remains as-is (no forced decimal rounding).
-            const netAdditions = bonus + effectiveOtOrIncentive;
+            const netAdditions = bonus + effectiveOtOrIncentive + openLeaveSalary + variableSalary;
 
             // Business rule: net deductions (all deductions combined) are rounded to 2 decimals.
             const netDeductions = Math.round((
@@ -1619,6 +1669,7 @@ Deno.serve(async (req) => {
                 approved_minutes: calculated.approvedMinutes,
                 grace_minutes: calculated.graceMinutes,
                 deductible_minutes: finalizedDeductibleMinutes,
+                ramadan_gift_minutes: Math.max(0, calculated.ramadanGiftMinutes || 0),
                 extra_prev_month_deductible_minutes: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_days: 0,  // DISABLED - no longer used
                 extra_prev_month_lop_pay: 0,  // DISABLED - no longer used
@@ -1642,6 +1693,8 @@ Deno.serve(async (req) => {
                 otherDeduction: otherDeduction,
                 bonus: bonus,
                 incentive: incentive,
+                open_leave_salary: openLeaveSalary,
+                variable_salary: variableSalary,
                 advanceSalaryDeduction: advanceSalaryDeduction,
                 total: totalWithAdjustments,
                 wpsPay: finalWpsAmount,
