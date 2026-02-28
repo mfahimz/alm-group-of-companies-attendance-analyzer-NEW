@@ -461,8 +461,8 @@ export default function UserDialog({ open, onClose, user }) {
                             </p>
                         </div>
 
-                        {/* Company field for user, department_head, ceo, hr_manager */}
-                        {['user', 'department_head', 'ceo', 'hr_manager'].includes(formData.extended_role) && (
+                        {/* Company field for user, department_head, ceo only. HR Manager = all companies */}
+                        {['user', 'department_head', 'ceo'].includes(formData.extended_role) && (
                             <div>
                                 <Label htmlFor="company">Assigned Company *</Label>
                                 <Select
