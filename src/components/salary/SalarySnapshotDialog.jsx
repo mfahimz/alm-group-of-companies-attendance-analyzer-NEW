@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, DollarSign, Clock, TrendingDown, Info } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 
 /**
  * SalarySnapshotDialog - Read-only view of a single SalarySnapshot
