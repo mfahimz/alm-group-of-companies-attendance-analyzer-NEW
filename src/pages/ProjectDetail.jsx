@@ -61,6 +61,7 @@ export default function ProjectDetail() {
   const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO || isHRManager || isUser;
   const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
   const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
+  const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
 
   // CRITICAL: Department heads can only access CLOSED projects
   React.useEffect(() => {
