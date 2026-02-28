@@ -325,7 +325,7 @@ export default function ProjectDetail() {
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-indigo-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
                             Attendance {isReadOnly && '🔒'}
                         </TabsTrigger>
-                        {Number(project?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID &&
+                        {isAlMaraghiMotors &&
             <TabsTrigger
               value="salary"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-green-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
