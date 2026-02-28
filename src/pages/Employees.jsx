@@ -65,6 +65,7 @@ export default function Employees() {
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
+    const isHRManager = userRole === 'hr_manager';
     const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
 
@@ -73,9 +74,9 @@ export default function Employees() {
         queryKey: ['employees', selectedCompany, currentUser?.company, currentUser?.department, userRole],
         queryFn: async () => {
             if (!currentUser) return [];
-            
-            // Admin, Supervisor, CEO can see all employees OR filtered by selected company
-            if (isAdmin || isSupervisor || isCEO) {
+
+            // Admin, Supervisor, CEO, HR Manager can see all employees OR filtered by selected company
+            if (isAdmin || isSupervisor || isCEO || isHRManager) {
                 if (selectedCompany) {
                     return await base44.entities.Employee.filter({ company: selectedCompany }, 'name', 1000);
                 }

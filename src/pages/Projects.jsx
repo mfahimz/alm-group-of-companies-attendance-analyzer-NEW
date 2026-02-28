@@ -92,7 +92,7 @@ export default function Projects() {
         queryKey: ['projects', currentUser?.company, userRole, page, pageSize],
         queryFn: async () => {
             const role = currentUser?.extended_role || currentUser?.role || 'user';
-            const isAdminRole = role === 'admin' || role === 'supervisor' || role === 'ceo';
+            const isAdminRole = role === 'admin' || role === 'supervisor' || role === 'ceo' || role === 'hr_manager';
             const isDeptHead = role === 'department_head';
 
             console.log('[Projects] Fetching projects for user:', {
