@@ -173,7 +173,11 @@ export default function OvertimeTab({ project }) {
     };
 
     const getValue = (row, field) => {
-        return editableData[row.attendance_id]?.[field] ?? row[field] ?? 0;
+        if (editableData[row.attendance_id] !== undefined && editableData[row.attendance_id][field] !== undefined) {
+            return editableData[row.attendance_id][field];
+        }
+        const persistedOtRecord = overtimeRecords.find(ot => String(ot.attendance_id) === String(row.attendance_id));
+        return persistedOtRecord?.[field] ?? 0;
     };
 
     const handleAdjustmentChange = (attendanceId, field, value) => {
