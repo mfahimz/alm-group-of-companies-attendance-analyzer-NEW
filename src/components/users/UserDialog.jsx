@@ -147,7 +147,7 @@ export default function UserDialog({ open, onClose, user }) {
     useEffect(() => {
         if (!user?.hrms_id) return;
         const role = user.extended_role || user.role || '';
-        if (role !== 'ceo' && role !== 'hr_manager') return;
+        if (role !== 'ceo' && role !== 'hr_manager' && role !== 'department_head') return;
         if (employees.length === 0 || deptHeads.length === 0) return;
         const emp = employees.find(e => e.hrms_id === user.hrms_id);
         if (!emp) return;
