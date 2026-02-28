@@ -1576,13 +1576,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const saveRamadanGift = async (row, value) => {
         const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
         const newValue = Math.max(0, Number(value || 0));
+
+        // Optimistic update: patch the cached results immediately so UI updates without waiting for DB round-trip
+        queryClient.setQueryData(['results', reportRun.id], (old) => {
+            if (!Array.isArray(old)) return old;
+            return old.map(r => r.id === row.id ? { ...r, ramadan_gift_minutes: newValue } : r);
+        });
+
         await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
+
         if (oldValue !== newValue) {
             base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(()=>{});
         }
-        // Remove stale cache and force fresh fetch so new value is reflected immediately
-        queryClient.removeQueries({ queryKey: ['results', reportRun.id] });
-        await queryClient.fetchQuery({ queryKey: ['results', reportRun.id], queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000) });
+
         toast.success('Ramadan gift saved');
     };
 
