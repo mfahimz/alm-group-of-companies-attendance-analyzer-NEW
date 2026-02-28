@@ -849,7 +849,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         };
     };
 
-    const isAlMaraghiMotors = Number(companyRecord?.company_id) === AL_MARAGHI_MOTORS_COMPANY_ID;
+    const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
     const hasRamadanSchedule = React.useMemo(() => {
         if (!reportRun?.date_from || !reportRun?.date_to) return false;
         const projectStart = new Date(reportRun.date_from);
