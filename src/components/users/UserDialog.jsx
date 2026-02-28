@@ -175,6 +175,7 @@ export default function UserDialog({ open, onClose, user }) {
             setFormData(prev => ({
                 ...prev,
                 linked_dept_head_id: '',
+                company: '',
                 department: '',
                 hrms_id: ''
             }));
