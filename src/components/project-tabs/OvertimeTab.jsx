@@ -32,6 +32,13 @@ export default function OvertimeTab({ project }) {
         queryFn: () => base44.auth.me()
     });
 
+    // Fetch companies to scope special behavior by stable company_id
+    const { data: companies = [], isLoading: loadingCompanies } = useQuery({
+        queryKey: ['companies'],
+        queryFn: () => base44.entities.Company.list('-company_id'),
+        staleTime: 5 * 60 * 1000
+    });
+
     // Fetch employees for this company
     const { data: employees = [], isLoading: loadingEmployees } = useQuery({
         queryKey: ['employees', project?.company],
@@ -78,9 +85,18 @@ export default function OvertimeTab({ project }) {
     // DERIVED VALUES
     // ============================================
     const hasFinalReport = !!finalizedReport;
-    const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
+    const alMaraghiMotorsCompanyId = useMemo(() => {
+        return companies.find(company => company.name === 'Al Maraghi Motors')?.company_id ?? null;
+    }, [companies]);
+    const currentProjectCompanyId = useMemo(() => {
+        return companies.find(company => company.name === project?.company)?.company_id ?? null;
+    }, [companies, project?.company]);
+    const isAlMaraghiMotors =
+        alMaraghiMotorsCompanyId !== null &&
+        currentProjectCompanyId !== null &&
+        currentProjectCompanyId === alMaraghiMotorsCompanyId;
     const isProjectClosed = project?.status === 'closed';
-    const canEditAdjustments = hasFinalReport && !isProjectClosed;
+    const canEditAdjustments = (isAlMaraghiMotors || hasFinalReport) && !isProjectClosed;
 
     // Build employee list with OT data
     const overtimeData = useMemo(() => {
@@ -423,7 +439,7 @@ export default function OvertimeTab({ project }) {
     // ============================================
     // RENDER
     // ============================================
-    if (loadingEmployees || loadingOT || loadingReports || loadingSnapshots) {
+    if (loadingCompanies || loadingEmployees || loadingOT || loadingReports || loadingSnapshots) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
@@ -582,7 +598,9 @@ export default function OvertimeTab({ project }) {
                                 {isProjectClosed && <Lock className="w-4 h-4 text-slate-400" />}
                             </CardTitle>
                             <p className="text-sm text-slate-500 mt-1">
-                                Enter bonus, incentives, and deductions for finalized report
+                                {isAlMaraghiMotors
+                                    ? 'Enter bonus, incentives, and deductions at any report status'
+                                    : 'Enter bonus, incentives, and deductions for finalized report'}
                             </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
