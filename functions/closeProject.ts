@@ -164,8 +164,8 @@ Deno.serve(async (req) => {
                     graceEntries.push({ employee, result, effectiveGrace, lateMinutes, earlyCheckoutMinutes, unusedGrace });
                 }
 
-                // Resolve GraceMinutesManagement entity reference
-                const graceManagementEntity = base44.asServiceRole.entities.GraceMinutesManagement;
+                // Resolve EmployeeGraceHistory entity reference
+                const graceManagementEntity = base44.asServiceRole.entities.EmployeeGraceHistory;
                 let graceWriteFailures = 0;
 
                 // Process in batches
