@@ -176,9 +176,9 @@ Deno.serve(async (req) => {
                         const { employee, result, effectiveGrace, lateMinutes, earlyCheckoutMinutes, unusedGrace } = entry;
 
                         try {
-                            // WRITE A: GraceMinutesManagement upsert (replace, never add)
+                            // WRITE A: EmployeeGraceHistory upsert (replace, never add)
                             const existingMgmtRecords = await graceManagementEntity.filter({
-                                employee_id: String(employee.id)
+                                employee_id: String(employee.hrms_id)
                             }, null, 5);
 
                             const existingMgmtRecord = existingMgmtRecords.length > 0 ? existingMgmtRecords[0] : null;
