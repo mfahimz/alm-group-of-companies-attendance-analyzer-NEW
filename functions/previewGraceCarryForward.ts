@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
             
             if (!employee) continue;
             
-            // Get department-specific base grace
+            // effectiveGrace source of truth = finalized AnalysisResult.grace_minutes.
+            // We still expose base/carry components for diagnostics.
             const dept = employee.department || 'Admin';
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) 
                 ? rules.grace_minutes[dept] 
