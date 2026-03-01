@@ -2,7 +2,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
  * Preview grace minutes carry-forward before actually closing project
- * Returns list of employees with unused grace calculation
+ * Returns list of employees with unused grace calculation.
+ *
+ * IMPORTANT: effectiveGrace is read from AnalysisResult.grace_minutes — the value
+ * that was actually applied during the analysis run. This prevents drift caused by
+ * live Employee.carried_grace_minutes changing between analysis and project close.
  */
 Deno.serve(async (req) => {
     try {
@@ -51,25 +55,12 @@ Deno.serve(async (req) => {
         // Get finalized analysis results
         const results = await base44.asServiceRole.entities.AnalysisResult.filter({
             report_run_id: reportRun.id
-        });
+        }, null, 5000);
 
         // Get employees
         const employees = await base44.asServiceRole.entities.Employee.filter({
             company: project.company
-        });
-
-        // Get attendance rules for grace configuration
-        const rulesData = await base44.asServiceRole.entities.AttendanceRules.filter({
-            company: project.company
-        });
-        let rules = null;
-        if (rulesData.length > 0) {
-            try {
-                rules = JSON.parse(rulesData[0].rules_json);
-            } catch (e) {
-                rules = null;
-            }
-        }
+        }, null, 5000);
 
         // Build preview data
         const preview = [];
@@ -80,17 +71,11 @@ Deno.serve(async (req) => {
             );
             
             if (!employee) continue;
-            
-            // effectiveGrace source of truth = finalized AnalysisResult.grace_minutes.
-            // We still expose base/carry components for diagnostics.
-            const dept = employee.department || 'Admin';
-            const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) 
-                ? rules.grace_minutes[dept] 
-                : 15;
-            const carriedGrace = employee.carried_grace_minutes || 0;
-            const effectiveGrace = baseGrace + carriedGrace;
 
-            // CALCULATION: unusedGrace = max(0, effectiveGrace - (late + early))
+            // effectiveGrace = what was stored in AnalysisResult during analysis run
+            // This is the authoritative source — avoids drift from live Employee data
+            const effectiveGrace = result.grace_minutes || 0;
+
             const lateMinutes = result.late_minutes || 0;
             const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
             const timeIssues = lateMinutes + earlyCheckoutMinutes;
@@ -104,8 +89,6 @@ Deno.serve(async (req) => {
                 late_minutes: lateMinutes,
                 early_checkout_minutes: earlyCheckoutMinutes,
                 time_issues: timeIssues,
-                base_grace_minutes: baseGrace,
-                carried_grace_minutes: carriedGrace,
                 grace_minutes_available: effectiveGrace,
                 unused_grace_minutes: unusedGraceMinutes
             });
