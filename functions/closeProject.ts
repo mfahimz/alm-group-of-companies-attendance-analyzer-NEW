@@ -165,34 +165,16 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
+                    // Step 3: effectiveGrace = base grace + carried grace (if any)
                     const dept = employee.department || 'Admin';
                     const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
+                    const carriedGrace = employee.carried_grace_minutes || 0;
+                    const effectiveGrace = baseGrace + carriedGrace;
 
-                    // Effective grace source for close-time carry-forward:
-                    // finalized report grace override if present, else AttendanceRules base grace.
-                    const effectiveGrace = (typeof result.grace_minutes === 'number')
-                        ? Math.max(0, result.grace_minutes)
-                        : Math.max(0, baseGrace);
-
-                    const lateMinutes = Math.max(0, Number(result.late_minutes || 0));
-                    const earlyCheckoutMinutes = Math.max(0, Number(result.early_checkout_minutes || 0));
+                    // Step 4: unusedGrace = max(0, effectiveGrace - (late + early))
+                    const lateMinutes = result.late_minutes || 0;
+                    const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
                     const unusedGrace = Math.max(0, effectiveGrace - (lateMinutes + earlyCheckoutMinutes));
-
-                    graceEntries.push({
-                        employee,
-                        result,
-                        baseGrace,
-                        effectiveGrace,
-                        lateMinutes,
-                        earlyCheckoutMinutes,
-                        unusedGrace
-                    });
-                }
-
-                const graceManagementEntity = base44.asServiceRole.entities.GraceMinutesManagement;
-                const BATCH_SIZE = 10;
-                const BATCH_DELAY_MS = 300;
-                let graceWriteFailures = 0;
 
                 for (let i = 0; i < graceEntries.length; i += BATCH_SIZE) {
                     const batch = graceEntries.slice(i, i + BATCH_SIZE);
