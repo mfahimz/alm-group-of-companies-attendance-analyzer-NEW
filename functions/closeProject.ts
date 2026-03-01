@@ -1,5 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 300;
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -108,16 +111,14 @@ Deno.serve(async (req) => {
         await Promise.all(updates);
 
         // ============================================================================
-        // GRACE MINUTES CARRY-FORWARD (Al Maraghi Motors only — identified by stable company_id)
+        // GRACE MINUTES CARRY-FORWARD (Al Maraghi Motors only)
         // ============================================================================
-        const AL_MARAGHI_MOTORS_COMPANY_ID = 2;
         let graceCarryForwardResults = { processed: 0, skipped: 0 };
 
-        // Step 1: Check if this project belongs to Al Maraghi Motors by company_id
         let isAlMaraghiMotors = false;
         try {
             const companyRecords = await base44.asServiceRole.entities.Company.filter({ name: project.company }, null, 5);
-            if (companyRecords.length > 0 && companyRecords[0].company_id === AL_MARAGHI_MOTORS_COMPANY_ID) {
+            if (companyRecords.length > 0 && companyRecords[0].company_id === 2) {
                 isAlMaraghiMotors = true;
             }
         } catch (e) {
@@ -127,7 +128,6 @@ Deno.serve(async (req) => {
         if (isAlMaraghiMotors) {
             console.log('[closeProject] Al Maraghi Motors detected (company_id=2), running grace carry-forward');
 
-            // Step 2: Fetch the single finalized ReportRun for this project
             let reportRun = null;
             try {
                 const reportRuns = await base44.asServiceRole.entities.ReportRun.filter({
@@ -141,20 +141,8 @@ Deno.serve(async (req) => {
             if (!reportRun || !reportRun.is_final) {
                 console.warn(`[closeProject] No finalized report found for project_id=${project_id}, skipping grace update`);
             } else {
-                // Fetch AttendanceRules for the company
-                const rulesData = await base44.asServiceRole.entities.AttendanceRules.filter({
-                    company: project.company
-                }, null, 10);
-                let rules = null;
-                if (rulesData.length > 0) {
-                    try {
-                        rules = JSON.parse(rulesData[0].rules_json);
-                    } catch (e) {
-                        console.warn('[closeProject] Failed to parse AttendanceRules');
-                    }
-                }
-
-                // Steps 3–7: Process each employee in batches (10) with delay (300ms)
+                // Build grace entries list — use result.grace_minutes as the authoritative effectiveGrace
+                // (this is the value actually applied during analysis, not a live recompute)
                 const graceEntries = [];
                 for (const result of results) {
                     const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
@@ -165,65 +153,52 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
-                    const dept = employee.department || 'Admin';
-                    const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
+                    // effectiveGrace = what was actually stored in AnalysisResult during analysis run
+                    const effectiveGrace = result.grace_minutes || 0;
 
-                    // Effective grace source for close-time carry-forward:
-                    // finalized report grace override if present, else AttendanceRules base grace.
-                    const effectiveGrace = (typeof result.grace_minutes === 'number')
-                        ? Math.max(0, result.grace_minutes)
-                        : Math.max(0, baseGrace);
+                    // unusedGrace = max(0, effectiveGrace - (late + early))
+                    const lateMinutes = result.late_minutes || 0;
+                    const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
+                    const unusedGrace = Math.max(0, effectiveGrace - (lateMinutes + earlyCheckoutMinutes));
 
-                    const lateMinutes = Math.max(0, Number(result.late_minutes || 0));
-                    const earlyCheckoutMinutes = Math.max(0, Number(result.early_checkout_minutes || 0));
-                    const annualLeaveDays = Math.max(0, Number(result.annual_leave_count || 0));
-                    const isAnnualLeaveDisqualified = annualLeaveDays > 2;
-                    const unusedGrace = isAnnualLeaveDisqualified
-                        ? 0
-                        : Math.max(0, effectiveGrace - (lateMinutes + earlyCheckoutMinutes));
-
-                    graceEntries.push({
-                        employee,
-                        result,
-                        baseGrace,
-                        effectiveGrace,
-                        lateMinutes,
-                        earlyCheckoutMinutes,
-                        annualLeaveDays,
-                        isAnnualLeaveDisqualified,
-                        unusedGrace
-                    });
+                    graceEntries.push({ employee, result, effectiveGrace, lateMinutes, earlyCheckoutMinutes, unusedGrace });
                 }
 
-                const graceManagementEntity = base44.asServiceRole.entities.GraceMinutesManagement;
-                const BATCH_SIZE = 10;
-                const BATCH_DELAY_MS = 300;
+                // Resolve EmployeeGraceHistory entity reference
+                const graceManagementEntity = base44.asServiceRole.entities.EmployeeGraceHistory;
                 let graceWriteFailures = 0;
 
+                // Process in batches
                 for (let i = 0; i < graceEntries.length; i += BATCH_SIZE) {
                     const batch = graceEntries.slice(i, i + BATCH_SIZE);
 
                     await Promise.all(batch.map(async (entry) => {
-                        const { employee, result, baseGrace, effectiveGrace, lateMinutes, earlyCheckoutMinutes, annualLeaveDays, isAnnualLeaveDisqualified, unusedGrace } = entry;
+                        const { employee, result, effectiveGrace, lateMinutes, earlyCheckoutMinutes, unusedGrace } = entry;
 
                         try {
-                            // WRITE A: GraceMinutesManagement upsert (replace, never add)
+                            // WRITE A: EmployeeGraceHistory upsert (replace, never add)
                             const existingMgmtRecords = await graceManagementEntity.filter({
-                                employee_id: String(employee.id)
+                                employee_id: String(employee.hrms_id)
                             }, null, 5);
 
                             const existingMgmtRecord = existingMgmtRecords.length > 0 ? existingMgmtRecords[0] : null;
                             const managementPayload = {
-                                employee_id: String(employee.id),
-                                employee_hrms_id: String(employee.hrms_id),
-                                attendance_id: String(employee.attendance_id),
+                                employee_id: String(employee.hrms_id),
                                 employee_name: String(employee.name || ''),
+                                attendance_id: String(employee.attendance_id),
                                 company: project.company,
                                 unused_grace_minutes: unusedGrace,
-                                effective_grace_minutes: effectiveGrace,
+                                grace_minutes_available: effectiveGrace,
                                 late_minutes: lateMinutes,
                                 early_checkout_minutes: earlyCheckoutMinutes,
-                                source_project_id: String(project_id)
+                                time_issues: lateMinutes + earlyCheckoutMinutes,
+                                source_project_id: String(project_id),
+                                report_run_id: project.last_saved_report_id,
+                                source_project_name: project.name,
+                                period_from: project.date_from,
+                                period_to: project.date_to,
+                                carried_by: user.email,
+                                carried_at: new Date().toISOString()
                             };
 
                             let mgmtRecordId = existingMgmtRecord?.id || null;
@@ -243,7 +218,7 @@ Deno.serve(async (req) => {
                                     carried_grace_minutes: unusedGrace
                                 });
                             } catch (employeeWriteErr) {
-                                // Keep both stores in sync: rollback GraceMinutesManagement write when Employee update fails.
+                                // Rollback GraceMinutesManagement if Employee update fails
                                 try {
                                     if (existingMgmtRecord && mgmtRecordId) {
                                         await graceManagementEntity.update(mgmtRecordId, {
@@ -258,24 +233,7 @@ Deno.serve(async (req) => {
                                 throw employeeWriteErr;
                             }
 
-                            console.log(`[closeProject] Grace synced attendance_id=${result.attendance_id}: baseGrace=${baseGrace}, effectiveGrace=${effectiveGrace}, late=${lateMinutes}, early=${earlyCheckoutMinutes}, annualLeaveDays=${annualLeaveDays}, disqualified=${isAnnualLeaveDisqualified}, unusedGrace=${unusedGrace}, oldEmployeeCarried=${oldCarriedGrace}`);
-
-                            await base44.asServiceRole.functions.invoke('logAudit', {
-                                action_type: 'GRACE_CARRY_FORWARD_EMPLOYEE_SYNC',
-                                entity_name: 'Employee',
-                                entity_id: String(employee.id),
-                                project_id: project_id,
-                                company: project.company,
-                                context: `closeProject employee grace sync. Acting user: ${user.email}`,
-                                changes: JSON.stringify({
-                                    employee_id: String(employee.id),
-                                    attendance_id: String(employee.attendance_id),
-                                    annual_leave_days: annualLeaveDays,
-                                    disqualified_due_to_annual_leave: isAnnualLeaveDisqualified,
-                                    unused_grace_written: unusedGrace
-                                })
-                            });
-
+                            console.log(`[closeProject] Grace synced attendance_id=${result.attendance_id}: effectiveGrace=${effectiveGrace}, late=${lateMinutes}, early=${earlyCheckoutMinutes}, unusedGrace=${unusedGrace}, oldEmployeeCarried=${oldCarriedGrace}`);
                             graceCarryForwardResults.processed++;
                         } catch (err) {
                             console.error(`[closeProject] Grace sync failed attendance_id=${result.attendance_id}:`, err?.message || err);
@@ -291,7 +249,7 @@ Deno.serve(async (req) => {
 
                 await base44.asServiceRole.functions.invoke('logAudit', {
                     action_type: 'GRACE_CARRY_FORWARD_BATCH_SYNC',
-                    entity_name: 'GraceMinutesManagement,Employee',
+                    entity_name: 'EmployeeGraceHistory,Employee',
                     entity_id: String(project_id),
                     project_id: project_id,
                     company: project.company,

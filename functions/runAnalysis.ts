@@ -1215,22 +1215,10 @@ Deno.serve(async (req) => {
                         }
                     }
                     
-                    // Apply approved minutes offset if enabled
-                    if (rules.approved_minutes_enabled && approvedMinutesForDay > 0) {
-                        const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                        const excessMinutes = Math.max(0, totalDayMinutes - approvedMinutesForDay);
-                        
-                        if (totalDayMinutes > 0 && excessMinutes > 0) {
-                            const lateRatio = dayLateMinutes / totalDayMinutes;
-                            const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                            dayLateMinutes = Math.round(excessMinutes * lateRatio);
-                            dayEarlyMinutes = Math.round(excessMinutes * earlyRatio);
-                        } else {
-                            dayLateMinutes = 0;
-                            dayEarlyMinutes = 0;
-                        }
-                    }
-                    
+                    // Store RAW late/early minutes (before any approved-minutes offset).
+                    // Approved minutes are NOT applied here — they only affect deductible_minutes
+                    // in the final formula below. This keeps late_minutes and early_checkout_minutes
+                    // in AnalysisResult as pure raw punch-vs-shift differences.
                     lateMinutes += dayLateMinutes;
                     earlyCheckoutMinutes += dayEarlyMinutes;
                 }
@@ -1329,11 +1317,19 @@ Deno.serve(async (req) => {
             // Grace = baseGrace + carriedGrace
             // Other minutes are NOT part of deductible calculation at all
             // ============================================================================
+            // ============================================================================
+            // GRACE CARRY-FORWARD FORMULA (used by closeProject / previewGraceCarryForward):
+            //   unusedGrace = max(0, effectiveGrace - (late_minutes + early_checkout_minutes))
+            //   Where late_minutes and early_checkout_minutes are the RAW values stored here.
+            //   No other fields (approved, other, deductible, ramadan_gift) are involved.
+            // ============================================================================
             const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
-            const baseMinutes = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);  // EXCLUDE other_minutes
-            const deductibleMinutes = Math.max(0, baseMinutes - totalGraceMinutes);
+            const rawLateEarly = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);  // RAW, EXCLUDE other_minutes
+            // Approved minutes reduce what is DEDUCTIBLE (not the raw late/early stored in AnalysisResult)
+            const afterApproved = Math.max(0, rawLateEarly - Math.max(0, totalApprovedMinutes));
+            const deductibleMinutes = Math.max(0, afterApproved - totalGraceMinutes);
             
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}, Early=${earlyCheckoutMinutes}, Base=${baseMinutes} (NO other minutes), BaseGrace=${baseGrace}, Carried=${carriedGrace}, Total Grace=${totalGraceMinutes}, Deductible=${deductibleMinutes} (approved ${totalApprovedMinutes} already applied per-day), Other Minutes=${otherMinutes} (NOT in deductible)`);
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(raw), Early=${earlyCheckoutMinutes}(raw), Approved=${totalApprovedMinutes}, AfterApproved=${afterApproved}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
 
             return {
                 attendance_id,
