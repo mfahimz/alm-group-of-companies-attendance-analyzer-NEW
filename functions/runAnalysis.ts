@@ -1215,22 +1215,10 @@ Deno.serve(async (req) => {
                         }
                     }
                     
-                    // Apply approved minutes offset if enabled
-                    if (rules.approved_minutes_enabled && approvedMinutesForDay > 0) {
-                        const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                        const excessMinutes = Math.max(0, totalDayMinutes - approvedMinutesForDay);
-                        
-                        if (totalDayMinutes > 0 && excessMinutes > 0) {
-                            const lateRatio = dayLateMinutes / totalDayMinutes;
-                            const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                            dayLateMinutes = Math.round(excessMinutes * lateRatio);
-                            dayEarlyMinutes = Math.round(excessMinutes * earlyRatio);
-                        } else {
-                            dayLateMinutes = 0;
-                            dayEarlyMinutes = 0;
-                        }
-                    }
-                    
+                    // Store RAW late/early minutes (before any approved-minutes offset).
+                    // Approved minutes are NOT applied here — they only affect deductible_minutes
+                    // in the final formula below. This keeps late_minutes and early_checkout_minutes
+                    // in AnalysisResult as pure raw punch-vs-shift differences.
                     lateMinutes += dayLateMinutes;
                     earlyCheckoutMinutes += dayEarlyMinutes;
                 }
