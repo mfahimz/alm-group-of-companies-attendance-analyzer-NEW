@@ -183,16 +183,22 @@ Deno.serve(async (req) => {
 
                             const existingMgmtRecord = existingMgmtRecords.length > 0 ? existingMgmtRecords[0] : null;
                             const managementPayload = {
-                                employee_id: String(employee.id),
-                                employee_hrms_id: String(employee.hrms_id),
-                                attendance_id: String(employee.attendance_id),
+                                employee_id: String(employee.hrms_id),
                                 employee_name: String(employee.name || ''),
+                                attendance_id: String(employee.attendance_id),
                                 company: project.company,
                                 unused_grace_minutes: unusedGrace,
-                                effective_grace_minutes: effectiveGrace,
+                                grace_minutes_available: effectiveGrace,
                                 late_minutes: lateMinutes,
                                 early_checkout_minutes: earlyCheckoutMinutes,
-                                source_project_id: String(project_id)
+                                time_issues: lateMinutes + earlyCheckoutMinutes,
+                                source_project_id: String(project_id),
+                                report_run_id: project.last_saved_report_id,
+                                source_project_name: project.name,
+                                period_from: project.date_from,
+                                period_to: project.date_to,
+                                carried_by: user.email,
+                                carried_at: new Date().toISOString()
                             };
 
                             let mgmtRecordId = existingMgmtRecord?.id || null;
