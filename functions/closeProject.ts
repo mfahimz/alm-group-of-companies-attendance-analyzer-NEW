@@ -154,11 +154,11 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Steps 3–6: Process each employee in the finalized report
+                // Steps 3–7: Process each employee in batches (10) with delay (300ms)
+                const graceEntries = [];
                 for (const result of results) {
                     const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
-                    // Step 6: If employee has no matching record, skip silently and log
                     if (!employee || !employee.hrms_id || !employee.attendance_id) {
                         console.warn(`[closeProject] No employee record for attendance_id=${result.attendance_id}, skipping`);
                         graceCarryForwardResults.skipped++;
@@ -176,36 +176,92 @@ Deno.serve(async (req) => {
                     const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
                     const unusedGrace = Math.max(0, effectiveGrace - (lateMinutes + earlyCheckoutMinutes));
 
-                    // Step 5: Replace carried_grace_minutes entirely (write 0 explicitly if unusedGrace is 0)
-                    const oldCarriedGrace = employee.carried_grace_minutes || 0;
+                for (let i = 0; i < graceEntries.length; i += BATCH_SIZE) {
+                    const batch = graceEntries.slice(i, i + BATCH_SIZE);
 
-                    try {
-                        await base44.asServiceRole.entities.Employee.update(employee.id, {
-                            hrms_id: String(employee.hrms_id).trim(),
-                            attendance_id: String(employee.attendance_id).trim(),
-                            carried_grace_minutes: unusedGrace
-                        });
+                    await Promise.all(batch.map(async (entry) => {
+                        const { employee, result, baseGrace, effectiveGrace, lateMinutes, earlyCheckoutMinutes, unusedGrace } = entry;
 
-                        // Step 7: logAudit for each employee updated
-                        await base44.asServiceRole.functions.invoke('logAudit', {
-                            action_type: 'GRACE_CARRY_FORWARD',
-                            entity_name: 'Employee',
-                            entity_id: String(employee.hrms_id),
-                            changes: JSON.stringify({
-                                carried_grace_minutes: { old: oldCarriedGrace, new: unusedGrace }
-                            }),
-                            project_id: project_id,
-                            company: project.company,
-                            context: `closeProject grace carry-forward. Acting user: ${user.email}`
-                        });
+                        try {
+                            // WRITE A: GraceMinutesManagement upsert (replace, never add)
+                            const existingMgmtRecords = await graceManagementEntity.filter({
+                                employee_id: String(employee.id)
+                            }, null, 5);
 
-                        console.log(`[closeProject] Grace updated: ${employee.name} — old=${oldCarriedGrace}, new=${unusedGrace}`);
-                        graceCarryForwardResults.processed++;
-                    } catch (err) {
-                        console.error(`[closeProject] Failed to update grace for ${employee.name}:`, err.message);
-                        graceCarryForwardResults.skipped++;
+                            const existingMgmtRecord = existingMgmtRecords.length > 0 ? existingMgmtRecords[0] : null;
+                            const managementPayload = {
+                                employee_id: String(employee.id),
+                                employee_hrms_id: String(employee.hrms_id),
+                                attendance_id: String(employee.attendance_id),
+                                employee_name: String(employee.name || ''),
+                                company: project.company,
+                                unused_grace_minutes: unusedGrace,
+                                effective_grace_minutes: effectiveGrace,
+                                late_minutes: lateMinutes,
+                                early_checkout_minutes: earlyCheckoutMinutes,
+                                source_project_id: String(project_id)
+                            };
+
+                            let mgmtRecordId = existingMgmtRecord?.id || null;
+                            if (existingMgmtRecord) {
+                                await graceManagementEntity.update(existingMgmtRecord.id, managementPayload);
+                            } else {
+                                const created = await graceManagementEntity.create(managementPayload);
+                                mgmtRecordId = created?.id || null;
+                            }
+
+                            // WRITE B: Employee profile replace (never add)
+                            const oldCarriedGrace = Number(employee.carried_grace_minutes || 0);
+                            try {
+                                await base44.asServiceRole.entities.Employee.update(employee.id, {
+                                    hrms_id: String(employee.hrms_id).trim(),
+                                    attendance_id: String(employee.attendance_id).trim(),
+                                    carried_grace_minutes: unusedGrace
+                                });
+                            } catch (employeeWriteErr) {
+                                // Keep both stores in sync: rollback GraceMinutesManagement write when Employee update fails.
+                                try {
+                                    if (existingMgmtRecord && mgmtRecordId) {
+                                        await graceManagementEntity.update(mgmtRecordId, {
+                                            unused_grace_minutes: Number(existingMgmtRecord.unused_grace_minutes || 0)
+                                        });
+                                    } else if (!existingMgmtRecord && mgmtRecordId) {
+                                        await graceManagementEntity.delete(mgmtRecordId);
+                                    }
+                                } catch (rollbackErr) {
+                                    console.error(`[closeProject] Rollback failed attendance_id=${result.attendance_id}:`, rollbackErr?.message || rollbackErr);
+                                }
+                                throw employeeWriteErr;
+                            }
+
+                            console.log(`[closeProject] Grace synced attendance_id=${result.attendance_id}: baseGrace=${baseGrace}, effectiveGrace=${effectiveGrace}, late=${lateMinutes}, early=${earlyCheckoutMinutes}, unusedGrace=${unusedGrace}, oldEmployeeCarried=${oldCarriedGrace}`);
+                            graceCarryForwardResults.processed++;
+                        } catch (err) {
+                            console.error(`[closeProject] Grace sync failed attendance_id=${result.attendance_id}:`, err?.message || err);
+                            graceCarryForwardResults.skipped++;
+                            graceWriteFailures++;
+                        }
+                    }));
+
+                    if (i + BATCH_SIZE < graceEntries.length) {
+                        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
                     }
                 }
+
+                await base44.asServiceRole.functions.invoke('logAudit', {
+                    action_type: 'GRACE_CARRY_FORWARD_BATCH_SYNC',
+                    entity_name: 'GraceMinutesManagement,Employee',
+                    entity_id: String(project_id),
+                    project_id: project_id,
+                    company: project.company,
+                    context: `closeProject grace sync. Acting user: ${user.email}`,
+                    changes: JSON.stringify({
+                        total_employees_processed: graceEntries.length,
+                        total_employees_updated_successfully: graceCarryForwardResults.processed,
+                        total_employees_failed: graceWriteFailures,
+                        acting_user: user.email
+                    })
+                });
             }
         }
 
