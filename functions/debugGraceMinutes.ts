@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 
             const dept = employee.department || 'Admin';
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
-            const carriedGrace = project.use_carried_grace_minutes ? (employee.carried_grace_minutes || 0) : 0;
+            const carriedGrace = employee.carried_grace_minutes || 0;
             const graceMinutesAvailable = baseGrace + carriedGrace;
 
             const lateMinutes = result.late_minutes || 0;

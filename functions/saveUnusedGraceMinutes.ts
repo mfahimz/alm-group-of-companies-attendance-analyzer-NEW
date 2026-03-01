@@ -78,14 +78,13 @@ Deno.serve(async (req) => {
             // Calculate grace
             const dept = employee.department || 'Admin';
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
-            const carriedGrace = project.use_carried_grace_minutes ? (employee.carried_grace_minutes || 0) : 0;
-            const graceMinutesAvailable = baseGrace + carriedGrace;
+            const carriedGrace = employee.carried_grace_minutes || 0;
+            const effectiveGrace = baseGrace + carriedGrace;
 
             const lateMinutes = result.late_minutes || 0;
             const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-            const ramadanGiftMinutes = result.ramadan_gift_minutes || 0;
-            const timeIssues = Math.max(0, lateMinutes + earlyCheckoutMinutes - ramadanGiftMinutes);
-            const unusedGraceMinutes = Math.max(0, graceMinutesAvailable - timeIssues);
+            const timeIssues = lateMinutes + earlyCheckoutMinutes;
+            const unusedGraceMinutes = Math.max(0, effectiveGrace - timeIssues);
 
             if (unusedGraceMinutes <= 0) {
                 skipped++;
@@ -115,7 +114,7 @@ Deno.serve(async (req) => {
                     report_run_id: String(project.last_saved_report_id).trim(),
                     period_from: String(periodFrom).trim(),
                     period_to: String(periodTo).trim(),
-                    grace_minutes_available: Math.max(0, Number(graceMinutesAvailable)),
+                    grace_minutes_available: Math.max(0, Number(effectiveGrace)),
                     late_minutes: Math.max(0, Number(lateMinutes)),
                     early_checkout_minutes: Math.max(0, Number(earlyCheckoutMinutes)),
                     time_issues: Math.max(0, Number(timeIssues)),

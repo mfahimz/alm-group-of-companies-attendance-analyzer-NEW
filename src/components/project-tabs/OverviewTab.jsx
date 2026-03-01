@@ -123,9 +123,10 @@ export default function OverviewTab({ project }) {
                 const employee = employees.find(e => e.attendance_id === result.attendance_id);
                 if (!employee) return null;
 
-                const totalAllowed = result.grace_minutes || 15;
-                const used = result.late_minutes || 0;
-                const unused = Math.max(0, totalAllowed - used);
+                const effectiveGrace = result.grace_minutes || 15;
+                const totalLateMinutes = result.late_minutes || 0;
+                const totalEarlyCheckoutMinutes = result.early_checkout_minutes || 0;
+                const unused = Math.max(0, effectiveGrace - (totalLateMinutes + totalEarlyCheckoutMinutes));
 
                 // If project used carried grace, it means current allowance included previous balance.
                 // The new balance is simply what's left.
