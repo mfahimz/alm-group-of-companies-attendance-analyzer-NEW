@@ -86,18 +86,14 @@ Deno.serve(async (req) => {
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) 
                 ? rules.grace_minutes[dept] 
                 : 15;
-            const carriedGrace = project.use_carried_grace_minutes 
-                ? (employee.carried_grace_minutes || 0) 
-                : 0;
-            const graceMinutesAvailable = baseGrace + carriedGrace;
-            
-            // CALCULATION: time_issues = late + early - ramadan_gift_minutes
-            // Ramadan gift reduces the minutes counted against grace (same as how it reduces deductible_minutes)
+            const carriedGrace = employee.carried_grace_minutes || 0;
+            const effectiveGrace = baseGrace + carriedGrace;
+
+            // CALCULATION: unusedGrace = max(0, effectiveGrace - (late + early))
             const lateMinutes = result.late_minutes || 0;
             const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-            const ramadanGiftMinutes = result.ramadan_gift_minutes || 0;
-            const timeIssues = Math.max(0, lateMinutes + earlyCheckoutMinutes - ramadanGiftMinutes);
-            const unusedGraceMinutes = Math.max(0, graceMinutesAvailable - timeIssues);
+            const timeIssues = lateMinutes + earlyCheckoutMinutes;
+            const unusedGraceMinutes = Math.max(0, effectiveGrace - timeIssues);
             
             preview.push({
                 attendance_id: String(employee.attendance_id),
@@ -109,7 +105,7 @@ Deno.serve(async (req) => {
                 time_issues: timeIssues,
                 base_grace_minutes: baseGrace,
                 carried_grace_minutes: carriedGrace,
-                grace_minutes_available: graceMinutesAvailable,
+                grace_minutes_available: effectiveGrace,
                 unused_grace_minutes: unusedGraceMinutes
             });
         }

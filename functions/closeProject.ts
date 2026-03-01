@@ -165,23 +165,16 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
-                    // Step 3: Get grace allocation used for this employee
-                    // If carry-forward was enabled, read effectiveGrace from AnalysisResult.grace_minutes
-                    // (the exact value runAnalysis computed and used, not recomputed).
-                    // If carry-forward was NOT enabled, use defaultGraceMinutes from AttendanceRules.
-                    let graceMinutesAllocated;
-                    if (project.use_carried_grace_minutes) {
-                        graceMinutesAllocated = result.grace_minutes || 0;
-                    } else {
-                        const dept = employee.department || 'Admin';
-                        graceMinutesAllocated = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
-                    }
+                    // Step 3: effectiveGrace = base grace + carried grace (if any)
+                    const dept = employee.department || 'Admin';
+                    const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
+                    const carriedGrace = employee.carried_grace_minutes || 0;
+                    const effectiveGrace = baseGrace + carriedGrace;
 
-                    // Step 4: Compute unusedGrace — only late + early checkout, NOT otherMinutes
+                    // Step 4: unusedGrace = max(0, effectiveGrace - (late + early))
                     const lateMinutes = result.late_minutes || 0;
                     const earlyCheckoutMinutes = result.early_checkout_minutes || 0;
-                    const totalLateAndEarlyMinutes = lateMinutes + earlyCheckoutMinutes;
-                    const unusedGrace = Math.max(0, graceMinutesAllocated - totalLateAndEarlyMinutes);
+                    const unusedGrace = Math.max(0, effectiveGrace - (lateMinutes + earlyCheckoutMinutes));
 
                     // Step 5: Replace carried_grace_minutes entirely (write 0 explicitly if unusedGrace is 0)
                     const oldCarriedGrace = employee.carried_grace_minutes || 0;
