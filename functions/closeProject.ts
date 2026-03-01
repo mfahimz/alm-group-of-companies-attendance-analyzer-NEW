@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
 
                 await base44.asServiceRole.functions.invoke('logAudit', {
                     action_type: 'GRACE_CARRY_FORWARD_BATCH_SYNC',
-                    entity_name: 'GraceMinutesManagement,Employee',
+                    entity_name: 'EmployeeGraceHistory,Employee',
                     entity_id: String(project_id),
                     project_id: project_id,
                     company: project.company,
