@@ -165,17 +165,11 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
-                    // Step 3: effectiveGrace source of truth = finalized AnalysisResult.grace_minutes.
-                    // We still log base+carried components for diagnostics.
+                    // Step 3: effectiveGrace = base grace + carried grace (if any)
                     const dept = employee.department || 'Admin';
                     const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
                     const carriedGrace = employee.carried_grace_minutes || 0;
-                    const effectiveGraceFromRuleAndCarry = baseGrace + carriedGrace;
-                    const effectiveGrace = (typeof result.grace_minutes === 'number')
-                        ? Math.max(0, result.grace_minutes)
-                        : Math.max(0, baseGrace);
-
-                    console.log(`[closeProject] Grace inputs attendance_id=${result.attendance_id}: baseGrace=${baseGrace}, carriedGrace=${carriedGrace}, basePlusCarry=${effectiveGraceFromRuleAndCarry}, analysisResult.grace_minutes=${result.grace_minutes ?? 'null'}, effectiveGraceUsed=${effectiveGrace}`);
+                    const effectiveGrace = baseGrace + carriedGrace;
 
                     // Step 4: unusedGrace = max(0, effectiveGrace - (late + early))
                     const lateMinutes = result.late_minutes || 0;
