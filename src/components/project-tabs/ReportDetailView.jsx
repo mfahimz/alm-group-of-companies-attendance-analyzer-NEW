@@ -1772,6 +1772,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         LOP Days
                                     </SortableTableHead>
+                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50 text-rose-600 text-[11px]" title="Weekly off days adjacent to LOP, counted as additional LOP">
+                                        +Weekly Off LOP
+                                    </th>
                                     <SortableTableHead sortKey="half_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Half Days
                                     </SortableTableHead>
