@@ -111,15 +111,18 @@ export default function Projects() {
             const skip = (page - 1) * pageSize;
             
             try {
-                // Department heads see only CLOSED projects from their company
+                // Department heads see only the LATEST closed project from their company
                 if (isDeptHead) {
-                    console.log('[Projects] Fetching CLOSED projects for department head, company:', currentUser.company);
-                    const items = await base44.entities.Project.filter({
+                    console.log('[Projects] Fetching LATEST CLOSED project for department head, company:', currentUser.company);
+                    const allClosed = await base44.entities.Project.filter({
                         company: currentUser.company,
                         status: 'closed'
-                    }, '-created_date', pageSize, skip);
-                    console.log('[Projects] Fetched', items.length, 'closed projects for department head');
-                    return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
+                    }, '-created_date', 100);
+                    // Sort by date_to descending to get the most recent closed project
+                    allClosed.sort((a, b) => new Date(b.date_to) - new Date(a.date_to));
+                    const latestClosed = allClosed.length > 0 ? [allClosed[0]] : [];
+                    console.log('[Projects] Showing latest closed project:', latestClosed[0]?.name || 'none');
+                    return { items: latestClosed, total: latestClosed.length };
                 }
                 
                 // Admin, Supervisor, CEO can see all projects OR filtered by company if company is set
