@@ -9,6 +9,7 @@ export default function ReportTableRow({
     result,
     isAdmin,
     isSupervisor,
+    isDepartmentHead,
     project,
     reportRun,
     showRamadanGiftColumn,
