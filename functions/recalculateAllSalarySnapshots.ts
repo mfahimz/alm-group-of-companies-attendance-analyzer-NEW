@@ -195,7 +195,6 @@ Deno.serve(async (req) => {
                 // Salary Leave Amount = (Basic Salary + Allowances ONLY) / Divisor * Salary Leave Days
                 // CRITICAL: Use allowances (NOT allowances_with_bonus)
                 // For 9-working-hour employees: round up to nearest multiple of 5
-                const workingHours = snapshot.working_hours || salaryRecord.working_hours || 9;
                 const rawSalaryLeaveAmount = salaryLeaveDays > 0 
                     ? ((basicSalary + allowances) / divisor) * salaryLeaveDays 
                     : 0;
