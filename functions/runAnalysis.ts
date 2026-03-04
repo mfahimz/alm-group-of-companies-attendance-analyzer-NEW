@@ -792,6 +792,7 @@ Deno.serve(async (req) => {
                         // Skip this day for attendance counting - annual leave already counted as calendar days upfront
                         // Decrement working days since this is a leave day (not a working day to count)
                         workingDays--;
+                        dateStatusMap[dateStr] = 'ANNUAL_LEAVE';
                         continue;
                     }
                     // If employee worked, continue normal analysis
