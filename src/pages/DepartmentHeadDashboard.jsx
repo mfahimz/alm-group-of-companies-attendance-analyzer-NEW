@@ -433,7 +433,6 @@ export default function DepartmentHeadDashboard() {
                                                             {approved}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell>{grace}</TableCell>
                                                     <TableCell>
                                                         <span className={`font-bold ${deductible > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                                             {deductible} min
