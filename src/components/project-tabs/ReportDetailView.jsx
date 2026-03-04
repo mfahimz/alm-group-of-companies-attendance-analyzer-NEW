@@ -1793,7 +1793,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Other Minutes
                                     </SortableTableHead>
-                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>
+                                    {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>}
                                     {showRamadanGiftColumn && (
                                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Ramadan Gift (min)</th>
                                     )}
