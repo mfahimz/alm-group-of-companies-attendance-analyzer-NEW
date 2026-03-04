@@ -50,7 +50,6 @@ SelectScrollDownButton.displayName =
   SelectPrimitive.ScrollDownButton.displayName
 
 const SelectContent = React.forwardRef(({ className, children, position = "popper", filter = true, ...props }, ref) => {
-  // Build: fixed invalid binding pattern
   const [search, setSearch] = React.useState("");
 
   // Filter children based on search if enabled
