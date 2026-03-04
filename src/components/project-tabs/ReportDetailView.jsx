@@ -17,6 +17,7 @@ import RamadanGiftCellWidget from './RamadanGiftCell';
 import { GraceMinutesDialog, SaveConfirmationDialog, FinalizationProgressDialog } from './ReportDetailDialogs';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
 import DeductibleCell from './DeductibleCell';
+import ReportTableRow from './ReportTableRow';
 import * as XLSX from 'xlsx';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
