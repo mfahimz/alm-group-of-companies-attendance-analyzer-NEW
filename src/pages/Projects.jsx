@@ -287,25 +287,27 @@ export default function Projects() {
                     </h1>
                     <p className="text-slate-600 mt-2 text-sm sm:text-base">Manage attendance analysis projects</p>
                 </div>
-                <div className="flex gap-2">
-                    {selectedProjects.length > 0 && (
-                        <Button
-                            onClick={() => setShowBulkEdit(true)}
-                            variant="outline"
-                            className="w-full sm:w-auto"
+                {!isDepartmentHead && (
+                    <div className="flex gap-2">
+                        {selectedProjects.length > 0 && (
+                            <Button
+                                onClick={() => setShowBulkEdit(true)}
+                                variant="outline"
+                                className="w-full sm:w-auto"
+                            >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Bulk Edit ({selectedProjects.length})
+                            </Button>
+                        )}
+                        <Button 
+                            onClick={() => setShowCreateDialog(true)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
                         >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Bulk Edit ({selectedProjects.length})
+                            <Plus className="w-4 h-4 mr-2" />
+                            New Project
                         </Button>
-                    )}
-                    <Button 
-                        onClick={() => setShowCreateDialog(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        New Project
-                    </Button>
-                </div>
+                    </div>
+                )}
             </div>
 
             {/* Search and Filters */}
