@@ -52,6 +52,10 @@ export default function Projects() {
     const isAdminOrSupervisor = isAdmin || isSupervisor;
     
     const [statusFilter, setStatusFilter] = useState('all');
+    // Reset status filter when user role resolves
+    useEffect(() => {
+        if (isDepartmentHead) setStatusFilter('closed');
+    }, [isDepartmentHead]);
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
