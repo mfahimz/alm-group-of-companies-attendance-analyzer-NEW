@@ -342,11 +342,11 @@ Deno.serve(async (req) => {
         // Total deductible hours pay = current month only (no prev month)
         const deductibleHoursPay = currentMonthDeductibleHoursPay;
         
-        // Normal OT Salary = OT Hourly Rate * 1.25 * Normal OT Hours
-        const normalOtSalary = otHourlyRate * 1.25 * adjustmentValues.normalOtHours;
+        // Normal OT Salary - conventional rounding
+        const normalOtSalary = Math.round(otHourlyRate * 1.25 * adjustmentValues.normalOtHours);
 
-        // Special OT Salary = OT Hourly Rate * 1.5 * Special OT Hours
-        const specialOtSalary = otHourlyRate * 1.5 * adjustmentValues.specialOtHours;
+        // Special OT Salary - conventional rounding
+        const specialOtSalary = Math.round(otHourlyRate * 1.5 * adjustmentValues.specialOtHours);
 
         // Total OT Salary
         const totalOtSalary = normalOtSalary + specialOtSalary;
