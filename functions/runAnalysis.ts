@@ -1394,12 +1394,12 @@ Deno.serve(async (req) => {
             //   No other fields (approved, other, deductible, ramadan_gift) are involved.
             // ============================================================================
             const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
-            const rawLateEarly = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);  // RAW, EXCLUDE other_minutes
-            // Approved minutes reduce what is DEDUCTIBLE (not the raw late/early stored in AnalysisResult)
-            const afterApproved = Math.max(0, rawLateEarly - Math.max(0, totalApprovedMinutes));
-            const deductibleMinutes = Math.max(0, afterApproved - totalGraceMinutes);
+            // lateMinutes and earlyCheckoutMinutes are ALREADY net of per-day approved reductions.
+            // Do NOT subtract totalApprovedMinutes again — that would be double-dipping.
+            const rawLateEarly = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);
+            const deductibleMinutes = Math.max(0, rawLateEarly - totalGraceMinutes);
             
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(raw), Early=${earlyCheckoutMinutes}(raw), Approved=${totalApprovedMinutes}, AfterApproved=${afterApproved}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
 
             // Build set of LOP-adjacent weekly off dates for storage
             const lopAdjacentWeeklyOffDates = Object.entries(dateStatusMap)
