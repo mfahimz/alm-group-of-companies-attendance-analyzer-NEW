@@ -389,7 +389,6 @@ export default function DepartmentHeadDashboard() {
                                         <TableHead>Late Minutes</TableHead>
                                         <TableHead>Early Checkout</TableHead>
                                         <TableHead>Approved Minutes</TableHead>
-                                        <TableHead>Grace</TableHead>
                                         <TableHead>Deductible</TableHead>
                                     </TableRow>
                                 </TableHeader>
