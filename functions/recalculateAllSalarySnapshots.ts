@@ -189,14 +189,20 @@ Deno.serve(async (req) => {
                 // Leave Days = Annual Leave + LOP
                 const leaveDays = annualLeaveCount + fullAbsenceCount;
 
-                // Leave Pay = (Total Salary / Divisor) * Leave Days
-                const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
+                // Leave Pay - conventional rounding
+                const leavePay = leaveDays > 0 ? Math.round((totalSalary / divisor) * leaveDays) : 0;
                 
                 // Salary Leave Amount = (Basic Salary + Allowances ONLY) / Divisor * Salary Leave Days
                 // CRITICAL: Use allowances (NOT allowances_with_bonus)
-                const salaryLeaveAmount = salaryLeaveDays > 0 
+                // For 9-working-hour employees: round up to nearest multiple of 5
+                const workingHours = snapshot.working_hours || salaryRecord.working_hours || 9;
+                const rawSalaryLeaveAmount = salaryLeaveDays > 0 
                     ? ((basicSalary + allowances) / divisor) * salaryLeaveDays 
                     : 0;
+                const is9HourEmployee = workingHours === 9;
+                const salaryLeaveAmount = is9HourEmployee
+                    ? Math.ceil(rawSalaryLeaveAmount / 5) * 5
+                    : Math.round(rawSalaryLeaveAmount);
                 
                 // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
                 const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
