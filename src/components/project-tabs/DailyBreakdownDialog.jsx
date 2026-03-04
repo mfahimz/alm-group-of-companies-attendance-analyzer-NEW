@@ -715,10 +715,11 @@ export default function DailyBreakdownDialog({
                                         <TableCell>
                                             <div>
                                                 <span className={`px-2 py-1 rounded text-xs font-medium
-                                                    ${day.status.includes('Present') && !day.status.includes('Half') ? 'bg-green-100 text-green-700' : ''}
-                                                    ${day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
-                                                    ${day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
-                                                    ${day.status.includes('Off') ? 'bg-slate-100 text-slate-700' : ''}
+                                                    ${day.isLopAdjacentWeeklyOff ? 'bg-rose-600 text-white' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Present') && !day.status.includes('Half') ? 'bg-green-100 text-green-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Off') && !day.status.includes('LOP') ? 'bg-slate-100 text-slate-700' : ''}
                                                 `}>
                                                     {day.status}
                                                 </span>
