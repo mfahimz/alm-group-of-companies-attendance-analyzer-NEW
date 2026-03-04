@@ -1137,6 +1137,7 @@ Deno.serve(async (req) => {
                     if (partialDayResult.isPartial) {
                         presentDays++;
                         halfAbsenceCount++;
+                        dateStatusMap[dateStr] = 'PRESENT';
                         auto_resolutions.push({
                             date: dateStr,
                             type: 'PARTIAL_DAY_DETECTED',
@@ -1144,6 +1145,7 @@ Deno.serve(async (req) => {
                         });
                     } else {
                         presentDays++;
+                        dateStatusMap[dateStr] = 'PRESENT';
                     }
 
                     if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
@@ -1157,6 +1159,9 @@ Deno.serve(async (req) => {
                     // Only count as LOP if no exception covers it
                     if (!dateException || (dateException.type !== 'MANUAL_PRESENT' && dateException.type !== 'MANUAL_HALF')) {
                         fullAbsenceCount++;
+                        dateStatusMap[dateStr] = 'LOP';
+                    } else {
+                        dateStatusMap[dateStr] = 'PRESENT';
                     }
                 }
 
