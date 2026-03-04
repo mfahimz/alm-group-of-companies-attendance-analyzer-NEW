@@ -1,10 +1,4 @@
-// Placeholder file, this should be overridden by the generated code
-
-
+// Placeholder - redirects to Dashboard
 export default function Home() {
-
-  return (
-    <div>
-    </div>
-  );
+  return <div />;
 }
