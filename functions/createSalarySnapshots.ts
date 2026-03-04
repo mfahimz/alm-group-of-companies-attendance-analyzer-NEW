@@ -1466,13 +1466,19 @@ Deno.serve(async (req) => {
             const leavePayBase = leavePayFormula === 'BASIC_PLUS_ALLOWANCES' 
                 ? (basicSalary + allowancesAmount)
                 : totalSalaryAmount;
-            const leavePay = Math.round((leaveDays > 0 ? (leavePayBase / divisor) * leaveDays : 0) * 100) / 100;
+            const rawLeavePay = leaveDays > 0 ? (leavePayBase / divisor) * leaveDays : 0;
+            const leavePay = Math.round(rawLeavePay);
             
             // Salary Leave Amount Formula (configurable)
             const salaryLeaveBase = salaryLeaveFormula === 'BASIC_PLUS_ALLOWANCES' 
                 ? (basicSalary + allowancesAmount)
                 : totalSalaryAmount;
-            const salaryLeaveAmount = Math.round((salaryLeaveDays > 0 ? (salaryLeaveBase / divisor) * salaryLeaveDays : 0) * 100) / 100;
+            const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryLeaveBase / divisor) * salaryLeaveDays : 0;
+            // For 9-working-hour employees: round up to nearest multiple of 5; otherwise conventional round
+            const is9HourEmployee = workingHours === 9;
+            const salaryLeaveAmount = is9HourEmployee
+                ? Math.ceil(rawSalaryLeaveAmount / 5) * 5
+                : Math.round(rawSalaryLeaveAmount);
             
             console.log(`[createSalarySnapshots] 💡 SALARY LEAVE CALCULATION for ${emp.name}:`);
             console.log(`[createSalarySnapshots]    Formula: ${salaryLeaveFormula}`);
