@@ -212,14 +212,14 @@ Deno.serve(async (req) => {
                 
                 // Deductible Hours Pay (current month, uses salary divisor)
                 const hourlyRateDeduction = totalSalary / divisor / workingHours;
-                const deductibleHoursPay = hourlyRateDeduction * deductibleHours;
+                const deductibleHoursPay = Math.round(hourlyRateDeduction * deductibleHours);
 
                 // OT Hourly Rate (uses OT Divisor)
                 const otHourlyRate = totalSalary / otDivisor / workingHours;
                 
-                // OT Salaries
-                const normalOtSalary = otHourlyRate * 1.25 * normalOtHours;
-                const specialOtSalary = otHourlyRate * 1.5 * specialOtHours;
+                // OT Salaries - conventional rounding
+                const normalOtSalary = Math.round(otHourlyRate * 1.25 * normalOtHours);
+                const specialOtSalary = Math.round(otHourlyRate * 1.5 * specialOtHours);
                 const totalOtSalary = normalOtSalary + specialOtSalary;
 
                 // Final Total
