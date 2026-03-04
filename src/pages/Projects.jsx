@@ -382,13 +382,15 @@ export default function Projects() {
                                 : 'Create your first project to start tracking attendance'
                             }
                         </p>
-                        <Button 
-                            onClick={() => setShowCreateDialog(true)}
-                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Create First Project
-                        </Button>
+                        {!isDepartmentHead && (
+                            <Button 
+                                onClick={() => setShowCreateDialog(true)}
+                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create First Project
+                            </Button>
+                        )}
                     </CardContent>
                 </Card>
             ) : (
