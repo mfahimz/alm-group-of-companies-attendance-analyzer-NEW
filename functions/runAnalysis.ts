@@ -656,6 +656,8 @@ Deno.serve(async (req) => {
                 
                 // Check if this is employee's weekly off day - BEFORE any other processing
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    // Track weekly off day in dateStatusMap for LOP-adjacent check
+                    dateStatusMap[dateStr] = 'WEEKLY_OFF';
                     continue;
                 }
                 
