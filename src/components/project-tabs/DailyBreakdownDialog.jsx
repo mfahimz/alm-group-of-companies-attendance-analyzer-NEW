@@ -648,8 +648,17 @@ export default function DailyBreakdownDialog({
                             </TableHeader>
                             <TableBody>
                                 {getDailyBreakdown.map((day, idx) => (
-                                    <TableRow key={idx} className={`${day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride ? 'border-l-4 border-l-indigo-400' : ''}`}>
-                                        <TableCell className="font-medium">{day.date}</TableCell>
+                                    <TableRow key={idx} className={`${day.isLopAdjacentWeeklyOff ? 'bg-rose-100 border-l-4 border-l-rose-500' : day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.isLopAdjacentWeeklyOff ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{day.date}</span>
+                                                {day.isLopAdjacentWeeklyOff && (
+                                                    <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[9px] font-bold rounded uppercase tracking-wide">
+                                                        Double Deduction
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-1">
                                                 <span>{day.punches}</span>
