@@ -689,6 +689,9 @@ Deno.serve(async (req) => {
                     const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
                     if (hasManualAbsent) {
                         fullAbsenceCount++;
+                        dateStatusMap[dateStr] = 'LOP';
+                    } else {
+                        dateStatusMap[dateStr] = 'PUBLIC_HOLIDAY';
                     }
                     continue; // Skip this day - it's a holiday
                 }
