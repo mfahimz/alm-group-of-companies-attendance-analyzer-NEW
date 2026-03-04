@@ -7,10 +7,19 @@ import { base44 } from '@/api/base44Client';
 
 export default function PINLock({ onUnlock, storageKey = 'salary_pin_unlocked' }) {
     const [pin, setPin] = useState('');
-    const [isUnlocked, setIsUnlocked] = useState(false);
+    // Initialize synchronously from sessionStorage to avoid flash
+    const [isUnlocked, setIsUnlocked] = useState(() => sessionStorage.getItem(storageKey) === 'true');
     const [attempts, setAttempts] = useState(0);
     const [systemPin, setSystemPin] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Notify parent of initial unlock state synchronously
+    useEffect(() => {
+        if (isUnlocked) {
+            onUnlock?.(true);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Load system PIN from settings - only on mount, non-blocking
     useEffect(() => {
@@ -41,25 +50,16 @@ export default function PINLock({ onUnlock, storageKey = 'salary_pin_unlocked' }
         };
     }, []);
 
-    // Check if already unlocked in session
-    useEffect(() => {
-        const unlocked = sessionStorage.getItem(storageKey) === 'true';
-        if (unlocked) {
-            setIsUnlocked(true);
-            onUnlock?.(true);
-        }
-    }, [onUnlock, storageKey]);
-
     // If no PIN set, auto-unlock
     useEffect(() => {
-        if (loading === false && !systemPin) {
+        if (loading === false && !systemPin && !isUnlocked) {
             setIsUnlocked(true);
             onUnlock?.(true);
         }
-    }, [loading, systemPin, onUnlock]);
+    }, [loading, systemPin]);
 
-    // If no PIN set or already unlocked, don't show lock modal
-    if (loading) return null;
+    // If loading PIN config, show nothing (but don't block if already unlocked)
+    if (loading && !isUnlocked) return null;
     if (isUnlocked) return null;
 
     const handleSubmit = (e) => {
