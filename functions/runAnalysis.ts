@@ -1389,6 +1389,13 @@ Deno.serve(async (req) => {
             
             console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(raw), Early=${earlyCheckoutMinutes}(raw), Approved=${totalApprovedMinutes}, AfterApproved=${afterApproved}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
 
+            // Build set of LOP-adjacent weekly off dates for storage
+            const lopAdjacentWeeklyOffDates = Object.entries(dateStatusMap)
+                .filter(([, status]) => status === 'LOP_ADJACENT_WEEKLY_OFF')
+                .map(([dateStr]) => dateStr)
+                .sort()
+                .join(', ');
+
             return {
                 attendance_id,
                 working_days: Math.max(0, workingDays),
@@ -1406,6 +1413,8 @@ Deno.serve(async (req) => {
                 abnormal_dates: [...abnormal_dates_set].sort().join(', '),
                 notes: criticalDatesFormatted,
                 auto_resolutions: autoResolutionNotes,
+                lop_adjacent_weekly_off_count: Math.max(0, lopAdjacentWeeklyOffCount),
+                lop_adjacent_weekly_off_dates: lopAdjacentWeeklyOffDates,
                 // CRITICAL: Only include other minutes that did NOT come from existing exceptions.
                 // Other minutes from existing exceptions are already in the DB — do NOT re-create them.
                 // otherMinutesByDate = from NON-exception sources (should be created as new exceptions)
