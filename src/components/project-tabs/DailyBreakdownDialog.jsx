@@ -125,6 +125,12 @@ export default function DailyBreakdownDialog({
             return cd >= from && cd <= to;
         };
 
+        // Precompute LOP-adjacent weekly off dates from stored result
+        const lopAdjacentWeeklyOffDates = new Set(
+            (currentResult.lop_adjacent_weekly_off_dates || '')
+                .split(',').map(d => d.trim()).filter(Boolean)
+        );
+
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
@@ -137,7 +143,39 @@ export default function DailyBreakdownDialog({
                 weeklyOffDay = dayNameToNumber[employee.weekly_off];
             }
 
-            if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) continue;
+            // If this weekly off day was counted as LOP-adjacent, include it in breakdown with special flag
+            if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                if (lopAdjacentWeeklyOffDates.has(dateStr)) {
+                    breakdown.push({
+                        date: formatDate(dateStr),
+                        dateStr,
+                        punches: 0,
+                        crossoverPunches: 0,
+                        shiftEndsNearMidnight: false,
+                        punchTimes: '',
+                        punchTimesShort: '-',
+                        allPunchTimes: '',
+                        punchObjects: [],
+                        nextDateStr: '',
+                        shift: 'Weekly Off',
+                        exception: '-',
+                        status: 'Weekly Off (LOP)',
+                        abnormal: false,
+                        isCriticalAbnormal: false,
+                        lateInfo: '-',
+                        lateMinutesTotal: 0,
+                        earlyCheckoutInfo: '-',
+                        otherMinutes: 0,
+                        hasOverride: false,
+                        partialDayReason: null,
+                        punchMatches: [],
+                        hasUnmatchedPunch: false,
+                        hasFarExtendedMatch: false,
+                        isLopAdjacentWeeklyOff: true
+                    });
+                }
+                continue;
+            }
 
             // ================================================================
             // MIDNIGHT SHIFT FIX: Mirror backend runAnalysis logic
