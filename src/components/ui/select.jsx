@@ -49,7 +49,7 @@ const SelectScrollDownButton = React.forwardRef(({ className, ...props }, ref) =
 SelectScrollDownButton.displayName =
   SelectPrimitive.ScrollDownButton.displayName
 
-const SelectContent = React.forwardRef(({ className, children, position = "popper", filter = true, ...props }, ref) => {
+const SelectContent = React.forwardRef(({ className, children, position = "popper", filter = true, id: _id, ...props }, ref) => {
   const [search, setSearch] = React.useState("");
 
   // Filter children based on search if enabled
