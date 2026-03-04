@@ -290,20 +290,25 @@ Deno.serve(async (req) => {
         // Leave Days = Annual Leave + LOP (excludes sick leave per Al Maraghi rule)
         const leaveDays = attendanceValues.annual_leave_count + attendanceValues.full_absence_count;
 
-        // Leave Pay = (Total Salary / Divisor) * Leave Days
-        const leavePay = leaveDays > 0 ? (totalSalary / divisor) * leaveDays : 0;
+        // Leave Pay = (Total Salary / Divisor) * Leave Days - conventional round
+        const leavePay = leaveDays > 0 ? Math.round((totalSalary / divisor) * leaveDays) : 0;
         
         // ============================================================
         // SALARY LEAVE AMOUNT FORMULA (NON-NEGOTIABLE)
         // Base = Basic Salary + Allowances ONLY (NO BONUS, NO allowances_with_bonus)
         // Formula: (Basic + Allowances) / salary_divisor × salary_leave_days
+        // For 9-working-hour employees: round up to nearest multiple of 5
         // ============================================================
         let salaryLeaveAmount = 0;
         const salaryLeaveDays = snapshot.override_salary_leave_days ?? snapshot.salary_leave_days ?? snapshot.annual_leave_count ?? 0;
         
         if (salaryLeaveDays > 0) {
             const salaryBaseForLeave = basicSalary + allowances;
-            salaryLeaveAmount = (salaryBaseForLeave / divisor) * salaryLeaveDays;
+            const rawSalaryLeaveAmount = (salaryBaseForLeave / divisor) * salaryLeaveDays;
+            const is9HourEmployee = workingHours === 9;
+            salaryLeaveAmount = is9HourEmployee
+                ? Math.ceil(rawSalaryLeaveAmount / 5) * 5
+                : Math.round(rawSalaryLeaveAmount);
         }
         
         // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
