@@ -58,26 +58,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id],
-        queryFn: async () => {
-            // Primary: fetch by report_run_id
-            let results = await base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000);
-            
-            // Fallback: if no results found (e.g. finalized report stored under different run ID),
-            // fetch by project_id and filter to the most recent set matching the report's date range
-            if (results.length === 0 && project?.id) {
-                console.log('[ReportDetailView] No results by report_run_id, fetching by project_id fallback');
-                const allProjectResults = await base44.entities.AnalysisResult.filter({ project_id: project.id }, null, 5000);
-                // Group by report_run_id and pick the run closest to this reportRun
-                // Use the ones with the most data / matching the finalized run
-                if (allProjectResults.length > 0) {
-                    // Try to find results matching our report run by checking if any have the same run id in nested data
-                    // Last resort: use all project results (they'll be filtered by dept head logic below)
-                    results = allProjectResults;
-                }
-            }
-            
-            return results;
-        },
+        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000),
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
