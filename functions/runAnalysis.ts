@@ -518,11 +518,14 @@ Deno.serve(async (req) => {
             let earlyCheckoutMinutes = 0;
             let otherMinutes = 0;
             let totalApprovedMinutes = 0;
+            let lopAdjacentWeeklyOffCount = 0; // Weekly off days adjacent to LOP counted as LOP
             const otherMinutesByDate = {}; // Track other minutes per date (only from NON-exception sources)
             const otherMinutesFromExceptions = {}; // Track other minutes that came from existing exceptions (DO NOT re-create)
             const abnormal_dates_set = new Set();
             const critical_abnormal_dates_set = new Set();
             const auto_resolutions = [];
+            // Track per-date status for LOP-adjacent weekly off calculation (done after main loop)
+            const dateStatusMap = {}; // dateStr -> 'LOP' | 'SICK_LEAVE' | 'PRESENT' | 'ANNUAL_LEAVE' | 'OTHER'
 
             const startDate = new Date(date_from);
             const endDate = new Date(date_to);
