@@ -1293,6 +1293,46 @@ Deno.serve(async (req) => {
                 }
             }
 
+            // ================================================================
+            // LOP-ADJACENT WEEKLY OFF RULE
+            // If the day BEFORE or AFTER an employee's weekly off is LOP,
+            // the weekly off is also counted as LOP (double deduction).
+            // Exception: Sick leave adjacent to weekly off does NOT trigger this.
+            // Annual leave adjacent to weekly off is already handled separately.
+            // ================================================================
+            {
+                // Find all WEEKLY_OFF dates
+                const weeklyOffDates = Object.entries(dateStatusMap)
+                    .filter(([, status]) => status === 'WEEKLY_OFF')
+                    .map(([dateStr]) => dateStr);
+
+                for (const woDateStr of weeklyOffDates) {
+                    const woDate = new Date(woDateStr);
+                    
+                    const prevDate = new Date(woDate);
+                    prevDate.setDate(prevDate.getDate() - 1);
+                    const prevDateStr = prevDate.toISOString().split('T')[0];
+                    
+                    const nextDate = new Date(woDate);
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    const nextDateStr = nextDate.toISOString().split('T')[0];
+                    
+                    const prevStatus = dateStatusMap[prevDateStr];
+                    const nextStatus = dateStatusMap[nextDateStr];
+                    
+                    const prevIsLOP = prevStatus === 'LOP';
+                    const nextIsLOP = nextStatus === 'LOP';
+                    
+                    if (prevIsLOP || nextIsLOP) {
+                        // Weekly off adjacent to LOP → count weekly off as LOP too
+                        lopAdjacentWeeklyOffCount++;
+                        fullAbsenceCount++;
+                        dateStatusMap[woDateStr] = 'LOP_ADJACENT_WEEKLY_OFF';
+                        console.log(`[runAnalysis] LOP-adjacent weekly off: Employee ${attendanceIdStr}, Weekly off ${woDateStr} (prev=${prevStatus}, next=${nextStatus}) → counted as LOP`);
+                    }
+                }
+            }
+
             const criticalDatesFormatted = critical_abnormal_dates_set.size > 0
                 ? [...critical_abnormal_dates_set].sort().map(d => new Date(d).toLocaleDateString()).join(', ')
                 : '';
