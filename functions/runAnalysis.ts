@@ -1165,18 +1165,20 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Check for approved minutes (foundation for all companies, currently enabled for Al Maraghi Motors only)
-                // NOTE: approvedMinutesForDay is applied PER-DAY in the punch time calculation below
-                // (reducing late/early for that specific day). totalApprovedMinutes is tracked for REPORTING
-                // purposes only — it is NOT used to reduce deductible again (that would be double-dipping).
+                // Check for approved minutes (Al Maraghi Motors only).
+                // RULES:
+                // 1. Only applies if employee was PRESENT (has punches) — not on absent/LOP days.
+                // 2. Applied PER-DAY: reduces that specific day's late+early BEFORE accumulating.
+                //    This means the raw late/early stored in AnalysisResult are ALREADY reduced.
+                //    totalApprovedMinutes is the SUM of per-day reductions, tracked for DISPLAY only.
                 let approvedMinutesForDay = 0;
                 try {
                     if (rules.approved_minutes_enabled && 
                         dateException && 
                         dateException.type === 'ALLOWED_MINUTES' && 
-                        dateException.approval_status === 'approved_dept_head') {
+                        dateException.approval_status === 'approved_dept_head' &&
+                        filteredPunches.length > 0) {  // FIX: only apply if employee was present
                         approvedMinutesForDay = dateException.allowed_minutes || 0;
-                        totalApprovedMinutes += approvedMinutesForDay;
                     }
                 } catch {
                     approvedMinutesForDay = 0;
@@ -1211,7 +1213,6 @@ Deno.serve(async (req) => {
                     let dayLateMinutes = 0;
                     let dayEarlyMinutes = 0;
                     
-                    // BUG FIX #2: Use Math.abs on RESULT of time difference, not individual components
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         
@@ -1233,10 +1234,21 @@ Deno.serve(async (req) => {
                         }
                     }
                     
-                    // Store RAW late/early minutes (before any approved-minutes offset).
-                    // Approved minutes are NOT applied here — they only affect deductible_minutes
-                    // in the final formula below. This keeps late_minutes and early_checkout_minutes
-                    // in AnalysisResult as pure raw punch-vs-shift differences.
+                    // FIX: Apply approved minutes PER-DAY before accumulating.
+                    // Reduce this day's late+early by the approved amount (floor at 0 each).
+                    // This means lateMinutes/earlyCheckoutMinutes in AnalysisResult are ALREADY
+                    // net of approved minutes. totalApprovedMinutes tracks the sum for display.
+                    if (approvedMinutesForDay > 0) {
+                        const dayTotal = dayLateMinutes + dayEarlyMinutes;
+                        const reduction = Math.min(approvedMinutesForDay, dayTotal);
+                        const lateRatio = dayTotal > 0 ? dayLateMinutes / dayTotal : 0;
+                        const earlyRatio = dayTotal > 0 ? dayEarlyMinutes / dayTotal : 0;
+                        dayLateMinutes = Math.max(0, dayLateMinutes - Math.round(reduction * lateRatio));
+                        dayEarlyMinutes = Math.max(0, dayEarlyMinutes - Math.round(reduction * earlyRatio));
+                        totalApprovedMinutes += reduction; // track actual reduction for display
+                        console.log(`[runAnalysis] ALLOWED_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: approved=${approvedMinutesForDay}, reduced by ${reduction} (late: ${dayLateMinutes}, early: ${dayEarlyMinutes})`);
+                    }
+                    
                     lateMinutes += dayLateMinutes;
                     earlyCheckoutMinutes += dayEarlyMinutes;
                 }
