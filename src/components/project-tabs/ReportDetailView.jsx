@@ -1805,18 +1805,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <tbody className="[&_tr:last-child]:border-0">
                                 {filteredResults.map((result) => (
                                     <ReportTableRow
-                                        key={result.id}
-                                        result={result}
-                                        isAdmin={isAdmin}
-                                        isSupervisor={isSupervisor}
-                                        project={project}
-                                        reportRun={reportRun}
-                                        showRamadanGiftColumn={showRamadanGiftColumn}
-                                        onToggleVerification={toggleVerification}
-                                        onEditGrace={setEditingGraceMinutes}
-                                        onShowBreakdown={showDailyBreakdown}
-                                        onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
-                                        onSaveRamadanGift={saveRamadanGift}
+                                    key={result.id}
+                                    result={result}
+                                    isAdmin={isAdmin}
+                                    isSupervisor={isSupervisor}
+                                    isDepartmentHead={isDepartmentHead}
+                                    project={project}
+                                    reportRun={reportRun}
+                                    showRamadanGiftColumn={showRamadanGiftColumn}
+                                    onToggleVerification={toggleVerification}
+                                    onEditGrace={setEditingGraceMinutes}
+                                    onShowBreakdown={showDailyBreakdown}
+                                    onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
+                                    onSaveRamadanGift={saveRamadanGift}
                                     />
                                 ))}
                             </tbody>
