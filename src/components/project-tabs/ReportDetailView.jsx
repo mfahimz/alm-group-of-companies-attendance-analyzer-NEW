@@ -57,9 +57,23 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const canEditRamadanGift = isAdmin || isCEO || isHRManager;
 
     const { data: allResults = [] } = useQuery({
-        queryKey: ['results', reportRun.id],
-        queryFn: () => base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000),
-        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        queryKey: ['results', reportRun.id, project.id],
+        queryFn: async () => {
+            // Primary: fetch by report_run_id
+            const results = await base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000);
+            
+            // Fallback for closed projects: if no results found by report_run_id,
+            // try fetching by project_id (covers cases where finalized results stored under a different run id)
+            if (results.length === 0 && project?.id && (project.status === 'closed' || reportRun.is_final)) {
+                console.log('[ReportDetailView] Fallback: fetching results by project_id for closed/finalized report');
+                const byProject = await base44.entities.AnalysisResult.filter({ project_id: project.id }, null, 5000);
+                // Return the set with the most data that matches this report's period
+                if (byProject.length > 0) return byProject;
+            }
+            
+            return results;
+        },
+        staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
