@@ -1507,9 +1507,8 @@ Deno.serve(async (req) => {
             // Current month hourly rate uses salary divisor (2 decimals)
             const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
             
-            // Current month deductible hours pay (2 decimals)
-            // Uses combined deductible + other minutes for payroll
-            const currentMonthDeductibleHoursPay = Math.round((hourlyRate * deductibleHours) * 100) / 100;
+            // Current month deductible hours pay - conventional rounding (0.5+ rounds up)
+            const currentMonthDeductibleHoursPay = Math.round(hourlyRate * deductibleHours);
             
             // ============================================================
             // DISABLED: Previous month deduction logic
