@@ -1581,8 +1581,8 @@ Deno.serve(async (req) => {
             
             const normalOtHours = otRecord?.normalOtHours || 0;
             const specialOtHours = otRecord?.specialOtHours || 0;
-            const normalOtSalary = Math.round(otHourlyRate * otNormalRate * normalOtHours * 100) / 100;
-            const specialOtSalary = Math.round(otHourlyRate * otSpecialRate * specialOtHours * 100) / 100;
+            const normalOtSalary = Math.round(otHourlyRate * otNormalRate * normalOtHours);
+            const specialOtSalary = Math.round(otHourlyRate * otSpecialRate * specialOtHours);
             const totalOtSalary = normalOtSalary + specialOtSalary;
 
             // Get adjustment values from OvertimeData
