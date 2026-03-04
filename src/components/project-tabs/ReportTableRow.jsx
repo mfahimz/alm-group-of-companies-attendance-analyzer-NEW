@@ -117,21 +117,23 @@ export default function ReportTableRow({
                     {Math.max(0, result.other_minutes || 0)}
                 </span>
             </td>
-            <td className="p-2 align-middle">
-                <div className="flex items-center gap-2 group">
-                    <span>{Math.max(0, result.grace_minutes ?? 15)}</span>
-                    {(isAdmin || isSupervisor) && (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => onEditGrace(result)}
-                        >
-                            <Edit className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
-                        </Button>
-                    )}
-                </div>
-            </td>
+            {!isDepartmentHead && (
+                <td className="p-2 align-middle">
+                    <div className="flex items-center gap-2 group">
+                        <span>{Math.max(0, result.grace_minutes ?? 15)}</span>
+                        {(isAdmin || isSupervisor) && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => onEditGrace(result)}
+                            >
+                                <Edit className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
+                            </Button>
+                        )}
+                    </div>
+                </td>
+            )}
             {showRamadanGiftColumn && (() => {
                 const canEdit = !reportRun.is_final && project.status !== 'closed';
                 if (!canEdit) return <td className="p-2 align-middle"><span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span></td>;
