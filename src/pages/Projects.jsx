@@ -51,7 +51,7 @@ export default function Projects() {
     const isDepartmentHead = userRole === 'department_head';
     const isAdminOrSupervisor = isAdmin || isSupervisor;
     
-    const [statusFilter, setStatusFilter] = useState(isDepartmentHead ? 'all' : 'draft-analyzed');
+    const [statusFilter, setStatusFilter] = useState('all');
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
