@@ -908,6 +908,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             if (isFinalized) {
                 // FINALIZED: Use stored values AS-IS — never recalculate
+                const storedDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? null;
+                
+                // If stored deductible is null/missing but we have late+early data, compute it
+                // This handles the case where results were fetched from wrong report run via fallback
+                const lateMin = result.late_minutes || 0;
+                const earlyMin = result.early_checkout_minutes || 0;
+                const graceMin = result.grace_minutes ?? 15;
+                const approvedMin = result.approved_minutes || 0;
+                const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
+                
+                const effectiveDeductible = storedDeductible !== null 
+                    ? storedDeductible 
+                    : computedDeductible;
+
                 return {
                     ...result,
                     name: employee?.name || 'Unknown',
@@ -917,15 +931,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     half_absence_count: result.half_absence_count || 0,
                     sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
                     annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
-                    late_minutes: result.late_minutes || 0,
-                    early_checkout_minutes: result.early_checkout_minutes || 0,
+                    late_minutes: lateMin,
+                    early_checkout_minutes: earlyMin,
                     other_minutes: result.other_minutes || 0,
-                    approved_minutes: result.approved_minutes || 0,
-                    deductible_minutes: result.manual_deductible_minutes ?? result.deductible_minutes ?? 0,
+                    approved_minutes: approvedMin,
+                    deductible_minutes: effectiveDeductible,
                     ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
                     // effective = raw deductible (after grace) minus ramadan gift
-                    effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? result.deductible_minutes ?? 0) - Math.max(0, result.ramadan_gift_minutes || 0)),
-                    grace_minutes: result.grace_minutes ?? 15,
+                    effective_deductible_minutes: Math.max(0, effectiveDeductible - Math.max(0, result.ramadan_gift_minutes || 0)),
+                    grace_minutes: graceMin,
                     has_no_punches: hasNoPunches
                 };
             }
