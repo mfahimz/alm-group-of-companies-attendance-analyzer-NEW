@@ -67,7 +67,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             if (results.length === 0 && project?.id && (project.status === 'closed' || reportRun.is_final)) {
                 console.log('[ReportDetailView] Fallback: fetching results by project_id for closed/finalized report');
                 const byProject = await base44.entities.AnalysisResult.filter({ project_id: project.id }, null, 5000);
-                // Return the set with the most data that matches this report's period
+                // Filter to only results that belong to this specific report_run_id if possible
+                const matchingRun = byProject.filter(r => r.report_run_id === reportRun.id);
+                if (matchingRun.length > 0) return matchingRun;
                 if (byProject.length > 0) return byProject;
             }
             
