@@ -142,12 +142,22 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return allResults;
         }
         
+        // For finalized/closed projects, prioritize results that have deductible_minutes stored
+        // (i.e. results that belong to the actual finalized report run)
+        const isFinalized = reportRun.is_final || project.status === 'closed';
+        let sourceResults = allResults;
+        if (isFinalized && allResults.length > 0) {
+            // Prefer results that have this specific report_run_id
+            const withRunId = allResults.filter(r => r.report_run_id === reportRun.id);
+            if (withRunId.length > 0) sourceResults = withRunId;
+        }
+
         // Filter results to only show department head's subordinates
         const departmentAttendanceIds = employees.map(emp => String(emp.attendance_id));
-        return allResults.filter(result => 
+        return sourceResults.filter(result => 
             departmentAttendanceIds.includes(String(result.attendance_id))
         );
-    }, [allResults, isDepartmentHead, deptHeadVerification, employees]);
+    }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, project]);
 
     // Source of truth for UI display/editing: AnalysisResult.ramadan_gift_minutes per row
     React.useEffect(() => {
