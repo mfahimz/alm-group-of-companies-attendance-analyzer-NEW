@@ -1,31 +1,58 @@
 import React, { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, X, Loader2, ScanLine } from 'lucide-react';
+import { Upload, FileText, X, Loader2, ScanLine, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 
-const DEPARTMENTS = ['Service', 'Marketing', 'Operations', 'Finance', 'HR', 'AGM'];
-
-const CRITERIA_TEMPLATES = {
-    'Service Technician': 'Required: Automotive repair experience 3+ years, UAE driving license\nPreferred: ADAS/EVs knowledge, OEM certifications\nEducation: Diploma or higher in Automotive Engineering\nLanguages: English (required), Arabic (preferred)',
-    'Marketing Executive': 'Required: 2+ years digital marketing experience, social media management\nPreferred: UAE/GCC market experience, automotive industry\nEducation: Bachelor\'s in Marketing or related field\nSkills: Google Ads, Meta Ads, content creation',
-    'Finance Officer': 'Required: 3+ years accounting experience, UAE VAT knowledge\nPreferred: Automotive/dealership sector, ERP experience (SAP/Oracle)\nEducation: Bachelor\'s in Accounting or Finance\nCertifications: CPA or ACCA preferred',
-    'HR Specialist': 'Required: 2+ years HR experience, UAE Labor Law knowledge, WPS\nPreferred: HRMS systems, payroll processing experience\nEducation: Bachelor\'s in HR or Business Administration\nLanguages: English (required), Arabic (advantage)',
-    'Operations Manager': 'Required: 5+ years operations management, team leadership\nPreferred: Automotive industry, process improvement (Lean/Six Sigma)\nEducation: Bachelor\'s in Business or Engineering\nSkills: KPI management, budgeting, vendor management'
-};
-
 export default function ResumeScanForm({ onScanComplete }) {
+    const [selectedTemplateId, setSelectedTemplateId] = useState('');
+    const [criteria, setCriteria] = useState({
+        position_name: '',
+        department: '',
+        min_experience_years: '',
+        required_education: '',
+        required_skills: '',
+        preferred_skills: '',
+        required_certifications: '',
+        required_languages: '',
+        industry_experience: '',
+        notes: ''
+    });
     const [file, setFile] = useState(null);
-    const [positionApplied, setPositionApplied] = useState('');
-    const [department, setDepartment] = useState('');
-    const [criteria, setCriteria] = useState('');
     const [isScanning, setIsScanning] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const fileInputRef = useRef(null);
+
+    const { data: templates = [] } = useQuery({
+        queryKey: ['jobTemplates'],
+        queryFn: () => base44.entities.JobTemplate.list('-created_date', 100)
+    });
+
+    const handleTemplateSelect = (templateId) => {
+        setSelectedTemplateId(templateId);
+        const t = templates.find(t => t.id === templateId);
+        if (t) {
+            setCriteria({
+                position_name: t.position_name || '',
+                department: t.department || '',
+                min_experience_years: t.min_experience_years ?? '',
+                required_education: t.required_education || '',
+                required_skills: t.required_skills || '',
+                preferred_skills: t.preferred_skills || '',
+                required_certifications: t.required_certifications || '',
+                required_languages: t.required_languages || '',
+                industry_experience: t.industry_experience || '',
+                notes: t.notes || ''
+            });
+        }
+    };
+
+    const setField = (field, value) => setCriteria(c => ({ ...c, [field]: value }));
 
     const handleFileSelect = (selectedFile) => {
         const allowed = ['application/pdf', 'application/msword',
@@ -48,17 +75,12 @@ export default function ResumeScanForm({ onScanComplete }) {
         if (dropped) handleFileSelect(dropped);
     };
 
-    const loadTemplate = (templateKey) => {
-        setCriteria(CRITERIA_TEMPLATES[templateKey]);
-    };
-
     const handleScan = async () => {
         if (!file) { toast.error('Please upload a resume file'); return; }
-        if (!criteria.trim()) { toast.error('Please enter screening criteria'); return; }
+        if (!criteria.position_name.trim()) { toast.error('Please select a template or enter a position name'); return; }
 
         setIsScanning(true);
         try {
-            // Convert file to base64
             const base64 = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -70,9 +92,7 @@ export default function ResumeScanForm({ onScanComplete }) {
                 fileBase64: base64,
                 fileName: file.name,
                 fileType: file.type,
-                criteria,
-                positionApplied,
-                department
+                criteria
             });
 
             if (response.data?.success) {
@@ -88,11 +108,103 @@ export default function ResumeScanForm({ onScanComplete }) {
         }
     };
 
+    const hasTemplate = !!selectedTemplateId;
+
     return (
         <div className="space-y-6">
-            {/* File Upload */}
+            {/* Step 1: Template Selection */}
             <div>
-                <Label className="text-sm font-medium text-[#1F2937] mb-2 block">Resume File *</Label>
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded-full bg-[#0F1E36] text-white text-xs flex items-center justify-center font-bold">1</div>
+                    <Label className="text-sm font-semibold text-[#1F2937]">Select Position Template</Label>
+                </div>
+                <Select value={selectedTemplateId} onValueChange={handleTemplateSelect}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder={templates.length === 0 ? "No templates yet — create one in the Templates tab" : "Choose a position template..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {templates.map(t => (
+                            <SelectItem key={t.id} value={t.id}>
+                                {t.position_name} <span className="text-[#9CA3AF] ml-1">— {t.department}</span>
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                {templates.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1.5">⚠ Create position templates in the Templates tab before scanning.</p>
+                )}
+            </div>
+
+            {/* Step 2: Editable Criteria (shown after template selected) */}
+            {hasTemplate && (
+                <div className="border border-[#E2E6EC] rounded-xl p-4 bg-[#FAFBFD] space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                        <div className="w-5 h-5 rounded-full bg-[#0F1E36] text-white text-xs flex items-center justify-center font-bold">2</div>
+                        <Label className="text-sm font-semibold text-[#1F2937]">Review & Adjust Criteria</Label>
+                        <span className="text-xs text-[#9CA3AF]">(editable — changes apply to this scan only)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Position Name</Label>
+                            <Input value={criteria.position_name} onChange={e => setField('position_name', e.target.value)} />
+                        </div>
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Department</Label>
+                            <Input value={criteria.department} onChange={e => setField('department', e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Min. Experience (years)</Label>
+                            <Input type="number" value={criteria.min_experience_years} onChange={e => setField('min_experience_years', e.target.value)} />
+                        </div>
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Required Education</Label>
+                            <Input value={criteria.required_education} onChange={e => setField('required_education', e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Required Skills</Label>
+                            <Textarea value={criteria.required_skills} onChange={e => setField('required_skills', e.target.value)} className="h-20 text-sm" />
+                        </div>
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Preferred Skills</Label>
+                            <Textarea value={criteria.preferred_skills} onChange={e => setField('preferred_skills', e.target.value)} className="h-20 text-sm" />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Certifications</Label>
+                            <Input value={criteria.required_certifications} onChange={e => setField('required_certifications', e.target.value)} />
+                        </div>
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Languages</Label>
+                            <Input value={criteria.required_languages} onChange={e => setField('required_languages', e.target.value)} />
+                        </div>
+                        <div>
+                            <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Industry Experience</Label>
+                            <Input value={criteria.industry_experience} onChange={e => setField('industry_experience', e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label className="text-xs font-medium text-[#6B7280] mb-1.5 block">Additional Notes for AI</Label>
+                        <Textarea value={criteria.notes} onChange={e => setField('notes', e.target.value)} className="h-16 text-sm" />
+                    </div>
+                </div>
+            )}
+
+            {/* Step 3: Upload Resume */}
+            <div>
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded-full bg-[#0F1E36] text-white text-xs flex items-center justify-center font-bold">3</div>
+                    <Label className="text-sm font-semibold text-[#1F2937]">Upload Resume</Label>
+                </div>
                 <div
                     className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                         dragOver ? 'border-[#0F1E36] bg-blue-50' : 'border-[#CBD5E1] hover:border-[#0F1E36] hover:bg-gray-50'
@@ -109,10 +221,7 @@ export default function ResumeScanForm({ onScanComplete }) {
                                 <p className="text-sm font-medium text-[#1F2937]">{file.name}</p>
                                 <p className="text-xs text-[#6B7280]">{(file.size / 1024).toFixed(1)} KB</p>
                             </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                                className="ml-2 p-1 text-[#6B7280] hover:text-red-500 rounded"
-                            >
+                            <button onClick={e => { e.stopPropagation(); setFile(null); }} className="ml-2 p-1 text-[#6B7280] hover:text-red-500 rounded">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -124,83 +233,15 @@ export default function ResumeScanForm({ onScanComplete }) {
                         </div>
                     )}
                 </div>
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => e.target.files[0] && handleFileSelect(e.target.files[0])}
-                />
+                <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={e => e.target.files[0] && handleFileSelect(e.target.files[0])} />
             </div>
 
-            {/* Position & Department */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <Label className="text-sm font-medium text-[#1F2937] mb-2 block">Position Applied For</Label>
-                    <Input
-                        placeholder="e.g. Service Technician"
-                        value={positionApplied}
-                        onChange={(e) => setPositionApplied(e.target.value)}
-                    />
-                </div>
-                <div>
-                    <Label className="text-sm font-medium text-[#1F2937] mb-2 block">Department</Label>
-                    <Select value={department} onValueChange={setDepartment}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {DEPARTMENTS.map(d => (
-                                <SelectItem key={d} value={d}>{d}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            {/* Criteria */}
-            <div>
-                <div className="flex items-center justify-between mb-2">
-                    <Label className="text-sm font-medium text-[#1F2937]">Screening Criteria *</Label>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-[#6B7280]">Load template:</span>
-                        <Select onValueChange={loadTemplate}>
-                            <SelectTrigger className="h-7 text-xs w-44">
-                                <SelectValue placeholder="Choose role..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.keys(CRITERIA_TEMPLATES).map(t => (
-                                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <Textarea
-                    placeholder="e.g. Required: 5+ years automotive experience, UAE driving license&#10;Preferred: ADAS knowledge, English & Arabic&#10;Education: Diploma or higher in Automotive Engineering"
-                    value={criteria}
-                    onChange={(e) => setCriteria(e.target.value)}
-                    className="h-32 text-sm"
-                />
-                <p className="text-xs text-[#9CA3AF] mt-1">Describe required skills, experience, education, and languages</p>
-            </div>
-
-            {/* Scan Button */}
-            <Button
-                onClick={handleScan}
-                disabled={isScanning || !file}
-                className="w-full h-11"
-            >
+            {/* Step 4: Scan */}
+            <Button onClick={handleScan} disabled={isScanning || !file || !criteria.position_name.trim()} className="w-full h-11">
                 {isScanning ? (
-                    <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Scanning Resume (this may take 15–30 seconds)...
-                    </>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Scanning Resume — this may take 30–60 seconds...</>
                 ) : (
-                    <>
-                        <ScanLine className="w-4 h-4 mr-2" />
-                        Scan Resume with AI
-                    </>
+                    <><ScanLine className="w-4 h-4 mr-2" />Scan Resume with AI</>
                 )}
             </Button>
         </div>
