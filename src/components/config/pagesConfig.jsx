@@ -226,6 +226,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo', 'supervisor', 'hr_manager']
     },
+    ResumeScanner: {
+        name: 'ResumeScanner',
+        title: 'AI Resume Scanner',
+        icon: ScanLine,
+        category: 'HRManagement',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo', 'hr_manager', 'supervisor']
+    },
     AuditLogs: {
         name: 'AuditLogs',
         title: 'Audit Logs',
