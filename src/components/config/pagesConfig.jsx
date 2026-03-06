@@ -18,7 +18,8 @@ import {
     GitPullRequest,
     BookText,
     Lightbulb,
-    FileText
+    FileText,
+    ScanLine
 } from 'lucide-react';
 
 /**
