@@ -83,6 +83,7 @@ import TestDataViewer from './pages/TestDataViewer';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import ResumeScanner from './pages/ResumeScanner';
 import __Layout from './Layout.jsx';
 
 
@@ -123,6 +124,7 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
+    "ResumeScanner": ResumeScanner,
 }
 
 export const pagesConfig = {
