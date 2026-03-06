@@ -74,6 +74,7 @@ import QuarterlyMinutesManagement from './pages/QuarterlyMinutesManagement';
 import reportArchitecture from './pages/REPORT_ARCHITECTURE';
 import RamadanSchedules from './pages/RamadanSchedules';
 import ReportDetail from './pages/ReportDetail';
+import ResumeScanner from './pages/ResumeScanner';
 import RulesSettings from './pages/RulesSettings';
 import Salaries from './pages/Salaries';
 import SalaryIncrements from './pages/SalaryIncrements';
@@ -83,7 +84,6 @@ import TestDataViewer from './pages/TestDataViewer';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import ResumeScanner from './pages/ResumeScanner';
 import __Layout from './Layout.jsx';
 
 
@@ -115,6 +115,7 @@ export const PAGES = {
     "REPORT_ARCHITECTURE": reportArchitecture,
     "RamadanSchedules": RamadanSchedules,
     "ReportDetail": ReportDetail,
+    "ResumeScanner": ResumeScanner,
     "RulesSettings": RulesSettings,
     "Salaries": Salaries,
     "SalaryIncrements": SalaryIncrements,
@@ -124,7 +125,6 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
-    "ResumeScanner": ResumeScanner,
 }
 
 export const pagesConfig = {
