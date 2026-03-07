@@ -4,8 +4,9 @@ import { parseISO, differenceInDays, getDaysInMonth } from 'npm:date-fns@3.6.0';
 /**
  * createAnnualLeaveChecklistTasks
  *
- * Automatically creates "Annual Leave" checklist tasks for a project based on
- * approved annual leave records that overlap with the project period.
+ * Automatically creates "Annual Leave" and "Rejoining Date" checklist tasks
+ * for a project based on approved annual leave records that overlap with the
+ * project period.
  *
  * This function is called after annual leaves are imported into a project
  * (via importAnnualLeavesToProject). It is purely additive — it does not
@@ -15,71 +16,63 @@ import { parseISO, differenceInDays, getDaysInMonth } from 'npm:date-fns@3.6.0';
  * USE CASE: Leave added for the first time
  * ============================================================================
  * When an employee's annual leave is imported to a project for the first time,
- * this function creates a new ChecklistItem of type "Annual Leave" with the
- * employee's name, leave dates, and the calculated number of leave days that
- * apply to this project's current month. The task is marked with
- * is_auto_created: true so it can be distinguished from manually created tasks.
+ * this function creates TWO new ChecklistItems:
+ * 1. "Annual Leave" — with employee name, leave dates, and calculated days
+ * 2. "Rejoining Date" — with employee name and the first working day after
+ *    leave ends (forward-rolled past weekly/public holidays)
+ * Both are marked with is_auto_created: true.
  *
  * ============================================================================
  * USE CASE: Leave spanning two months (days in both previous and current month)
  * ============================================================================
  * A project period covers two calendar months. The "previous month" is the
- * month with fewer calendar days, and the "current month" is the one with more
- * calendar days. Only leave days falling in the current month are counted for
- * this project's checklist task. Days falling in the previous month are excluded
- * because they belong to the prior project's payroll period.
- *
- * Example: Project spans Feb 1 – Mar 31. February has 28 days (shorter), so it
- * is the "previous month". March has 31 days, so it is the "current month".
- * If an employee has leave from Feb 25 – Mar 5, only the 5 days in March
- * (Mar 1–5) count for this project. The 4 days in February belong to the
- * prior project.
+ * month with fewer calendar days, and the "current month" is the one with more.
+ * Only leave days falling in the current month are counted for this project.
  *
  * ============================================================================
  * PREVIOUS MONTH CALCULATION LOGIC
  * ============================================================================
- * The project date range always spans exactly two calendar months. To determine
- * which is the "previous" month vs the "current" month, we compare the number
- * of calendar days in each month (using getDaysInMonth). The month with fewer
- * calendar days is treated as the previous month. This is because the shorter
- * month is assumed to be the tail end of the prior payroll cycle that overlaps
- * into this project's date range. The longer month represents the primary
- * payroll period for this project. This convention ensures consistent handling
- * across all projects regardless of which specific months they span.
+ * Compare calendar days in each month using getDaysInMonth. The shorter month
+ * is the previous month (tail of prior payroll cycle). The longer month is
+ * the primary payroll period for this project.
  *
  * ============================================================================
  * USE CASE: Leave extending beyond project end date (Al Maraghi Motors)
  * ============================================================================
- * For employees belonging to Al Maraghi Motors specifically, if the leave
- * extends beyond the project end date, the total leave day count shown in the
- * checklist task must reflect ALL leave days — including those beyond the
- * project end date. This count is sourced directly from the AnnualLeave
- * record's total_days field and is NOT recalculated or clamped to the project
- * boundary. This rule exists because Al Maraghi Motors payroll processing
- * requires visibility into the full leave duration for salary hold and
- * end-of-service calculations, even when the leave crosses project boundaries.
- * The full count allows payroll staff to make informed decisions about salary
- * adjustments without needing to look up the original leave record.
+ * For Al Maraghi Motors, if leave extends beyond the project end date, the
+ * total_days from the AnnualLeave record is used directly (not recalculated).
  *
  * ============================================================================
  * USE CASE: Employee having multiple separate leave periods in the same project
  * ============================================================================
- * If an employee has multiple approved annual leave records that overlap with
- * the same project period, each leave creates its own separate checklist task.
- * Each task shows the specific leave dates and day count for that particular
- * leave period. The linked_annual_leave_id field on each task ties it back to
- * the specific AnnualLeave record, so tasks can be individually updated or
- * removed if a specific leave is modified or cancelled. The deduplication key
- * (attendance_id + leave date_from + leave date_to) ensures the same leave
- * period is never duplicated as a checklist task.
+ * Each leave creates its own pair of tasks (Annual Leave + Rejoining Date).
+ * linked_annual_leave_id ties each pair to the specific AnnualLeave record.
  *
  * ============================================================================
  * USE CASE: No leave existing for an employee
  * ============================================================================
- * If no approved annual leaves overlap with the project period for any
- * employee, this function simply returns with imported: 0. No checklist tasks
- * are created and no existing data is modified. This is a no-op scenario.
+ * Returns with imported: 0. No tasks created.
  *
+ * ============================================================================
+ * REJOINING DATE FORWARD-ROLLING LOGIC
+ * ============================================================================
+ * The rejoining date starts as leave end date + 1 day. It is then checked
+ * against the employee's weekly holiday and all public holidays in the project.
+ * If it falls on either, it rolls forward one day at a time until a clear
+ * working day is found. Both weekly and public holidays are checked because:
+ * - Weekly holidays vary per employee (Sunday vs Friday etc.)
+ * - Public holidays are company/national days off
+ * - They can occur consecutively, requiring multi-day forward rolls
+ * This applies to ALL companies, not just Al Maraghi Motors.
+ *
+ * USE CASE: Rejoining date landing on a weekly holiday
+ * Leave ends Thursday, employee weekly off is Friday → rejoining = Saturday
+ *
+ * USE CASE: Rejoining date landing on a public holiday
+ * Leave ends Wednesday, Thursday is public holiday → rejoining = Friday
+ *
+ * USE CASE: Rejoining date landing on both consecutively
+ * Leave ends Wed, Thu = public holiday, Fri = weekly off → rejoining = Saturday
  * ============================================================================
  */
 
@@ -93,7 +86,6 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Missing projectId' }, { status: 400 });
         }
 
-        // Fetch the project to get date range and company
         const [project] = await base44.asServiceRole.entities.Project.filter({ id: projectId });
         if (!project) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
@@ -102,20 +94,18 @@ Deno.serve(async (req) => {
         const projectStart = parseISO(project.date_from);
         const projectEnd = parseISO(project.date_to);
 
-        // Fetch all approved annual leaves for this company
         const allLeaves = await base44.asServiceRole.entities.AnnualLeave.filter({
             company: project.company,
             status: 'approved'
         });
 
-        // Filter leaves that overlap with the project period
         const relevantLeaves = allLeaves.filter(leave => {
             const leaveStart = parseISO(leave.date_from);
             const leaveEnd = parseISO(leave.date_to);
             return (leaveStart <= projectEnd && leaveEnd >= projectStart);
         });
 
-        // USE CASE: No leave existing — nothing to do, return early
+        // USE CASE: No leave existing — nothing to do
         if (relevantLeaves.length === 0) {
             return Response.json({
                 success: true,
@@ -124,42 +114,68 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Fetch existing auto-created annual leave checklist tasks to avoid duplicates
-        const existingTasks = await base44.asServiceRole.entities.ChecklistItem.filter({
+        // Fetch existing auto-created tasks for both types to avoid duplicates
+        const existingAnnualLeaveTasks = await base44.asServiceRole.entities.ChecklistItem.filter({
             project_id: projectId,
             task_type: 'Annual Leave'
         });
+        const existingRejoiningTasks = await base44.asServiceRole.entities.ChecklistItem.filter({
+            project_id: projectId,
+            task_type: 'Rejoining Date'
+        });
 
-        // Build a set of deduplication keys from existing auto-created tasks
-        // Key format: attendance_id|leave_date_from|leave_date_to
-        const existingKeys = new Set(
-            existingTasks
+        const existingLeaveIds = new Set(
+            existingAnnualLeaveTasks
+                .filter(t => t.is_auto_created === true)
+                .map(t => t.linked_annual_leave_id || '')
+        );
+        const existingRejoiningLeaveIds = new Set(
+            existingRejoiningTasks
                 .filter(t => t.is_auto_created === true)
                 .map(t => t.linked_annual_leave_id || '')
         );
 
-        // =========================================================================
-        // PREVIOUS MONTH CALCULATION
-        // =========================================================================
-        // The project spans two calendar months. We determine which is the
-        // "previous" month by comparing the number of calendar days in each.
-        // The month with fewer calendar days is the previous month.
-        // This is because the shorter month represents the tail of the prior
-        // payroll cycle. The longer month is the primary/current payroll month.
-        // =========================================================================
-        const month1 = projectStart; // First month in the project range
-        const month2 = projectEnd;   // Second month in the project range
-        const daysInMonth1 = getDaysInMonth(month1);
-        const daysInMonth2 = getDaysInMonth(month2);
+        // Fetch public holidays for rejoining date calculation
+        const projectExceptions = await base44.asServiceRole.entities.Exception.filter({
+            project_id: projectId
+        });
+        const publicHolidayDates = new Set(
+            projectExceptions
+                .filter(ex => ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF')
+                .flatMap(ex => {
+                    const dates: string[] = [];
+                    const start = parseISO(ex.date_from);
+                    const end = ex.date_to ? parseISO(ex.date_to) : start;
+                    const cursor = new Date(start);
+                    while (cursor <= end) {
+                        dates.push(cursor.toISOString().split('T')[0]);
+                        cursor.setDate(cursor.getDate() + 1);
+                    }
+                    return dates;
+                })
+        );
 
-        // The month with fewer calendar days is the "previous" month
-        // The month with more (or equal) calendar days is the "current" month
+        // Build employee map for weekly_off lookup
+        const uniqueAttendanceIds = [...new Set(relevantLeaves.map(l => l.attendance_id))];
+        const employeeMap: Record<string, any> = {};
+        for (const attId of uniqueAttendanceIds) {
+            const employees = await base44.asServiceRole.entities.Employee.filter({
+                attendance_id: attId
+            });
+            if (employees.length > 0) {
+                employeeMap[attId] = employees[0];
+            }
+        }
+
+        // Previous month calculation
+        const daysInMonth1 = getDaysInMonth(projectStart);
+        const daysInMonth2 = getDaysInMonth(projectEnd);
         const previousMonthIndex = daysInMonth1 <= daysInMonth2
-            ? month1.getMonth()
-            : month2.getMonth();
+            ? projectStart.getMonth()
+            : projectEnd.getMonth();
         const previousMonthYear = daysInMonth1 <= daysInMonth2
-            ? month1.getFullYear()
-            : month2.getFullYear();
+            ? projectStart.getFullYear()
+            : projectEnd.getFullYear();
 
         let created = 0;
         let skipped = 0;
@@ -168,80 +184,93 @@ Deno.serve(async (req) => {
             const leaveStart = parseISO(leave.date_from);
             const leaveEnd = parseISO(leave.date_to);
 
-            // Deduplication: skip if a task already exists for this leave record
-            if (existingKeys.has(String(leave.id))) {
+            // Skip Annual Leave task if it already exists
+            const annualLeaveExists = existingLeaveIds.has(String(leave.id));
+            const rejoiningExists = existingRejoiningLeaveIds.has(String(leave.id));
+
+            if (annualLeaveExists && rejoiningExists) {
                 skipped++;
                 continue;
             }
 
-            // Calculate the effective overlap of leave with project boundaries
             const effectiveStart = leaveStart > projectStart ? leaveStart : projectStart;
             const effectiveEnd = leaveEnd < projectEnd ? leaveEnd : projectEnd;
 
-            // =====================================================================
-            // AL MARAGHI MOTORS SPECIAL RULE
-            // =====================================================================
-            // For Al Maraghi Motors, if the leave extends beyond the project end
-            // date, the total leave day count shown in the task must reflect ALL
-            // leave days including those beyond the project end date. This count
-            // is sourced directly from the AnnualLeave record's total_days field
-            // and is NOT recalculated. This is required because Al Maraghi Motors
-            // payroll processing needs the full leave duration for salary hold
-            // calculations and end-of-service processing. Using the full count
-            // regardless of project boundaries ensures payroll staff see the
-            // complete picture without needing to cross-reference the leave
-            // management records manually.
-            // =====================================================================
             const leaveExtendsBeyondProject = leaveEnd > projectEnd;
             const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
             let leaveDaysForTask;
 
             if (isAlMaraghiMotors && leaveExtendsBeyondProject) {
-                // USE CASE: Al Maraghi Motors leave extending beyond project end
-                // Use the total_days from the AnnualLeave record directly,
-                // not recalculated. This includes days beyond the project end date.
                 leaveDaysForTask = leave.total_days;
             } else {
-                // Standard calculation: count only days in the "current" month
-                // of the project period, excluding days in the "previous" month
                 leaveDaysForTask = calculateCurrentMonthLeaveDays(
-                    effectiveStart,
-                    effectiveEnd,
-                    previousMonthIndex,
-                    previousMonthYear
+                    effectiveStart, effectiveEnd, previousMonthIndex, previousMonthYear
                 );
             }
 
-            // Build the task description with employee name, dates, and day count
-            const taskDescription = [
-                `${leave.employee_name}`,
-                `Leave: ${leave.date_from} to ${leave.date_to}`,
-                `Days for this project: ${leaveDaysForTask}`
-            ].join(' | ');
+            // Create Annual Leave task (if not already existing)
+            if (!annualLeaveExists) {
+                const taskDescription = [
+                    `${leave.employee_name}`,
+                    `Leave: ${leave.date_from} to ${leave.date_to}`,
+                    `Days for this project: ${leaveDaysForTask}`
+                ].join(' | ');
 
-            // Create the checklist task
-            // is_auto_created: true distinguishes this from manually created tasks
-            // linked_annual_leave_id: ties this task to the specific AnnualLeave record
-            // These markers allow reliable identification for future updates/deletions
-            await base44.asServiceRole.entities.ChecklistItem.create({
-                project_id: projectId,
-                task_type: 'Annual Leave',
-                task_description: taskDescription,
-                status: 'pending',
-                is_predefined: false,
-                is_auto_created: true,
-                linked_annual_leave_id: String(leave.id),
-                notes: buildTaskNotes(leave, leaveDaysForTask, isAlMaraghiMotors, leaveExtendsBeyondProject, previousMonthIndex, previousMonthYear)
-            });
+                await base44.asServiceRole.entities.ChecklistItem.create({
+                    project_id: projectId,
+                    task_type: 'Annual Leave',
+                    task_description: taskDescription,
+                    status: 'pending',
+                    is_predefined: false,
+                    is_auto_created: true,
+                    linked_annual_leave_id: String(leave.id),
+                    notes: buildTaskNotes(leave, leaveDaysForTask, isAlMaraghiMotors, leaveExtendsBeyondProject, previousMonthIndex, previousMonthYear)
+                });
+                created++;
+            }
 
-            created++;
+            // Create Rejoining Date task (if not already existing)
+            if (!rejoiningExists) {
+                const employee = employeeMap[leave.attendance_id];
+                const rejoiningDate = calculateRejoiningDate(leaveEnd, employee, publicHolidayDates);
+                const rejoiningDateStr = rejoiningDate.toISOString().split('T')[0];
+
+                const rejoiningDescription = [
+                    `${leave.employee_name}`,
+                    `Rejoining Date: ${rejoiningDateStr}`
+                ].join(' | ');
+
+                const rejoiningNotes = [
+                    `Employee: ${leave.employee_name}`,
+                    `Attendance ID: ${leave.attendance_id}`,
+                    `Leave end date: ${leave.date_to}`,
+                    `Calculated rejoining date: ${rejoiningDateStr}`,
+                    `Employee weekly off: ${employee?.weekly_off || 'Sunday'}`,
+                    '',
+                    '[Auto-created] This task was automatically generated alongside the Annual Leave task.',
+                    'The rejoining date is the first working day after leave ends,',
+                    'skipping weekly holidays and public holidays.'
+                ];
+
+                await base44.asServiceRole.entities.ChecklistItem.create({
+                    project_id: projectId,
+                    task_type: 'Rejoining Date',
+                    task_description: rejoiningDescription,
+                    status: 'pending',
+                    is_predefined: false,
+                    is_auto_created: true,
+                    linked_annual_leave_id: String(leave.id),
+                    notes: rejoiningNotes.join('\n')
+                });
+                created++;
+            }
         }
 
         return Response.json({
             success: true,
             imported: created,
             skipped,
-            message: `Created ${created} annual leave checklist task(s) (${skipped} already existed)`
+            message: `Created ${created} checklist task(s) (${skipped} already existed)`
         });
 
     } catch (error) {
@@ -257,21 +286,8 @@ Deno.serve(async (req) => {
  * calculateCurrentMonthLeaveDays
  *
  * Counts only the leave days that fall within the "current" month of the
- * project period. Days falling in the "previous" month (the month with fewer
- * calendar days) are excluded because they belong to the prior project's
- * payroll period.
- *
- * USE CASE: Leave spanning two months
- * If a leave spans from the previous month into the current month, only
- * the days in the current month are counted. For example, if the previous
- * month is February and the current month is March, and the leave is
- * Feb 25 – Mar 5, this function returns 5 (only the March days).
- *
- * @param effectiveStart - The start of the leave (clamped to project start)
- * @param effectiveEnd - The end of the leave (clamped to project end)
- * @param previousMonthIndex - The month index (0-11) of the previous month
- * @param previousMonthYear - The year of the previous month
- * @returns Number of leave days in the current month only
+ * project period. Days in the "previous" month (fewer calendar days) are
+ * excluded because they belong to the prior project's payroll period.
  */
 function calculateCurrentMonthLeaveDays(
     effectiveStart: Date,
@@ -280,30 +296,87 @@ function calculateCurrentMonthLeaveDays(
     previousMonthYear: number
 ): number {
     let currentMonthDays = 0;
-
-    // Iterate through each day of the leave period
     const cursor = new Date(effectiveStart);
     while (cursor <= effectiveEnd) {
-        // Only count this day if it does NOT fall in the previous month
         const isInPreviousMonth =
             cursor.getMonth() === previousMonthIndex &&
             cursor.getFullYear() === previousMonthYear;
-
         if (!isInPreviousMonth) {
             currentMonthDays++;
         }
-
         cursor.setDate(cursor.getDate() + 1);
     }
-
     return currentMonthDays;
+}
+
+/**
+ * calculateRejoiningDate
+ *
+ * Calculates the first valid working day after an employee's leave ends.
+ *
+ * FORWARD-ROLLING LOGIC:
+ * 1. Start with leaveEndDate + 1 day
+ * 2. Check if it falls on the employee's weekly holiday (employee.weekly_off)
+ * 3. Check if it falls on a public holiday (PUBLIC_HOLIDAY/OFF exception)
+ * 4. If either is true, advance by one day and re-check
+ * 5. Repeat until a valid working day is found
+ *
+ * Both weekly and public holidays are checked because:
+ * - Weekly holidays vary per employee (some have Sunday off, others Friday)
+ * - Public holidays are company-wide and can fall on any day
+ * - They can occur consecutively, requiring multi-day forward rolls
+ *
+ * This applies to ALL companies — not just Al Maraghi Motors.
+ *
+ * USE CASE: Rejoining date landing on a weekly holiday
+ * Leave ends Thursday, weekly off Friday → rejoining = Saturday
+ *
+ * USE CASE: Rejoining date landing on a public holiday
+ * Leave ends Wednesday, Thursday is public holiday → rejoining = Friday
+ *
+ * USE CASE: Rejoining date landing on both consecutively
+ * Leave ends Wed, Thu = public holiday, Fri = weekly off → rejoining = Saturday
+ */
+function calculateRejoiningDate(
+    leaveEndDate: Date,
+    employee: any,
+    publicHolidayDates: Set<string>
+): Date {
+    const dayNameToNumber: Record<string, number> = {
+        'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+        'Thursday': 4, 'Friday': 5, 'Saturday': 6
+    };
+
+    const weeklyOffDay = dayNameToNumber[employee?.weekly_off || 'Sunday'] ?? 0;
+
+    const candidate = new Date(leaveEndDate);
+    candidate.setDate(candidate.getDate() + 1);
+
+    let iterations = 0;
+    const MAX_ITERATIONS = 30;
+
+    while (iterations < MAX_ITERATIONS) {
+        const dayOfWeek = candidate.getUTCDay();
+        const dateStr = candidate.toISOString().split('T')[0];
+
+        const isWeeklyHoliday = dayOfWeek === weeklyOffDay;
+        const isPublicHoliday = publicHolidayDates.has(dateStr);
+
+        if (!isWeeklyHoliday && !isPublicHoliday) {
+            break;
+        }
+
+        candidate.setDate(candidate.getDate() + 1);
+        iterations++;
+    }
+
+    return candidate;
 }
 
 /**
  * buildTaskNotes
  *
- * Constructs detailed notes for the checklist task, providing context about
- * the leave calculation for payroll reviewers.
+ * Constructs detailed notes for the Annual Leave checklist task.
  */
 function buildTaskNotes(
     leave: any,
@@ -326,7 +399,6 @@ function buildTaskNotes(
         `Reason: ${leave.reason || 'Annual leave'}`
     ];
 
-    // Al Maraghi Motors special note
     if (isAlMaraghiMotors && leaveExtendsBeyondProject) {
         lines.push('');
         lines.push('[Al Maraghi Motors] Leave extends beyond project end date.');
@@ -334,7 +406,6 @@ function buildTaskNotes(
         lines.push('This count is sourced directly from the annual leave record (not recalculated).');
     }
 
-    // Auto-creation marker note
     lines.push('');
     lines.push('[Auto-created] This task was automatically generated from annual leave records.');
 

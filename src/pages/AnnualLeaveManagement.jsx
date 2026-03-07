@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,66 @@ export default function AnnualLeaveManagement() {
 
     const queryClient = useQueryClient();
     const { selectedCompany: filterCompany } = useCompanyFilter();
+
+    // =========================================================================
+    // DEBOUNCE MECHANISM FOR CHECKLIST TASK SYNC
+    // =========================================================================
+    // When a leave record is updated or deleted, we sync the auto-created
+    // checklist tasks (Annual Leave + Rejoining Date) in the background.
+    //
+    // USE CASE: Rapid successive updates to the same leave record
+    // If the user changes leave dates and then immediately changes them again,
+    // only the final state should trigger the sync. The debounce map (keyed by
+    // leaveId) ensures that rapid successive calls cancel previous pending
+    // syncs and only the last one executes after SYNC_DEBOUNCE_MS.
+    //
+    // The sync runs silently in the background — no loading state, no toast,
+    // no interruption to the user. Errors are caught and logged to console
+    // only, never surfaced as user-facing errors.
+    // =========================================================================
+    const SYNC_DEBOUNCE_MS = 1500;
+    const syncDebounceTimers = useRef({});
+
+    /**
+     * triggerChecklistSync
+     *
+     * Debounced function that calls the syncAnnualLeaveChecklistTasks backend
+     * function for each project the leave is applied to.
+     *
+     * @param leaveId - The ID of the leave record that changed
+     * @param appliedToProjects - Comma-separated string of project IDs
+     * @param action - 'update' or 'delete'
+     */
+    const triggerChecklistSync = useCallback((leaveId, appliedToProjects, action) => {
+        if (!appliedToProjects) return;
+
+        const projectIds = appliedToProjects.split(',').filter(Boolean);
+        if (projectIds.length === 0) return;
+
+        // Cancel any pending debounce for this leave
+        const debounceKey = String(leaveId);
+        if (syncDebounceTimers.current[debounceKey]) {
+            clearTimeout(syncDebounceTimers.current[debounceKey]);
+        }
+
+        // Set a new debounced sync
+        syncDebounceTimers.current[debounceKey] = setTimeout(async () => {
+            delete syncDebounceTimers.current[debounceKey];
+
+            for (const projectId of projectIds) {
+                try {
+                    await base44.functions.invoke('syncAnnualLeaveChecklistTasks', {
+                        leaveId: String(leaveId),
+                        projectId: projectId.trim(),
+                        action
+                    });
+                } catch (syncError) {
+                    // Silently log — do not surface to the user
+                    console.error('Background checklist sync error:', syncError);
+                }
+            }
+        }, SYNC_DEBOUNCE_MS);
+    }, []);
 
     const { data: leaves = [] } = useQuery({
         queryKey: ['annualLeaves', filterCompany],
@@ -87,7 +147,7 @@ export default function AnnualLeaveManagement() {
             if (!employee) throw new Error('Employee not found');
 
             const totalDays = calculateDays(data.date_from, data.date_to);
-            
+
             const leaveData = {
                 ...data,
                 attendance_id: employee.attendance_id,
@@ -107,6 +167,13 @@ export default function AnnualLeaveManagement() {
             }
         },
         onSuccess: () => {
+            // USE CASE: Leave dates updated with new start or end date
+            // When editing an existing leave, trigger background sync to delete
+            // old checklist tasks and recreate them with updated values.
+            // The sync is debounced so rapid successive edits only trigger once.
+            if (editingLeave && editingLeave.applied_to_projects) {
+                triggerChecklistSync(editingLeave.id, editingLeave.applied_to_projects, 'update');
+            }
             queryClient.invalidateQueries(['annualLeaves']);
             setShowDialog(false);
             setEditingLeave(null);
@@ -132,9 +199,26 @@ export default function AnnualLeaveManagement() {
         }
     });
 
+    // USE CASE: Leave deleted entirely
+    // When a leave is deleted, both "Annual Leave" and "Rejoining Date" tasks
+    // must be removed from all projects the leave was applied to. We save the
+    // leave info before deletion so we have the applied_to_projects list.
+    const pendingDeleteLeaveRef = useRef(null);
+
     const deleteMutation = useMutation({
-        mutationFn: (id) => base44.entities.AnnualLeave.delete(id),
+        mutationFn: (id) => {
+            // Save the leave record before deleting so we can sync projects
+            const leaveToDelete = leaves.find(l => l.id === id);
+            pendingDeleteLeaveRef.current = leaveToDelete || null;
+            return base44.entities.AnnualLeave.delete(id);
+        },
         onSuccess: () => {
+            // Trigger background sync to delete checklist tasks from all projects
+            const deletedLeave = pendingDeleteLeaveRef.current;
+            if (deletedLeave && deletedLeave.applied_to_projects) {
+                triggerChecklistSync(deletedLeave.id, deletedLeave.applied_to_projects, 'delete');
+            }
+            pendingDeleteLeaveRef.current = null;
             queryClient.invalidateQueries(['annualLeaves']);
             toast.success('Leave deleted');
         }
