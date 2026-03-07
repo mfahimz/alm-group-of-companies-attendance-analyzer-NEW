@@ -107,7 +107,6 @@ export default function ScanHistoryTable({ refreshKey }) {
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Recommendation</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Scanned By</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Date</th>
-                            <th className="text-center px-4 py-3 font-semibold text-[#4B5563] text-xs">Resume</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -134,14 +133,6 @@ export default function ScanHistoryTable({ refreshKey }) {
                                 <td className="px-4 py-3 text-xs text-[#6B7280]">{scan.scanned_by?.split('@')[0] || '—'}</td>
                                 <td className="px-4 py-3 text-xs text-[#6B7280]">
                                     {scan.created_date ? new Date(scan.created_date).toLocaleDateString('en-AE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                                </td>
-                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                    {scan.file_url ? (
-                                        <a href={scan.file_url} target="_blank" rel="noreferrer"
-                                            className="text-[#0F1E36] hover:text-blue-600 inline-flex items-center gap-1 text-xs">
-                                            <ExternalLink className="w-3.5 h-3.5" />View
-                                        </a>
-                                    ) : '—'}
                                 </td>
                             </tr>
                         ))}
