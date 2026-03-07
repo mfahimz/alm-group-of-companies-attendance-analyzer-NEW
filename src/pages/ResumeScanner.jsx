@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScanLine, History, Plus, Settings } from 'lucide-react';
 import ResumeScanForm from '../components/resume/ResumeScanForm';
 import BatchScanResults from '../components/resume/BatchScanResults';
 import ScanHistoryTable from '../components/resume/ScanHistoryTable';
 import JobTemplateManager from '../components/resume/JobTemplateManager';
+import { base44 } from '@/api/base44Client';
 
 export default function ResumeScanner() {
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    useEffect(() => {
+        base44.auth.me().then(u => setIsAdmin(u?.role === 'admin')).catch(() => {});
+    }, []);
     const [activeTab, setActiveTab] = useState('scan');
     const [scanResults, setScanResults] = useState(null); // array of results
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
