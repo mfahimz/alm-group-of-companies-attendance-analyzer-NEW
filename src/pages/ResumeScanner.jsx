@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
 import { ScanLine, History, Plus, Settings } from 'lucide-react';
 import ResumeScanForm from '../components/resume/ResumeScanForm';
-import ResumeScanResultView from '../components/resume/ResumeScanResult';
+import BatchScanResults from '../components/resume/BatchScanResults';
 import ScanHistoryTable from '../components/resume/ScanHistoryTable';
 import JobTemplateManager from '../components/resume/JobTemplateManager';
 
 export default function ResumeScanner() {
     const [activeTab, setActiveTab] = useState('scan');
-    const [scanResult, setScanResult] = useState(null);
+    const [scanResults, setScanResults] = useState(null); // array of results
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
-    const handleScanComplete = (data) => {
-        setScanResult(data.result);
+    // onScanComplete now receives an array of result objects
+    const handleScanComplete = (results) => {
+        setScanResults(results);
         setHistoryRefreshKey(k => k + 1);
     };
 
     const handleNewScan = () => {
-        setScanResult(null);
+        setScanResults(null);
         setActiveTab('scan');
     };
 
