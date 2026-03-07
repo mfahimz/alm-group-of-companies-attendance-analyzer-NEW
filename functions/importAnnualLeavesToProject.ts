@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { startOfMonth, endOfMonth, parseISO, differenceInDays, isWithinInterval } from 'npm:date-fns@3.6.0';
+import { startOfMonth, endOfMonth, parseISO, differenceInDays, isWithinInterval, getDaysInMonth } from 'npm:date-fns@3.6.0';
 
 Deno.serve(async (req) => {
     try {
@@ -116,11 +116,29 @@ Deno.serve(async (req) => {
             }
         }
 
+        // =====================================================================
+        // AUTO-CREATE ANNUAL LEAVE CHECKLIST TASKS
+        // =====================================================================
+        // After importing annual leave exceptions, automatically create
+        // "Annual Leave" checklist tasks for each imported leave entry.
+        // This is purely additive — it does not modify any existing tasks.
+        // =====================================================================
+        let checklistCreated = 0;
+        try {
+            checklistCreated = await createAnnualLeaveChecklistTasks(
+                base44, projectId, project, relevantLeaves, projectStart, projectEnd
+            );
+        } catch (checklistError) {
+            // Log but don't fail the import if checklist creation fails
+            console.error('Error creating annual leave checklist tasks:', checklistError);
+        }
+
         return Response.json({
             success: true,
             imported,
             skipped,
-            message: `Imported ${imported} annual leave(s) to project (${skipped} already existed)`
+            checklistTasksCreated: checklistCreated,
+            message: `Imported ${imported} annual leave(s) to project (${skipped} already existed). Created ${checklistCreated} checklist task(s).`
         });
 
     } catch (error) {
@@ -171,4 +189,221 @@ function calculateSalaryLeaveDays(leave, effectiveStart, effectiveEnd, projectEn
     }
 
     return totalDays;
+}
+
+/**
+ * createAnnualLeaveChecklistTasks
+ *
+ * Automatically creates "Annual Leave" checklist tasks for each relevant
+ * leave entry after annual leaves are imported into a project.
+ *
+ * ============================================================================
+ * USE CASE: Leave added for the first time
+ * ============================================================================
+ * When an employee's annual leave is imported to a project for the first time,
+ * a new ChecklistItem of type "Annual Leave" is created with the employee's
+ * name, leave dates, and the calculated leave days for this project.
+ * The task is marked with is_auto_created: true to distinguish it from
+ * manually created tasks.
+ *
+ * ============================================================================
+ * USE CASE: Leave spanning two months (days in both previous and current month)
+ * ============================================================================
+ * The project period covers two calendar months. The "previous month" is the
+ * month with fewer calendar days, and the "current month" has more days.
+ * Only leave days falling in the current month are counted for this project.
+ * Days in the previous month are excluded — they belong to the prior project.
+ *
+ * ============================================================================
+ * PREVIOUS MONTH CALCULATION LOGIC
+ * ============================================================================
+ * To determine which month is "previous" vs "current", compare the number of
+ * calendar days in each month using getDaysInMonth. The month with fewer
+ * calendar days is the previous month. This is because the shorter month is
+ * the tail end of the prior payroll cycle overlapping into this project's
+ * range. The longer month is the primary payroll period for this project.
+ *
+ * ============================================================================
+ * USE CASE: Leave extending beyond project end date (Al Maraghi Motors)
+ * ============================================================================
+ * For Al Maraghi Motors, if leave extends past the project end date, the total
+ * leave day count is sourced directly from the AnnualLeave record's total_days
+ * field (not recalculated). This is required for salary hold and end-of-service
+ * calculations at Al Maraghi Motors, where the full leave duration must be
+ * visible regardless of project boundaries.
+ *
+ * ============================================================================
+ * USE CASE: Employee having multiple separate leave periods in same project
+ * ============================================================================
+ * Each separate leave period creates its own checklist task. The
+ * linked_annual_leave_id field ties each task to its specific AnnualLeave
+ * record. Deduplication uses the leave record ID to prevent duplicates.
+ *
+ * ============================================================================
+ * USE CASE: No leave existing for an employee
+ * ============================================================================
+ * If no leaves overlap, no checklist tasks are created and 0 is returned.
+ *
+ * @returns Number of checklist tasks created
+ */
+async function createAnnualLeaveChecklistTasks(
+    base44: any,
+    projectId: string,
+    project: any,
+    relevantLeaves: any[],
+    projectStart: Date,
+    projectEnd: Date
+): Promise<number> {
+    // Fetch existing auto-created annual leave checklist tasks to avoid duplicates
+    const existingTasks = await base44.asServiceRole.entities.ChecklistItem.filter({
+        project_id: projectId,
+        task_type: 'Annual Leave'
+    });
+
+    // Build a set of existing linked_annual_leave_id values for deduplication
+    const existingLeaveIds = new Set(
+        existingTasks
+            .filter((t: any) => t.is_auto_created === true)
+            .map((t: any) => t.linked_annual_leave_id || '')
+    );
+
+    // =========================================================================
+    // PREVIOUS MONTH CALCULATION
+    // =========================================================================
+    // The project spans two calendar months. We determine which is the
+    // "previous" month by comparing calendar days in each month.
+    // The month with fewer calendar days is the previous month because it
+    // represents the tail of the prior payroll cycle. The longer month is
+    // the primary/current payroll month for this project.
+    // =========================================================================
+    const daysInMonth1 = getDaysInMonth(projectStart);
+    const daysInMonth2 = getDaysInMonth(projectEnd);
+    const previousMonthIndex = daysInMonth1 <= daysInMonth2
+        ? projectStart.getMonth()
+        : projectEnd.getMonth();
+    const previousMonthYear = daysInMonth1 <= daysInMonth2
+        ? projectStart.getFullYear()
+        : projectEnd.getFullYear();
+
+    let created = 0;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    for (const leave of relevantLeaves) {
+        const leaveStart = parseISO(leave.date_from);
+        const leaveEnd = parseISO(leave.date_to);
+
+        // Skip if a checklist task already exists for this leave record
+        if (existingLeaveIds.has(String(leave.id))) {
+            continue;
+        }
+
+        // Calculate effective overlap of leave with project boundaries
+        const effectiveStart = leaveStart > projectStart ? leaveStart : projectStart;
+        const effectiveEnd = leaveEnd < projectEnd ? leaveEnd : projectEnd;
+
+        // =====================================================================
+        // AL MARAGHI MOTORS SPECIAL RULE
+        // =====================================================================
+        // For Al Maraghi Motors, if the leave extends beyond the project end
+        // date, the total leave day count shown in the task reflects ALL leave
+        // days including those beyond the project end date. This count is
+        // sourced directly from the AnnualLeave record's total_days field and
+        // is NOT recalculated. Al Maraghi Motors payroll processing requires
+        // the full leave duration for salary hold and end-of-service
+        // calculations, so the full count is used regardless of project
+        // boundaries to give payroll staff complete visibility.
+        // =====================================================================
+        const leaveExtendsBeyondProject = leaveEnd > projectEnd;
+        const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
+        let leaveDaysForTask: number;
+
+        if (isAlMaraghiMotors && leaveExtendsBeyondProject) {
+            // Use total_days from AnnualLeave record directly — not recalculated
+            leaveDaysForTask = leave.total_days;
+        } else {
+            // Count only days in the "current" month, excluding "previous" month days
+            leaveDaysForTask = countCurrentMonthDays(
+                effectiveStart, effectiveEnd, previousMonthIndex, previousMonthYear
+            );
+        }
+
+        // Build task description with employee name, dates, and day count
+        const taskDescription = [
+            `${leave.employee_name}`,
+            `Leave: ${leave.date_from} to ${leave.date_to}`,
+            `Days for this project: ${leaveDaysForTask}`
+        ].join(' | ');
+
+        // Build detailed notes for payroll reviewers
+        const notesLines = [
+            `Employee: ${leave.employee_name}`,
+            `Attendance ID: ${leave.attendance_id}`,
+            `Full leave period: ${leave.date_from} to ${leave.date_to}`,
+            `Total leave days (from record): ${leave.total_days}`,
+            `Days counted for this project: ${leaveDaysForTask}`,
+            `Previous month (excluded): ${monthNames[previousMonthIndex]} ${previousMonthYear}`,
+            `Reason: ${leave.reason || 'Annual leave'}`
+        ];
+
+        if (isAlMaraghiMotors && leaveExtendsBeyondProject) {
+            notesLines.push('');
+            notesLines.push('[Al Maraghi Motors] Leave extends beyond project end date.');
+            notesLines.push('Total days shown includes all leave days beyond the project boundary.');
+            notesLines.push('This count is sourced directly from the annual leave record (not recalculated).');
+        }
+
+        notesLines.push('');
+        notesLines.push('[Auto-created] This task was automatically generated from annual leave records.');
+
+        // Create the checklist task
+        // is_auto_created: true marks this as auto-generated (not manual)
+        // linked_annual_leave_id: ties this to the specific AnnualLeave record
+        // These markers allow reliable identification for future updates/deletions
+        await base44.asServiceRole.entities.ChecklistItem.create({
+            project_id: projectId,
+            task_type: 'Annual Leave',
+            task_description: taskDescription,
+            status: 'pending',
+            is_predefined: false,
+            is_auto_created: true,
+            linked_annual_leave_id: String(leave.id),
+            notes: notesLines.join('\n')
+        });
+
+        created++;
+    }
+
+    return created;
+}
+
+/**
+ * countCurrentMonthDays
+ *
+ * Counts leave days that fall in the "current" month of the project period,
+ * excluding days in the "previous" month.
+ *
+ * USE CASE: Leave spanning two months
+ * If leave spans Feb 25 – Mar 5 and the previous month is February, only the
+ * 5 March days are counted. The 4 February days are excluded as they belong
+ * to the prior project's payroll period.
+ */
+function countCurrentMonthDays(
+    effectiveStart: Date,
+    effectiveEnd: Date,
+    previousMonthIndex: number,
+    previousMonthYear: number
+): number {
+    let count = 0;
+    const cursor = new Date(effectiveStart);
+    while (cursor <= effectiveEnd) {
+        const isInPreviousMonth =
+            cursor.getMonth() === previousMonthIndex &&
+            cursor.getFullYear() === previousMonthYear;
+        if (!isInPreviousMonth) {
+            count++;
+        }
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return count;
 }
