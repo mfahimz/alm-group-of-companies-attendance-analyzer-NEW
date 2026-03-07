@@ -66,13 +66,28 @@ function buildCodeComparison(extracted, criteria) {
     result.candidate_certifications = candCerts;
     result.certifications_met = reqCerts ? candCertText.includes(reqCerts.split(',')[0].trim()) : null;
 
-    // Languages
-    const reqLangs = (criteria.required_languages || '').toLowerCase();
+    // Languages — extract each individual language from the requirement string and check ALL are present
+    const reqLangsRaw = criteria.required_languages || '';
     const candLangs = extracted?.languages || [];
     const candLangText = candLangs.join(' ').toLowerCase();
-    result.required_languages = criteria.required_languages || null;
+    result.required_languages = reqLangsRaw || null;
     result.candidate_languages = candLangs;
-    result.languages_met = reqLangs ? (candLangText.includes('english') || candLangText.length > 0) : null;
+
+    if (reqLangsRaw) {
+        // Parse language names out of strings like "English (mandatory), Arabic (mandatory), French (preferred)"
+        // Strip parenthetical qualifiers and split by comma/semicolon
+        const mandatoryLangs = reqLangsRaw
+            .split(/[,;]/)
+            .map(part => part.replace(/\(.*?\)/g, '').trim().toLowerCase())
+            .filter(Boolean);
+        // All required languages must be present in candidate's language list
+        const missingLangs = mandatoryLangs.filter(lang => !candLangText.includes(lang));
+        result.languages_met = missingLangs.length === 0;
+        result.missing_languages = missingLangs;
+    } else {
+        result.languages_met = null;
+        result.missing_languages = [];
+    }
 
     // Industry
     result.required_industry = criteria.industry_experience || null;
