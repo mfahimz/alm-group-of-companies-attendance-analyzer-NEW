@@ -16,29 +16,61 @@ function buildCriteriaText(criteria) {
     return lines.join('\n');
 }
 
+// Degree equivalence map — normalized key -> list of matching substrings
+const DEGREE_EQUIVALENTS = {
+    bachelor: ['bachelor', 'bsc', 'b.sc', 'b.s.', 'b.s ', 'ba ', 'b.a.', 'b.a ', 'be ', 'b.e.', 'b.tech', 'btech', 'b.eng', 'beng', 'bachelor of science', 'bachelor of arts', 'bachelor of engineering', 'bachelor of technology', 'undergraduate degree'],
+    master: ['master', 'msc', 'm.sc', 'm.s.', 'm.s ', 'ma ', 'm.a.', 'mba', 'm.b.a', 'm.tech', 'mtech', 'm.eng', 'meng', 'master of science', 'master of arts', 'master of business', 'postgraduate'],
+    phd: ['phd', 'ph.d', 'doctorate', 'doctor of philosophy'],
+    diploma: ['diploma', 'dip.', 'advanced diploma', 'higher diploma'],
+    iti: ['iti', 'industrial training', 'vocational'],
+    associate: ['associate', 'aas', 'a.a.s', 'a.s.'],
+    highschool: ['high school', 'secondary', 'hsc', 'ssc', 'o-level', 'a-level', 'gcse'],
+};
+
+function educationMatches(requiredEdu, candidateEduText) {
+    if (!requiredEdu) return null;
+    const reqLower = requiredEdu.toLowerCase();
+    const candLower = candidateEduText.toLowerCase();
+
+    // Check for direct substring match first
+    if (candLower.includes(reqLower)) return true;
+
+    // Find which degree bucket(s) the requirement falls into
+    for (const [, synonyms] of Object.entries(DEGREE_EQUIVALENTS)) {
+        const reqMatchesBucket = synonyms.some(s => reqLower.includes(s));
+        if (reqMatchesBucket) {
+            // Check if candidate has any synonym from the same bucket
+            if (synonyms.some(s => candLower.includes(s))) return true;
+        }
+    }
+
+    // Also check specific field keywords (e.g. "automobiles", "mechanical")
+    const fieldWords = reqLower.split(/[\s,/]+/).filter(w => w.length > 4);
+    if (fieldWords.some(w => candLower.includes(w))) return true;
+
+    return false;
+}
+
 // Code-based comparison: deterministic checks against extracted data
 function buildCodeComparison(extracted, criteria) {
     const result = {};
 
-    // Experience — use relevant (role-specific) years, fall back to total only if relevant not extracted
+    // Experience — use relevant (role-specific) years, fall back to total
     const minExp = parseFloat(criteria.min_experience_years);
     const relevantExp = extracted?.relevant_years_experience ?? null;
     const totalExp = extracted?.total_years_experience ?? null;
-    const candExp = relevantExp ?? totalExp; // prefer relevant
+    const candExp = relevantExp ?? totalExp;
     result.required_experience = criteria.min_experience_years ? `${criteria.min_experience_years}+ years in relevant role` : null;
     result.candidate_experience = candExp != null
         ? `${candExp} years${relevantExp != null ? ' (relevant role)' : ' (total — relevant not extracted)'}`
         : null;
     result.experience_met = (!isNaN(minExp) && candExp != null) ? candExp >= minExp : null;
 
-    // Education
+    // Education — proper degree equivalence matching
     result.required_education = criteria.required_education || null;
-    const candEduText = (extracted?.education || []).map(e => [e.degree, e.institution].filter(Boolean).join(' ')).join('; ');
+    const candEduText = (extracted?.education || []).map(e => [e.degree, e.field, e.institution].filter(Boolean).join(' ')).join('; ');
     result.candidate_education = candEduText || null;
-    result.education_met = criteria.required_education
-        ? (candEduText.toLowerCase().includes(criteria.required_education.toLowerCase().split(' ')[0]) ||
-           (extracted?.education?.length > 0))
-        : null;
+    result.education_met = educationMatches(criteria.required_education, candEduText);
 
     // Required Skills
     const reqSkillsList = (criteria.required_skills || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -58,15 +90,18 @@ function buildCodeComparison(extracted, criteria) {
     result.preferred_skills_list = (criteria.preferred_skills || '').split(',').map(s => s.trim()).filter(Boolean);
     result.candidate_preferred_matched = matchedPrefSkills;
 
-    // Certifications
-    const reqCerts = (criteria.required_certifications || '').toLowerCase();
+    // Certifications — ALL items must be matched, not just the first
+    const reqCertsList = (criteria.required_certifications || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     const candCerts = extracted?.certifications || [];
     const candCertText = candCerts.join(' ').toLowerCase() + ' ' + allCandText;
+    const matchedCerts = reqCertsList.filter(cert => candCertText.includes(cert));
+    const unmatchedCerts = reqCertsList.filter(cert => !candCertText.includes(cert));
     result.required_certifications = criteria.required_certifications || null;
     result.candidate_certifications = candCerts;
-    result.certifications_met = reqCerts ? candCertText.includes(reqCerts.split(',')[0].trim()) : null;
+    result.certifications_met = reqCertsList.length > 0 ? unmatchedCerts.length === 0 : null;
+    result.missing_certifications = unmatchedCerts;
 
-    // Languages — extract each individual language from the requirement string and check ALL are present
+    // Languages — ALL mandatory languages must be present
     const reqLangsRaw = criteria.required_languages || '';
     const candLangs = extracted?.languages || [];
     const candLangText = candLangs.join(' ').toLowerCase();
@@ -74,13 +109,10 @@ function buildCodeComparison(extracted, criteria) {
     result.candidate_languages = candLangs;
 
     if (reqLangsRaw) {
-        // Parse language names out of strings like "English (mandatory), Arabic (mandatory), French (preferred)"
-        // Strip parenthetical qualifiers and split by comma/semicolon
         const mandatoryLangs = reqLangsRaw
             .split(/[,;]/)
             .map(part => part.replace(/\(.*?\)/g, '').trim().toLowerCase())
             .filter(Boolean);
-        // All required languages must be present in candidate's language list
         const missingLangs = mandatoryLangs.filter(lang => !candLangText.includes(lang));
         result.languages_met = missingLangs.length === 0;
         result.missing_languages = missingLangs;
@@ -89,14 +121,28 @@ function buildCodeComparison(extracted, criteria) {
         result.missing_languages = [];
     }
 
-    // Industry
+    // Industry — ALL items must be matched, not just the first
+    const reqIndustryList = (criteria.industry_experience || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     result.required_industry = criteria.industry_experience || null;
-    const industryText = (criteria.industry_experience || '').toLowerCase();
     result.candidate_industry = (extracted?.experience || []).map(e => e.company).filter(Boolean).join(', ') || null;
-    result.industry_met = industryText ? allCandText.includes(industryText.split(',')[0].trim()) : null;
+    if (reqIndustryList.length > 0) {
+        const matchedIndustry = reqIndustryList.filter(ind => allCandText.includes(ind));
+        result.industry_met = matchedIndustry.length === reqIndustryList.length;
+        result.missing_industry = reqIndustryList.filter(ind => !allCandText.includes(ind));
+    } else {
+        result.industry_met = null;
+        result.missing_industry = [];
+    }
 
     return result;
 }
+
+const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+];
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc'];
 
 Deno.serve(async (req) => {
     try {
@@ -114,6 +160,14 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'File data is required' }, { status: 400 });
         }
 
+        // File type validation
+        const ext = ('.' + fileName.split('.').pop()).toLowerCase();
+        const mimeOk = ALLOWED_MIME_TYPES.includes(fileType);
+        const extOk = ALLOWED_EXTENSIONS.includes(ext);
+        if (!mimeOk && !extOk) {
+            return Response.json({ error: 'Invalid file type. Only PDF and DOCX resumes are accepted.' }, { status: 400 });
+        }
+
         if (!criteria || !criteria.position_name) {
             return Response.json({ error: 'Position criteria is required' }, { status: 400 });
         }
@@ -124,11 +178,10 @@ Deno.serve(async (req) => {
         for (let i = 0; i < binaryStr.length; i++) {
             bytes[i] = binaryStr.charCodeAt(i);
         }
-        // Create a proper File object (available in Deno as a Web API)
         const mimeType = fileType || 'application/octet-stream';
         const fileObj = new File([bytes], fileName, { type: mimeType });
 
-        // Step 1: Upload file via SDK (File object works in Deno's Web API environment)
+        // Step 1: Upload file
         const uploadResult = await base44.integrations.Core.UploadFile({ file: fileObj });
         const fileUrl = uploadResult.file_url;
 
@@ -139,8 +192,11 @@ Deno.serve(async (req) => {
                 full_name: { type: "string" },
                 email: { type: "string" },
                 phone: { type: "string" },
-                total_years_experience: { type: "number" },
-                relevant_years_experience: { type: "number", description: "Years of experience specifically in roles similar or directly related to the job being applied for, NOT total career years" },
+                total_years_experience: { type: "number", description: "Total years across all jobs" },
+                relevant_years_experience: {
+                    type: "number",
+                    description: `Years of experience in roles directly similar to "${criteria.position_name}" in the ${criteria.department || 'relevant'} field. Count only roles where the job title, responsibilities, or industry closely match this position. Do NOT count unrelated roles.`
+                },
                 current_or_last_position: { type: "string" },
                 current_or_last_company: { type: "string" },
                 skills: { type: "array", items: { type: "string" } },
@@ -150,6 +206,7 @@ Deno.serve(async (req) => {
                         type: "object",
                         properties: {
                             degree: { type: "string" },
+                            field: { type: "string", description: "Field of study, e.g. Mechanical Engineering, Computer Science" },
                             institution: { type: "string" },
                             year: { type: "string" }
                         }
@@ -188,13 +245,13 @@ Deno.serve(async (req) => {
         // Step 3: Code-based comparison
         const codeComparison = buildCodeComparison(extractedData || {}, criteria);
 
-        // Step 4: AI Evaluation with structured criteria
+        // Step 4: AI Evaluation
         const criteriaText = buildCriteriaText(criteria);
         const resumeDataStr = extractedData
             ? JSON.stringify(extractedData, null, 2)
             : `File uploaded but could not be parsed. File: ${fileName}`;
 
-        const prompt = `You are an expert HR recruiter and ATS (Applicant Tracking System) evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
+        const prompt = `You are an expert HR recruiter and ATS evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
 
 Evaluate the following resume against the structured screening criteria for this role.
 
@@ -208,19 +265,21 @@ CODE-BASED REQUIREMENTS MATCH SUMMARY:
 - Experience met: ${codeComparison.experience_met}
 - Required skills matched: ${codeComparison.candidate_skills_matched?.join(', ') || 'none'}
 - Certifications found: ${codeComparison.candidate_certifications?.join(', ') || 'none'}
+- Languages present: ${(extractedData?.languages || []).join(', ') || 'none'}
+- Missing languages: ${codeComparison.missing_languages?.join(', ') || 'none'}
 
 Provide a thorough, objective evaluation. Consider UAE work environment and automotive industry context.
 Be specific and cite actual data from the resume.
 
 Output a JSON with these exact fields:
-- score: number 0-100 overall suitability (factor in both required AND preferred criteria)
+- score: number 0-100 overall suitability
 - recommendation: exactly one of ["Highly Recommended", "Recommended", "Consider", "Not Recommended"]
 - summary: 2-3 sentences explaining overall assessment
-- matched_skills: array of strings - specific criteria the candidate meets (from the requirements list)
+- matched_skills: array of strings - specific criteria the candidate meets
 - missing_skills: array of strings - important requirements the candidate lacks
 - strengths: array of 3 specific strings from the resume data
-- concerns: array of strings - specific red flags (empty if none)
-- experience_years: number - estimated years of experience specifically in roles RELEVANT to the position being applied for (NOT total career years). For example, if a candidate has 10 years total but only 3 years in automotive/similar roles, return 3.`;
+- concerns: array of strings - specific red flags (empty array if none)
+- experience_years: number - years in roles RELEVANT to "${criteria.position_name}" only, not total career years`;
 
         const aiResponse = await base44.integrations.Core.InvokeLLM({
             prompt,
@@ -239,7 +298,10 @@ Output a JSON with these exact fields:
             }
         });
 
-        // Step 5: Save result
+        // Properly distinguish score=0 from missing score
+        const aiScore = aiResponse?.score != null ? aiResponse.score : 0;
+
+        // Step 5: Save result — consistent JSON array storage for all list fields
         const scanRecord = await base44.entities.ResumeScanResult.create({
             applicant_name: extractedData?.full_name || 'Unknown',
             applicant_email: extractedData?.email || '',
@@ -251,14 +313,15 @@ Output a JSON with these exact fields:
             extracted_data: JSON.stringify(extractedData),
             code_comparison: JSON.stringify(codeComparison),
             criteria_used: criteriaText,
-            ai_score: aiResponse?.score || 0,
+            criteria_data: JSON.stringify(criteria), // structured criteria for audit/re-run
+            ai_score: aiScore,
             ai_recommendation: aiResponse?.recommendation || 'Consider',
             ai_summary: aiResponse?.summary || '',
-            matched_skills: (aiResponse?.matched_skills || []).join(', '),
-            missing_skills: (aiResponse?.missing_skills || []).join(', '),
+            matched_skills: JSON.stringify(aiResponse?.matched_skills || []),
+            missing_skills: JSON.stringify(aiResponse?.missing_skills || []),
             strengths: JSON.stringify(aiResponse?.strengths || []),
             concerns: JSON.stringify(aiResponse?.concerns || []),
-            years_experience: aiResponse?.experience_years || extractedData?.total_years_experience || 0,
+            years_experience: aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
             scanned_by: user.email,
             status: 'completed'
         });
@@ -267,14 +330,14 @@ Output a JSON with these exact fields:
             success: true,
             scanId: scanRecord.id,
             result: {
-                score: aiResponse?.score || 0,
+                score: aiScore,
                 recommendation: aiResponse?.recommendation || 'Consider',
                 summary: aiResponse?.summary || '',
                 matched_skills: aiResponse?.matched_skills || [],
                 missing_skills: aiResponse?.missing_skills || [],
                 strengths: aiResponse?.strengths || [],
                 concerns: aiResponse?.concerns || [],
-                experience_years: aiResponse?.experience_years || 0,
+                experience_years: aiResponse?.experience_years ?? 0,
                 applicant_name: extractedData?.full_name || 'Unknown',
                 applicant_email: extractedData?.email || '',
                 file_url: fileUrl,
