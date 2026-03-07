@@ -1,4 +1,5 @@
 import { Toaster as Sonner } from "sonner"
+import { useTheme } from "@/components/ui/next-themes-stub"
 
 const Toaster = ({ ...props }) => {
   return (
