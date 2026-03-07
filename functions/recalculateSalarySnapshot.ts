@@ -351,16 +351,29 @@ Deno.serve(async (req) => {
         // Total OT Salary
         const totalOtSalary = normalOtSalary + specialOtSalary;
 
-        // Final Total = Total Salary + OT + Bonus + max(OT, Incentive) + OpenLeave + Variable
+        // Final Total = Total Salary + Bonus + effectiveOtOrIncentive + OpenLeave + Variable
         //             - Net Deduction (current month leave)
         //             - Current Month Deductible Hours Pay
         //             - Other Deduction - Advance
+        // effectiveOtOrIncentive = max(OT, Incentive) for Operations dept,
+        //                          OT + Incentive for all other departments.
         // NO PREVIOUS MONTH DEDUCTIONS
-        // Business rule: pay only the higher of OT vs incentive (not both)
-        const effectiveOtOrIncentive = Math.max(
-            Math.round(totalOtSalary * 100) / 100,
-            Math.round(adjustmentValues.incentive * 100) / 100
-        );
+        // ============================================================
+        // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
+        // ============================================================
+        // For employees in the "Operations" department (across all companies,
+        // but noted specifically for Al Maraghi Motors): pay only the HIGHER
+        // of overtime vs incentive — not both added together.
+        // For all other employees outside the Operations department: both
+        // incentive and overtime are added together in full with no comparison.
+        // ============================================================
+        const isOperationsDept = snapshot.department === 'Operations';
+        const effectiveOtOrIncentive = isOperationsDept
+            ? Math.max(
+                Math.round(totalOtSalary * 100) / 100,
+                Math.round(adjustmentValues.incentive * 100) / 100
+            )
+            : Math.round(totalOtSalary * 100) / 100 + Math.round(adjustmentValues.incentive * 100) / 100;
         let finalTotal = totalSalary 
             + effectiveOtOrIncentive 
             + adjustmentValues.bonus 

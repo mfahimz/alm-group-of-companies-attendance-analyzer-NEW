@@ -1593,11 +1593,22 @@ Deno.serve(async (req) => {
             const otherDeduction = otRecord?.otherDeduction || 0;
             const advanceSalaryDeduction = otRecord?.advanceSalaryDeduction || 0;
 
-            // Business rule: pay only the higher of OT vs incentive (not both together)
-            const effectiveOtOrIncentive = Math.max(
-                Math.round(totalOtSalary * 100) / 100,
-                Math.round(incentive * 100) / 100
-            );
+            // ============================================================
+            // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
+            // ============================================================
+            // For employees in the "Operations" department (across all companies,
+            // but noted specifically for Al Maraghi Motors): pay only the HIGHER
+            // of overtime vs incentive — not both added together.
+            // For all other employees outside the Operations department: both
+            // incentive and overtime are added together in full with no comparison.
+            // ============================================================
+            const isOperationsDept = emp.department === 'Operations';
+            const effectiveOtOrIncentive = isOperationsDept
+                ? Math.max(
+                    Math.round(totalOtSalary * 100) / 100,
+                    Math.round(incentive * 100) / 100
+                )
+                : Math.round(totalOtSalary * 100) / 100 + Math.round(incentive * 100) / 100;
 
             // Business rule: bonus remains as-is (no forced decimal rounding).
             const netAdditions = bonus + effectiveOtOrIncentive + openLeaveSalary + variableSalary;

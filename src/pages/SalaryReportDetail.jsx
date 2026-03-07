@@ -265,8 +265,19 @@ export default function SalaryReportDetail() {
         const extraPrevMonthLopPay = asNumber(row.extra_prev_month_lop_pay);
         const extraPrevMonthDeductibleHoursPay = asNumber(row.extra_prev_month_deductible_hours_pay);
 
-        // Business rule: if both OT and incentive exist, pay only the higher one.
-        const effectiveOtOrIncentive = Math.max(round2(totalOtSalary), round2(incentive));
+        // ============================================================
+        // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
+        // ============================================================
+        // For employees in the "Operations" department (across all companies,
+        // but noted specifically for Al Maraghi Motors): pay only the HIGHER
+        // of overtime vs incentive — not both added together.
+        // For all other employees outside the Operations department: both
+        // incentive and overtime are added together in full with no comparison.
+        // ============================================================
+        const isOperationsDept = row.department === 'Operations';
+        const effectiveOtOrIncentive = isOperationsDept
+            ? Math.max(round2(totalOtSalary), round2(incentive))
+            : round2(totalOtSalary) + round2(incentive);
 
         // Bonus is added as-is (do not force-round bonus value itself).
         const netAdditions = bonus + effectiveOtOrIncentive + openLeaveSalary + variableSalary;
@@ -376,7 +387,13 @@ export default function SalaryReportDetail() {
              const extraPrevMonthLopPay = updated.extra_prev_month_lop_pay || 0;
              const extraPrevMonthDeductibleHoursPay = updated.extra_prev_month_deductible_hours_pay || 0;
 
-             const effectiveOtOrIncentive = Math.max(round2(totalOtSalary), round2(updated.incentive || 0));
+             // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
+             // Operations dept: pay only the HIGHER of OT vs incentive.
+             // All other departments: both OT and incentive are added in full.
+             const isOperationsDept = updated.department === 'Operations';
+             const effectiveOtOrIncentive = isOperationsDept
+                 ? Math.max(round2(totalOtSalary), round2(updated.incentive || 0))
+                 : round2(totalOtSalary) + round2(updated.incentive || 0);
              const openLeaveSalary = isAlMaraghi ? asNumber(updated.open_leave_salary || 0) : 0;
              const variableSalary = isAlMaraghi ? asNumber(updated.variable_salary || 0) : 0;
              const netAdditions = (updated.bonus || 0) + effectiveOtOrIncentive + openLeaveSalary + variableSalary;
