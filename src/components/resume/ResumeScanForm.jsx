@@ -247,49 +247,98 @@ export default function ResumeScanForm({ onScanComplete }) {
                 </div>
             )}
 
-            {/* Step 3: Upload Resume */}
+            {/* Step 3: Upload Resumes */}
             <div>
                 <div className="flex items-center gap-2 mb-3">
                     <div className="w-5 h-5 rounded-full bg-[#0F1E36] text-white text-xs flex items-center justify-center font-bold">3</div>
-                    <Label className="text-sm font-semibold text-[#1F2937]">Upload Resume</Label>
+                    <Label className="text-sm font-semibold text-[#1F2937]">Upload Resumes</Label>
+                    <span className="text-xs text-[#9CA3AF]">(up to {MAX_FILES} files)</span>
                 </div>
+
+                {/* Drop Zone */}
                 <div
                     className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                         dragOver ? 'border-[#0F1E36] bg-blue-50' : 'border-[#CBD5E1] hover:border-[#0F1E36] hover:bg-gray-50'
-                    }`}
+                    } ${files.length >= MAX_FILES ? 'opacity-50 pointer-events-none' : ''}`}
                     onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={handleDrop}
-                    onClick={() => !file && fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                 >
-                    {file ? (
-                        <div className="flex items-center justify-center gap-3">
-                            <FileText className="w-8 h-8 text-[#0F1E36]" />
-                            <div className="text-left">
-                                <p className="text-sm font-medium text-[#1F2937]">{file.name}</p>
-                                <p className="text-xs text-[#6B7280]">{(file.size / 1024).toFixed(1)} KB</p>
-                            </div>
-                            <button onClick={e => { e.stopPropagation(); setFile(null); }} className="ml-2 p-1 text-[#6B7280] hover:text-red-500 rounded">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ) : (
-                        <div>
-                            <Upload className="w-10 h-10 text-[#9CA3AF] mx-auto mb-2" />
-                            <p className="text-sm font-medium text-[#4B5563]">Drop resume here or click to browse</p>
-                            <p className="text-xs text-[#9CA3AF] mt-1">PDF, DOC, DOCX — max 10MB</p>
-                        </div>
-                    )}
+                    <Upload className="w-8 h-8 text-[#9CA3AF] mx-auto mb-2" />
+                    <p className="text-sm font-medium text-[#4B5563]">Drop resumes here or click to browse</p>
+                    <p className="text-xs text-[#9CA3AF] mt-1">PDF, DOC, DOCX — max 10MB each — up to {MAX_FILES} files</p>
                 </div>
-                <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={e => e.target.files[0] && handleFileSelect(e.target.files[0])} />
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    multiple
+                    onChange={e => e.target.files?.length && addFiles(Array.from(e.target.files))}
+                />
+
+                {/* File List */}
+                {files.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                        {files.map((f, i) => (
+                            <div key={i} className="flex items-center gap-3 px-3 py-2 bg-[#F4F6F9] rounded-lg border border-[#E2E6EC]">
+                                <FileText className="w-4 h-4 text-[#0F1E36] flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-[#1F2937] truncate">{f.name}</p>
+                                    <p className="text-xs text-[#9CA3AF]">{(f.size / 1024).toFixed(1)} KB</p>
+                                </div>
+                                {!isScanning && (
+                                    <button onClick={() => removeFile(i)} className="p-1 text-[#9CA3AF] hover:text-red-500 rounded flex-shrink-0">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
+            {/* Scan Progress */}
+            {isScanning && scanProgress && (
+                <div className="border border-[#E2E6EC] rounded-xl p-4 bg-[#FAFBFD] space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-[#1F2937]">Scanning resumes...</span>
+                        <span className="text-[#6B7280]">{scanProgress.current} / {scanProgress.total}</span>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="w-full h-1.5 bg-[#E2E6EC] rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-[#0F1E36] rounded-full transition-all duration-500"
+                            style={{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }}
+                        />
+                    </div>
+                    {/* Per-file statuses */}
+                    <div className="space-y-1.5">
+                        {scanProgress.statuses.map((s, i) => (
+                            <div key={i} className="flex items-center gap-2 text-xs">
+                                {s.status === 'done'    && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />}
+                                {s.status === 'error'   && <AlertCircle  className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
+                                {s.status === 'scanning'&& <Loader2      className="w-3.5 h-3.5 text-[#0F1E36] animate-spin flex-shrink-0" />}
+                                {s.status === 'pending' && <div className="w-3.5 h-3.5 rounded-full border border-[#CBD5E1] flex-shrink-0" />}
+                                <span className={`truncate ${s.status === 'error' ? 'text-red-600' : s.status === 'done' ? 'text-green-700' : s.status === 'scanning' ? 'text-[#1F2937] font-medium' : 'text-[#9CA3AF]'}`}>
+                                    {s.fileName}
+                                    {s.status === 'scanning' && ' — analyzing...'}
+                                    {s.status === 'error' && ` — ${s.error || 'failed'}`}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-[#9CA3AF]">Processing sequentially to avoid rate limits. Please wait...</p>
+                </div>
+            )}
+
             {/* Step 4: Scan */}
-            <Button onClick={handleScan} disabled={isScanning || !file || !criteria.position_name.trim()} className="w-full h-11">
+            <Button onClick={handleScan} disabled={isScanning || files.length === 0 || !criteria.position_name.trim()} className="w-full h-11">
                 {isScanning ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Scanning Resume — this may take 30–60 seconds...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Scanning — please wait...</>
                 ) : (
-                    <><ScanLine className="w-4 h-4 mr-2" />Scan Resume with AI</>
+                    <><ScanLine className="w-4 h-4 mr-2" />Scan {files.length > 1 ? `${files.length} Resumes` : 'Resume'} with AI</>
                 )}
             </Button>
         </div>
