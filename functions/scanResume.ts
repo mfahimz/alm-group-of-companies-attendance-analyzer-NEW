@@ -121,6 +121,7 @@ Deno.serve(async (req) => {
                 email: { type: "string" },
                 phone: { type: "string" },
                 total_years_experience: { type: "number" },
+                relevant_years_experience: { type: "number", description: "Years of experience specifically in roles similar or directly related to the job being applied for, NOT total career years" },
                 current_or_last_position: { type: "string" },
                 current_or_last_company: { type: "string" },
                 skills: { type: "array", items: { type: "string" } },
