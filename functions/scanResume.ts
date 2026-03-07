@@ -105,26 +105,12 @@ Deno.serve(async (req) => {
         for (let i = 0; i < binaryStr.length; i++) {
             bytes[i] = binaryStr.charCodeAt(i);
         }
-        const fileBlob = new Blob([bytes], { type: fileType || 'application/octet-stream' });
+        // Create a proper File object (available in Deno as a Web API)
+        const mimeType = fileType || 'application/octet-stream';
+        const fileObj = new File([bytes], fileName, { type: mimeType });
 
-        // Step 1: Upload file using multipart/form-data via the SDK endpoint
-        const appId = Deno.env.get('BASE44_APP_ID');
-        const authHeader = req.headers.get('Authorization') || req.headers.get('x-base44-token') || '';
-        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-
-        const formData = new FormData();
-        formData.append('file', fileBlob, fileName);
-
-        const uploadResp = await fetch(`https://base44.app/api/apps/${appId}/integrations/Core/UploadFile`, {
-            method: 'POST',
-            headers: { 'x-base44-token': token },
-            body: formData
-        });
-        if (!uploadResp.ok) {
-            const errText = await uploadResp.text();
-            throw new Error(`File upload failed (${uploadResp.status}): ${errText.substring(0, 200)}`);
-        }
-        const uploadResult = await uploadResp.json();
+        // Step 1: Upload file via SDK (File object works in Deno's Web API environment)
+        const uploadResult = await base44.integrations.Core.UploadFile({ file: fileObj });
         const fileUrl = uploadResult.file_url;
 
         // Step 2: Extract structured data from resume
