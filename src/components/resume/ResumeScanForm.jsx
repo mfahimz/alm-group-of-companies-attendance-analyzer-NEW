@@ -62,58 +62,98 @@ export default function ResumeScanForm({ onScanComplete }) {
 
     const setField = (field, value) => setCriteria(c => ({ ...c, [field]: value }));
 
-    const handleFileSelect = (selectedFile) => {
+    const validateFile = (f) => {
         const allowed = ['application/pdf', 'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        if (!allowed.includes(selectedFile.type) && !selectedFile.name.match(/\.(pdf|doc|docx)$/i)) {
-            toast.error('Only PDF, DOC, and DOCX files are supported');
-            return;
-        }
-        if (selectedFile.size > 10 * 1024 * 1024) {
-            toast.error('File size must be under 10MB');
-            return;
-        }
-        setFile(selectedFile);
+        if (!allowed.includes(f.type) && !f.name.match(/\.(pdf|doc|docx)$/i)) return 'Only PDF, DOC, DOCX supported';
+        if (f.size > 10 * 1024 * 1024) return 'File must be under 10MB';
+        return null;
     };
+
+    const addFiles = (newFiles) => {
+        const combined = [...files];
+        let skipped = 0;
+        for (const f of newFiles) {
+            if (combined.length >= MAX_FILES) { skipped++; continue; }
+            const err = validateFile(f);
+            if (err) { toast.error(`${f.name}: ${err}`); continue; }
+            if (combined.find(x => x.name === f.name && x.size === f.size)) continue; // dedupe
+            combined.push(f);
+        }
+        if (skipped > 0) toast.warning(`Max ${MAX_FILES} resumes allowed. ${skipped} file(s) skipped.`);
+        setFiles(combined);
+    };
+
+    const removeFile = (index) => setFiles(f => f.filter((_, i) => i !== index));
 
     const handleDrop = (e) => {
         e.preventDefault();
         setDragOver(false);
-        const dropped = e.dataTransfer.files[0];
-        if (dropped) handleFileSelect(dropped);
+        addFiles(Array.from(e.dataTransfer.files));
+    };
+
+    const scanSingleFile = async (file) => {
+        const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        const response = await base44.functions.invoke('scanResume', {
+            fileBase64: base64,
+            fileName: file.name,
+            fileType: file.type,
+            criteria
+        });
+        if (!response.data?.success) throw new Error(response.data?.error || 'Scan failed');
+        return response.data.result;
     };
 
     const handleScan = async () => {
-        if (!file) { toast.error('Please upload a resume file'); return; }
+        if (files.length === 0) { toast.error('Please upload at least one resume'); return; }
         if (!criteria.position_name.trim()) { toast.error('Please select a template or enter a position name'); return; }
 
         setIsScanning(true);
-        try {
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
+        const statuses = files.map(f => ({ fileName: f.name, status: 'pending' })); // pending | scanning | done | error
+        setScanProgress({ current: 0, total: files.length, statuses });
 
-            const response = await base44.functions.invoke('scanResume', {
-                fileBase64: base64,
-                fileName: file.name,
-                fileType: file.type,
-                criteria
-            });
+        const results = [];
 
-            if (response.data?.success) {
-                toast.success('Resume scanned successfully!');
-                onScanComplete(response.data);
-            } else {
-                toast.error(response.data?.error || 'Scan failed');
+        for (let i = 0; i < files.length; i++) {
+            // Update status to scanning
+            statuses[i] = { ...statuses[i], status: 'scanning' };
+            setScanProgress({ current: i + 1, total: files.length, statuses: [...statuses] });
+
+            try {
+                const result = await scanSingleFile(files[i]);
+                results.push(result);
+                statuses[i] = { ...statuses[i], status: 'done' };
+            } catch (err) {
+                console.error(`Failed scanning ${files[i].name}:`, err.message);
+                statuses[i] = { ...statuses[i], status: 'error', error: err.message };
             }
-        } catch (err) {
-            toast.error('Scan failed: ' + (err.message || 'Unknown error'));
-        } finally {
-            setIsScanning(false);
+
+            setScanProgress({ current: i + 1, total: files.length, statuses: [...statuses] });
+
+            // Rate-limit safe delay between calls (skip after last file)
+            if (i < files.length - 1) {
+                await sleep(DELAY_BETWEEN_SCANS_MS);
+            }
         }
+
+        setIsScanning(false);
+        setScanProgress(null);
+
+        if (results.length === 0) {
+            toast.error('All scans failed. Please try again.');
+            return;
+        }
+
+        const failed = statuses.filter(s => s.status === 'error').length;
+        if (failed > 0) toast.warning(`${results.length} scanned successfully, ${failed} failed.`);
+        else toast.success(`${results.length} resume${results.length > 1 ? 's' : ''} scanned successfully!`);
+
+        onScanComplete(results);
     };
 
     const hasTemplate = !!selectedTemplateId;
