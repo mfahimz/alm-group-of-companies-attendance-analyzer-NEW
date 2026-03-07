@@ -234,7 +234,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin']
+        defaultRoles: ['admin', 'supervisor']
     },
     AuditLogs: {
         name: 'AuditLogs',
