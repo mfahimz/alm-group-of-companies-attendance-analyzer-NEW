@@ -5,11 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Save, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-
-const DEPARTMENTS = ['Service', 'Marketing', 'Operations', 'Finance', 'HR', 'AGM'];
 
 const EMPTY_TEMPLATE = {
     position_name: '',
@@ -27,12 +24,78 @@ const EMPTY_TEMPLATE = {
 
 function TemplateForm({ template, onSave, onCancel, isSaving }) {
     const [form, setForm] = useState(template || EMPTY_TEMPLATE);
+    const [quickText, setQuickText] = useState('');
+    const [quickParsing, setQuickParsing] = useState(false);
     const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+    const handleQuickFill = async () => {
+        if (!quickText.trim()) { toast.error('Please enter a description'); return; }
+        setQuickParsing(true);
+        try {
+            const result = await base44.integrations.Core.InvokeLLM({
+                prompt: `Extract job position template details from this description and return structured JSON.
+
+Description: "${quickText}"
+
+Return JSON with these fields (use empty string if not mentioned):
+{
+  "position_name": "job title",
+  "department": "department name",
+  "min_experience_years": number or 0,
+  "required_education": "education requirement",
+  "required_skills": "comma-separated required skills",
+  "preferred_skills": "comma-separated nice-to-have skills",
+  "required_certifications": "required certifications",
+  "required_languages": "e.g. English (required), Arabic (preferred)",
+  "industry_experience": "industry background needed",
+  "notes": "any other important notes for AI evaluation"
+}`,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        position_name: { type: "string" },
+                        department: { type: "string" },
+                        min_experience_years: { type: "number" },
+                        required_education: { type: "string" },
+                        required_skills: { type: "string" },
+                        preferred_skills: { type: "string" },
+                        required_certifications: { type: "string" },
+                        required_languages: { type: "string" },
+                        industry_experience: { type: "string" },
+                        notes: { type: "string" }
+                    }
+                }
+            });
+            setForm(f => ({
+                ...f,
+                position_name: result.position_name || f.position_name,
+                department: result.department || f.department,
+                min_experience_years: result.min_experience_years != null ? result.min_experience_years : f.min_experience_years,
+                required_education: result.required_education || f.required_education,
+                required_skills: result.required_skills || f.required_skills,
+                preferred_skills: result.preferred_skills || f.preferred_skills,
+                required_certifications: result.required_certifications || f.required_certifications,
+                required_languages: result.required_languages || f.required_languages,
+                industry_experience: result.industry_experience || f.industry_experience,
+                notes: result.notes || f.notes,
+            }));
+            setQuickText('');
+            toast.success('Form filled! Review and adjust before saving.');
+        } catch (err) {
+            toast.error('Failed to parse: ' + err.message);
+        } finally {
+            setQuickParsing(false);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!form.position_name.trim()) { toast.error('Position name is required'); return; }
-        if (!form.department) { toast.error('Department is required'); return; }
+        if (!form.min_experience_years && form.min_experience_years !== 0) { toast.error('Minimum experience is required'); return; }
+        if (!form.required_education.trim()) { toast.error('Required education is required'); return; }
+        if (!form.required_skills.trim()) { toast.error('Required skills are required'); return; }
+        if (!form.required_languages.trim()) { toast.error('Languages are required'); return; }
+        if (!form.industry_experience.trim()) { toast.error('Industry experience is required'); return; }
         onSave(form);
     };
 
@@ -45,6 +108,38 @@ function TemplateForm({ template, onSave, onCancel, isSaving }) {
                 </button>
             </div>
 
+            {/* Quick Entry AI Autofill */}
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
+                <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <Label className="font-medium text-indigo-900 text-xs">Quick Entry (Optional)</Label>
+                </div>
+                <p className="text-xs text-slate-600 mb-3">Describe the role and we'll fill the form below</p>
+                <div className="flex gap-2">
+                    <Input
+                        placeholder='e.g. Service Technician with 3+ years automotive experience, English required'
+                        value={quickText}
+                        onChange={e => setQuickText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !quickParsing) { e.preventDefault(); handleQuickFill(); } }}
+                        disabled={quickParsing}
+                        className="flex-1 text-sm"
+                    />
+                    <Button
+                        type="button"
+                        onClick={handleQuickFill}
+                        disabled={quickParsing || !quickText.trim()}
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 shrink-0"
+                    >
+                        {quickParsing ? (
+                            <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Parsing...</>
+                        ) : (
+                            <><Sparkles className="w-3.5 h-3.5 mr-1.5" />Fill Form</>
+                        )}
+                    </Button>
+                </div>
+            </div>
+
             {/* Position & Department */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -52,24 +147,19 @@ function TemplateForm({ template, onSave, onCancel, isSaving }) {
                     <Input placeholder="e.g. Service Technician" value={form.position_name} onChange={e => set('position_name', e.target.value)} />
                 </div>
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Department *</Label>
-                    <Select value={form.department} onValueChange={v => set('department', v)}>
-                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                        <SelectContent>
-                            {DEPARTMENTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Department</Label>
+                    <Input placeholder="e.g. Service, HR, Finance" value={form.department} onChange={e => set('department', e.target.value)} />
                 </div>
             </div>
 
             {/* Experience & Education */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Minimum Experience (years)</Label>
+                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Minimum Experience (years) *</Label>
                     <Input type="number" min="0" max="30" placeholder="e.g. 3" value={form.min_experience_years} onChange={e => set('min_experience_years', e.target.value)} />
                 </div>
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Required Education</Label>
+                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Required Education *</Label>
                     <Input placeholder="e.g. Bachelor's in Mechanical Engineering" value={form.required_education} onChange={e => set('required_education', e.target.value)} />
                 </div>
             </div>
@@ -77,7 +167,7 @@ function TemplateForm({ template, onSave, onCancel, isSaving }) {
             {/* Skills */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Required Skills <span className="text-[#9CA3AF]">(comma-separated)</span></Label>
+                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Required Skills * <span className="text-[#9CA3AF]">(comma-separated)</span></Label>
                     <Textarea placeholder="e.g. Automotive repair, Diagnostics, OBD-II" value={form.required_skills} onChange={e => set('required_skills', e.target.value)} className="h-20 text-sm" />
                 </div>
                 <div>
@@ -93,11 +183,11 @@ function TemplateForm({ template, onSave, onCancel, isSaving }) {
                     <Input placeholder="e.g. UAE Driving License, ASE" value={form.required_certifications} onChange={e => set('required_certifications', e.target.value)} />
                 </div>
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Languages</Label>
+                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Languages *</Label>
                     <Input placeholder="e.g. English (required), Arabic (preferred)" value={form.required_languages} onChange={e => set('required_languages', e.target.value)} />
                 </div>
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Industry Experience</Label>
+                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Industry Experience *</Label>
                     <Input placeholder="e.g. Automotive, Dealership" value={form.industry_experience} onChange={e => set('industry_experience', e.target.value)} />
                 </div>
             </div>
