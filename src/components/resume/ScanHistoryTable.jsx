@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { ExternalLink, Loader2, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import ResumeScanResultView from './ResumeScanResult';
 
 const RECOMMENDATION_COLORS = {
