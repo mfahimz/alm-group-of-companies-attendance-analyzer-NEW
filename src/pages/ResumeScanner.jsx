@@ -66,8 +66,8 @@ export default function ResumeScanner() {
             <div className="max-w-5xl mx-auto px-6 py-6">
                 {activeTab === 'scan' && (
                     <div className="bg-white rounded-xl border border-[#E2E6EC] shadow-sm p-6">
-                        {scanResult ? (
-                            <ResumeScanResultView result={scanResult} onNewScan={handleNewScan} />
+                        {scanResults ? (
+                            <BatchScanResults results={scanResults} onNewScan={handleNewScan} />
                         ) : (
                             <ResumeScanForm onScanComplete={handleScanComplete} />
                         )}
