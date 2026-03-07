@@ -205,7 +205,7 @@ Output a JSON with these exact fields:
 - missing_skills: array of strings - important requirements the candidate lacks
 - strengths: array of 3 specific strings from the resume data
 - concerns: array of strings - specific red flags (empty if none)
-- experience_years: number - estimated total years of relevant experience`;
+- experience_years: number - estimated years of experience specifically in roles RELEVANT to the position being applied for (NOT total career years). For example, if a candidate has 10 years total but only 3 years in automotive/similar roles, return 3.`;
 
         const aiResponse = await base44.integrations.Core.InvokeLLM({
             prompt,
