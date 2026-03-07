@@ -99,31 +99,30 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Position criteria is required' }, { status: 400 });
         }
 
-        // Convert base64 to binary and upload via multipart/form-data
+        // Convert base64 to binary
         const binaryStr = atob(fileBase64);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) {
             bytes[i] = binaryStr.charCodeAt(i);
         }
         const fileBlob = new Blob([bytes], { type: fileType || 'application/octet-stream' });
-        const fileObj = new File([fileBlob], fileName, { type: fileType || 'application/octet-stream' });
 
-        // Step 1: Upload file using multipart/form-data
-        const formData = new FormData();
-        formData.append('file', fileObj, fileName);
-
+        // Step 1: Upload file using multipart/form-data via the SDK endpoint
         const appId = Deno.env.get('BASE44_APP_ID');
-        const authToken = req.headers.get('Authorization')?.replace('Bearer ', '') || req.headers.get('x-base44-token') || '';
-        const uploadResp = await fetch(`https://api.base44.com/api/apps/${appId}/integrations/Core/UploadFile`, {
+        const authHeader = req.headers.get('Authorization') || req.headers.get('x-base44-token') || '';
+        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
+        const formData = new FormData();
+        formData.append('file', fileBlob, fileName);
+
+        const uploadResp = await fetch(`https://base44.app/api/apps/${appId}/integrations/Core/UploadFile`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
+            headers: { 'x-base44-token': token },
             body: formData
         });
         if (!uploadResp.ok) {
             const errText = await uploadResp.text();
-            throw new Error(`File upload failed: ${errText}`);
+            throw new Error(`File upload failed (${uploadResp.status}): ${errText.substring(0, 200)}`);
         }
         const uploadResult = await uploadResp.json();
         const fileUrl = uploadResult.file_url;
