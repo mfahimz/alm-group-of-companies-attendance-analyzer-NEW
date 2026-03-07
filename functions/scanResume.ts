@@ -20,11 +20,15 @@ function buildCriteriaText(criteria) {
 function buildCodeComparison(extracted, criteria) {
     const result = {};
 
-    // Experience
+    // Experience — use relevant (role-specific) years, fall back to total only if relevant not extracted
     const minExp = parseFloat(criteria.min_experience_years);
-    const candExp = extracted?.total_years_experience ?? null;
-    result.required_experience = criteria.min_experience_years ? `${criteria.min_experience_years}+ years` : null;
-    result.candidate_experience = candExp != null ? `${candExp} years` : null;
+    const relevantExp = extracted?.relevant_years_experience ?? null;
+    const totalExp = extracted?.total_years_experience ?? null;
+    const candExp = relevantExp ?? totalExp; // prefer relevant
+    result.required_experience = criteria.min_experience_years ? `${criteria.min_experience_years}+ years in relevant role` : null;
+    result.candidate_experience = candExp != null
+        ? `${candExp} years${relevantExp != null ? ' (relevant role)' : ' (total — relevant not extracted)'}`
+        : null;
     result.experience_met = (!isNaN(minExp) && candExp != null) ? candExp >= minExp : null;
 
     // Education
