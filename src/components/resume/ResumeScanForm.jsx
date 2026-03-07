@@ -5,9 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, X, Loader2, ScanLine, ChevronDown } from 'lucide-react';
+import { Upload, FileText, X, Loader2, ScanLine, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
+
+const MAX_FILES = 5;
+const DELAY_BETWEEN_SCANS_MS = 3000; // 3s gap to avoid rate limits
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export default function ResumeScanForm({ onScanComplete }) {
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -23,8 +30,9 @@ export default function ResumeScanForm({ onScanComplete }) {
         industry_experience: '',
         notes: ''
     });
-    const [file, setFile] = useState(null);
+    const [files, setFiles] = useState([]); // array of File objects
     const [isScanning, setIsScanning] = useState(false);
+    const [scanProgress, setScanProgress] = useState(null); // { current, total, fileName, statuses }
     const [dragOver, setDragOver] = useState(false);
     const fileInputRef = useRef(null);
 
