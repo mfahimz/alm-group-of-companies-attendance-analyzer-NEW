@@ -86,7 +86,7 @@ export default function ResumeScanner() {
                             <h2 className="text-sm font-semibold text-[#1F2937]">Past Resume Scans</h2>
                             <p className="text-xs text-[#6B7280] mt-0.5">Click any row to view the full scan report</p>
                         </div>
-                        <ScanHistoryTable refreshKey={historyRefreshKey} />
+                        <ScanHistoryTable refreshKey={historyRefreshKey} isAdmin={isAdmin} />
                     </div>
                 )}
 
