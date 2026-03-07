@@ -122,7 +122,12 @@ function ExtractedDataSection({ data, fileUrl, fileName }) {
             </div>
 
             {fileUrl && (
-                <a href={fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-[#0F1E36] hover:underline border border-[#CBD5E1] px-3 py-1.5 rounded-lg">
+                <a
+                    href={fileUrl.replace(/^https?:\/\/[^/]+/, window.location.origin)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-[#0F1E36] hover:underline border border-[#CBD5E1] px-3 py-1.5 rounded-lg"
+                >
                     <ExternalLink className="w-3.5 h-3.5" />View Original File{fileName ? ` — ${fileName}` : ''}
                 </a>
             )}
