@@ -279,6 +279,22 @@ export const PAGES_CONFIG = {
         defaultRoles: ['admin']
     },
 
+    // Developer Module — Admin-only, NEVER shown in navigation.
+    // This page is accessed exclusively by typing the route directly in the
+    // browser. It must not appear in DesktopNav, MobileNav, any sidebar,
+    // dropdown, or menu for ANY user role including admin. The internal nav
+    // bar on this page is scoped entirely within the DeveloperModule component.
+    DeveloperModule: {
+        name: 'DeveloperModule',
+        title: 'Developer Module',
+        icon: Code,
+        category: 'Developer',
+        showInNav: false,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+
     // Hidden Pages (No navigation)
     ProjectDetail: {
         name: 'ProjectDetail',
