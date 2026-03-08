@@ -116,13 +116,13 @@ Deno.serve(async (req) => {
 
                     const TOTAL = 120;
 
+                    // quarter=0 is used as sentinel value for half-yearly records (schema requires a number)
                     const h1Record = {
                         employee_id: String(employee_id),
                         company: company,
                         year: year,
                         half: 1,
-                        quarter: null,
-                        allocation_type: 'calendar_half_year',
+                        quarter: 0,
                         total_minutes: TOTAL,
                         used_minutes: h1Used,
                         remaining_minutes: Math.max(0, TOTAL - h1Used)
@@ -133,8 +133,7 @@ Deno.serve(async (req) => {
                         company: company,
                         year: year,
                         half: 2,
-                        quarter: null,
-                        allocation_type: 'calendar_half_year',
+                        quarter: 0,
                         total_minutes: TOTAL,
                         used_minutes: h2Used,
                         remaining_minutes: Math.max(0, TOTAL - h2Used)
