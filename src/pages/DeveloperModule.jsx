@@ -38,9 +38,12 @@ import {
     ShieldAlert
 } from 'lucide-react';
 
-// Full implementations replacing the entity-explorer and function-runner placeholders
+// Full implementations replacing the entity-explorer, function-runner,
+// employee-inspector, and system-health placeholders
 import EntityExplorer from '@/components/developer/EntityExplorer';
 import FunctionRunner from '@/components/developer/FunctionRunner';
+import EmployeeInspector from '@/components/developer/EmployeeInspector';
+import SystemHealth from '@/components/developer/SystemHealth';
 
 /**
  * Internal navigation sections for the Developer Module.
@@ -147,13 +150,16 @@ export default function DeveloperModule() {
             {/* SECTION CONTENT AREA */}
             <div className="mt-6">
                 {/*
-                  Route to the full implementation components for entity-explorer and
-                  function-runner. All other sections still show the placeholder until
-                  their implementations are built in future prompts.
+                  Route to the full implementation components for entity-explorer,
+                  function-runner, employee-inspector, and system-health. All other
+                  sections still show the placeholder until their implementations
+                  are built in future prompts.
                 */}
                 {activeSection === 'entity-explorer' && <EntityExplorer />}
                 {activeSection === 'function-runner' && <FunctionRunner />}
-                {activeSection !== 'entity-explorer' && activeSection !== 'function-runner' && (
+                {activeSection === 'employee-inspector' && <EmployeeInspector />}
+                {activeSection === 'system-health' && <SystemHealth />}
+                {activeSection !== 'entity-explorer' && activeSection !== 'function-runner' && activeSection !== 'employee-inspector' && activeSection !== 'system-health' && (
                     <SectionPlaceholder section={currentSection} />
                 )}
             </div>
