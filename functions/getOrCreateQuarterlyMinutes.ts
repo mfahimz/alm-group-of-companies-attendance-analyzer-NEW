@@ -1,21 +1,23 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
- * Get or Create Quarterly Minutes Record (Calendar-Based)
- * 
- * This function retrieves or creates a quarterly minutes record for an employee
- * based on a specific DATE (not project). The quarter is determined from the date.
- * 
+ * Get or Create Half-Yearly Minutes Record (Calendar-Based)
+ *
+ * This function retrieves or creates a half-yearly minutes record for an employee
+ * based on a specific DATE (not project). The half is determined from the date.
+ *
+ * Half determination rule:
+ * - Months 1–6  (Jan–Jun) → half 1 (H1)
+ * - Months 7–12 (Jul–Dec) → half 2 (H2)
+ *
  * Pure calendar-based tracking:
- * - Q1: January 1 - March 31
- * - Q2: April 1 - June 30
- * - Q3: July 1 - September 30
- * - Q4: October 1 - December 31
- * 
+ * - H1: January 1 - June 30
+ * - H2: July 1 - December 31
+ *
  * Usage:
  * const record = await getOrCreateQuarterlyMinutes(employee_id, company, date_string);
- * 
- * Returns: { year, quarter, total_minutes, used_minutes, remaining_minutes, record_id }
+ *
+ * Returns: { year, half, half_name, half_period, total_minutes, used_minutes, remaining_minutes, record_id }
  */
 
 Deno.serve(async (req) => {
@@ -36,37 +38,30 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        // Check if company supports quarterly minutes
+        // Check if company supports half-yearly minutes
         if (company !== 'Al Maraghi Motors') {
             return Response.json({
                 success: false,
-                error: 'Quarterly minutes feature is only available for Al Maraghi Motors'
+                error: 'Half-yearly minutes feature is only available for Al Maraghi Motors'
             }, { status: 400 });
         }
 
-        // Parse date and determine quarter
+        // Parse date and determine half
         const targetDate = new Date(date);
         const year = targetDate.getFullYear();
         const month = targetDate.getMonth() + 1; // 1-12
-        
-        // Determine quarter from month
-        let quarter;
-        if (month >= 1 && month <= 3) {
-            quarter = 1; // Q1: Jan-Mar
-        } else if (month >= 4 && month <= 6) {
-            quarter = 2; // Q2: Apr-Jun
-        } else if (month >= 7 && month <= 9) {
-            quarter = 3; // Q3: Jul-Sep
-        } else {
-            quarter = 4; // Q4: Oct-Dec
-        }
+
+        // Determine half from month:
+        // Months 1–6 (Jan–Jun) → half 1 (H1)
+        // Months 7–12 (Jul–Dec) → half 2 (H2)
+        const half = month <= 6 ? 1 : 2;
 
         // Check if record exists
         const existing = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
             employee_id: employee_id,
             company: company,
             year: year,
-            quarter: quarter
+            half: half
         });
 
         let record;
@@ -79,7 +74,7 @@ Deno.serve(async (req) => {
                 employee_id: employee_id,
                 company: company,
                 year: year,
-                quarter: quarter,
+                half: half,
                 total_minutes: 120,
                 used_minutes: 0,
                 remaining_minutes: 120
@@ -89,9 +84,9 @@ Deno.serve(async (req) => {
         return Response.json({
             success: true,
             year: record.year,
-            quarter: record.quarter,
-            quarter_name: `Q${record.quarter} ${record.year}`,
-            quarter_period: getQuarterPeriod(record.quarter, record.year),
+            half: record.half,
+            half_name: `H${record.half} ${record.year}`,
+            half_period: getHalfPeriod(record.half, record.year),
             total_minutes: record.total_minutes,
             used_minutes: record.used_minutes,
             remaining_minutes: record.remaining_minutes,
@@ -106,13 +101,11 @@ Deno.serve(async (req) => {
     }
 });
 
-// Helper function to get quarter period string
-function getQuarterPeriod(quarter, year) {
+// Helper function to get half-year period string
+function getHalfPeriod(half, year) {
     const periods = {
-        1: `Jan 1 - Mar 31, ${year}`,
-        2: `Apr 1 - Jun 30, ${year}`,
-        3: `Jul 1 - Sep 30, ${year}`,
-        4: `Oct 1 - Dec 31, ${year}`
+        1: `H1 Jan-Jun ${year}`,
+        2: `H2 Jul-Dec ${year}`
     };
-    return periods[quarter];
+    return periods[half];
 }

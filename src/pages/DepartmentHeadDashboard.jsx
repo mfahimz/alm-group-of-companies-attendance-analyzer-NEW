@@ -236,30 +236,28 @@ export default function DepartmentHeadDashboard() {
         refetchOnMount: false
     });
 
-    // No auto-initialization needed - using calendar quarters directly
+    // No auto-initialization needed - using calendar halves directly
 
-    // Get quarterly minutes for all managed employees (calendar-based - auto-determined from current date)
-    const { data: quarterlyMinutes = [] } = useQuery({
-        queryKey: ['quarterlyMinutes', currentProject?.company],
+    // Get half-yearly minutes for all managed employees (calendar-based - auto-determined from current date)
+    const { data: halfYearlyMinutes = [] } = useQuery({
+        queryKey: ['halfYearlyMinutes', currentProject?.company],
         queryFn: async () => {
             if (!currentProject) return [];
 
-            // Determine current quarter from today's date
+            // Determine current half from today's date
+            // Half determination rule:
+            // Months 1–6  (Jan–Jun) → half 1 (H1)
+            // Months 7–12 (Jul–Dec) → half 2 (H2)
             const today = nowInUAE();
             const currentYear = today.getFullYear();
             const currentMonth = today.getMonth() + 1; // 1-12
-            
-            let currentQuarter;
-            if (currentMonth >= 1 && currentMonth <= 3) currentQuarter = 1;
-            else if (currentMonth >= 4 && currentMonth <= 6) currentQuarter = 2;
-            else if (currentMonth >= 7 && currentMonth <= 9) currentQuarter = 3;
-            else currentQuarter = 4;
+            const currentHalf = currentMonth <= 6 ? 1 : 2;
 
-            // Fetch quarterly minutes for current quarter
+            // Fetch half-yearly minutes for current half
             const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
                 company: currentProject.company,
                 year: currentYear,
-                quarter: currentQuarter
+                half: currentHalf
             });
 
             return allMinutes;
@@ -274,7 +272,7 @@ export default function DepartmentHeadDashboard() {
 
     // Get remaining minutes for an employee (handle both string and number IDs)
     const getEmployeeRemainingMinutes = (employeeId) => {
-        const record = quarterlyMinutes.find(qm => String(qm.employee_id) === String(employeeId));
+        const record = halfYearlyMinutes.find(hm => String(hm.employee_id) === String(employeeId));
         return record?.remaining_minutes || 0;
     };
 
