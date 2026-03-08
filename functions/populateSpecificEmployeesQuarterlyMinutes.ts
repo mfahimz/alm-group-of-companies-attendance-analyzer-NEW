@@ -1,8 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
- * Safely populate quarterly minutes for specific employees
- * Checks for existing records and only creates missing ones
+ * Safely populate half-yearly minutes for specific employees.
+ * Checks for existing records and only creates missing ones.
+ * Creates 2 records per employee per year: H1 (Jan-Jun) and H2 (Jul-Dec).
  */
 Deno.serve(async (req) => {
     try {
@@ -23,14 +24,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'year and company are required' }, { status: 400 });
         }
 
-        // Fetch employees to validate (convert to numbers for query)
         const numericIds = hrms_ids.map(id => Number(id));
-        const employees = await base44.asServiceRole.entities.Employee.filter({
-            company
-        });
-        
-        // Filter to only requested employees
-        const targetEmployees = employees.filter(emp => 
+        const employees = await base44.asServiceRole.entities.Employee.filter({ company });
+
+        const targetEmployees = employees.filter(emp =>
             numericIds.includes(Number(emp.hrms_id))
         );
 
@@ -38,62 +35,44 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'No employees found with provided HRMS IDs' }, { status: 404 });
         }
 
-        const results = {
-            created: [],
-            skipped: [],
-            errors: []
-        };
+        const results = { created: [], skipped: [], errors: [] };
 
-        // Process each employee
+        // H1 = Jan-Jun (half 1), H2 = Jul-Dec (half 2)
+        const halves = [1, 2];
+
         for (const employee of targetEmployees) {
             const hrms_id = employee.hrms_id;
-            
-            // Process all 4 quarters
-            for (let quarter = 1; quarter <= 4; quarter++) {
+
+            for (const half of halves) {
                 try {
-                    // Check if record already exists (use string for employee_id)
                     const existing = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
                         employee_id: String(hrms_id),
                         company,
                         year,
-                        quarter
+                        half
                     });
 
                     if (existing.length > 0) {
-                        results.skipped.push({
-                            hrms_id,
-                            quarter,
-                            reason: 'Record already exists'
-                        });
+                        results.skipped.push({ hrms_id, half, reason: 'Record already exists' });
                         continue;
                     }
 
-                    // Get the limit from employee record
-                    const quarterlyLimit = employee.approved_other_minutes_limit || 120;
+                    const halfYearlyLimit = employee.approved_other_minutes_limit || 120;
 
-                    // Create new record (employee_id as string)
                     await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.create({
                         employee_id: String(hrms_id),
                         company,
                         year,
-                        quarter,
-                        total_minutes: quarterlyLimit,
+                        half,
+                        total_minutes: halfYearlyLimit,
                         used_minutes: 0,
-                        remaining_minutes: quarterlyLimit
+                        remaining_minutes: halfYearlyLimit
                     });
 
-                    results.created.push({
-                        hrms_id,
-                        quarter,
-                        total_minutes: quarterlyLimit
-                    });
+                    results.created.push({ hrms_id, half, total_minutes: halfYearlyLimit });
 
                 } catch (error) {
-                    results.errors.push({
-                        hrms_id,
-                        quarter,
-                        error: error.message
-                    });
+                    results.errors.push({ hrms_id, half, error: error.message });
                 }
             }
         }
@@ -111,8 +90,6 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Population error:', error);
-        return Response.json({ 
-            error: error.message 
-        }, { status: 500 });
+        return Response.json({ error: error.message }, { status: 500 });
     }
 });

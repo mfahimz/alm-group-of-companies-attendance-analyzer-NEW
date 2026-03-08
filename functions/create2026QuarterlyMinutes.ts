@@ -1,5 +1,13 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+/**
+ * Create H1 + H2 half-yearly minutes records for 2026
+ * for all active Al Maraghi Auto Repairs employees.
+ *
+ * Creates 2 records per employee:
+ *   H1 (half=1): Jan-Jun 2026
+ *   H2 (half=2): Jul-Dec 2026
+ */
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -9,40 +17,35 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized - Admin only' }, { status: 403 });
         }
 
-        // Fetch all active Al Maraghi employees with valid HRMS IDs
         const employees = await base44.asServiceRole.entities.Employee.filter({
             company: 'Al Maraghi Auto Repairs',
             active: true
         });
 
-        // Filter out employees with NULL or invalid HRMS IDs
-        const validEmployees = employees.filter(emp => 
-            emp.hrms_id && 
-            emp.hrms_id !== 'NULL' && 
-            emp.hrms_id !== null && 
+        const validEmployees = employees.filter(emp =>
+            emp.hrms_id &&
+            emp.hrms_id !== 'NULL' &&
+            emp.hrms_id !== null &&
             typeof emp.hrms_id === 'number'
         );
 
         console.log(`Found ${validEmployees.length} valid employees for Al Maraghi Auto Repairs`);
 
-        // Create Q1-Q4 2026 records for each employee
-        const quarters = [
-            { quarter: 1, year: 2026 },
-            { quarter: 2, year: 2026 },
-            { quarter: 3, year: 2026 },
-            { quarter: 4, year: 2026 }
+        // H1 (Jan-Jun) and H2 (Jul-Dec)
+        const halves = [
+            { half: 1, year: 2026 },
+            { half: 2, year: 2026 }
         ];
 
         const recordsToCreate = [];
-        
+
         for (const employee of validEmployees) {
-            for (const q of quarters) {
+            for (const h of halves) {
                 recordsToCreate.push({
                     employee_id: String(employee.hrms_id),
                     company: 'Al Maraghi Auto Repairs',
-                    year: q.year,
-                    quarter: q.quarter,
-                    allocation_type: 'calendar_quarter',
+                    year: h.year,
+                    half: h.half,
                     total_minutes: 120,
                     used_minutes: 0,
                     remaining_minutes: 120
@@ -50,9 +53,8 @@ Deno.serve(async (req) => {
             }
         }
 
-        console.log(`Creating ${recordsToCreate.length} quarterly minute records...`);
+        console.log(`Creating ${recordsToCreate.length} half-yearly minute records (H1+H2 2026)...`);
 
-        // Bulk create all records
         const created = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.bulkCreate(recordsToCreate);
 
         return Response.json({
@@ -67,8 +69,8 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('Error creating 2026 quarterly minutes:', error);
-        return Response.json({ 
+        console.error('Error creating 2026 half-yearly minutes:', error);
+        return Response.json({
             error: error.message,
             stack: error.stack
         }, { status: 500 });
