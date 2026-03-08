@@ -209,6 +209,7 @@ export default function HalfYearlyMinutesManagement() {
 
         updateMinutesMutation.mutate({
             recordId: record.id,
+            employeeHrmsId: record.employee_id,
             updates: {
                 total_minutes: totalMinutes,
                 used_minutes: usedMinutes,
