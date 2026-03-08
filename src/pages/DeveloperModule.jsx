@@ -38,6 +38,10 @@ import {
     ShieldAlert
 } from 'lucide-react';
 
+// Full implementations replacing the entity-explorer and function-runner placeholders
+import EntityExplorer from '@/components/developer/EntityExplorer';
+import FunctionRunner from '@/components/developer/FunctionRunner';
+
 /**
  * Internal navigation sections for the Developer Module.
  * This nav bar is scoped exclusively to this page and must never be
@@ -142,7 +146,16 @@ export default function DeveloperModule() {
 
             {/* SECTION CONTENT AREA */}
             <div className="mt-6">
-                <SectionPlaceholder section={currentSection} />
+                {/*
+                  Route to the full implementation components for entity-explorer and
+                  function-runner. All other sections still show the placeholder until
+                  their implementations are built in future prompts.
+                */}
+                {activeSection === 'entity-explorer' && <EntityExplorer />}
+                {activeSection === 'function-runner' && <FunctionRunner />}
+                {activeSection !== 'entity-explorer' && activeSection !== 'function-runner' && (
+                    <SectionPlaceholder section={currentSection} />
+                )}
             </div>
         </div>
     );
