@@ -15,7 +15,7 @@ export default function EmployeeProfile() {
     const queryClient = useQueryClient();
     const urlParams = new URLSearchParams(window.location.search);
     const employeeId = urlParams.get('id');
-    const [editingQuarter, setEditingQuarter] = useState(null);
+    const [editingHalf, setEditingHalf] = useState(null);
     const [editValue, setEditValue] = useState('');
 
     const { data: employee, isLoading } = useQuery({
@@ -37,16 +37,12 @@ export default function EmployeeProfile() {
         queryFn: () => base44.entities.Project.list()
     });
 
-    // Fetch ALL quarterly minutes (both calendar and project-based)
-    const { data: quarterlyMinutes = [] } = useQuery({
-        queryKey: ['quarterlyMinutes', employee?.hrms_id],
+    // Fetch half-yearly minutes for this employee (Al Maraghi Auto Repairs only)
+    const { data: halfYearlyMinutes = [] } = useQuery({
+        queryKey: ['halfYearlyMinutes', employee?.hrms_id],
         queryFn: async () => {
             if (!employee) return [];
-            
-            // Only fetch for Al Maraghi Auto Repairs
-            if (employee.company !== 'Al Maraghi Auto Repairs') {
-                return [];
-            }
+            if (employee.company !== 'Al Maraghi Auto Repairs') return [];
 
             // Fetch all allocations for this employee
             const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
@@ -54,22 +50,29 @@ export default function EmployeeProfile() {
                 company: employee.company
             });
 
-            // Also ensure current year calendar quarters exist
+            // Ensure current year H1 and H2 exist
             const year = new Date().getFullYear();
-            const quarters = [1, 2, 3, 4];
-            
-            for (const quarter of quarters) {
-                const exists = allMinutes.some(
-                    m => m.allocation_type === 'calendar_quarter' && m.year === year && m.quarter === quarter
-                );
+            const halves = [1, 2];
+            // Representative dates: Jan 1 → H1, Jul 1 → H2
+            const halfDates = { 1: `${year}-01-01`, 2: `${year}-07-01` };
+
+            for (const half of halves) {
+                const exists = allMinutes.some(m => m.year === year && m.half === half);
                 if (!exists) {
                     const response = await base44.functions.invoke('getOrCreateQuarterlyMinutes', {
-                        employee_id: employee.hrms_id,
+                        employee_id: String(employee.hrms_id),
                         company: employee.company,
-                        date: `${year}-${quarter * 3}-01`
+                        date: halfDates[half]
                     });
-                    if (response.data?.data) {
-                        allMinutes.push(response.data.data);
+                    if (response.data?.success && response.data?.record_id) {
+                        allMinutes.push({
+                            id: response.data.record_id,
+                            year: response.data.year,
+                            half: response.data.half,
+                            total_minutes: response.data.total_minutes,
+                            used_minutes: response.data.used_minutes,
+                            remaining_minutes: response.data.remaining_minutes
+                        });
                     }
                 }
             }
@@ -79,28 +82,28 @@ export default function EmployeeProfile() {
         enabled: !!employee && employee.company === 'Al Maraghi Auto Repairs'
     });
 
-    const updateQuarterlyMutation = useMutation({
-        mutationFn: async ({ id, total_minutes }) => {
-            const record = quarterlyMinutes.find(q => q.id === id);
+    const updateHalfYearlyMutation = useMutation({
+        mutationFn: async ({ id, employee_hrms_id, total_minutes }) => {
+            const record = halfYearlyMinutes.find(q => q.id === id);
             const newRemaining = Math.max(0, total_minutes - record.used_minutes);
-            
-            // Update EmployeeQuarterlyMinutes
+
             await base44.entities.EmployeeQuarterlyMinutes.update(id, {
-                total_minutes: total_minutes,
+                total_minutes,
                 remaining_minutes: newRemaining
             });
-            
-            // Sync back to Employee profile (bi-directional sync)
+
+            // Sync back to Employee profile
             await base44.functions.invoke('syncQuarterlyMinutesToEmployee', {
                 quarterly_minutes_id: id,
-                total_minutes: total_minutes
+                employee_hrms_id,
+                total_minutes
             });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['quarterlyMinutes']);
+            queryClient.invalidateQueries(['halfYearlyMinutes']);
             queryClient.invalidateQueries(['employee']);
-            toast.success('Quarterly minutes updated and synced');
-            setEditingQuarter(null);
+            toast.success('Half-yearly minutes updated and synced');
+            setEditingHalf(null);
         },
         onError: (error) => {
             toast.error('Failed to update: ' + error.message);
@@ -128,41 +131,37 @@ export default function EmployeeProfile() {
     const canEdit = currentUser?.role === 'admin' || currentUser?.extended_role === 'supervisor';
     const isAlMaraghi = employee.company === 'Al Maraghi Auto Repairs';
 
-    const handleEditQuarter = (quarter) => {
-        setEditingQuarter(quarter.id);
-        setEditValue(quarter.total_minutes.toString());
+    const handleEditHalf = (record) => {
+        setEditingHalf(record.id);
+        setEditValue(record.total_minutes.toString());
     };
 
-    const handleSaveQuarter = (quarterId) => {
+    const handleSaveHalf = (record) => {
         const value = parseInt(editValue);
         if (isNaN(value) || value < 0) {
             toast.error('Please enter a valid number');
             return;
         }
-        updateQuarterlyMutation.mutate({ id: quarterId, total_minutes: value });
+        updateHalfYearlyMutation.mutate({
+            id: record.id,
+            employee_hrms_id: employee.hrms_id,
+            total_minutes: value
+        });
     };
 
     const handleCancelEdit = () => {
-        setEditingQuarter(null);
+        setEditingHalf(null);
         setEditValue('');
     };
 
-    const getQuarterName = (quarter) => {
-        const names = {
-            1: 'Q1 (Jan-Mar)',
-            2: 'Q2 (Apr-Jun)',
-            3: 'Q3 (Jul-Sep)',
-            4: 'Q4 (Oct-Dec)'
-        };
-        return names[quarter] || `Q${quarter}`;
+    const getHalfName = (half) => {
+        const names = { 1: 'H1 (Jan-Jun)', 2: 'H2 (Jul-Dec)' };
+        return names[half] || `H${half}`;
     };
 
-    const getCurrentQuarter = () => {
-        const month = new Date().getMonth() + 1;
-        if (month <= 3) return 1;
-        if (month <= 6) return 2;
-        if (month <= 9) return 3;
-        return 4;
+    // Months 1-6 → H1, months 7-12 → H2
+    const getCurrentHalf = () => {
+        return new Date().getMonth() + 1 <= 6 ? 1 : 2;
     };
 
     return (
@@ -280,150 +279,56 @@ export default function EmployeeProfile() {
                     </CardContent>
                 </Card>
 
-                {/* Quarterly Other Minutes - Al Maraghi Auto Repairs Only */}
+                {/* Half-Yearly Other Minutes - Al Maraghi Auto Repairs Only */}
                 {isAlMaraghi && (
                     <Card className="border-0 shadow-md col-span-1 md:col-span-2 bg-gradient-to-br from-amber-50 to-orange-50">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Award className="w-5 h-5 text-amber-600" />
-                                Other Minutes Allowances
+                                Half-Yearly Minutes Allowances
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="mb-4 p-3 bg-white/60 rounded-lg">
                                 <p className="text-xs text-slate-600">
-                                    <strong>Policy:</strong> Employees receive other minutes allowances either by calendar quarter or by specific project period. 
+                                    <strong>Policy:</strong> Each employee receives 120 minutes per calendar half-year.
+                                    H1 covers January–June and H2 covers July–December.
                                     Department heads can approve usage to reduce salary deductions.
                                 </p>
                             </div>
 
-                            {/* Calendar Quarters */}
-                            {quarterlyMinutes.filter(q => q.allocation_type === 'calendar_quarter').length > 0 && (
-                                <>
-                                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Calendar Quarters ({new Date().getFullYear()})</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                                        {quarterlyMinutes
-                                            .filter(q => q.allocation_type === 'calendar_quarter')
-                                            .sort((a, b) => a.quarter - b.quarter)
-                                            .map((quarter) => {
-                                                const isCurrentQuarter = quarter.quarter === getCurrentQuarter();
-                                                const isEditing = editingQuarter === quarter.id;
-                                    
-                                                return (
-                                                    <div 
-                                                        key={quarter.id} 
-                                                        className={`p-4 rounded-lg border-2 ${
-                                                            isCurrentQuarter 
-                                                                ? 'border-amber-500 bg-white shadow-md' 
-                                                                : 'border-slate-200 bg-white/80'
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <h4 className="font-semibold text-slate-700">
-                                                                {getQuarterName(quarter.quarter)}
-                                                            </h4>
-                                                            {isCurrentQuarter && (
-                                                                <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded">
-                                                                    Current
-                                                                </span>
-                                                            )}
-                                                        </div>
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                                Calendar Half-Years ({new Date().getFullYear()})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                {halfYearlyMinutes
+                                    .filter(r => r.year === new Date().getFullYear())
+                                    .sort((a, b) => a.half - b.half)
+                                    .map((record) => {
+                                        const isCurrentHalf = record.half === getCurrentHalf();
+                                        const isEditing = editingHalf === record.id;
 
-                                                            {isEditing ? (
-                                                                <div className="space-y-2">
-                                                    <Input
-                                                        type="number"
-                                                        value={editValue}
-                                                        onChange={(e) => setEditValue(e.target.value)}
-                                                        className="h-8"
-                                                        min="0"
-                                                    />
-                                                    <div className="flex gap-1">
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => handleSaveQuarter(quarter.id)}
-                                                            className="flex-1 h-7"
-                                                        >
-                                                            <Save className="w-3 h-3 mr-1" />
-                                                            Save
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={handleCancelEdit}
-                                                            className="h-7"
-                                                        >
-                                                            <X className="w-3 h-3" />
-                                                        </Button>
-                                                    </div>
-                                                    </div>
-                                                    ) : (
-                                                    <>
-                                                    <div className="flex items-baseline justify-between mb-1">
-                                                        <span className="text-xs text-slate-500">Total:</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-lg font-bold text-slate-900">
-                                                                {quarter.total_minutes}
-                                                            </span>
-                                                            {canEdit && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => handleEditQuarter(quarter)}
-                                                                    className="h-6 w-6 p-0"
-                                                                >
-                                                                    <Edit2 className="w-3 h-3" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-baseline justify-between mb-1">
-                                                        <span className="text-xs text-slate-500">Used:</span>
-                                                        <span className="text-sm font-medium text-red-600">
-                                                            {quarter.used_minutes}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-baseline justify-between">
-                                                        <span className="text-xs text-slate-500">Remaining:</span>
-                                                        <span className="text-sm font-bold text-green-600">
-                                                            {quarter.remaining_minutes}
-                                                        </span>
-                                                    </div>
-                                                    </>
-                                                    )}
-                                                    </div>
-                                                    );
-                                                    })}
-                                                    </div>
-                                                    </>
-                                                    )}
-
-                                                    {/* Project Period Allocations */}
-                                                    {quarterlyMinutes.filter(q => q.allocation_type === 'project_period').length > 0 && (
-                                                    <>
-                                                    <h3 className="text-sm font-semibold text-slate-700 mb-3 mt-6">Project-Based Allocations</h3>
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    {quarterlyMinutes
-                                                    .filter(q => q.allocation_type === 'project_period')
-                                                    .map((allocation) => {
-                                                    const isEditing = editingQuarter === allocation.id;
-                                                    const project = projects.find(p => p.id === allocation.project_id);
-
-                                                    return (
-                                                    <div 
-                                                    key={allocation.id} 
-                                                    className="p-4 rounded-lg border-2 border-purple-300 bg-white shadow-sm"
-                                                    >
-                                                    <div className="mb-2">
-                                                    <h4 className="font-semibold text-slate-700 text-sm">
-                                                        {project?.name || 'Unknown Project'}
+                                        return (
+                                            <div
+                                                key={record.id}
+                                                className={`p-4 rounded-lg border-2 ${
+                                                    isCurrentHalf
+                                                        ? 'border-amber-500 bg-white shadow-md'
+                                                        : 'border-slate-200 bg-white/80'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="font-semibold text-slate-700">
+                                                        {getHalfName(record.half)}
                                                     </h4>
-                                                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded mt-1 inline-block">
-                                                        Project Period
-                                                    </span>
-                                                    </div>
+                                                    {isCurrentHalf && (
+                                                        <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded">
+                                                            Current
+                                                        </span>
+                                                    )}
+                                                </div>
 
-                                                    {isEditing ? (
+                                                {isEditing ? (
                                                     <div className="space-y-2">
                                                         <Input
                                                             type="number"
@@ -435,7 +340,7 @@ export default function EmployeeProfile() {
                                                         <div className="flex gap-1">
                                                             <Button
                                                                 size="sm"
-                                                                onClick={() => handleSaveQuarter(allocation.id)}
+                                                                onClick={() => handleSaveHalf(record)}
                                                                 className="flex-1 h-7"
                                                             >
                                                                 <Save className="w-3 h-3 mr-1" />
@@ -451,19 +356,19 @@ export default function EmployeeProfile() {
                                                             </Button>
                                                         </div>
                                                     </div>
-                                                    ) : (
+                                                ) : (
                                                     <>
                                                         <div className="flex items-baseline justify-between mb-1">
                                                             <span className="text-xs text-slate-500">Total:</span>
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-lg font-bold text-slate-900">
-                                                                    {allocation.total_minutes}
+                                                                    {record.total_minutes}
                                                                 </span>
                                                                 {canEdit && (
                                                                     <Button
                                                                         size="sm"
                                                                         variant="ghost"
-                                                                        onClick={() => handleEditQuarter(allocation)}
+                                                                        onClick={() => handleEditHalf(record)}
                                                                         className="h-6 w-6 p-0"
                                                                     >
                                                                         <Edit2 className="w-3 h-3" />
@@ -474,23 +379,92 @@ export default function EmployeeProfile() {
                                                         <div className="flex items-baseline justify-between mb-1">
                                                             <span className="text-xs text-slate-500">Used:</span>
                                                             <span className="text-sm font-medium text-red-600">
-                                                                {allocation.used_minutes}
+                                                                {record.used_minutes}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-baseline justify-between">
                                                             <span className="text-xs text-slate-500">Remaining:</span>
                                                             <span className="text-sm font-bold text-green-600">
-                                                                {allocation.remaining_minutes}
+                                                                {record.remaining_minutes}
                                                             </span>
                                                         </div>
                                                     </>
-                                                    )}
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+
+                            {/* Project Period Allocations (legacy — shown if present) */}
+                            {halfYearlyMinutes.filter(q => q.allocation_type === 'project_period').length > 0 && (
+                                <>
+                                    <h3 className="text-sm font-semibold text-slate-700 mb-3 mt-6">Project-Based Allocations</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {halfYearlyMinutes
+                                            .filter(q => q.allocation_type === 'project_period')
+                                            .map((allocation) => {
+                                                const isEditing = editingHalf === allocation.id;
+                                                const project = projects.find(p => p.id === allocation.project_id);
+                                                return (
+                                                    <div
+                                                        key={allocation.id}
+                                                        className="p-4 rounded-lg border-2 border-purple-300 bg-white shadow-sm"
+                                                    >
+                                                        <div className="mb-2">
+                                                            <h4 className="font-semibold text-slate-700 text-sm">
+                                                                {project?.name || 'Unknown Project'}
+                                                            </h4>
+                                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded mt-1 inline-block">
+                                                                Project Period
+                                                            </span>
+                                                        </div>
+                                                        {isEditing ? (
+                                                            <div className="space-y-2">
+                                                                <Input
+                                                                    type="number"
+                                                                    value={editValue}
+                                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                                    className="h-8"
+                                                                    min="0"
+                                                                />
+                                                                <div className="flex gap-1">
+                                                                    <Button size="sm" onClick={() => handleSaveHalf(allocation)} className="flex-1 h-7">
+                                                                        <Save className="w-3 h-3 mr-1" />Save
+                                                                    </Button>
+                                                                    <Button size="sm" variant="outline" onClick={handleCancelEdit} className="h-7">
+                                                                        <X className="w-3 h-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex items-baseline justify-between mb-1">
+                                                                    <span className="text-xs text-slate-500">Total:</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-lg font-bold text-slate-900">{allocation.total_minutes}</span>
+                                                                        {canEdit && (
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleEditHalf(allocation)} className="h-6 w-6 p-0">
+                                                                                <Edit2 className="w-3 h-3" />
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-baseline justify-between mb-1">
+                                                                    <span className="text-xs text-slate-500">Used:</span>
+                                                                    <span className="text-sm font-medium text-red-600">{allocation.used_minutes}</span>
+                                                                </div>
+                                                                <div className="flex items-baseline justify-between">
+                                                                    <span className="text-xs text-slate-500">Remaining:</span>
+                                                                    <span className="text-sm font-bold text-green-600">{allocation.remaining_minutes}</span>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
-                                                    );
-                                                    })}
-                                                    </div>
-                                                    </>
-                                                    )}
+                                                );
+                                            })}
+                                    </div>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
                 )}
