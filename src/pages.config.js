@@ -70,7 +70,6 @@ import Maintenance from './pages/Maintenance';
 import MaintenanceSettings from './pages/MaintenanceSettings';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
-import QuarterlyMinutesDocumentation from './pages/QuarterlyMinutesDocumentation';
 import reportArchitecture from './pages/REPORT_ARCHITECTURE';
 import RamadanSchedules from './pages/RamadanSchedules';
 import ReportDetail from './pages/ReportDetail';
@@ -81,7 +80,6 @@ import SalaryIncrements from './pages/SalaryIncrements';
 import SalaryReportDetail from './pages/SalaryReportDetail';
 import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestDataViewer from './pages/TestDataViewer';
-import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import HalfYearlyMinutesManagement from './pages/HalfYearlyMinutesManagement';
@@ -112,7 +110,6 @@ export const PAGES = {
     "MaintenanceSettings": MaintenanceSettings,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
-    "QuarterlyMinutesDocumentation": QuarterlyMinutesDocumentation,
     "REPORT_ARCHITECTURE": reportArchitecture,
     "RamadanSchedules": RamadanSchedules,
     "ReportDetail": ReportDetail,
@@ -123,7 +120,6 @@ export const PAGES = {
     "SalaryReportDetail": SalaryReportDetail,
     "TechnicalDocumentation": TechnicalDocumentation,
     "TestDataViewer": TestDataViewer,
-    "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
     "HalfYearlyMinutesManagement": HalfYearlyMinutesManagement,

@@ -75,11 +75,13 @@ export default function HalfYearlyMinutesManagement() {
     };
 
     const updateMinutesMutation = useMutation({
-        mutationFn: async ({ recordId, updates }) => {
+        mutationFn: async ({ recordId, employeeHrmsId, updates }) => {
             const result = await base44.entities.EmployeeQuarterlyMinutes.update(recordId, updates);
             if (updates.total_minutes !== undefined) {
+                // Pass employee_hrms_id directly to avoid unreliable filter-by-id lookup in the function
                 await base44.functions.invoke('syncQuarterlyMinutesToEmployee', {
                     quarterly_minutes_id: recordId,
+                    employee_hrms_id: employeeHrmsId,
                     total_minutes: updates.total_minutes
                 });
             }

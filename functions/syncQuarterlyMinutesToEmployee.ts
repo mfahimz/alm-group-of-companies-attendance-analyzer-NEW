@@ -4,33 +4,42 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
         
-        const { quarterly_minutes_id, total_minutes } = await req.json();
+        // MIGRATION NOTE: System migrated from quarterly to half-yearly.
+        // `employee_hrms_id` is now passed directly from the page to avoid
+        // an unreliable filter({ id }) lookup on the EmployeeQuarterlyMinutes entity.
+        const { quarterly_minutes_id, employee_hrms_id, total_minutes } = await req.json();
         
-        if (!quarterly_minutes_id || total_minutes === undefined) {
-            return Response.json({ error: 'quarterly_minutes_id and total_minutes required' }, { status: 400 });
+        if (total_minutes === undefined) {
+            return Response.json({ error: 'total_minutes required' }, { status: 400 });
+        }
+
+        let hrmsId = employee_hrms_id;
+
+        // Fallback: if employee_hrms_id not provided, resolve via quarterly record
+        if (!hrmsId) {
+            if (!quarterly_minutes_id) {
+                return Response.json({ error: 'employee_hrms_id or quarterly_minutes_id required' }, { status: 400 });
+            }
+            const allRecords = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.list();
+            const record = allRecords.find(r => r.id === quarterly_minutes_id);
+            if (!record) {
+                return Response.json({ error: 'Half-yearly minutes record not found' }, { status: 404 });
+            }
+            hrmsId = record.employee_id;
         }
         
-        // Get quarterly minutes record
-        const records = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({ 
-            id: quarterly_minutes_id 
-        });
-        
-        if (records.length === 0) {
-            return Response.json({ error: 'Quarterly minutes record not found' }, { status: 404 });
-        }
-        
-        const record = records[0];
-        
-        // Get employee by hrms_id
+        // Find employee by hrms_id — try both string and integer match
         const employees = await base44.asServiceRole.entities.Employee.filter({
-            hrms_id: parseInt(record.employee_id)
+            hrms_id: String(hrmsId)
         });
+        const employees2 = employees.length === 0
+            ? await base44.asServiceRole.entities.Employee.filter({ hrms_id: parseInt(hrmsId) })
+            : [];
         
-        if (employees.length === 0) {
-            return Response.json({ error: 'Employee not found' }, { status: 404 });
+        const employee = employees[0] || employees2[0];
+        if (!employee) {
+            return Response.json({ error: `Employee not found for hrms_id: ${hrmsId}` }, { status: 404 });
         }
-        
-        const employee = employees[0];
         
         // Sync total_minutes back to employee profile
         await base44.asServiceRole.entities.Employee.update(employee.id, {
@@ -39,11 +48,11 @@ Deno.serve(async (req) => {
         
         return Response.json({ 
             success: true, 
-            message: 'Employee profile synced from quarterly minutes' 
+            message: 'Employee profile synced from half-yearly minutes' 
         });
         
     } catch (error) {
-        console.error('Sync quarterly minutes to employee error:', error);
+        console.error('Sync half-yearly minutes to employee error:', error);
         return Response.json({ error: error.message }, { status: 500 });
     }
 });
