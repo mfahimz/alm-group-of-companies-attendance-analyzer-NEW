@@ -18,7 +18,7 @@ export default function QuarterlyMinutesManagement() {
     const [searchQuery, setSearchQuery] = useState('');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [yearFilter, setYearFilter] = useState('all');
-    const [quarterFilter, setQuarterFilter] = useState('all');
+    const [halfFilter, setHalfFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_name', direction: 'asc' });
     const [editingValues, setEditingValues] = useState({});
     const [selectedRecords, setSelectedRecords] = useState([]);
@@ -63,15 +63,13 @@ export default function QuarterlyMinutesManagement() {
         queryFn: () => base44.entities.CompanySettings.list()
     });
 
-    // Get quarter period display
-    const getQuarterPeriod = (quarter, year) => {
+    // Terminology migrated from quarterly to half-yearly to match new entity structure (year + half).
+    const getHalfYearPeriod = (half, year) => {
         const periods = {
-            1: `Jan-Mar ${year}`,
-            2: `Apr-Jun ${year}`,
-            3: `Jul-Sep ${year}`,
-            4: `Oct-Dec ${year}`
+            1: `H1 Jan-Jun ${year}`,
+            2: `H2 Jul-Dec ${year}`
         };
-        return periods[quarter] || `Q${quarter} ${year}`;
+        return periods[half] || `H${half} ${year}`;
     };
 
     const updateMinutesMutation = useMutation({
@@ -92,7 +90,7 @@ export default function QuarterlyMinutesManagement() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['quarterlyMinutes'] });
             queryClient.invalidateQueries({ queryKey: ['employees'] });
-            toast.success('Quarterly minutes updated and synced to employee profile');
+            toast.success('Half-yearly minutes updated and synced to employee profile');
         },
         onError: (error) => {
             toast.error('Failed to update: ' + error.message);
@@ -130,7 +128,7 @@ export default function QuarterlyMinutesManagement() {
         }
     });
 
-    // Combine employee and quarterly minutes data
+    // Combine employee and half-yearly minutes data
     const combinedData = useMemo(() => {
         return quarterlyMinutes.map(qm => {
             const employee = employees.find(e => 
@@ -145,7 +143,7 @@ export default function QuarterlyMinutesManagement() {
                 employee_attendance_id: employee?.attendance_id || '-',
                 employee_company: employee?.company || qm.company,
                 employee_department: employee?.department || '-',
-                quarter_period: getQuarterPeriod(qm.quarter, qm.year)
+                half_year_period: getHalfYearPeriod(qm.half, qm.year)
             };
         });
     }, [quarterlyMinutes, employees]);
@@ -161,12 +159,12 @@ export default function QuarterlyMinutesManagement() {
             const matchesCompany = !companyFilter || item.employee_company === companyFilter;
             const matchesDepartment = departmentFilter === 'all' || item.employee_department === departmentFilter;
             const matchesYear = yearFilter === 'all' || String(item.year) === yearFilter;
-            const matchesQuarter = quarterFilter === 'all' || String(item.quarter) === quarterFilter;
+            const matchesHalf = halfFilter === 'all' || String(item.half) === halfFilter;
 
             // User role filtering
             const matchesRole = isAdminOrCEO || item.employee_company === userCompany;
 
-            return matchesSearch && matchesCompany && matchesDepartment && matchesYear && matchesQuarter && matchesRole;
+            return matchesSearch && matchesCompany && matchesDepartment && matchesYear && matchesHalf && matchesRole;
         });
 
         // Sort
@@ -185,7 +183,7 @@ export default function QuarterlyMinutesManagement() {
         });
 
         return filtered;
-    }, [combinedData, searchQuery, companyFilter, departmentFilter, yearFilter, quarterFilter, sortConfig, isAdminOrCEO, userCompany]);
+    }, [combinedData, searchQuery, companyFilter, departmentFilter, yearFilter, halfFilter, sortConfig, isAdminOrCEO, userCompany]);
 
     const handleSort = (key) => {
         setSortConfig(prev => ({
@@ -230,7 +228,7 @@ export default function QuarterlyMinutesManagement() {
     };
 
     const handleDelete = (recordId) => {
-        if (confirm('Are you sure you want to delete this quarterly minutes record?')) {
+        if (confirm('Are you sure you want to delete this half-yearly minutes record?')) {
             deleteRecordMutation.mutate(recordId);
         }
     };
@@ -264,7 +262,7 @@ export default function QuarterlyMinutesManagement() {
     const availableCompanies = [...new Set(combinedData.map(d => d.employee_company))].filter(Boolean);
     const availableDepartments = [...new Set(combinedData.map(d => d.employee_department))].filter(Boolean);
     const availableYears = [...new Set(combinedData.map(d => d.year))].filter(Boolean).sort((a, b) => b - a);
-    const availableQuarters = [...new Set(combinedData.map(d => d.quarter))].filter(Boolean).sort();
+    const availableHalves = [...new Set(combinedData.map(d => d.half))].filter(Boolean).sort();
 
     if (employeesLoading || minutesLoading) {
         return (
@@ -278,7 +276,7 @@ export default function QuarterlyMinutesManagement() {
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Quarterly Minutes Management</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">Half-Yearly Minutes Management</h1>
                     <p className="text-sm text-slate-600 mt-1">
                         Manage approved minutes allowances for all employees
                     </p>
@@ -297,12 +295,12 @@ export default function QuarterlyMinutesManagement() {
                     <Button
                         variant="destructive"
                         onClick={() => {
-                            const invalidRecords = combinedData.filter(r => !r.year || !r.quarter);
+                            const invalidRecords = combinedData.filter(r => !r.year || !r.half);
                             if (invalidRecords.length === 0) {
-                                toast.info('No records without year/quarter found');
+                                toast.info('No records without year/half found');
                                 return;
                             }
-                            if (confirm(`Delete ${invalidRecords.length} record(s) without year/quarter?`)) {
+                            if (confirm(`Delete ${invalidRecords.length} record(s) without year/half?`)) {
                                 bulkDeleteMutation.mutate(invalidRecords.map(r => r.id));
                             }
                         }}
@@ -365,14 +363,14 @@ export default function QuarterlyMinutesManagement() {
                             </SelectContent>
                         </Select>
 
-                        <Select value={quarterFilter} onValueChange={setQuarterFilter}>
+                        <Select value={halfFilter} onValueChange={setHalfFilter}>
                             <SelectTrigger>
-                                <SelectValue placeholder="All Quarters" />
+                                <SelectValue placeholder="All Half-Years" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Quarters</SelectItem>
-                                {availableQuarters.map(q => (
-                                    <SelectItem key={q} value={String(q)}>Q{q}</SelectItem>
+                                <SelectItem value="all">All Half-Years</SelectItem>
+                                {availableHalves.map(h => (
+                                    <SelectItem key={h} value={String(h)}>{h === 1 ? "First Half (Jan-Jun)" : "Second Half (Jul-Dec)"}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -386,11 +384,11 @@ export default function QuarterlyMinutesManagement() {
                     <div className="flex items-start gap-3">
                         <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
                         <div className="text-sm text-blue-900">
-                            <p className="font-medium">📅 Calendar-Based Quarterly Tracking</p>
+                            <p className="font-medium">📅 Calendar-Based Half-Yearly Tracking</p>
                             <p className="text-blue-800 mt-1">
-                                Each employee gets 120 minutes per calendar quarter (Q1: Jan-Mar, Q2: Apr-Jun, Q3: Jul-Sep, Q4: Oct-Dec). 
-                                Minutes are shared across ALL projects in that quarter. When a department head approves minutes on any date, 
-                                it deducts from that quarter's allowance regardless of which project is running.
+                                Each employee gets 120 minutes per calendar half-year (H1: Jan-Jun, H2: Jul-Dec).
+                                Minutes are shared across ALL projects in that half-year. When a department head approves minutes on any date,
+                                it deducts from that half-year allowance regardless of which project is running.
                             </p>
                         </div>
                     </div>
@@ -401,7 +399,7 @@ export default function QuarterlyMinutesManagement() {
             <Card>
                 <CardHeader>
                     <CardTitle>
-                        Quarterly Minutes Records
+                        Half-Yearly Minutes Records
                         <span className="text-sm font-normal text-slate-600 ml-3">
                             ({filteredAndSortedData.length} records)
                         </span>
@@ -459,8 +457,8 @@ export default function QuarterlyMinutesManagement() {
                                         onSort={handleSort}
                                     />
                                     <SortableTableHead
-                                        label="Quarter"
-                                        sortKey="quarter"
+                                        label="Half-Year"
+                                        sortKey="half"
                                         currentSort={sortConfig}
                                         onSort={handleSort}
                                     />
@@ -490,7 +488,7 @@ export default function QuarterlyMinutesManagement() {
                                 {filteredAndSortedData.length === 0 ? (
                                    <TableRow>
                                        <TableCell colSpan={isAdminOrCEO ? 13 : 12} className="text-center py-8 text-slate-500">
-                                           No quarterly minutes records found
+                                           No half-yearly minutes records found
                                        </TableCell>
                                    </TableRow>
                                 ) : (
@@ -531,7 +529,7 @@ export default function QuarterlyMinutesManagement() {
                                                 </TableCell>
                                                 <TableCell>{record.year || '-'}</TableCell>
                                                 <TableCell>
-                                                    {record.quarter ? `Q${record.quarter}` : '-'}
+                                                    {record.half ? `H${record.half}` : '-'}
                                                 </TableCell>
                                                 <TableCell>
                                                     {isEditing ? (
@@ -566,7 +564,7 @@ export default function QuarterlyMinutesManagement() {
                                                     </span>
                                                 </TableCell>
                                                 <TableCell className="text-sm text-slate-700">
-                                                    {record.quarter_period}
+                                                    {record.half_year_period}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {isEditing ? (
