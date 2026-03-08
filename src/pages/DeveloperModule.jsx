@@ -38,12 +38,14 @@ import {
     ShieldAlert
 } from 'lucide-react';
 
-// Full implementations replacing the entity-explorer, function-runner,
-// employee-inspector, and system-health placeholders
+// Full implementations for all seven Developer Module sections
 import EntityExplorer from '@/components/developer/EntityExplorer';
 import FunctionRunner from '@/components/developer/FunctionRunner';
 import EmployeeInspector from '@/components/developer/EmployeeInspector';
 import SystemHealth from '@/components/developer/SystemHealth';
+import LiveLogs from '@/components/developer/LiveLogs';
+import ChangeHistory from '@/components/developer/ChangeHistory';
+import ChangeManagement from '@/components/developer/ChangeManagement';
 
 /**
  * Internal navigation sections for the Developer Module.
@@ -59,21 +61,6 @@ const SECTIONS = [
     { key: 'change-history', label: 'Change History', icon: History },
     { key: 'change-management', label: 'Change Management', icon: GitCompareArrows },
 ];
-
-/** Placeholder content for each section — will be replaced in future prompts. */
-function SectionPlaceholder({ section }) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-slate-300 rounded-xl bg-white">
-            <section.icon className="w-12 h-12 text-slate-400 mb-4" />
-            <h2 className="text-xl font-semibold text-slate-700 mb-2">
-                {section.label}
-            </h2>
-            <p className="text-sm text-slate-500">
-                Placeholder — implementation coming soon.
-            </p>
-        </div>
-    );
-}
 
 export default function DeveloperModule() {
     usePageTitle('Developer Module');
@@ -150,18 +137,16 @@ export default function DeveloperModule() {
             {/* SECTION CONTENT AREA */}
             <div className="mt-6">
                 {/*
-                  Route to the full implementation components for entity-explorer,
-                  function-runner, employee-inspector, and system-health. All other
-                  sections still show the placeholder until their implementations
-                  are built in future prompts.
+                  All seven sections are now fully implemented.
+                  Each section renders its dedicated component.
                 */}
                 {activeSection === 'entity-explorer' && <EntityExplorer />}
                 {activeSection === 'function-runner' && <FunctionRunner />}
                 {activeSection === 'employee-inspector' && <EmployeeInspector />}
                 {activeSection === 'system-health' && <SystemHealth />}
-                {activeSection !== 'entity-explorer' && activeSection !== 'function-runner' && activeSection !== 'employee-inspector' && activeSection !== 'system-health' && (
-                    <SectionPlaceholder section={currentSection} />
-                )}
+                {activeSection === 'live-logs' && <LiveLogs />}
+                {activeSection === 'change-history' && <ChangeHistory />}
+                {activeSection === 'change-management' && <ChangeManagement />}
             </div>
         </div>
     );
