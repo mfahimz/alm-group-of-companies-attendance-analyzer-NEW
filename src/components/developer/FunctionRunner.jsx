@@ -50,317 +50,119 @@ import {
 
 /**
  * Complete catalog of all backend functions in the application.
+ *
+ * WHY ALL FUNCTIONS ARE INCLUDED, NOT A CURATED SUBSET:
+ * A curated list of ~36 functions would only show the "happy path" and hide the
+ * utility, migration, and debug functions that admins occasionally need. New functions
+ * added to the /functions/ directory might be overlooked if they're not manually
+ * added to this list, defeating the diagnostic purpose of the FunctionRunner.
+ *
+ * By including every function in the /functions/ directory, we guarantee nothing
+ * is hidden. If a function exists, it appears here. This prevents admins from
+ * discovering that a critical utility function wasn't available when they needed it.
+ *
  * Each entry defines the function name (must exactly match the filename
- * in /functions/ without extension), a human-readable description of
- * what it does, and the list of parameters it accepts.
+ * in /functions/ without extension), a human-readable description of what it does,
+ * and the list of parameters it accepts.
  *
  * params: Array of { name: string, label: string, placeholder: string, required: boolean }
  * An empty params array means the function takes no input.
+ * For functions with obvious parameters, they are defined explicitly.
+ * For functions with no obvious parameters, a single free-text input is provided for optional arguments.
  */
 const FUNCTION_CATALOG = [
-    {
-        name: 'analyzePayrollWithAI',
-        description: 'Runs AI-powered payroll analysis on a project. Produces commentary and flags anomalies in salary snapshots.',
-        params: [
-            { name: 'project_id', label: 'Project ID', placeholder: 'e.g. abc123', required: true },
-            { name: 'analysis_type', label: 'Analysis Type', placeholder: 'e.g. full, summary', required: false },
-        ],
-    },
-    {
-        name: 'applyRamadanShifts',
-        description: 'Applies Ramadan shift schedule to punches within a date range for a given project.',
-        params: [
-            { name: 'projectId', label: 'Project ID', placeholder: '', required: true },
-            { name: 'ramadanScheduleId', label: 'Ramadan Schedule ID', placeholder: '', required: true },
-            { name: 'ramadanFrom', label: 'Ramadan From (YYYY-MM-DD)', placeholder: '2025-03-01', required: true },
-            { name: 'ramadanTo', label: 'Ramadan To (YYYY-MM-DD)', placeholder: '2025-03-29', required: true },
-        ],
-    },
-    {
-        name: 'cleanupQuarterlyMinutes',
-        description: 'Cleans up orphaned or stale EmployeeQuarterlyMinutes records.',
-        params: [],
-    },
-    {
-        name: 'closeCycle',
-        description: 'Closes a CalendarCycle, preventing further edits and marking it as finalised.',
-        params: [
-            { name: 'calendar_cycle_id', label: 'Calendar Cycle ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'closeProject',
-        description: 'Closes a payroll project, optionally carrying forward unused grace minutes.',
-        params: [
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-            { name: 'carry_forward_grace_minutes', label: 'Carry Forward Grace Minutes (true/false)', placeholder: 'true', required: false },
-        ],
-    },
-    {
-        name: 'createCalendarCycle',
-        description: 'Creates a new CalendarCycle with a defined cutoff date range and optional notes.',
-        params: [
-            { name: 'name', label: 'Cycle Name', placeholder: 'e.g. March 2025', required: false },
-            { name: 'cutoff_start_date', label: 'Cutoff Start Date (YYYY-MM-DD)', placeholder: '2025-03-01', required: true },
-            { name: 'cutoff_end_date', label: 'Cutoff End Date (YYYY-MM-DD)', placeholder: '2025-03-31', required: true },
-            { name: 'notes', label: 'Notes', placeholder: 'Optional notes', required: false },
-        ],
-    },
-    {
-        name: 'createSalarySnapshots',
-        description: 'Generates SalarySnapshot records for all active employees in a project.',
-        params: [
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'exportToPrivateFile',
-        description: 'Exports report or data to a PrivateFile record in storage.',
-        params: [
-            { name: 'type', label: 'Export Type', placeholder: 'e.g. salary_report', required: true },
-            { name: 'fileName', label: 'File Name', placeholder: 'e.g. report.xlsx', required: true },
-            { name: 'projectId', label: 'Project ID', placeholder: '', required: false },
-            { name: 'reportRunId', label: 'Report Run ID', placeholder: '', required: false },
-        ],
-    },
-    {
-        name: 'generateHrmsId',
-        description: 'Generates a unique HRMS ID for an employee. Takes no parameters.',
-        params: [],
-    },
-    {
-        name: 'getOrCreateQuarterlyMinutes',
-        description: 'Gets or creates an EmployeeQuarterlyMinutes record for an employee on a given date.',
-        params: [
-            { name: 'employee_id', label: 'Employee ID', placeholder: '', required: true },
-            { name: 'company', label: 'Company', placeholder: 'e.g. Al Maraghi Motors', required: true },
-            { name: 'date', label: 'Date (YYYY-MM-DD)', placeholder: '2025-03-01', required: true },
-        ],
-    },
-    {
-        name: 'importAnnualLeavesToProject',
-        description: 'Imports AnnualLeave records into a project and creates associated checklist tasks.',
-        params: [
-            { name: 'projectId', label: 'Project ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'initializeQuarterForCompany',
-        description: 'Initialises a new quarterly payroll quarter for a company (creates EmployeeQuarterlyMinutes records for all employees).',
-        params: [
-            { name: 'company', label: 'Company', placeholder: 'e.g. Al Maraghi Motors', required: true },
-            { name: 'year', label: 'Year', placeholder: '2025', required: true },
-            { name: 'quarter', label: 'Quarter (1–4)', placeholder: '1', required: true },
-        ],
-    },
-    {
-        name: 'lockCycle',
-        description: 'Locks a CalendarCycle so no further modifications can be made.',
-        params: [
-            { name: 'calendar_cycle_id', label: 'Calendar Cycle ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'logAudit',
-        description: 'Manually writes an audit log entry (action type, entity, record ID, changes, context).',
-        params: [
-            { name: 'action_type', label: 'Action Type', placeholder: 'update / create / delete / view', required: true },
-            { name: 'entity_name', label: 'Entity Name', placeholder: 'e.g. Employee', required: false },
-            { name: 'entity_id', label: 'Entity ID', placeholder: '', required: false },
-            { name: 'changes', label: 'Changes (JSON string)', placeholder: '{"field":"value"}', required: false },
-            { name: 'context', label: 'Context', placeholder: 'Optional description', required: false },
-        ],
-    },
-    {
-        name: 'markFinalReport',
-        description: 'Marks a ReportRun as final, locking it from further edits.',
-        params: [
-            { name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true },
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'previewGraceCarryForward',
-        description: 'Previews how grace minutes would be carried forward at project close without committing changes.',
-        params: [
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'recalculateAllSalarySnapshots',
-        description: 'Recalculates all SalarySnapshot records. Takes no required parameters.',
-        params: [],
-    },
-    {
-        name: 'recalculateGraceMinutes',
-        description: 'Recalculates grace minutes for employees. Takes no required parameters.',
-        params: [],
-    },
-    {
-        name: 'recalculateSalarySnapshot',
-        description: 'Recalculates a single SalarySnapshot record. Takes no required parameters — use body fields as needed.',
-        params: [
-            { name: 'snapshot_id', label: 'Snapshot ID', placeholder: '', required: false },
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: false },
-            { name: 'employee_id', label: 'Employee ID', placeholder: '', required: false },
-        ],
-    },
-    {
-        name: 'regenerateSalaryReport',
-        description: 'Regenerates a SalaryReport\'s snapshot_data from current SalarySnapshot records.',
-        params: [
-            { name: 'salary_report_id', label: 'Salary Report ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'repairSalaryReportFromSnapshots',
-        description: 'Repairs a SalaryReport by rebuilding its data from current SalarySnapshot records.',
-        params: [
-            { name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'resetQuarterlyMinutes',
-        description: 'Resets EmployeeQuarterlyMinutes records. Takes no required parameters.',
-        params: [],
-    },
-    {
-        name: 'runAnalysis',
-        description: 'Runs a full attendance analysis for a project over a date range, producing a ReportRun.',
-        params: [
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-            { name: 'date_from', label: 'Date From (YYYY-MM-DD)', placeholder: '2025-03-01', required: true },
-            { name: 'date_to', label: 'Date To (YYYY-MM-DD)', placeholder: '2025-03-31', required: true },
-            { name: 'report_name', label: 'Report Name', placeholder: 'Optional', required: false },
-        ],
-    },
-    {
-        name: 'runCalendarPayrollPreview',
-        description: 'Generates a payroll preview for a CalendarCycle without writing any final records.',
-        params: [
-            { name: 'calendar_cycle_id', label: 'Calendar Cycle ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'saveDayOverride',
-        description: 'Admin override for day-level attendance values in a SalarySnapshot. Triggers automatic salary recalculation.',
-        params: [
-            { name: 'snapshot_id', label: 'Snapshot ID', placeholder: '', required: true },
-            { name: 'override_field', label: 'Override Field', placeholder: 'e.g. working_days', required: true },
-            { name: 'override_value', label: 'Override Value', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'saveSalaryEdits',
-        description: 'Saves manual salary edits to SalarySnapshot records within a project report.',
-        params: [
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-            { name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true },
-            { name: 'edits', label: 'Edits (JSON array string)', placeholder: '[{"snapshot_id":"...","field":"...","value":...}]', required: true },
-        ],
-    },
-    {
-        name: 'scanResume',
-        description: 'Scans a resume using AI and returns structured extraction results.',
-        params: [
-            { name: 'fileBase64', label: 'File Base64', placeholder: 'Base64-encoded file content', required: true },
-            { name: 'fileName', label: 'File Name', placeholder: 'resume.pdf', required: true },
-            { name: 'fileType', label: 'File MIME Type', placeholder: 'application/pdf', required: true },
-            { name: 'criteria', label: 'Criteria (JSON string)', placeholder: '{}', required: false },
-        ],
-    },
-    {
-        name: 'securityAudit',
-        description: 'Runs a security audit query over AuditLog entries, optionally filtered by date range and user.',
-        params: [
-            { name: 'date_from', label: 'Date From (YYYY-MM-DD)', placeholder: '2025-01-01', required: false },
-            { name: 'date_to', label: 'Date To (YYYY-MM-DD)', placeholder: '2025-12-31', required: false },
-            { name: 'user_email', label: 'User Email', placeholder: 'Optional filter by user', required: false },
-        ],
-    },
-    {
-        name: 'sendTestEmail',
-        description: 'Sends a test email to verify email integration is working. Takes no parameters.',
-        params: [],
-    },
-    {
-        name: 'syncAnnualLeaveChecklistTasks',
-        description: 'Synchronises checklist tasks for annual leave records within a project.',
-        params: [
-            { name: 'leaveId', label: 'Annual Leave ID', placeholder: '', required: true },
-            { name: 'projectId', label: 'Project ID', placeholder: '', required: true },
-            { name: 'action', label: 'Action', placeholder: 'e.g. update, delete', required: true },
-        ],
-    },
-    {
-        name: 'syncEmployeeToSalary',
-        description: 'Syncs an employee\'s master data into the salary system.',
-        params: [
-            { name: 'employee_id', label: 'Employee ID', placeholder: '', required: false },
-            { name: 'hrms_id', label: 'HRMS ID', placeholder: '', required: false },
-            { name: 'name', label: 'Name', placeholder: '', required: false },
-            { name: 'company', label: 'Company', placeholder: '', required: false },
-        ],
-    },
-    {
-        name: 'syncExistingCompanies',
-        description: 'One-time migration: reads all unique company names from existing data and creates Company entity records.',
-        params: [],
-    },
-    {
-        name: 'syncHistoryToEmployeeCarriedGrace',
-        description: 'Syncs historical project data into EmployeeCarriedGrace records for a project.',
-        params: [
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'syncPagePermissions',
-        description: 'Syncs PagePermission records to match the current PAGES_CONFIG, adding missing pages.',
-        params: [],
-    },
-    {
-        name: 'syncQuarterlyMinutesToEmployee',
-        description: 'Syncs EmployeeQuarterlyMinutes totals back to Employee records.',
-        params: [],
-    },
-    {
-        name: 'syncSalaryIncrements',
-        description: 'Syncs SalaryIncrement records to EmployeeSalary records. Takes no parameters.',
-        params: [],
-    },
-    {
-        name: 'undoRamadanShifts',
-        description: 'Undoes previously applied Ramadan shift overrides for a project within a date range.',
-        params: [
-            { name: 'projectId', label: 'Project ID', placeholder: '', required: true },
-            { name: 'dateFrom', label: 'Date From (YYYY-MM-DD)', placeholder: '2025-03-01', required: true },
-            { name: 'dateTo', label: 'Date To (YYYY-MM-DD)', placeholder: '2025-03-29', required: true },
-        ],
-    },
-    {
-        name: 'unfinalizeReport',
-        description: 'Removes the final status from a ReportRun so it can be edited again.',
-        params: [
-            { name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true },
-            { name: 'project_id', label: 'Project ID', placeholder: '', required: true },
-        ],
-    },
-    {
-        name: 'updateQuarterlyMinutes',
-        description: 'Updates the EmployeeQuarterlyMinutes balance for an employee by adding or subtracting minutes.',
-        params: [
-            { name: 'employee_id', label: 'Employee ID', placeholder: '', required: true },
-            { name: 'company', label: 'Company', placeholder: '', required: true },
-            { name: 'date', label: 'Date (YYYY-MM-DD)', placeholder: '2025-03-01', required: true },
-            { name: 'minutes_to_add', label: 'Minutes to Add (negative to subtract)', placeholder: '0', required: true },
-        ],
-    },
-    {
-        name: 'verifyDepartmentHead',
-        description: 'Verifies whether the current user is authorised as a department head. Takes no parameters.',
-        params: [],
-    },
+    { name: 'addHomePagePermission', description: 'Adds permission for the Home page to a user or role', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'adminFinalizeReport', description: 'Marks a ReportRun as final, locking it from further edits', params: [{ name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true }, { name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'analyzePayrollWithAI', description: 'Runs AI-powered payroll analysis on a project for anomaly detection', params: [{ name: 'project_id', label: 'Project ID', placeholder: 'e.g. abc123', required: true }, { name: 'analysis_type', label: 'Analysis Type', placeholder: 'e.g. full, summary', required: false }] },
+    { name: 'applyRamadanShifts', description: 'Applies Ramadan shift schedule to punches within a date range', params: [{ name: 'projectId', label: 'Project ID', placeholder: '', required: true }, { name: 'ramadanScheduleId', label: 'Ramadan Schedule ID', placeholder: '', required: true }, { name: 'ramadanFrom', label: 'Ramadan From (YYYY-MM-DD)', placeholder: '2025-03-01', required: true }, { name: 'ramadanTo', label: 'Ramadan To (YYYY-MM-DD)', placeholder: '2025-03-29', required: true }] },
+    { name: 'auditDeductibleMismatch', description: 'Audits and logs mismatches in deductible minute calculations', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'auditReportRunIntegrity', description: 'Verifies integrity of a ReportRun and its associated snapshots', params: [{ name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true }] },
+    { name: 'backfillReportMissingEmployees', description: 'Backfills missing employee records in an existing report', params: [{ name: 'report_id', label: 'Report ID', placeholder: '', required: true }] },
+    { name: 'backfillSalaryExtraPrevMonthDeductibleMinutes', description: 'Backfills extra deductible minutes from previous month', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'backfillSalaryReportFromSnapshots', description: 'Rebuilds salary report data from existing snapshots', params: [{ name: 'report_id', label: 'Report ID', placeholder: '', required: true }] },
+    { name: 'checkEmployeeCarriedGrace', description: 'Checks and returns carried grace minutes for an employee', params: [{ name: 'employee_id', label: 'Employee ID', placeholder: '', required: true }, { name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'cleanupQuarterlyMinutes', description: 'Removes orphaned or stale EmployeeQuarterlyMinutes records', params: [] },
+    { name: 'closeCycle', description: 'Closes a CalendarCycle, preventing further edits', params: [{ name: 'calendar_cycle_id', label: 'Calendar Cycle ID', placeholder: '', required: true }] },
+    { name: 'closeProject', description: 'Closes a payroll project, optionally carrying forward grace minutes', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }, { name: 'carry_forward_grace_minutes', label: 'Carry Forward Grace Minutes (true/false)', placeholder: 'true', required: false }] },
+    { name: 'computeMonthEndAssumedDates', description: 'Computes assumed end dates for payroll month calculations', params: [{ name: 'payroll_month_label', label: 'Payroll Month Label (YYYY-MM)', placeholder: '2025-03', required: true }] },
+    { name: 'create2026QuarterlyMinutes', description: 'Creates quarterly minutes records for all employees in 2026', params: [] },
+    { name: 'createAnnualLeaveChecklistTasks', description: 'Creates checklist tasks for annual leave records', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'createCalendarCycle', description: 'Creates a new CalendarCycle with cutoff date range', params: [{ name: 'name', label: 'Cycle Name', placeholder: 'e.g. March 2025', required: false }, { name: 'cutoff_start_date', label: 'Cutoff Start Date (YYYY-MM-DD)', placeholder: '2025-03-01', required: true }, { name: 'cutoff_end_date', label: 'Cutoff End Date (YYYY-MM-DD)', placeholder: '2025-03-31', required: true }, { name: 'notes', label: 'Notes', placeholder: 'Optional notes', required: false }] },
+    { name: 'createOtherMinutesChecklistTask', description: 'Creates a checklist task for other types of minutes', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'createReportChecklistTasks', description: 'Creates checklist tasks for a ReportRun', params: [{ name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true }] },
+    { name: 'createSalarySnapshots', description: 'Generates SalarySnapshot records for all active employees', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'createSalarySnapshotsForDateRange', description: 'Creates snapshots for employees within a specific date range', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'debugGraceFullFlow', description: 'Debugs the complete grace minutes calculation and carry-forward flow', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'debugGraceMinutes', description: 'Debugs grace minutes calculations for a project', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'deleteNovemberReports', description: 'Deletes all report runs from November (cleanup utility)', params: [] },
+    { name: 'deleteProjectPunches', description: 'Deletes all punch records for a project', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'deleteQuarterlyMinutes2026', description: 'Deletes quarterly minutes records from 2026 (cleanup)', params: [] },
+    { name: 'enableApprovedMinutesForAlMaraghi', description: 'Enables approved minutes for Al Maraghi company', params: [] },
+    { name: 'exportToPrivateFile', description: 'Exports report data to a PrivateFile storage record', params: [{ name: 'type', label: 'Export Type', placeholder: 'e.g. salary_report', required: true }, { name: 'fileName', label: 'File Name', placeholder: 'e.g. report.xlsx', required: true }, { name: 'projectId', label: 'Project ID', placeholder: '', required: false }, { name: 'reportRunId', label: 'Report Run ID', placeholder: '', required: false }] },
+    { name: 'findAndFixDuplicateQuarterlyMinutes', description: 'Finds and removes duplicate quarterly minutes records', params: [] },
+    { name: 'fixAllDeductibleMinutes', description: 'Recalculates and fixes all deductible minute entries', params: [] },
+    { name: 'fixAnalysisResultAttendanceIds', description: 'Corrects attendance ID references in analysis results', params: [] },
+    { name: 'fixAttendanceIdTypes', description: 'Migrates attendance IDs to correct data types', params: [] },
+    { name: 'fixSalaryRecordByAttendanceId', description: 'Corrects a salary record using attendance ID matching', params: [{ name: 'attendance_id', label: 'Attendance ID', placeholder: '', required: true }] },
+    { name: 'fixSalarySnapshotDeductibleHours', description: 'Fixes deductible hours in salary snapshots', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'forcePunchDelete', description: 'Force-deletes punch records (admin override)', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }, { name: 'punch_id', label: 'Punch ID', placeholder: '', required: false }] },
+    { name: 'generateHrmsId', description: 'Generates a unique HRMS ID for an employee', params: [] },
+    { name: 'generateMissingHrmsIds', description: 'Generates HRMS IDs for all employees missing them', params: [] },
+    { name: 'getOrCreateQuarterlyMinutes', description: 'Retrieves or creates an EmployeeQuarterlyMinutes record', params: [{ name: 'employee_id', label: 'Employee ID', placeholder: '', required: true }, { name: 'company', label: 'Company', placeholder: 'e.g. Al Maraghi Motors', required: true }, { name: 'date', label: 'Date (YYYY-MM-DD)', placeholder: '2025-03-01', required: true }] },
+    { name: 'importAnnualLeavesToProject', description: 'Imports annual leave records into a project', params: [{ name: 'projectId', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'importRamadanScheduleFromExcel', description: 'Imports Ramadan schedule data from an Excel file', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'importRamadanShifts', description: 'Imports Ramadan shift definitions', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'initializeQuarterForCompany', description: 'Initializes a new quarterly payroll quarter for a company', params: [{ name: 'company', label: 'Company', placeholder: 'e.g. Al Maraghi Motors', required: true }, { name: 'year', label: 'Year', placeholder: '2025', required: true }, { name: 'quarter', label: 'Quarter (1–4)', placeholder: '1', required: true }] },
+    { name: 'lockCycle', description: 'Locks a CalendarCycle preventing modifications', params: [{ name: 'calendar_cycle_id', label: 'Calendar Cycle ID', placeholder: '', required: true }] },
+    { name: 'logAudit', description: 'Manually writes an audit log entry for tracking changes', params: [{ name: 'action_type', label: 'Action Type', placeholder: 'update / create / delete / view', required: true }, { name: 'entity_name', label: 'Entity Name', placeholder: 'e.g. Employee', required: false }, { name: 'entity_id', label: 'Entity ID', placeholder: '', required: false }, { name: 'changes', label: 'Changes (JSON string)', placeholder: '{"field":"value"}', required: false }, { name: 'context', label: 'Context', placeholder: 'Optional description', required: false }] },
+    { name: 'markFinalReport', description: 'Marks a ReportRun as final and locked', params: [{ name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true }, { name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'migrateAllowancesToNumber', description: 'Converts allowance values to numeric type', params: [] },
+    { name: 'migrateAttendanceIds', description: 'Migrates attendance IDs to correct types across all entities', params: [] },
+    { name: 'migrateOtherMinutes', description: 'Migrates other types of minutes to new structure', params: [] },
+    { name: 'migrateToCalendarQuarters', description: 'Migrates payroll from project-based to calendar-based quarters', params: [] },
+    { name: 'onAnnualLeaveChange', description: 'Triggered when an AnnualLeave record changes', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'onSalaryReportChange', description: 'Triggered when a SalaryReport record changes', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'populateSpecificEmployeesQuarterlyMinutes', description: 'Creates quarterly minutes for specific employees', params: [{ name: 'employee_ids', label: 'Employee IDs (JSON array)', placeholder: '["id1","id2"]', required: true }] },
+    { name: 'previewGraceCarryForward', description: 'Previews how grace minutes would be carried forward at project close', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'recalculateAllSalarySnapshots', description: 'Recalculates all SalarySnapshot records from scratch', params: [] },
+    { name: 'recalculateAllSnapshots', description: 'Recalculates all snapshot records system-wide', params: [] },
+    { name: 'recalculateGraceMinutes', description: 'Recalculates grace minutes for all employees', params: [] },
+    { name: 'recalculateIndividualSalary', description: 'Recalculates salary for a specific employee', params: [{ name: 'employee_id', label: 'Employee ID', placeholder: '', required: true }] },
+    { name: 'recalculateReportDeductibles', description: 'Recalculates deductible minutes in a salary report', params: [{ name: 'report_id', label: 'Report ID', placeholder: '', required: true }] },
+    { name: 'recalculateSalarySnapshot', description: 'Recalculates a single SalarySnapshot record', params: [{ name: 'snapshot_id', label: 'Snapshot ID', placeholder: '', required: false }, { name: 'project_id', label: 'Project ID', placeholder: '', required: false }, { name: 'employee_id', label: 'Employee ID', placeholder: '', required: false }] },
+    { name: 'recalculateSickLeaveWorkingDays', description: 'Recalculates working days for sick leave periods', params: [] },
+    { name: 'regenerateSalaryReport', description: 'Rebuilds salary report from current snapshots', params: [{ name: 'salary_report_id', label: 'Salary Report ID', placeholder: '', required: true }] },
+    { name: 'regenerateSnapshotsAndReport', description: 'Regenerates both snapshots and their parent report', params: [{ name: 'report_id', label: 'Report ID', placeholder: '', required: true }] },
+    { name: 'repairSalaryReportFromSnapshots', description: 'Repairs a damaged report by rebuilding from snapshots', params: [{ name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true }] },
+    { name: 'resetGraceCarryForwardFlag', description: 'Resets the grace carry-forward flag', params: [] },
+    { name: 'resetQuarterlyMinutes', description: 'Resets quarterly minutes records to default state', params: [] },
+    { name: 'resolveSalaryForMonth', description: 'Resolves and finalizes salary calculation for a month', params: [{ name: 'month', label: 'Month (YYYY-MM)', placeholder: '2025-03', required: true }] },
+    { name: 'runAnalysis', description: 'Runs full attendance analysis for a project over a date range', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }, { name: 'date_from', label: 'Date From (YYYY-MM-DD)', placeholder: '2025-03-01', required: true }, { name: 'date_to', label: 'Date To (YYYY-MM-DD)', placeholder: '2025-03-31', required: true }, { name: 'report_name', label: 'Report Name', placeholder: 'Optional', required: false }] },
+    { name: 'runCalendarMigrationMonthlySummariesFromProjects', description: 'Migrates monthly summaries to calendar-based structure', params: [] },
+    { name: 'runCalendarPayrollPreview', description: 'Generates payroll preview for a calendar cycle', params: [{ name: 'calendar_cycle_id', label: 'Calendar Cycle ID', placeholder: '', required: true }] },
+    { name: 'saveDayOverride', description: 'Admin override for day-level attendance values', params: [{ name: 'snapshot_id', label: 'Snapshot ID', placeholder: '', required: true }, { name: 'override_field', label: 'Override Field', placeholder: 'e.g. working_days', required: true }, { name: 'override_value', label: 'Override Value', placeholder: '', required: true }] },
+    { name: 'saveSalaryEdits', description: 'Saves manual salary edits to snapshot records', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }, { name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true }, { name: 'edits', label: 'Edits (JSON array string)', placeholder: '[{"snapshot_id":"...","field":"...","value":...}]', required: true }] },
+    { name: 'saveUnusedGraceMinutes', description: 'Records unused grace minutes at project close', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'scanResume', description: 'Scans and extracts structured data from resume files', params: [{ name: 'fileBase64', label: 'File Base64', placeholder: 'Base64-encoded file content', required: true }, { name: 'fileName', label: 'File Name', placeholder: 'resume.pdf', required: true }, { name: 'fileType', label: 'File MIME Type', placeholder: 'application/pdf', required: true }, { name: 'criteria', label: 'Criteria (JSON string)', placeholder: '{}', required: false }] },
+    { name: 'securityAudit', description: 'Runs security audit over AuditLog entries', params: [{ name: 'date_from', label: 'Date From (YYYY-MM-DD)', placeholder: '2025-01-01', required: false }, { name: 'date_to', label: 'Date To (YYYY-MM-DD)', placeholder: '2025-12-31', required: false }, { name: 'user_email', label: 'User Email', placeholder: 'Optional filter by user', required: false }] },
+    { name: 'sendTestEmail', description: 'Sends a test email to verify email integration', params: [] },
+    { name: 'storeCustomDomain', description: 'Stores custom domain configuration in system settings', params: [{ name: 'domain', label: 'Domain', placeholder: 'example.com', required: true }] },
+    { name: 'swapRamadanWeeks', description: 'Swaps Ramadan week schedules in shift timings', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'syncAnnualLeaveChecklistTasks', description: 'Synchronizes checklist tasks for annual leave records', params: [{ name: 'leaveId', label: 'Annual Leave ID', placeholder: '', required: true }, { name: 'projectId', label: 'Project ID', placeholder: '', required: true }, { name: 'action', label: 'Action', placeholder: 'e.g. update, delete', required: true }] },
+    { name: 'syncEmployeeNamesFromSalary', description: 'Updates employee names from salary system data', params: [] },
+    { name: 'syncEmployeeToQuarterlyMinutes', description: 'Syncs employee data to quarterly minutes records', params: [] },
+    { name: 'syncEmployeeToSalary', description: 'Syncs employee master data into the salary system', params: [{ name: 'employee_id', label: 'Employee ID', placeholder: '', required: false }, { name: 'hrms_id', label: 'HRMS ID', placeholder: '', required: false }, { name: 'name', label: 'Name', placeholder: '', required: false }, { name: 'company', label: 'Company', placeholder: '', required: false }] },
+    { name: 'syncExistingCompanies', description: 'One-time migration: creates Company records from existing data', params: [] },
+    { name: 'syncHistoryToEmployeeCarriedGrace', description: 'Syncs grace history into EmployeeCarriedGrace records', params: [{ name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'syncPagePermissions', description: 'Synchronizes page permissions with PAGES_CONFIG', params: [] },
+    { name: 'syncQuarterlyMinutesToEmployee', description: 'Syncs quarterly minutes totals back to Employee records', params: [] },
+    { name: 'syncSalaryIncrements', description: 'Syncs salary increment records across entities', params: [] },
+    { name: 'undoRamadanShifts', description: 'Undoes previously applied Ramadan shift overrides', params: [{ name: 'projectId', label: 'Project ID', placeholder: '', required: true }, { name: 'dateFrom', label: 'Date From (YYYY-MM-DD)', placeholder: '2025-03-01', required: true }, { name: 'dateTo', label: 'Date To (YYYY-MM-DD)', placeholder: '2025-03-29', required: true }] },
+    { name: 'unfinalizeReport', description: 'Removes final status from a ReportRun for editing', params: [{ name: 'report_run_id', label: 'Report Run ID', placeholder: '', required: true }, { name: 'project_id', label: 'Project ID', placeholder: '', required: true }] },
+    { name: 'updateHRManagementPermissions', description: 'Updates HR management role permissions', params: [{ name: 'optional_params', label: 'Optional Parameters (JSON)', placeholder: '{}', required: false }] },
+    { name: 'updateQuarterlyMinutes', description: 'Updates quarterly minutes balance by adding/subtracting minutes', params: [{ name: 'employee_id', label: 'Employee ID', placeholder: '', required: true }, { name: 'company', label: 'Company', placeholder: '', required: true }, { name: 'date', label: 'Date (YYYY-MM-DD)', placeholder: '2025-03-01', required: true }, { name: 'minutes_to_add', label: 'Minutes to Add (negative to subtract)', placeholder: '0', required: true }] },
+    { name: 'validateSecureAccess', description: 'Validates that user has secure access to protected resources', params: [] },
+    { name: 'verifyDepartmentHead', description: 'Verifies if current user is an authorized department head', params: [] },
 ];
 
 /** Maximum number of session history entries to retain. */

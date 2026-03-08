@@ -234,6 +234,35 @@ const PANEL_DEFINITIONS = [
         },
         limit: 5,
     },
+    {
+        key: 'employee_grace_history',
+        label: 'Carried Grace Minutes (EmployeeGraceHistory)',
+        icon: Timer,
+        entityName: 'EmployeeGraceHistory',
+        /**
+         * EmployeeGraceHistory represents the audit trail of grace minutes carried
+         * forward from closed projects. This entity records when grace was moved from
+         * one project to an employee's carried balance, for complete traceability.
+         *
+         * WHY THIS PANEL IS CRITICAL FOR EMPLOYEE DIAGNOSTICS:
+         * When an employee has unexpectedly high or low carried grace minutes, this
+         * history explains why. It shows exactly which projects contributed grace,
+         * when the carry-forward occurred, and how much was moved. Without this view,
+         * admins investigating grace discrepancies would have to manually query the
+         * database and reconstruct the history. This panel makes that investigation
+         * instant and transparent.
+         *
+         * EmployeeGraceHistory links via employee_id matching Employee.hrms_id.
+         */
+        fetch: async (emp) => {
+            if (!emp.hrms_id) return [];
+            const all = await base44.entities.EmployeeGraceHistory.filter(
+                { employee_id: String(emp.hrms_id) }, '-created_date', 1000
+            );
+            return all;
+        },
+        limit: null,
+    },
 ];
 
 export default function EmployeeInspector() {
