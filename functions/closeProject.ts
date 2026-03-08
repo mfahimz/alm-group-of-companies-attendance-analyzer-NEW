@@ -86,14 +86,23 @@ Deno.serve(async (req) => {
                 }
 
                 if (totalMinutesToDeduct > 0) {
-                    const quarterlyRecords = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
+                    // Half-year lookup replaced the old quarterly lookup.
+                    // Determine half from project month: Jan-Jun => H1, Jul-Dec => H2.
+                    const projectDate = new Date(project.date_from || project.date_to || new Date().toISOString());
+                    const projectYear = projectDate.getFullYear();
+                    const projectMonth = projectDate.getMonth() + 1;
+                    const projectHalf = projectMonth <= 6 ? 1 : 2;
+
+                    const halfYearRecords = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
                         employee_id: String(employee.hrms_id),
-                        project_id: project_id,
-                        allocation_type: 'project_period'
+                        company: project.company,
+                        year: projectYear,
+                        half: projectHalf,
+                        allocation_type: 'calendar_half_year'
                     }, null, 10);
 
-                    if (quarterlyRecords.length > 0) {
-                        const record = quarterlyRecords[0];
+                    if (halfYearRecords.length > 0) {
+                        const record = halfYearRecords[0];
                         const newUsedMinutes = (record.used_minutes || 0) + totalMinutesToDeduct;
                         const newRemainingMinutes = Math.max(0, (record.total_minutes || 0) - newUsedMinutes);
 
