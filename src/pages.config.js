@@ -65,6 +65,7 @@ import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
 import FeatureRequests from './pages/FeatureRequests';
 import GraceMinutesManagement from './pages/GraceMinutesManagement';
+import HalfYearlyMinutesManagement from './pages/HalfYearlyMinutesManagement';
 import Home from './pages/Home';
 import Maintenance from './pages/Maintenance';
 import MaintenanceSettings from './pages/MaintenanceSettings';
@@ -82,7 +83,6 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestDataViewer from './pages/TestDataViewer';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import HalfYearlyMinutesManagement from './pages/HalfYearlyMinutesManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -105,6 +105,7 @@ export const PAGES = {
     "Employees": Employees,
     "FeatureRequests": FeatureRequests,
     "GraceMinutesManagement": GraceMinutesManagement,
+    "HalfYearlyMinutesManagement": HalfYearlyMinutesManagement,
     "Home": Home,
     "Maintenance": Maintenance,
     "MaintenanceSettings": MaintenanceSettings,
@@ -122,7 +123,6 @@ export const PAGES = {
     "TestDataViewer": TestDataViewer,
     "UserProfile": UserProfile,
     "Users": Users,
-    "HalfYearlyMinutesManagement": HalfYearlyMinutesManagement,
 }
 
 export const pagesConfig = {

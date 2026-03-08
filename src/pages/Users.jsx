@@ -16,55 +16,79 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
 
 const PAGE_DISPLAY_NAMES = {
+    // Main
     'Home': 'Home (Smart Dashboard)',
     'Dashboard': 'Main Dashboard',
     'DepartmentHeadDashboard': 'Department Head Dashboard',
-    'HRManagerDashboard': 'HR Manager Dashboard',
+    // Projects
     'Projects': 'Projects List',
     'ProjectDetail': 'Project Details',
-    'Reports': 'Reports & Analytics',
     'ReportDetail': 'Report Details View',
+    // HR Management
     'Employees': 'Employees Management',
     'Salaries': 'Salary Management',
     'SalaryIncrements': 'Salary Increments',
-    'QuarterlyMinutesManagement': 'Quarterly Minutes Management',
-    'GraceMinutesManagement': 'Grace Minutes Management',
     'AnnualLeaveManagement': 'Annual Leave Calendar',
     'RamadanSchedules': 'Ramadan Schedules',
+    'ResumeScanner': 'AI Resume Scanner',
+    // Admin
+    'HalfYearlyMinutesManagement': 'Half-Yearly Minutes Management',
+    'GraceMinutesManagement': 'Grace Minutes Management',
     'CompanyManagement': 'Company Settings',
+    'CompanyBranding': 'Company Branding',
     'Users': 'Users & Permissions',
     'DepartmentHeadSettings': 'Department Heads Settings',
     'RulesSettings': 'Attendance Rules Settings',
     'MaintenanceSettings': 'Maintenance Mode Settings',
-    'SecurityAudit': 'Security Audit',
-    'SystemHealth': 'System Health',
-    'SalaryDataIntegrityRepair': 'Salary Data Repair',
-    'MigrationTools': 'Migration Tools',
-    'Documentation': 'System Documentation',
-    'Training': 'Training Guides',
-    'Calendar': 'Calendar Payroll',
+    'AIPayrollInsights': 'AI Payroll Insights',
+    'AuditLogs': 'Audit Logs',
+    // Developer
+    'DevelopmentLog': 'Development Log',
+    'AppDocumentation': 'App Documentation',
+    'FeatureRequests': 'Feature Requests',
+    'DeveloperModule': 'Developer Module',
+    // Hidden pages
     'EmployeeProfile': 'Employee Profile',
     'UserProfile': 'User Profile',
     'Maintenance': 'Maintenance Page'
 };
 
 const DEFAULT_PAGES = [
-    { page_name: 'Dashboard', description: 'Main dashboard with project overview', allowed_roles: 'admin,supervisor,user' },
-    { page_name: 'Projects', description: 'Project management and listing', allowed_roles: 'admin,supervisor' },
-    { page_name: 'ProjectDetail', description: 'Individual project details and management', allowed_roles: 'admin,supervisor' },
-    { page_name: 'Employees', description: 'Employee master data management', allowed_roles: 'admin,supervisor' },
-    { page_name: 'Salaries', description: 'Employee salary management', allowed_roles: 'admin,supervisor' },
-    { page_name: 'Users', description: 'User management and permissions', allowed_roles: 'admin' },
-    { page_name: 'RulesSettings', description: 'Attendance rules configuration', allowed_roles: 'admin' },
-    { page_name: 'RamadanSchedules', description: 'Ramadan shift schedule management', allowed_roles: 'admin' },
-    { page_name: 'Documentation', description: 'User guides and documentation', allowed_roles: 'admin,supervisor,user' },
-    { page_name: 'Training', description: 'Training guides and videos', allowed_roles: 'admin,supervisor,user' },
-    { page_name: 'UserProfile', description: 'User profile settings', allowed_roles: 'admin,supervisor,user' },
-    { page_name: 'EmployeeProfile', description: 'Employee profile details', allowed_roles: 'admin,supervisor' },
-    { page_name: 'ReportDetail', description: 'Detailed attendance report view', allowed_roles: 'admin,supervisor,department_head' },
-    { page_name: 'Reports', description: 'Reports and analytics', allowed_roles: 'admin,supervisor' },
-    { page_name: 'DepartmentHeadSettings', description: 'Department head configuration', allowed_roles: 'admin' },
-    { page_name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', allowed_roles: 'department_head' }
+    // Main
+    { page_name: 'Home', description: 'Smart home dashboard (routes by role)', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'Dashboard', description: 'Main dashboard with project overview', allowed_roles: 'admin,supervisor,user,ceo,hr_manager' },
+    { page_name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', allowed_roles: 'department_head,ceo,hr_manager' },
+    // Projects
+    { page_name: 'Projects', description: 'Project management and listing', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'ProjectDetail', description: 'Individual project details and management', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'ReportDetail', description: 'Detailed attendance report view', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    // HR Management
+    { page_name: 'Employees', description: 'Employee master data management', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'Salaries', description: 'Employee salary management', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
+    { page_name: 'SalaryIncrements', description: 'Salary increment management', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
+    { page_name: 'AnnualLeaveManagement', description: 'Annual leave calendar', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
+    { page_name: 'RamadanSchedules', description: 'Ramadan shift schedule management', allowed_roles: 'admin,ceo,hr_manager' },
+    { page_name: 'ResumeScanner', description: 'AI resume scanner for recruitment', allowed_roles: 'admin,supervisor' },
+    // Admin
+    { page_name: 'HalfYearlyMinutesManagement', description: 'Half-yearly minutes allowance management', allowed_roles: 'admin,ceo' },
+    { page_name: 'GraceMinutesManagement', description: 'Grace minutes management', allowed_roles: 'admin,ceo' },
+    { page_name: 'CompanyManagement', description: 'Company settings and configuration', allowed_roles: 'admin,ceo,hr_manager' },
+    { page_name: 'CompanyBranding', description: 'Company branding and theme settings', allowed_roles: 'admin,ceo' },
+    { page_name: 'Users', description: 'User management and permissions', allowed_roles: 'admin,ceo' },
+    { page_name: 'DepartmentHeadSettings', description: 'Department head configuration', allowed_roles: 'admin,ceo' },
+    { page_name: 'RulesSettings', description: 'Attendance rules configuration', allowed_roles: 'admin,ceo' },
+    { page_name: 'MaintenanceSettings', description: 'Maintenance mode settings', allowed_roles: 'admin,ceo' },
+    { page_name: 'AIPayrollInsights', description: 'AI payroll analysis and insights', allowed_roles: 'admin,ceo,supervisor,hr_manager' },
+    { page_name: 'AuditLogs', description: 'System audit trail', allowed_roles: 'admin' },
+    // Developer
+    { page_name: 'DevelopmentLog', description: 'Development change history', allowed_roles: 'admin' },
+    { page_name: 'AppDocumentation', description: 'App technical documentation', allowed_roles: 'admin' },
+    { page_name: 'FeatureRequests', description: 'Feature request tracking', allowed_roles: 'admin' },
+    { page_name: 'DeveloperModule', description: 'Developer tools (direct URL only)', allowed_roles: 'admin' },
+    // Hidden
+    { page_name: 'EmployeeProfile', description: 'Employee profile details', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'UserProfile', description: 'User profile settings', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'Maintenance', description: 'Maintenance mode page (public)', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' }
 ];
 
 export default function Users() {
