@@ -59,6 +59,7 @@ import CompanySelection from './pages/CompanySelection';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
+import DeveloperModule from './pages/DeveloperModule';
 import DevelopmentLog from './pages/DevelopmentLog';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
@@ -84,9 +85,6 @@ import TestDataViewer from './pages/TestDataViewer';
 import TestQuarterlyMinutes from './pages/TestQuarterlyMinutes';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-// DeveloperModule: Admin-only developer tools page. Accessed exclusively via
-// direct URL — must NEVER appear in any navigation menu, sidebar, or dropdown.
-import DeveloperModule from './pages/DeveloperModule';
 import __Layout from './Layout.jsx';
 
 
@@ -103,6 +101,7 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
+    "DeveloperModule": DeveloperModule,
     "DevelopmentLog": DevelopmentLog,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
@@ -128,8 +127,6 @@ export const PAGES = {
     "TestQuarterlyMinutes": TestQuarterlyMinutes,
     "UserProfile": UserProfile,
     "Users": Users,
-    // Admin-only — hidden from all navigation. Access by direct URL only.
-    "DeveloperModule": DeveloperModule,
 }
 
 export const pagesConfig = {

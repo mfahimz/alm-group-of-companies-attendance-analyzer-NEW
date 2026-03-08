@@ -93,12 +93,15 @@ Deno.serve(async (req) => {
                     const projectMonth = projectDate.getMonth() + 1;
                     const projectHalf = projectMonth <= 6 ? 1 : 2;
 
+                    // MIGRATION NOTE: System migrated from quarterly (quarter 1-4) to half-yearly (half 1 or 2).
+                    // Old structure: { quarter: 1|2|3|4 }
+                    // New structure: { half: 1|2 } where half 1 = Jan-Jun, half 2 = Jul-Dec
+                    // Half mapping: months 1-6 => half 1, months 7-12 => half 2
                     const halfYearRecords = await base44.asServiceRole.entities.EmployeeQuarterlyMinutes.filter({
                         employee_id: String(employee.hrms_id),
                         company: project.company,
                         year: projectYear,
-                        half: projectHalf,
-                        allocation_type: 'calendar_half_year'
+                        half: projectHalf
                     }, null, 10);
 
                     if (halfYearRecords.length > 0) {
@@ -284,12 +287,12 @@ Deno.serve(async (req) => {
             entity_id: project_id,
             entity_name: project.name,
             company: project.company,
-            details: `Project closed. Quarterly minutes: ${updates.length}. Grace carry-forward: ${carry_forward_grace_minutes ? 'Yes' : 'No'}. Processed: ${graceCarryForwardResults.processed}`
+            details: `Project closed. Half-yearly minutes: ${updates.length}. Grace carry-forward: ${carry_forward_grace_minutes ? 'Yes' : 'No'}. Processed: ${graceCarryForwardResults.processed}`
         });
 
         return Response.json({
             success: true,
-            message: `Project closed successfully. ${updates.length} quarterly minutes records updated.${graceCarryForwardResults.processed > 0 ? ` ${graceCarryForwardResults.processed} grace carry-forward records created.` : ''}`,
+            message: `Project closed successfully. ${updates.length} half-yearly minutes records updated.${graceCarryForwardResults.processed > 0 ? ` ${graceCarryForwardResults.processed} grace carry-forward records created.` : ''}`,
             updated_records: updates.length,
             grace_carry_forward: graceCarryForwardResults
         });

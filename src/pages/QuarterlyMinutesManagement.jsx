@@ -278,7 +278,7 @@ export default function QuarterlyMinutesManagement() {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Half-Yearly Minutes Management</h1>
                     <p className="text-sm text-slate-600 mt-1">
-                        Manage approved minutes allowances for all employees
+                        Manage approved minutes allowances for all employees on a half-yearly basis
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -386,8 +386,8 @@ export default function QuarterlyMinutesManagement() {
                         <div className="text-sm text-blue-900">
                             <p className="font-medium">📅 Calendar-Based Half-Yearly Tracking</p>
                             <p className="text-blue-800 mt-1">
-                                Each employee gets 120 minutes per calendar half-year (H1: Jan-Jun, H2: Jul-Dec).
-                                Minutes are shared across ALL projects in that half-year. When a department head approves minutes on any date,
+                                Each employee gets 120 minutes per calendar half-year. H1 covers January to June and H2 covers July to December.
+                                Minutes are shared across all projects in that half-year. When a department head approves minutes on any date
                                 it deducts from that half-year allowance regardless of which project is running.
                             </p>
                         </div>
