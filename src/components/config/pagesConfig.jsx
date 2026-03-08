@@ -113,9 +113,9 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
     },
-    QuarterlyMinutesManagement: {
-        name: 'QuarterlyMinutesManagement',
-        title: 'Quarterly Minutes',
+    HalfYearlyMinutesManagement: {
+        name: 'HalfYearlyMinutesManagement',
+        title: 'Half-Yearly Minutes',
         icon: Clock,
         category: 'Admin',
         showInNav: true,
