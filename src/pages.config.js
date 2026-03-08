@@ -71,7 +71,6 @@ import MaintenanceSettings from './pages/MaintenanceSettings';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
 import QuarterlyMinutesDocumentation from './pages/QuarterlyMinutesDocumentation';
-import QuarterlyMinutesManagement from './pages/QuarterlyMinutesManagement';
 import reportArchitecture from './pages/REPORT_ARCHITECTURE';
 import RamadanSchedules from './pages/RamadanSchedules';
 import ReportDetail from './pages/ReportDetail';
@@ -114,7 +113,6 @@ export const PAGES = {
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
     "QuarterlyMinutesDocumentation": QuarterlyMinutesDocumentation,
-    "QuarterlyMinutesManagement": QuarterlyMinutesManagement,
     "REPORT_ARCHITECTURE": reportArchitecture,
     "RamadanSchedules": RamadanSchedules,
     "ReportDetail": ReportDetail,
