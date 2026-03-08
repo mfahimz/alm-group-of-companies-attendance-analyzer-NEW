@@ -34,34 +34,34 @@ export default function PreApprovalDialog({
     const minAllowedDate = formatDateForInput(subDays(todayUAE, 5));
     const maxAllowedDate = formatDateForInput(addDays(todayUAE, 5));
 
-    // Check if company supports quarterly minutes
-    const supportsQuarterlyMinutes = currentProject?.company === 'Al Maraghi Motors';
+    // Check if company supports half-yearly minutes
+    const supportsHalfYearlyMinutes = currentProject?.company === 'Al Maraghi Motors';
 
-    // Fetch quarterly minutes for selected employee based on date
+    // Fetch half-yearly minutes for selected employee based on date
     const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);
-    const { data: quarterlyMinutes } = useQuery({
-        queryKey: ['employeeQuarterlyMinutes', selectedEmployee?.hrms_id, formData.date_from],
+    const { data: halfYearlyMinutes } = useQuery({
+        queryKey: ['employeeHalfYearlyMinutes', selectedEmployee?.hrms_id, formData.date_from],
         queryFn: async () => {
-            if (!selectedEmployee || !formData.date_from || !supportsQuarterlyMinutes) return null;
-            
-            // Get or create quarterly minutes for this employee and date
+            if (!selectedEmployee || !formData.date_from || !supportsHalfYearlyMinutes) return null;
+
+            // Get or create half-yearly minutes for this employee and date
             const response = await base44.functions.invoke('getOrCreateQuarterlyMinutes', {
                 employee_id: String(selectedEmployee.hrms_id),
                 company: selectedEmployee.company,
                 date: formData.date_from
             });
-            
+
             return response.data.success ? response.data : null;
         },
-        enabled: !!selectedEmployee && !!formData.date_from && supportsQuarterlyMinutes
+        enabled: !!selectedEmployee && !!formData.date_from && supportsHalfYearlyMinutes
     });
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
             const minutesToApprove = parseInt(data.allowed_minutes);
-            
-            // Update quarterly minutes usage first (only for companies that support it)
-            if (supportsQuarterlyMinutes) {
+
+            // Update half-yearly minutes usage first (only for companies that support it)
+            if (supportsHalfYearlyMinutes) {
                 const updateResponse = await base44.functions.invoke('updateQuarterlyMinutes', {
                     employee_id: String(selectedEmployee.hrms_id),
                     company: selectedEmployee.company,
@@ -70,7 +70,7 @@ export default function PreApprovalDialog({
                 });
 
                 if (!updateResponse.data.success) {
-                    throw new Error(updateResponse.data.error || 'Failed to update quarterly minutes');
+                    throw new Error(updateResponse.data.error || 'Failed to update half-yearly minutes');
                 }
             }
 
@@ -110,9 +110,9 @@ export default function PreApprovalDialog({
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['preApprovals', projectId]);
-            queryClient.invalidateQueries(['employeeQuarterlyMinutes']);
-            queryClient.invalidateQueries(['quarterlyMinutes']);
-            toast.success('Pre-approved minutes saved and deducted from quarterly allowance');
+            queryClient.invalidateQueries(['employeeHalfYearlyMinutes']);
+            queryClient.invalidateQueries(['halfYearlyMinutes']);
+            toast.success('Pre-approved minutes saved and deducted from half-yearly allowance');
             handleClose();
             onSuccess?.();
         },
@@ -140,9 +140,9 @@ export default function PreApprovalDialog({
             return;
         }
 
-        // Only check quarterly minutes balance for companies that support it
-        if (supportsQuarterlyMinutes) {
-            const availableMinutes = quarterlyMinutes?.remaining_minutes || 0;
+        // Only check half-yearly minutes balance for companies that support it
+        if (supportsHalfYearlyMinutes) {
+            const availableMinutes = halfYearlyMinutes?.remaining_minutes || 0;
             if (minutes > availableMinutes) {
                 toast.error(`Allowed minutes cannot exceed available balance of ${availableMinutes} minutes`);
                 return;
