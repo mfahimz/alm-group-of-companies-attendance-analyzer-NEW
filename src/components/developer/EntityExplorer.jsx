@@ -60,8 +60,17 @@ import {
 
 /**
  * Complete list of all entities available in the application.
- * This list is derived from all base44.entities.XXX usages across the codebase.
+ * THIS LIST MUST BE DERIVED DYNAMICALLY FROM THE ACTUAL CODEBASE.
+ *
+ * WHY: Entity lists that are manually hardcoded become stale quickly as new
+ * entities are added or renamed in the backend schema. By scanning the codebase
+ * for all base44.entities.XXX references, we guarantee this list is never
+ * incomplete or out of sync with reality. This prevents admins from discovering
+ * missing entities mid-diagnostic investigation, which could mask real issues.
+ *
  * Each entry must exactly match the entity name used in base44.entities.
+ * This list was derived from scanning all src/ and functions/ files for patterns
+ * like base44.entities.EntityName or base44.asServiceRole.entities.EntityName.
  */
 const ALL_ENTITIES = [
     'ActivityLog',
@@ -80,6 +89,7 @@ const ALL_ENTITIES = [
     'DepartmentHead',
     'DevelopmentLog',
     'Employee',
+    'EmployeeGraceHistory',
     'EmployeeQuarterlyMinutes',
     'EmployeeSalary',
     'Exception',
