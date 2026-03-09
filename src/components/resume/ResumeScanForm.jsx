@@ -9,7 +9,7 @@ import { Upload, FileText, X, Loader2, ScanLine, CheckCircle2, AlertCircle } fro
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 
-const MAX_FILES = 5;
+const MAX_FILES = 7;
 const DELAY_BETWEEN_SCANS_MS = 3000; // 3s gap to avoid rate limits
 
 function sleep(ms) {
