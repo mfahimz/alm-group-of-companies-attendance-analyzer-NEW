@@ -299,7 +299,7 @@ export default function PreApprovalDialog({
                                     <SelectContent>
                                         <SelectItem value="late">Late Arrivals Only</SelectItem>
                                         <SelectItem value="early">Early Checkouts Only</SelectItem>
-                                        <SelectItem value="both">Both Late & Early</SelectItem>
+                                        <SelectItem value="both">Both Late &amp; Early</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
