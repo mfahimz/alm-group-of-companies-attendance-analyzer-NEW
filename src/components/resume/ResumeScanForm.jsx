@@ -56,8 +56,32 @@ export default function ResumeScanForm({ onScanComplete }) {
     const handleTemplateToggle = (template) => {
         setSelectedTemplates(prev => {
             const exists = prev.find(t => t.id === template.id);
-            if (exists) return prev.filter(t => t.id !== template.id);
-            return [...prev, template];
+            const next = exists ? prev.filter(t => t.id !== template.id) : [...prev, template];
+
+            // When exactly 1 template is selected, populate the editable criteria form
+            // from that template's fields. In single-template mode the scan uses this
+            // criteria state, so it must reflect the chosen template.
+            if (next.length === 1) {
+                const t = next[0];
+                setCriteria({
+                    position_name: t.position_name || '',
+                    department: t.department || '',
+                    min_experience_years: t.min_experience_years ?? '',
+                    required_education: t.required_education || '',
+                    required_skills: t.required_skills || '',
+                    preferred_skills: t.preferred_skills || '',
+                    required_certifications: t.required_certifications || '',
+                    required_languages: t.required_languages || '',
+                    industry_experience: t.industry_experience || '',
+                    notes: t.notes || ''
+                });
+            } else if (next.length === 0) {
+                setCriteria({ position_name: '', department: '', min_experience_years: '', required_education: '', required_skills: '', preferred_skills: '', required_certifications: '', required_languages: '', industry_experience: '', notes: '' });
+            }
+            // 2+ templates: criteria state is unused (multi-template mode scans each
+            // template directly), so no update needed.
+
+            return next;
         });
     };
 
