@@ -97,7 +97,9 @@ export default function ResumeScanForm({ onScanComplete }) {
         addFiles(Array.from(e.dataTransfer.files));
     };
 
-    const scanSingleFile = async (file) => {
+    // scanSingleFile accepts an explicit criteriaArg so it can be called
+    // independently for each template without closing over the criteria state.
+    const scanSingleFile = async (file, criteriaArg) => {
         const base64 = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -108,7 +110,7 @@ export default function ResumeScanForm({ onScanComplete }) {
             fileBase64: base64,
             fileName: file.name,
             fileType: file.type,
-            criteria
+            criteria: criteriaArg
         });
         if (!response.data?.success) throw new Error(response.data?.error || 'Scan failed');
         return response.data.result;
@@ -124,13 +126,102 @@ export default function ResumeScanForm({ onScanComplete }) {
 
         const results = [];
 
+        // Multi-template mode activates when more than one template is selected.
+        // Each resume is scanned once per template independently, scores are compared,
+        // and the best-fitting template determines the canonical result for that resume.
+        // Single-template mode (0 or 1 selected templates) uses the manually editable
+        // criteria state and follows the original single-scan-per-file path.
+        const isMultiTemplate = selectedTemplates.length > 1;
+
         for (let i = 0; i < files.length; i++) {
-            // Update status to scanning
             statuses[i] = { ...statuses[i], status: 'scanning' };
             setScanProgress({ current: i + 1, total: files.length, statuses: [...statuses] });
 
             try {
-                const result = await scanSingleFile(files[i]);
+                let result;
+
+                if (isMultiTemplate) {
+                    // --- Per-template scanning ---
+                    // For each resume, iterate over every selected template and call
+                    // scanSingleFile once per template. Each call receives that template's
+                    // own field values as the criteria object, keeping scans fully independent.
+                    const templateScans = [];
+
+                    for (let j = 0; j < selectedTemplates.length; j++) {
+                        const tmpl = selectedTemplates[j];
+
+                        // Build the criteria object directly from the template's fields.
+                        // This is intentionally separate from the editable criteria state,
+                        // which is not used in multi-template mode.
+                        const templateCriteria = {
+                            position_name: tmpl.position_name || '',
+                            department: tmpl.department || '',
+                            min_experience_years: tmpl.min_experience_years ?? '',
+                            required_education: tmpl.required_education || '',
+                            required_skills: tmpl.required_skills || '',
+                            preferred_skills: tmpl.preferred_skills || '',
+                            required_certifications: tmpl.required_certifications || '',
+                            required_languages: tmpl.required_languages || '',
+                            industry_experience: tmpl.industry_experience || '',
+                            notes: tmpl.notes || ''
+                        };
+
+                        try {
+                            const templateResult = await scanSingleFile(files[i], templateCriteria);
+                            templateScans.push({ template: tmpl, result: templateResult });
+                        } catch (err) {
+                            // A single template scan failure is non-fatal — log it and
+                            // continue so the remaining templates are still evaluated.
+                            console.warn(`Template scan failed for "${tmpl.position_name}" on ${files[i].name}:`, err.message);
+                        }
+
+                        // Apply the rate-limit delay between every individual template
+                        // scan call. Skip the delay only after the absolute last scan
+                        // (last template of the last file) to avoid unnecessary waiting.
+                        const isLastScan = i === files.length - 1 && j === selectedTemplates.length - 1;
+                        if (!isLastScan) {
+                            await sleep(DELAY_BETWEEN_SCANS_MS);
+                        }
+                    }
+
+                    if (templateScans.length === 0) {
+                        throw new Error('All template scans failed for this resume');
+                    }
+
+                    // --- Score comparison ---
+                    // Each template scan returns a score. result.score is the primary
+                    // field; result.ai_score is the fallback for entity-mapped shapes.
+                    // Reduce over all scans to find the one with the highest numeric score.
+                    // Ties are broken in favour of the earlier template (first one selected wins).
+                    const best = templateScans.reduce((champion, candidate) => {
+                        const championScore = champion.result.score ?? champion.result.ai_score ?? 0;
+                        const candidateScore = candidate.result.score ?? candidate.result.ai_score ?? 0;
+                        return candidateScore > championScore ? candidate : champion;
+                    }, templateScans[0]);
+
+                    // --- Final result mapping ---
+                    // All narrative fields (summary, recommendation, strengths, concerns,
+                    // matched_skills, missing_skills, experience, applicant info, etc.)
+                    // are taken directly from the highest-scoring template scan.
+                    // Two fields are added on top:
+                    //   matched_template_name — the position_name of the winning template
+                    //   template_scores       — an ordered array of { template_name, score }
+                    //                          covering every template that was evaluated,
+                    //                          preserving the original selection order
+                    result = {
+                        ...best.result,
+                        matched_template_name: best.template.position_name,
+                        template_scores: templateScans.map(ts => ({
+                            template_name: ts.template.position_name,
+                            score: ts.result.score ?? ts.result.ai_score ?? 0
+                        }))
+                    };
+                } else {
+                    // Single-template (or manual criteria) mode: scan once using the
+                    // editable criteria state, exactly as before.
+                    result = await scanSingleFile(files[i], criteria);
+                }
+
                 results.push(result);
                 statuses[i] = { ...statuses[i], status: 'done' };
             } catch (err) {
@@ -140,8 +231,10 @@ export default function ResumeScanForm({ onScanComplete }) {
 
             setScanProgress({ current: i + 1, total: files.length, statuses: [...statuses] });
 
-            // Rate-limit safe delay between calls (skip after last file)
-            if (i < files.length - 1) {
+            // In single-template mode apply the inter-file rate-limit delay here.
+            // In multi-template mode the delay is already handled inside the
+            // per-template loop above, so no additional delay is needed between files.
+            if (!isMultiTemplate && i < files.length - 1) {
                 await sleep(DELAY_BETWEEN_SCANS_MS);
             }
         }
