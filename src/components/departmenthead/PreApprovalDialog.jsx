@@ -330,5 +330,6 @@ export default function PreApprovalDialog({
                 </form>
             </DialogContent>
         </Dialog>
+        </>
     );
 }
