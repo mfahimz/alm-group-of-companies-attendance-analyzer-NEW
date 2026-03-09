@@ -253,6 +253,8 @@ Deno.serve(async (req) => {
 
         const prompt = `You are an expert HR recruiter and ATS evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
 
+You are evaluating this candidate specifically for the role of: ${criteria.position_name}. All scoring, skill matching, and recommendations must be made relative to the requirements of this position only.
+
 Evaluate the following resume against the structured screening criteria for this role.
 
 SCREENING CRITERIA:
@@ -323,7 +325,11 @@ Output a JSON with these exact fields:
             concerns: JSON.stringify(aiResponse?.concerns || []),
             years_experience: aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
             scanned_by: user.email,
-            status: 'completed'
+            status: 'completed',
+            // evaluated_template_name records which template (position) was used in this
+            // specific scan call. The frontend uses this in multi-template mode to map
+            // each independent scan result back to the template that produced it.
+            evaluated_template_name: criteria.position_name || ''
         });
 
         return Response.json({
@@ -343,7 +349,8 @@ Output a JSON with these exact fields:
                 file_url: fileUrl,
                 file_name: fileName,
                 extracted_data: JSON.stringify(extractedData),
-                code_comparison: codeComparison
+                code_comparison: codeComparison,
+                evaluated_template_name: criteria.position_name || ''
             }
         });
 
