@@ -1,11 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, X, Loader2, ScanLine, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, X, Loader2, ScanLine, CheckCircle2, AlertCircle, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 
@@ -17,7 +16,9 @@ function sleep(ms) {
 }
 
 export default function ResumeScanForm({ onScanComplete }) {
-    const [selectedTemplateId, setSelectedTemplateId] = useState('');
+    const [selectedTemplates, setSelectedTemplates] = useState([]);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
     const [criteria, setCriteria] = useState({
         position_name: '',
         department: '',
@@ -41,23 +42,27 @@ export default function ResumeScanForm({ onScanComplete }) {
         queryFn: () => base44.entities.JobTemplate.list('-created_date', 100)
     });
 
-    const handleTemplateSelect = (templateId) => {
-        setSelectedTemplateId(templateId);
-        const t = templates.find(t => t.id === templateId);
-        if (t) {
-            setCriteria({
-                position_name: t.position_name || '',
-                department: t.department || '',
-                min_experience_years: t.min_experience_years ?? '',
-                required_education: t.required_education || '',
-                required_skills: t.required_skills || '',
-                preferred_skills: t.preferred_skills || '',
-                required_certifications: t.required_certifications || '',
-                required_languages: t.required_languages || '',
-                industry_experience: t.industry_experience || '',
-                notes: t.notes || ''
-            });
-        }
+    useEffect(() => {
+        if (!dropdownOpen) return;
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                setDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [dropdownOpen]);
+
+    const handleTemplateToggle = (template) => {
+        setSelectedTemplates(prev => {
+            const exists = prev.find(t => t.id === template.id);
+            if (exists) return prev.filter(t => t.id !== template.id);
+            return [...prev, template];
+        });
+    };
+
+    const removeTemplate = (templateId) => {
+        setSelectedTemplates(prev => prev.filter(t => t.id !== templateId));
     };
 
     const setField = (field, value) => setCriteria(c => ({ ...c, [field]: value }));
@@ -156,7 +161,7 @@ export default function ResumeScanForm({ onScanComplete }) {
         onScanComplete(results);
     };
 
-    const hasTemplate = !!selectedTemplateId;
+    const hasTemplate = selectedTemplates.length > 0;
 
     return (
         <div className="space-y-6">
@@ -166,18 +171,59 @@ export default function ResumeScanForm({ onScanComplete }) {
                     <div className="w-5 h-5 rounded-full bg-[#0F1E36] text-white text-xs flex items-center justify-center font-bold">1</div>
                     <Label className="text-sm font-semibold text-[#1F2937]">Select Position Template</Label>
                 </div>
-                <Select value={selectedTemplateId} onValueChange={handleTemplateSelect}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder={templates.length === 0 ? "No templates yet — create one in the Templates tab" : "Choose a position template..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {templates.map(t => (
-                            <SelectItem key={t.id} value={t.id}>
-                                {t.position_name} <span className="text-[#9CA3AF] ml-1">— {t.department}</span>
-                            </SelectItem>
+                <div className="relative" ref={dropdownRef}>
+                    <button
+                        type="button"
+                        onClick={() => templates.length > 0 && setDropdownOpen(o => !o)}
+                        className={`w-full flex items-center justify-between px-3 py-2 border border-[#E2E6EC] rounded-md bg-white text-sm hover:border-[#0F1E36] transition-colors ${templates.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                        <span className={selectedTemplates.length === 0 ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}>
+                            {templates.length === 0
+                                ? 'No templates yet — create one in the Templates tab'
+                                : selectedTemplates.length === 0
+                                    ? 'Choose position templates...'
+                                    : `${selectedTemplates.length} template${selectedTemplates.length > 1 ? 's' : ''} selected`}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-[#6B7280] transition-transform flex-shrink-0 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {dropdownOpen && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-[#E2E6EC] rounded-md shadow-lg max-h-52 overflow-y-auto">
+                            {templates.map(t => {
+                                const isSelected = selectedTemplates.some(s => s.id === t.id);
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => handleTemplateToggle(t)}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-[#F4F6F9] transition-colors ${isSelected ? 'bg-[#EEF2FF]' : ''}`}
+                                    >
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[#0F1E36] border-[#0F1E36]' : 'border-[#CBD5E1]'}`}>
+                                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <span className="flex-1 text-[#1F2937]">{t.position_name}</span>
+                                        {t.department && <span className="text-xs text-[#9CA3AF]">{t.department}</span>}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                {selectedTemplates.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedTemplates.map(t => (
+                            <span key={t.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#EEF2FF] border border-[#C7D2FE] rounded-full text-xs font-medium text-[#0F1E36]">
+                                {t.position_name}
+                                <button
+                                    type="button"
+                                    onClick={() => removeTemplate(t.id)}
+                                    className="text-[#6B7280] hover:text-[#1F2937] rounded-full"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </span>
                         ))}
-                    </SelectContent>
-                </Select>
+                    </div>
+                )}
                 {templates.length === 0 && (
                     <p className="text-xs text-amber-600 mt-1.5">⚠ Create position templates in the Templates tab before scanning.</p>
                 )}
