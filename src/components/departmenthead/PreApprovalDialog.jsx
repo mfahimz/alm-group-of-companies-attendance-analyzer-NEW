@@ -182,6 +182,46 @@ export default function PreApprovalDialog({
     };
 
     return (
+        <>
+        {/* Limit Exceeded Warning Popup */}
+        {showLimitWarning && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+                    <div className="bg-red-600 px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <AlertTriangle className="w-6 h-6 text-white" />
+                            <h3 className="text-white font-bold text-lg">Minutes Limit Exceeded</h3>
+                        </div>
+                        <button
+                            onClick={() => setShowLimitWarning(false)}
+                            className="text-white hover:text-red-200 transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="px-6 py-6 text-center space-y-4">
+                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                            <AlertTriangle className="w-8 h-8 text-red-600" />
+                        </div>
+                        <p className="text-slate-800 font-medium text-base leading-relaxed">
+                            You have tried to enter more than the available limit.
+                        </p>
+                        <p className="text-slate-600 text-sm leading-relaxed">
+                            Please contact your reporting officer for further instructions.
+                        </p>
+                        <div className="pt-2">
+                            <Button
+                                onClick={() => setShowLimitWarning(false)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-8"
+                            >
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
