@@ -208,9 +208,7 @@ export default function Layout({ children, currentPageName }) {
                     :root {
                         ${companyBranding.primary_color ? `--primary: ${companyBranding.primary_color};` : ''}
                         ${companyBranding.secondary_color ? `--secondary: ${companyBranding.secondary_color};` : ''}
-                        ${companyBranding.font_family ? `--font-family: ${companyBranding.font_family};` : ''}
                     }
-                    ${companyBranding.font_family ? `body { font-family: ${companyBranding.font_family}; }` : ''}
                 `}</style>
             )}
             
