@@ -225,6 +225,57 @@ export default function ResumeScanResultView({ result, onNewScan }) {
                 </div>
             </div>
 
+            {/* Multi-template evaluation result — only present when the resume was scanned
+                against multiple job position templates. matched_template_name is the template
+                that produced the highest score across all per-template evaluations; the score
+                gauge, recommendation, and detailed report shown above all reflect that winning
+                template. This block is not rendered for single-template scans. */}
+            {result.matched_template_name && (
+                <div className="bg-white border border-[#E2E6EC] rounded-xl p-5 space-y-3">
+                    {/* Prominent label: the position this resume matched best */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Matched Position</span>
+                        <span className="px-3 py-1 bg-[#EEF2FF] border border-[#C7D2FE] rounded-full text-sm font-semibold text-[#4338CA]">
+                            {result.matched_template_name}
+                        </span>
+                    </div>
+
+                    {/* Per-template score comparison table. Each row is one evaluated position
+                        template and the score this resume received against its criteria. The
+                        row with the highest score is highlighted — that is the template selected
+                        as matched_template_name (i.e. the best-fit position for this candidate). */}
+                    {result.template_scores?.length > 0 && (() => {
+                        const maxScore = Math.max(...result.template_scores.map(ts => ts.score));
+                        return (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b border-[#E2E6EC] bg-[#F4F6F9]">
+                                            <th className="text-left px-3 py-2 font-semibold text-[#6B7280]">Position</th>
+                                            <th className="text-right px-3 py-2 font-semibold text-[#6B7280] w-20">Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.template_scores.map((ts, i) => {
+                                            const isTop = ts.score === maxScore;
+                                            const scoreColor = ts.score >= 75 ? 'text-green-600' : ts.score >= 50 ? 'text-amber-600' : 'text-red-600';
+                                            return (
+                                                <tr key={i} className={`border-b border-[#F4F6F9] ${isTop ? 'bg-[#EEF2FF]' : ''}`}>
+                                                    <td className={`px-3 py-2 ${isTop ? 'font-semibold text-[#1F2937]' : 'text-[#4B5563]'}`}>
+                                                        {ts.template_name}{isTop ? ' ★' : ''}
+                                                    </td>
+                                                    <td className={`px-3 py-2 text-right font-bold ${scoreColor}`}>{ts.score}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
+
             {/* Section 1: Extracted Resume Data */}
             <Section title="📄 Extracted Resume Data" defaultOpen={true}>
                 <ExtractedDataSection data={extractedData} fileUrl={result.file_url} fileName={result.file_name} />

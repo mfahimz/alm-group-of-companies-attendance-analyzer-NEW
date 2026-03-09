@@ -1,15 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, X, Loader2, ScanLine, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, X, Loader2, ScanLine, CheckCircle2, AlertCircle, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 
-const MAX_FILES = 5;
+const MAX_FILES = 7;
 const DELAY_BETWEEN_SCANS_MS = 3000; // 3s gap to avoid rate limits
 
 function sleep(ms) {
@@ -17,7 +16,9 @@ function sleep(ms) {
 }
 
 export default function ResumeScanForm({ onScanComplete }) {
-    const [selectedTemplateId, setSelectedTemplateId] = useState('');
+    const [selectedTemplates, setSelectedTemplates] = useState([]);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
     const [criteria, setCriteria] = useState({
         position_name: '',
         department: '',
@@ -41,23 +42,27 @@ export default function ResumeScanForm({ onScanComplete }) {
         queryFn: () => base44.entities.JobTemplate.list('-created_date', 100)
     });
 
-    const handleTemplateSelect = (templateId) => {
-        setSelectedTemplateId(templateId);
-        const t = templates.find(t => t.id === templateId);
-        if (t) {
-            setCriteria({
-                position_name: t.position_name || '',
-                department: t.department || '',
-                min_experience_years: t.min_experience_years ?? '',
-                required_education: t.required_education || '',
-                required_skills: t.required_skills || '',
-                preferred_skills: t.preferred_skills || '',
-                required_certifications: t.required_certifications || '',
-                required_languages: t.required_languages || '',
-                industry_experience: t.industry_experience || '',
-                notes: t.notes || ''
-            });
-        }
+    useEffect(() => {
+        if (!dropdownOpen) return;
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                setDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [dropdownOpen]);
+
+    const handleTemplateToggle = (template) => {
+        setSelectedTemplates(prev => {
+            const exists = prev.find(t => t.id === template.id);
+            if (exists) return prev.filter(t => t.id !== template.id);
+            return [...prev, template];
+        });
+    };
+
+    const removeTemplate = (templateId) => {
+        setSelectedTemplates(prev => prev.filter(t => t.id !== templateId));
     };
 
     const setField = (field, value) => setCriteria(c => ({ ...c, [field]: value }));
@@ -92,7 +97,9 @@ export default function ResumeScanForm({ onScanComplete }) {
         addFiles(Array.from(e.dataTransfer.files));
     };
 
-    const scanSingleFile = async (file) => {
+    // scanSingleFile accepts an explicit criteriaArg so it can be called
+    // independently for each template without closing over the criteria state.
+    const scanSingleFile = async (file, criteriaArg) => {
         const base64 = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -103,7 +110,7 @@ export default function ResumeScanForm({ onScanComplete }) {
             fileBase64: base64,
             fileName: file.name,
             fileType: file.type,
-            criteria
+            criteria: criteriaArg
         });
         if (!response.data?.success) throw new Error(response.data?.error || 'Scan failed');
         return response.data.result;
@@ -119,13 +126,102 @@ export default function ResumeScanForm({ onScanComplete }) {
 
         const results = [];
 
+        // Multi-template mode activates when more than one template is selected.
+        // Each resume is scanned once per template independently, scores are compared,
+        // and the best-fitting template determines the canonical result for that resume.
+        // Single-template mode (0 or 1 selected templates) uses the manually editable
+        // criteria state and follows the original single-scan-per-file path.
+        const isMultiTemplate = selectedTemplates.length > 1;
+
         for (let i = 0; i < files.length; i++) {
-            // Update status to scanning
             statuses[i] = { ...statuses[i], status: 'scanning' };
             setScanProgress({ current: i + 1, total: files.length, statuses: [...statuses] });
 
             try {
-                const result = await scanSingleFile(files[i]);
+                let result;
+
+                if (isMultiTemplate) {
+                    // --- Per-template scanning ---
+                    // For each resume, iterate over every selected template and call
+                    // scanSingleFile once per template. Each call receives that template's
+                    // own field values as the criteria object, keeping scans fully independent.
+                    const templateScans = [];
+
+                    for (let j = 0; j < selectedTemplates.length; j++) {
+                        const tmpl = selectedTemplates[j];
+
+                        // Build the criteria object directly from the template's fields.
+                        // This is intentionally separate from the editable criteria state,
+                        // which is not used in multi-template mode.
+                        const templateCriteria = {
+                            position_name: tmpl.position_name || '',
+                            department: tmpl.department || '',
+                            min_experience_years: tmpl.min_experience_years ?? '',
+                            required_education: tmpl.required_education || '',
+                            required_skills: tmpl.required_skills || '',
+                            preferred_skills: tmpl.preferred_skills || '',
+                            required_certifications: tmpl.required_certifications || '',
+                            required_languages: tmpl.required_languages || '',
+                            industry_experience: tmpl.industry_experience || '',
+                            notes: tmpl.notes || ''
+                        };
+
+                        try {
+                            const templateResult = await scanSingleFile(files[i], templateCriteria);
+                            templateScans.push({ template: tmpl, result: templateResult });
+                        } catch (err) {
+                            // A single template scan failure is non-fatal — log it and
+                            // continue so the remaining templates are still evaluated.
+                            console.warn(`Template scan failed for "${tmpl.position_name}" on ${files[i].name}:`, err.message);
+                        }
+
+                        // Apply the rate-limit delay between every individual template
+                        // scan call. Skip the delay only after the absolute last scan
+                        // (last template of the last file) to avoid unnecessary waiting.
+                        const isLastScan = i === files.length - 1 && j === selectedTemplates.length - 1;
+                        if (!isLastScan) {
+                            await sleep(DELAY_BETWEEN_SCANS_MS);
+                        }
+                    }
+
+                    if (templateScans.length === 0) {
+                        throw new Error('All template scans failed for this resume');
+                    }
+
+                    // --- Score comparison ---
+                    // Each template scan returns a score. result.score is the primary
+                    // field; result.ai_score is the fallback for entity-mapped shapes.
+                    // Reduce over all scans to find the one with the highest numeric score.
+                    // Ties are broken in favour of the earlier template (first one selected wins).
+                    const best = templateScans.reduce((champion, candidate) => {
+                        const championScore = champion.result.score ?? champion.result.ai_score ?? 0;
+                        const candidateScore = candidate.result.score ?? candidate.result.ai_score ?? 0;
+                        return candidateScore > championScore ? candidate : champion;
+                    }, templateScans[0]);
+
+                    // --- Final result mapping ---
+                    // All narrative fields (summary, recommendation, strengths, concerns,
+                    // matched_skills, missing_skills, experience, applicant info, etc.)
+                    // are taken directly from the highest-scoring template scan.
+                    // Two fields are added on top:
+                    //   matched_template_name — the position_name of the winning template
+                    //   template_scores       — an ordered array of { template_name, score }
+                    //                          covering every template that was evaluated,
+                    //                          preserving the original selection order
+                    result = {
+                        ...best.result,
+                        matched_template_name: best.template.position_name,
+                        template_scores: templateScans.map(ts => ({
+                            template_name: ts.template.position_name,
+                            score: ts.result.score ?? ts.result.ai_score ?? 0
+                        }))
+                    };
+                } else {
+                    // Single-template (or manual criteria) mode: scan once using the
+                    // editable criteria state, exactly as before.
+                    result = await scanSingleFile(files[i], criteria);
+                }
+
                 results.push(result);
                 statuses[i] = { ...statuses[i], status: 'done' };
             } catch (err) {
@@ -135,8 +231,10 @@ export default function ResumeScanForm({ onScanComplete }) {
 
             setScanProgress({ current: i + 1, total: files.length, statuses: [...statuses] });
 
-            // Rate-limit safe delay between calls (skip after last file)
-            if (i < files.length - 1) {
+            // In single-template mode apply the inter-file rate-limit delay here.
+            // In multi-template mode the delay is already handled inside the
+            // per-template loop above, so no additional delay is needed between files.
+            if (!isMultiTemplate && i < files.length - 1) {
                 await sleep(DELAY_BETWEEN_SCANS_MS);
             }
         }
@@ -156,7 +254,7 @@ export default function ResumeScanForm({ onScanComplete }) {
         onScanComplete(results);
     };
 
-    const hasTemplate = !!selectedTemplateId;
+    const hasTemplate = selectedTemplates.length > 0;
 
     return (
         <div className="space-y-6">
@@ -166,18 +264,59 @@ export default function ResumeScanForm({ onScanComplete }) {
                     <div className="w-5 h-5 rounded-full bg-[#0F1E36] text-white text-xs flex items-center justify-center font-bold">1</div>
                     <Label className="text-sm font-semibold text-[#1F2937]">Select Position Template</Label>
                 </div>
-                <Select value={selectedTemplateId} onValueChange={handleTemplateSelect}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder={templates.length === 0 ? "No templates yet — create one in the Templates tab" : "Choose a position template..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {templates.map(t => (
-                            <SelectItem key={t.id} value={t.id}>
-                                {t.position_name} <span className="text-[#9CA3AF] ml-1">— {t.department}</span>
-                            </SelectItem>
+                <div className="relative" ref={dropdownRef}>
+                    <button
+                        type="button"
+                        onClick={() => templates.length > 0 && setDropdownOpen(o => !o)}
+                        className={`w-full flex items-center justify-between px-3 py-2 border border-[#E2E6EC] rounded-md bg-white text-sm hover:border-[#0F1E36] transition-colors ${templates.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                        <span className={selectedTemplates.length === 0 ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}>
+                            {templates.length === 0
+                                ? 'No templates yet — create one in the Templates tab'
+                                : selectedTemplates.length === 0
+                                    ? 'Choose position templates...'
+                                    : `${selectedTemplates.length} template${selectedTemplates.length > 1 ? 's' : ''} selected`}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-[#6B7280] transition-transform flex-shrink-0 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {dropdownOpen && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-[#E2E6EC] rounded-md shadow-lg max-h-52 overflow-y-auto">
+                            {templates.map(t => {
+                                const isSelected = selectedTemplates.some(s => s.id === t.id);
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => handleTemplateToggle(t)}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-[#F4F6F9] transition-colors ${isSelected ? 'bg-[#EEF2FF]' : ''}`}
+                                    >
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[#0F1E36] border-[#0F1E36]' : 'border-[#CBD5E1]'}`}>
+                                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <span className="flex-1 text-[#1F2937]">{t.position_name}</span>
+                                        {t.department && <span className="text-xs text-[#9CA3AF]">{t.department}</span>}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                {selectedTemplates.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedTemplates.map(t => (
+                            <span key={t.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#EEF2FF] border border-[#C7D2FE] rounded-full text-xs font-medium text-[#0F1E36]">
+                                {t.position_name}
+                                <button
+                                    type="button"
+                                    onClick={() => removeTemplate(t.id)}
+                                    className="text-[#6B7280] hover:text-[#1F2937] rounded-full"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </span>
                         ))}
-                    </SelectContent>
-                </Select>
+                    </div>
+                )}
                 {templates.length === 0 && (
                     <p className="text-xs text-amber-600 mt-1.5">⚠ Create position templates in the Templates tab before scanning.</p>
                 )}

@@ -212,6 +212,7 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Position</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Dept</th>
                             <th className="text-center px-4 py-3 font-semibold text-[#4B5563] text-xs">Score</th>
+                            <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Matched Position</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Recommendation</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Scanned By</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Date</th>
@@ -241,6 +242,9 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                                 <td className="px-4 py-3 text-center">
                                     <span className={SCORE_COLOR(scan.ai_score)}>{scan.ai_score ?? '—'}</span>
                                 </td>
+                                {/* evaluated_template_name holds the highest-scoring position template
+                                    determined after multi-template evaluation. Empty for single-template scans. */}
+                                <td className="px-4 py-3 text-xs text-[#4B5563]">{scan.evaluated_template_name || '—'}</td>
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RECOMMENDATION_COLORS[scan.ai_recommendation] || 'bg-gray-100 text-gray-700'}`}>
                                         {scan.ai_recommendation || '—'}

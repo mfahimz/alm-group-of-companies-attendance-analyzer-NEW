@@ -24,6 +24,8 @@ function ScoreBar({ score }) {
 
 export default function BatchScanResults({ results, onNewScan }) {
     const [selectedIndex, setSelectedIndex] = useState(null);
+    // Tracks which card indices have their per-template score breakdown open.
+    const [expandedScores, setExpandedScores] = useState(new Set());
 
     if (selectedIndex !== null) {
         return (
@@ -66,10 +68,15 @@ export default function BatchScanResults({ results, onNewScan }) {
                     const rec = REC_CONFIG[result.recommendation] || REC_CONFIG['Consider'];
                     const originalIndex = results.indexOf(result);
                     return (
-                        <button
+                        // Card is a div+role=button so nested interactive elements
+                        // (the template-scores toggle) are valid HTML.
+                        <div
                             key={idx}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setSelectedIndex(originalIndex)}
-                            className="w-full text-left bg-white border border-[#E2E6EC] rounded-xl px-4 py-3 hover:border-[#0F1E36] hover:shadow-sm transition-all group"
+                            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSelectedIndex(originalIndex)}
+                            className="w-full text-left bg-white border border-[#E2E6EC] rounded-xl px-4 py-3 hover:border-[#0F1E36] hover:shadow-sm transition-all group cursor-pointer"
                         >
                             <div className="flex items-center gap-3">
                                 {/* Rank */}
@@ -111,7 +118,62 @@ export default function BatchScanResults({ results, onNewScan }) {
                                     {result.recommendation}
                                 </span>
                             </div>
-                        </button>
+
+                            {/* matched_template_name badge — only present on multi-template scan
+                                results. It shows the highest-scoring template after all per-template
+                                evaluations were compared on the frontend. Not rendered for
+                                single-template scans where this field is absent. */}
+                            {result.matched_template_name && (
+                                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#EEF2FF] border border-[#C7D2FE] rounded-full text-xs font-medium text-[#4338CA]">
+                                        Best match: {result.matched_template_name}
+                                    </span>
+
+                                    {/* Toggle button for the per-template score breakdown.
+                                        stopPropagation prevents the card's onClick from firing. */}
+                                    {result.template_scores?.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setExpandedScores(prev => {
+                                                    const next = new Set(prev);
+                                                    if (next.has(idx)) next.delete(idx);
+                                                    else next.add(idx);
+                                                    return next;
+                                                });
+                                            }}
+                                            className="text-xs text-[#6B7280] hover:text-[#1F2937] transition-colors"
+                                        >
+                                            {expandedScores.has(idx)
+                                                ? 'Hide scores ▲'
+                                                : `All ${result.template_scores.length} templates ▼`}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Per-template score breakdown — expanded on demand.
+                                Each row shows a template name and the score this resume
+                                received when scanned against that template's criteria.
+                                The winning template (matched_template_name) is highlighted. */}
+                            {result.matched_template_name && expandedScores.has(idx) && result.template_scores?.length > 0 && (
+                                <div className="mt-2 ml-1 pl-3 border-l-2 border-[#E2E6EC] space-y-1">
+                                    {result.template_scores.map((ts, ti) => {
+                                        const isWinner = ts.template_name === result.matched_template_name;
+                                        const scoreColor = ts.score >= 75 ? 'text-green-600' : ts.score >= 50 ? 'text-amber-600' : 'text-red-600';
+                                        return (
+                                            <div key={ti} className="flex items-center justify-between text-xs">
+                                                <span className={isWinner ? 'font-semibold text-[#1F2937]' : 'text-[#6B7280]'}>
+                                                    {ts.template_name}{isWinner ? ' ★' : ''}
+                                                </span>
+                                                <span className={`font-bold ${scoreColor}`}>{ts.score}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
             </div>
