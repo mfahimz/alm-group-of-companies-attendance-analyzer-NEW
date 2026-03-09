@@ -29,6 +29,7 @@ export default function PreApprovalDialog({
         details: ''
     });
 
+    const [showLimitWarning, setShowLimitWarning] = useState(false);
     const queryClient = useQueryClient();
 
     const todayUAE = nowInUAE();
