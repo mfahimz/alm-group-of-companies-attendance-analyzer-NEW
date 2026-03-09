@@ -146,7 +146,7 @@ export default function PreApprovalDialog({
         if (supportsHalfYearlyMinutes) {
             const availableMinutes = halfYearlyMinutes?.remaining_minutes || 0;
             if (minutes > availableMinutes) {
-                toast.error(`Allowed minutes cannot exceed available balance of ${availableMinutes} minutes`);
+                setShowLimitWarning(true);
                 return;
             }
         }
