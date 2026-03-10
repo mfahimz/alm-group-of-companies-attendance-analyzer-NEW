@@ -7,7 +7,15 @@ const CompanyContext = createContext();
 export const useCompanyFilter = () => {
     const context = useContext(CompanyContext);
     if (!context) {
-        throw new Error('useCompanyFilter must be used within CompanyFilterProvider');
+        // Return safe defaults instead of throwing — prevents HMR cascade crashes
+        return {
+            selectedCompany: null,
+            setSelectedCompany: () => {},
+            clearCompanyFilter: () => {},
+            canSwitchCompany: false,
+            userCompany: null,
+            isLoading: true
+        };
     }
     return context;
 };
