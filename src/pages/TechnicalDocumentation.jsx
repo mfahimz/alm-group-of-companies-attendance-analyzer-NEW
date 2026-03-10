@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Code, Database, Workflow, Lock, AlertTriangle, Book, ChevronDown, ChevronRight } from 'lucide-react';
-import Breadcrumb from '../components/ui/Breadcrumb';
+import Breadcrumb from '../components/ui/Breadcrumb.jsx';
 
 export default function TechnicalDocumentation() {
     const [expandedSection, setExpandedSection] = useState('overview');
