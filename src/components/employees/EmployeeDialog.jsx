@@ -70,7 +70,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         assumed_present_daily: false,
                         exclude_from_attendance_deductions: false,
                         name: '',
-                        company: '',
+                        company: contextCompany || '',
                         department: '',
                         weekly_off: 'Sunday',
                         active: true,

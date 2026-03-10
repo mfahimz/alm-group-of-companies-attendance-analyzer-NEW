@@ -39,12 +39,15 @@ export default function CreateProjectDialog({ open, onClose }) {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
-    // Pre-fill company if user has a specific company assigned
+    // Pre-fill company from context (switched company) or user's assigned company
     React.useEffect(() => {
-        if (open && currentUser && currentUser.company && !currentUser.can_access_all_companies && currentUser.role !== 'admin') {
-            setFormData(prev => ({ ...prev, company: currentUser.company }));
+        if (open) {
+            const companyToUse = contextCompany || (currentUser?.company);
+            if (companyToUse) {
+                setFormData(prev => ({ ...prev, company: companyToUse }));
+            }
         }
-    }, [open, currentUser]);
+    }, [open, currentUser, contextCompany]);
 
     const { data: projects = [] } = useQuery({
         queryKey: ['projects'],
@@ -192,24 +195,12 @@ export default function CreateProjectDialog({ open, onClose }) {
 
                     <div>
                         <Label htmlFor="company">Company *</Label>
-                        <Select
+                        <Input
                             value={formData.company}
-                            onValueChange={(value) => setFormData({ ...formData, company: value })}
-                            disabled={currentUser && currentUser.company && !currentUser.can_access_all_companies && currentUser.role !== 'admin'}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select company" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
-                                <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
-                                <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
-                                <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {currentUser && currentUser.company && !currentUser.can_access_all_companies && currentUser.role !== 'admin' && (
-                            <p className="text-xs text-slate-500 mt-1">Company is locked to your assigned company</p>
-                        )}
+                            disabled
+                            className="bg-slate-50"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Company is set to your active company</p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
