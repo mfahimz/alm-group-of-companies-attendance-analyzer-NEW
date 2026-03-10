@@ -8,8 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { useCompanyFilter } from '../context/CompanyContext';
 
 export default function EmployeeDialog({ open, onClose, employee }) {
+    const { selectedCompany: contextCompany } = useCompanyFilter();
     const [formData, setFormData] = useState({
         hrms_id: '',
         has_attendance_tracking: true,

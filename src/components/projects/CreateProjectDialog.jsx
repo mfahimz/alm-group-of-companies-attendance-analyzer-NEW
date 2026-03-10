@@ -12,12 +12,14 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import EmployeeSelectionDialog from './EmployeeSelectionDialog';
+import { useCompanyFilter } from '../context/CompanyContext';
 
 export default function CreateProjectDialog({ open, onClose }) {
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
+    const { selectedCompany: contextCompany } = useCompanyFilter();
 
     const [formData, setFormData] = useState({
         name: '',
