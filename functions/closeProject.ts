@@ -282,12 +282,12 @@ Deno.serve(async (req) => {
         });
 
         await base44.asServiceRole.functions.invoke('logAudit', {
-            action: 'CLOSE_PROJECT',
-            entity_type: 'Project',
-            entity_id: project_id,
+            action_type: 'CLOSE_PROJECT',
             entity_name: project.name,
+            entity_id: project_id,
             company: project.company,
-            details: `Project closed. Half-yearly minutes: ${updates.length}. Grace carry-forward: ${carry_forward_grace_minutes ? 'Yes' : 'No'}. Processed: ${graceCarryForwardResults.processed}`
+            project_id: project_id,
+            context: `Project closed. Half-yearly minutes: ${updates.length}. Grace carry-forward: ${carry_forward_grace_minutes ? 'Yes' : 'No'}. Processed: ${graceCarryForwardResults.processed}`
         });
 
         return Response.json({
