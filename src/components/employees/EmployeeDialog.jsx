@@ -372,20 +372,26 @@ export default function EmployeeDialog({ open, onClose, employee }) {
 
                     <div>
                         <Label htmlFor="company">Company *</Label>
-                        <Select
-                            value={formData.company || undefined}
-                            onValueChange={(value) => setFormData({ ...formData, company: value, department: '' })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select company" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
-                                <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
-                                <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
-                                <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        {contextCompany ? (
+                            <>
+                                <Input value={formData.company || contextCompany} disabled className="bg-slate-50" />
+                                <p className="text-xs text-slate-500 mt-1">Company is set to your active company</p>
+                            </>
+                        ) : (
+                            <Select
+                                value={formData.company || undefined}
+                                onValueChange={(value) => setFormData({ ...formData, company: value, department: '' })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select company" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {companySettings.map(cs => (
+                                        <SelectItem key={cs.company} value={cs.company}>{cs.company}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                     </div>
 
                     <div>
