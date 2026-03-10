@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Trash2, Edit, Users, Search, Filter, CheckCircle, TreePine } from 'lucide-react';
 import { toast } from 'sonner';
+import Breadcrumb from '../components/ui/Breadcrumb';
 import HierarchyTree from '../components/departmenthead/HierarchyTree';
 
 export default function DepartmentHeadSettings() {
@@ -333,6 +334,8 @@ export default function DepartmentHeadSettings() {
 
     return (
         <div className="space-y-6">
+            <Breadcrumb items={[{ label: 'Settings', href: 'RulesSettings' }, { label: 'Department Heads' }]} />
+
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">Department Head Settings</h1>
                 <p className="text-slate-600 mt-2">Manage department heads, their teams, and approval workflows</p>

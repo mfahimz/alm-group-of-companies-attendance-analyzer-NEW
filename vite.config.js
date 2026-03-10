@@ -12,8 +12,5 @@ export default defineConfig({
       legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === 'true'
     }),
     react(),
-  ],
-  resolve: {
-    dedupe: ['react', 'react-dom'],
-  },
+  ]
 });

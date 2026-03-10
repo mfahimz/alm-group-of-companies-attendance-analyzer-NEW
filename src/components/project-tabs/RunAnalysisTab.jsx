@@ -775,239 +775,93 @@ export default function RunAnalysisTab({ project }) {
 
     const performDataQualityCheck = () => {
         const issues = [];
-
-        // Core configuration checks
-        if (!rules) {
-            issues.push({
-                type: 'error',
-                title: 'Attendance rules not configured',
-                details: 'Configure attendance rules for this company before running analysis.'
-            });
-        }
-
-        const punchesInRange = punches.filter(
-            (p) => p.punch_date >= dateFrom && p.punch_date <= dateTo
-        );
-
-        if (punches.length === 0) {
-            issues.push({
-                type: 'error',
-                title: 'No punch data found for this project',
-                details: 'Upload punch data before running analysis.'
-            });
-        } else if (punchesInRange.length === 0) {
-            issues.push({
-                type: 'error',
-                title: 'No punch data in selected date range',
-                details: `There are punches for this project, but none between ${dateFrom} and ${dateTo}.`
-            });
-        }
-
-        // Employee / shift coverage checks
-        const employeesWithoutShifts = employees.filter((emp) => {
-            const hasShift = shifts.some(
-                (s) => String(s.attendance_id) === String(emp.attendance_id)
-            );
+        
+        // Check for employees without shifts
+        const employeesWithoutShifts = employees.filter(emp => {
+            const hasShift = shifts.some(s => String(s.attendance_id) === String(emp.attendance_id));
             return !hasShift;
         });
-
+        
         if (employeesWithoutShifts.length > 0) {
             issues.push({
-                type: 'warning',
-                title: `${employeesWithoutShifts.length} employees have no shift timings configured`,
-                details:
-                    employeesWithoutShifts
-                        .slice(0, 5)
-                        .map((e) => `${e.attendance_id} - ${e.name}`)
-                        .join(', ') +
-                    (employeesWithoutShifts.length > 5
-                        ? ` and ${employeesWithoutShifts.length - 5} more`
-                        : '')
-            });
-        }
-
-        // Employees that have punches but no shift timings at all
-        const employeesByAttendanceId = new Map(
-            employees.map((e) => [String(e.attendance_id), e])
-        );
-
-        const employeeIdsWithPunches = [
-            ...new Set(punchesInRange.map((p) => String(p.attendance_id)))
-        ];
-
-        const employeesWithPunchesNoShifts = employeeIdsWithPunches
-            .map((attId) => {
-                const emp = employeesByAttendanceId.get(attId);
-                const hasShift = shifts.some(
-                    (s) => String(s.attendance_id) === attId
-                );
-                return !hasShift
-                    ? {
-                          attendance_id: attId,
-                          name: emp?.name || 'Unknown employee'
-                      }
-                    : null;
-            })
-            .filter(Boolean);
-
-        if (employeesWithPunchesNoShifts.length > 0) {
-            issues.push({
                 type: 'error',
-                title: `${employeesWithPunchesNoShifts.length} employees have punches but no shift timings`,
-                details:
-                    employeesWithPunchesNoShifts
-                        .slice(0, 5)
-                        .map((e) => `${e.attendance_id} - ${e.name}`)
-                        .join(', ') +
-                    (employeesWithPunchesNoShifts.length > 5
-                        ? ` and ${employeesWithPunchesNoShifts.length - 5} more`
-                        : '')
+                title: `${employeesWithoutShifts.length} employees have no shift timings`,
+                details: employeesWithoutShifts.slice(0, 5).map(e => `${e.attendance_id} - ${e.name}`).join(', ') + 
+                         (employeesWithoutShifts.length > 5 ? ` and ${employeesWithoutShifts.length - 5} more` : '')
             });
         }
-
-        // Punches for unknown employees (attendance IDs not in Employee master)
-        const unknownAttendanceIds = employeeIdsWithPunches.filter(
-            (attId) => !employeesByAttendanceId.has(attId)
-        );
-        if (unknownAttendanceIds.length > 0) {
-            issues.push({
-                type: 'warning',
-                title: `${unknownAttendanceIds.length} attendance IDs in punches not found in Employee master`,
-                details: unknownAttendanceIds.slice(0, 10).join(', ')
-            });
-        }
-
-        // Shift timing validity checks
-        const invalidShiftTimings = shifts.filter((s) => {
-            const hasAnyTime =
-                parseTime(s.am_start) ||
-                parseTime(s.am_end) ||
-                parseTime(s.pm_start) ||
-                parseTime(s.pm_end);
-            return !hasAnyTime;
-        });
-
-        if (invalidShiftTimings.length > 0) {
-            issues.push({
-                type: 'error',
-                title: `${invalidShiftTimings.length} shift records have invalid or missing times`,
-                details:
-                    'Some shifts have no valid AM/PM start/end times. Fix them in the Shifts tab.'
-            });
-        }
-
-        // Punches outside project period
-        const punchesOutsideProject = punches.filter(
-            (p) =>
-                p.punch_date < project.date_from ||
-                p.punch_date > project.date_to
-        );
-        if (punchesOutsideProject.length > 0) {
-            issues.push({
-                type: 'warning',
-                title: `${punchesOutsideProject.length} punches fall outside the project period`,
-                details: 'These punches will be ignored by analysis. Check the project dates or punch import.'
-            });
-        }
-
-        // Check for unusual punch counts (volume spikes or drops)
+        
+        // Check for unusual punch counts
         const punchCounts = {};
-        punchesInRange.forEach((p) => {
+        punches.forEach(p => {
             punchCounts[p.punch_date] = (punchCounts[p.punch_date] || 0) + 1;
         });
-
-        const unusualDates = Object.entries(punchCounts).filter(
-            ([, count]) => count < 10 || count > 500
-        );
+        
+        const unusualDates = Object.entries(punchCounts).filter(([date, count]) => count < 10 || count > 500);
         if (unusualDates.length > 0) {
             issues.push({
                 type: 'warning',
-                title: `${unusualDates.length} dates in range have unusual punch counts`,
-                details: unusualDates
-                    .slice(0, 3)
-                    .map(([d, c]) => `${d}: ${c} punches`)
-                    .join(', ')
+                title: `${unusualDates.length} dates have unusual punch counts`,
+                details: unusualDates.slice(0, 3).map(([d, c]) => `${d}: ${c} punches`).join(', ')
             });
         }
-
-        // Check for date gaps in punches (within selected range)
-        const punchDatesInRangeSorted = [
-            ...new Set(punchesInRange.map((p) => p.punch_date))
-        ].sort();
-
-        if (punchDatesInRangeSorted.length > 0) {
+        
+        // Check for date gaps in punches
+        const punchDates = [...new Set(punches.map(p => p.punch_date))].sort();
+        if (punchDates.length > 0) {
             const gaps = [];
-            for (let i = 1; i < punchDatesInRangeSorted.length; i++) {
-                const prev = new Date(punchDatesInRangeSorted[i - 1]);
-                const curr = new Date(punchDatesInRangeSorted[i]);
+            for (let i = 1; i < punchDates.length; i++) {
+                const prev = new Date(punchDates[i-1]);
+                const curr = new Date(punchDates[i]);
                 const dayDiff = (curr - prev) / (1000 * 60 * 60 * 24);
                 if (dayDiff > 3) {
-                    gaps.push(
-                        `${punchDatesInRangeSorted[i - 1]} to ${
-                            punchDatesInRangeSorted[i]
-                        } (${Math.floor(dayDiff)} days)`
-                    );
+                    gaps.push(`${punchDates[i-1]} to ${punchDates[i]} (${Math.floor(dayDiff)} days)`);
                 }
             }
             if (gaps.length > 0) {
                 issues.push({
                     type: 'warning',
-                    title: `${gaps.length} date gaps found in punch data (selected range)`,
+                    title: `${gaps.length} date gaps found in punch data`,
                     details: gaps.slice(0, 2).join(', ')
                 });
             }
         }
-
-        // Auto-fix: Count duplicate punches that analysis will auto-filter
+        
+        // Auto-fix: Count duplicate punches that will be removed
         let duplicateCount = 0;
-        const punchesByDate = {};
-        punchesInRange.forEach((p) => {
-            if (!punchesByDate[p.punch_date]) punchesByDate[p.punch_date] = [];
-            punchesByDate[p.punch_date].push(p);
+        const punchsByDate = {};
+        punches.forEach(p => {
+            if (!punchsByDate[p.punch_date]) punchsByDate[p.punch_date] = [];
+            punchsByDate[p.punch_date].push(p);
         });
-
-        Object.values(punchesByDate).forEach((dayPunches) => {
+        
+        Object.values(punchsByDate).forEach(dayPunches => {
             if (dayPunches.length > 1) {
                 const sorted = dayPunches.sort((a, b) => {
-                    const timeA = parseTime(
-                        a.timestamp_raw,
-                        project.company === 'Al Maraghi Automotive'
-                    );
-                    const timeB = parseTime(
-                        b.timestamp_raw,
-                        project.company === 'Al Maraghi Automotive'
-                    );
+                    const timeA = parseTime(a.timestamp_raw, project.company === 'Al Maraghi Automotive');
+                    const timeB = parseTime(b.timestamp_raw, project.company === 'Al Maraghi Automotive');
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
-
+                
                 for (let i = 1; i < sorted.length; i++) {
-                    const prevTime = parseTime(
-                        sorted[i - 1].timestamp_raw,
-                        project.company === 'Al Maraghi Automotive'
-                    );
-                    const currTime = parseTime(
-                        sorted[i].timestamp_raw,
-                        project.company === 'Al Maraghi Automotive'
-                    );
+                    const prevTime = parseTime(sorted[i-1].timestamp_raw, project.company === 'Al Maraghi Automotive');
+                    const currTime = parseTime(sorted[i].timestamp_raw, project.company === 'Al Maraghi Automotive');
                     if (prevTime && currTime) {
-                        const minutesDiff = Math.abs(
-                            (currTime - prevTime) / (1000 * 60)
-                        );
+                        const minutesDiff = Math.abs((currTime - prevTime) / (1000 * 60));
                         if (minutesDiff < 10) duplicateCount++;
                     }
                 }
             }
         });
-
+        
         if (duplicateCount > 0) {
             issues.push({
                 type: 'info',
-                title: `${duplicateCount} duplicate punches will be auto-removed in analysis`,
-                details:
-                    'Punches within 10 minutes of each other on the same day are automatically filtered.'
+                title: `${duplicateCount} duplicate punches will be auto-removed`,
+                details: 'Punches within 10 minutes of each other are automatically filtered'
             });
         }
-
+        
         setDataQualityIssues(issues);
         return issues;
     };

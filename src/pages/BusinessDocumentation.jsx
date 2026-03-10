@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Briefcase, Users, Shield, DollarSign, FileText, Settings, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function BusinessDocumentation() {
     const [expandedSection, setExpandedSection] = useState('overview');
@@ -42,6 +43,11 @@ export default function BusinessDocumentation() {
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
+            <Breadcrumb items={[
+                { label: 'Settings', href: 'RulesSettings' },
+                { label: 'Business Documentation' }
+            ]} />
+            
             <div className="text-center mb-8">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl mb-4">
                     <Briefcase className="w-8 h-8 text-indigo-600" />
