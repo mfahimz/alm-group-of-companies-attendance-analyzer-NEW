@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+
+Some things CANNOT be done in code and must be done directly in the Base44 web editor.
+When you encounter any of the following, STOP and tell the user exactly what to do in Base44 instead of trying to code a workaround:
+
+- Adding/removing/renaming entity fields → "Go to Base44 → Entities → [EntityName] → edit the schema"
+- Changing user roles or inviting users → "Go to Base44 → Users → Invite or edit role"
+- Setting environment variables/secrets → "Go to Base44 → Settings → Environment Variables"
+- Enabling/disabling GitHub sync → "Go to Base44 → Settings → GitHub Sync"
+- Deploying the app → "Go to Base44 → Publish"
+- Configuring a custom domain → "Go to Base44 → Settings → Custom Domain"
+- Creating or managing automations (scheduled/entity triggers) → "Go to Base44 → Automations"
+- Managing backend function deployment → "Go to Base44 → Code → Functions"
+- Viewing production logs → "Go to Base44 → Code → Functions → [function name] → Logs"
+- Auth/login configuration → "This is managed by Base44 platform, not configurable in code"
+- Test vs Production database switching → "Go to Base44 → toggle Test/Prod in the top bar"
+
+Format your response as: "⚠️ This requires a Base44 platform action: [exact steps]"
+Do NOT attempt to replicate platform functionality in application code.
