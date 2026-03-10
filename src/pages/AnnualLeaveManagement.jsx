@@ -226,7 +226,7 @@ export default function AnnualLeaveManagement() {
 
     const resetForm = () => {
         setFormData({
-            company: '',
+            company: filterCompany || '',
             employee_id: '',
             date_from: '',
             date_to: '',
@@ -447,21 +447,28 @@ export default function AnnualLeaveManagement() {
                     <div className="space-y-4">
                         <div>
                             <Label>Company *</Label>
-                            <Select 
-                                value={formData.company} 
-                                onValueChange={(value) => setFormData({ ...formData, company: value, employee_id: '' })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select company" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {companies.map(company => (
-                                        <SelectItem key={company} value={company}>
-                                            {company}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            {filterCompany ? (
+                                <>
+                                    <Input value={filterCompany} disabled className="bg-slate-50" />
+                                    <p className="text-xs text-slate-500 mt-1">Company is set to your active company</p>
+                                </>
+                            ) : (
+                                <Select 
+                                    value={formData.company} 
+                                    onValueChange={(value) => setFormData({ ...formData, company: value, employee_id: '' })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select company" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {companies.map(company => (
+                                            <SelectItem key={company} value={company}>
+                                                {company}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
                         </div>
                         <div>
                             <Label>Employee *</Label>

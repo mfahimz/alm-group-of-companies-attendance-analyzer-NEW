@@ -783,21 +783,28 @@ export default function Salaries() {
                             <>
                                 <div className="col-span-2">
                                     <Label>Company</Label>
-                                    <Select 
-                                        value={selectedCompany} 
-                                        onValueChange={setSelectedCompany}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select company first" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {companies.map(company => (
-                                                <SelectItem key={company} value={company}>
-                                                    {company}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    {companyFilter ? (
+                                        <>
+                                            <Input value={companyFilter} disabled className="bg-slate-50" />
+                                            <p className="text-xs text-slate-500 mt-1">Company is set to your active company</p>
+                                        </>
+                                    ) : (
+                                        <Select 
+                                            value={selectedCompany} 
+                                            onValueChange={setSelectedCompany}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select company first" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {companies.map(company => (
+                                                    <SelectItem key={company} value={company}>
+                                                        {company}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                 </div>
                                 
                                 <div className="col-span-2">
