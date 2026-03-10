@@ -209,7 +209,7 @@ export default function Salaries() {
             wps_cap_amount: 4900
         });
         setEditingSalary(null);
-        setSelectedCompany('');
+        setSelectedCompany(companyFilter || '');
         setSelectedEmployeeId('');
     };
 
