@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Briefcase, Users, Shield, DollarSign, FileText, Settings, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
-import Breadcrumb from '../components/ui/Breadcrumb';
+import Breadcrumb from '../components/ui/Breadcrumb.jsx';
 
 export default function BusinessDocumentation() {
     const [expandedSection, setExpandedSection] = useState('overview');
