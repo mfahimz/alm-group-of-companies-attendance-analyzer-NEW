@@ -51,7 +51,7 @@ export default function ShiftTimingsTab({ project }) {
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showCopyDialog, setShowCopyDialog] = useState(false);
-    const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '' });
+    const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '', sourceProjectBlockId: 'block1' });
 
     const [formData, setFormData] = useState({
         attendance_id: '',
@@ -131,6 +131,13 @@ export default function ShiftTimingsTab({ project }) {
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list(),
         enabled: showCopyDialog
+    });
+
+    // Fetch shifts from selected source project for block selection
+    const { data: sourceProjectShifts = [] } = useQuery({
+        queryKey: ['sourceProjectShifts', copySource.projectId],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: copySource.projectId }),
+        enabled: showCopyDialog && copySource.type === 'project' && !!copySource.projectId
     });
 
     const { data: companySettings = [] } = useQuery({
@@ -492,20 +499,20 @@ export default function ShiftTimingsTab({ project }) {
     });
 
     const copyShiftsMutation = useMutation({
-        mutationFn: async ({ sourceType, sourceBlockId, sourceProjectId, targetBlockId }) => {
+        mutationFn: async ({ sourceType, sourceBlockId, sourceProjectId, sourceProjectBlockId, targetBlockId }) => {
             let sourceShifts = [];
             
             if (sourceType === 'block') {
                 // Copy from another block in the same project
                 sourceShifts = shifts.filter(s => s.shift_block === sourceBlockId);
             } else if (sourceType === 'project') {
-                // Copy from another project
+                // Copy from another project's specific block
                 const otherProjectShifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProjectId });
-                sourceShifts = otherProjectShifts;
+                sourceShifts = otherProjectShifts.filter(s => s.shift_block === sourceProjectBlockId);
             }
             
             if (sourceShifts.length === 0) {
-                throw new Error('No shifts found in source');
+                throw new Error('No shifts found in source block');
             }
             
             const targetRange = blockDateRanges[targetBlockId];
@@ -1762,26 +1769,67 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                         )}
 
                         {copySource.type === 'project' && (
-                            <div>
-                                <Label>Source Project</Label>
-                                <Select
-                                    value={copySource.projectId || undefined}
-                                    onValueChange={(value) => setCopySource({ ...copySource, projectId: value })}
-                                >
-                                    <SelectTrigger className="mt-2">
-                                        <SelectValue placeholder="Select project..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {allProjects
-                                            .filter(p => p.id !== project.id && p.company === project.company)
-                                            .map(p => (
-                                                <SelectItem key={p.id} value={p.id}>
-                                                    {p.name} ({new Date(p.date_from).toLocaleDateString()})
-                                                </SelectItem>
-                                            ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            <>
+                                <div>
+                                    <Label>Source Project</Label>
+                                    <Select
+                                        value={copySource.projectId || undefined}
+                                        onValueChange={(value) => setCopySource({ ...copySource, projectId: value, sourceProjectBlockId: 'block1' })}
+                                    >
+                                        <SelectTrigger className="mt-2">
+                                            <SelectValue placeholder="Select project..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {allProjects
+                                                .filter(p => p.id !== project.id && p.company === project.company)
+                                                .map(p => (
+                                                    <SelectItem key={p.id} value={p.id}>
+                                                        {p.name} ({new Date(p.date_from).toLocaleDateString('en-GB')} - {new Date(p.date_to).toLocaleDateString('en-GB')})
+                                                    </SelectItem>
+                                                ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {copySource.projectId && (
+                                    <div>
+                                        <Label>Source Block</Label>
+                                        <Select
+                                            value={copySource.sourceProjectBlockId || undefined}
+                                            onValueChange={(value) => setCopySource({ ...copySource, sourceProjectBlockId: value })}
+                                        >
+                                            <SelectTrigger className="mt-2">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {(() => {
+                                                    const sourceProj = allProjects.find(p => p.id === copySource.projectId);
+                                                    const sourceBlocksCount = sourceProj?.shift_blocks_count || 2;
+                                                    let sourceBlockRanges = {};
+                                                    
+                                                    try {
+                                                        sourceBlockRanges = sourceProj?.shift_block_ranges ? JSON.parse(sourceProj.shift_block_ranges) : {};
+                                                    } catch (e) {
+                                                        sourceBlockRanges = {};
+                                                    }
+
+                                                    return Array.from({ length: sourceBlocksCount }, (_, i) => i + 1).map(num => {
+                                                        const blockId = `block${num}`;
+                                                        const range = sourceBlockRanges[blockId] || { from: sourceProj?.date_from, to: sourceProj?.date_to };
+                                                        const count = sourceProjectShifts.filter(s => s.shift_block === blockId).length;
+                                                        
+                                                        return (
+                                                            <SelectItem key={blockId} value={blockId}>
+                                                                Block {num} ({count} shifts) - {range?.from ? new Date(range.from).toLocaleDateString('en-GB') : 'N/A'} to {range?.to ? new Date(range.to).toLocaleDateString('en-GB') : 'N/A'}
+                                                            </SelectItem>
+                                                        );
+                                                    });
+                                                })()}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                            </>
                         )}
 
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -1797,6 +1845,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                 sourceType: copySource.type,
                                 sourceBlockId: copySource.blockId,
                                 sourceProjectId: copySource.projectId,
+                                sourceProjectBlockId: copySource.sourceProjectBlockId,
                                 targetBlockId: copySource.targetBlockId
                             })}
                             disabled={copyShiftsMutation.isPending || (copySource.type === 'project' && !copySource.projectId)}
