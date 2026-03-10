@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Code, Database, Workflow, Lock, AlertTriangle, Book, ChevronDown, ChevronRight } from 'lucide-react';
-import Breadcrumb from '@/components/ui/breadcrumb';
 
 export default function TechnicalDocumentation() {
     const [expandedSection, setExpandedSection] = useState('overview');
@@ -43,11 +42,6 @@ export default function TechnicalDocumentation() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
-            <Breadcrumb items={[
-                { label: 'Settings', href: 'RulesSettings' },
-                { label: 'Technical Documentation' }
-            ]} />
-            
             <div className="text-center mb-8">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl mb-4">
                     <Code className="w-8 h-8 text-indigo-600" />
