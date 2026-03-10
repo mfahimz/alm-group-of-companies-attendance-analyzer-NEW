@@ -151,9 +151,12 @@
   * {
     @apply border-border;
   }
+  html {
+    font-family: 'Inter', sans-serif !important;
+  }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', sans-serif !important;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
