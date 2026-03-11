@@ -503,12 +503,48 @@ export default function ShiftTimingsTab({ project }) {
             let sourceShifts = [];
             
             if (sourceType === 'block') {
-                // Copy from another block in the same project
-                sourceShifts = shifts.filter(s => s.shift_block === sourceBlockId);
+                // Copy from another block in the same project (including legacy shifts)
+                const sourceBlockRange = blockDateRanges[sourceBlockId];
+                sourceShifts = shifts.filter(s => {
+                    if (s.shift_block === sourceBlockId) return true;
+                    
+                    // For legacy shifts without shift_block, check date ranges
+                    if (!s.shift_block && s.effective_from && s.effective_to && sourceBlockRange) {
+                        if (s.effective_from === sourceBlockRange.from && s.effective_to === sourceBlockRange.to) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
             } else if (sourceType === 'project') {
-                // Copy from another project's specific block
+                // Copy from another project's specific block (including legacy shifts)
                 const otherProjectShifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProjectId });
-                sourceShifts = otherProjectShifts.filter(s => s.shift_block === sourceProjectBlockId);
+                
+                // Get source project to determine block ranges
+                const sourceProj = await base44.entities.Project.filter({ id: sourceProjectId });
+                let sourceBlockRanges = {};
+                try {
+                    sourceBlockRanges = sourceProj[0]?.shift_block_ranges ? JSON.parse(sourceProj[0].shift_block_ranges) : {};
+                } catch (e) {
+                    sourceBlockRanges = {};
+                }
+                
+                const sourceBlockRange = sourceBlockRanges[sourceProjectBlockId] || { 
+                    from: sourceProj[0]?.date_from, 
+                    to: sourceProj[0]?.date_to 
+                };
+                
+                sourceShifts = otherProjectShifts.filter(s => {
+                    if (s.shift_block === sourceProjectBlockId) return true;
+                    
+                    // For legacy shifts without shift_block, check date ranges
+                    if (!s.shift_block && s.effective_from && s.effective_to && sourceBlockRange) {
+                        if (s.effective_from === sourceBlockRange.from && s.effective_to === sourceBlockRange.to) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
             }
             
             if (sourceShifts.length === 0) {
