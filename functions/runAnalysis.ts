@@ -13,7 +13,15 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { project_id, date_from, date_to, report_name, _existing_report_run_id } = await req.json();
+        const { 
+            project_id, 
+            date_from, 
+            date_to, 
+            report_name, 
+            _existing_report_run_id,
+            _chunk_offset,
+            _chunk_size 
+        } = await req.json();
 
         if (!project_id || !date_from || !date_to) {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
@@ -1467,8 +1475,15 @@ Deno.serve(async (req) => {
         // Convert to array for batch processing
         const employeeIdsArray = [...uniqueEmployeeIds];
         
-        for (let i = 0; i < employeeIdsArray.length; i += ANALYSIS_BATCH_SIZE) {
-            const batchIds = employeeIdsArray.slice(i, i + ANALYSIS_BATCH_SIZE);
+        // CHUNK PROCESSING: If chunk params provided, only process that subset
+        const startIdx = _chunk_offset !== undefined ? _chunk_offset : 0;
+        const endIdx = _chunk_size !== undefined ? Math.min(startIdx + _chunk_size, employeeIdsArray.length) : employeeIdsArray.length;
+        const employeesToProcess = employeeIdsArray.slice(startIdx, endIdx);
+        
+        console.log(`[runAnalysis] Processing chunk: employees ${startIdx}-${endIdx} of ${employeeIdsArray.length}`);
+        
+        for (let i = 0; i < employeesToProcess.length; i += ANALYSIS_BATCH_SIZE) {
+            const batchIds = employeesToProcess.slice(i, i + ANALYSIS_BATCH_SIZE);
             
             // Process batch of employees
             for (const attendance_id of batchIds) {
@@ -1496,10 +1511,10 @@ Deno.serve(async (req) => {
             }
             
             // Log progress
-            console.log(`[runAnalysis] Processed batch ${Math.floor(i / ANALYSIS_BATCH_SIZE) + 1}/${Math.ceil(employeeIdsArray.length / ANALYSIS_BATCH_SIZE)} (${Math.min(i + ANALYSIS_BATCH_SIZE, employeeIdsArray.length)}/${employeeIdsArray.length} employees)`);
+            console.log(`[runAnalysis] Processed batch ${Math.floor(i / ANALYSIS_BATCH_SIZE) + 1}/${Math.ceil(employeesToProcess.length / ANALYSIS_BATCH_SIZE)} (${Math.min(i + ANALYSIS_BATCH_SIZE, employeesToProcess.length)}/${employeesToProcess.length} employees in this chunk)`);
             
             // Add delay between analysis batches to reduce database load
-            if (i + ANALYSIS_BATCH_SIZE < employeeIdsArray.length) {
+            if (i + ANALYSIS_BATCH_SIZE < employeesToProcess.length) {
                 await new Promise(resolve => setTimeout(resolve, ANALYSIS_BATCH_DELAY));
             }
         }
@@ -1507,9 +1522,21 @@ Deno.serve(async (req) => {
         console.log('[runAnalysis] Processed employees:', allResults.length);
         console.log('[runAnalysis] Unique attendance IDs processed:', processedAttendanceIds.size);
 
-        // Replace existing AnalysisResult rows for this report run so reruns are deterministic
-        // while preserving ramadan_gift_minutes values copied above.
-        if (existingResultsForReport.length > 0) {
+        // CHUNK MODE: Only delete results for employees in THIS chunk
+        if (_chunk_offset !== undefined && allResults.length > 0) {
+            const attendanceIdsToDelete = allResults.map(r => r.attendance_id);
+            for (const aid of attendanceIdsToDelete) {
+                const existing = await base44.asServiceRole.entities.AnalysisResult.filter({
+                    project_id,
+                    report_run_id: reportRun.id,
+                    attendance_id: aid
+                });
+                if (existing.length > 0) {
+                    await base44.asServiceRole.entities.AnalysisResult.delete(existing[0].id);
+                }
+            }
+        } else if (existingResultsForReport.length > 0 && _chunk_offset === undefined) {
+            // Full run - delete all existing
             await base44.asServiceRole.entities.AnalysisResult.deleteMany({
                 project_id,
                 report_run_id: reportRun.id
@@ -1580,19 +1607,25 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Update project status
-        await base44.asServiceRole.entities.Project.update(project_id, {
-            last_saved_report_id: reportRun.id,
-            status: 'analyzed'
-        });
+        // Update project status (only if this is NOT a chunk or it's the final chunk)
+        const isFinalChunk = _chunk_offset === undefined || (startIdx + allResults.length >= uniqueEmployeeIds.length);
+        if (isFinalChunk) {
+            await base44.asServiceRole.entities.Project.update(project_id, {
+                last_saved_report_id: reportRun.id,
+                status: 'analyzed'
+            });
+        }
 
         return Response.json({
             success: true,
             report_run_id: reportRun.id,
             processed_count: allResults.length,
             total_count: uniqueEmployeeIds.length,
+            chunk_start: startIdx,
+            chunk_end: endIdx,
+            is_complete: isFinalChunk,
             other_minutes_exceptions_created: otherMinutesExceptionsToCreate.length,
-            message: `Analysis complete for ${allResults.length} employees`
+            message: `Analysis complete for ${allResults.length} employees (${startIdx}-${endIdx} of ${uniqueEmployeeIds.length})`
         });
 
     } catch (error) {
