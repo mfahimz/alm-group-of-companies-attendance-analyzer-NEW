@@ -1457,8 +1457,8 @@ Deno.serve(async (req) => {
         const allResults = [];
         const processedAttendanceIds = new Set();
         const otherMinutesExceptionsToCreate = []; // Track other minutes exceptions to create
-        const ANALYSIS_BATCH_SIZE = 15; // BUG FIX #5: Increased from 5 to 15 for better performance
-        const ANALYSIS_BATCH_DELAY = 500; // 500ms delay between analysis batches
+        const ANALYSIS_BATCH_SIZE = 50; // PERFORMANCE FIX: Increased to 50 for much faster processing
+        const ANALYSIS_BATCH_DELAY = 0; // PERFORMANCE FIX: Remove delays for speed
         
         // Convert to array for batch processing
         const employeeIdsArray = [...uniqueEmployeeIds];
@@ -1512,9 +1512,9 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Save results in smaller batches with longer delays
-        const SAVE_BATCH_SIZE = 10; // Save 10 results at a time (reduced from 50)
-        const SAVE_BATCH_DELAY = 300; // 300ms delay between save batches
+        // Save results in larger batches with minimal delays
+        const SAVE_BATCH_SIZE = 50; // PERFORMANCE FIX: Save 50 results at a time for speed
+        const SAVE_BATCH_DELAY = 0; // PERFORMANCE FIX: Remove delays for speed
         
         for (let i = 0; i < allResults.length; i += SAVE_BATCH_SIZE) {
             const batch = allResults.slice(i, i + SAVE_BATCH_SIZE);
