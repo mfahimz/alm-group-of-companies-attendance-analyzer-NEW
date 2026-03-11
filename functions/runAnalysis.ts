@@ -850,18 +850,22 @@ Deno.serve(async (req) => {
                     for (const scheduleId in ramadanShiftsLookup) {
                         const ramadanData = ramadanShiftsLookup[scheduleId];
                         if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
+                            // Count Saturdays passed since Ramadan start to determine week
                             const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
-                            let weekNumber = 1;
+                            let saturdaysPassed = 0;
                             
-                            for (let i = 0; i <= daysSinceStart; i++) {
+                            for (let i = 0; i < daysSinceStart; i++) {
                                 const checkDate = new Date(ramadanData.start);
                                 checkDate.setDate(checkDate.getDate() + i);
                                 const checkDayOfWeek = checkDate.getUTCDay();
                                 
-                                if (checkDayOfWeek === 0 && i > 0) {
-                                    weekNumber = weekNumber === 1 ? 2 : 1;
+                                // Count Saturdays (day 6) that have already passed
+                                if (checkDayOfWeek === 6) {
+                                    saturdaysPassed++;
                                 }
                             }
+                            
+                            const weekNumber = (saturdaysPassed % 2) === 0 ? 1 : 2;
                             
                             const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
                             const employeeShiftData = weekData[attendanceIdStr];
