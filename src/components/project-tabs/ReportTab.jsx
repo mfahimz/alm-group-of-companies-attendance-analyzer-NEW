@@ -152,14 +152,33 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         }
 
         setIsAnalyzing(true);
-        setAnalysisProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Starting analysis on server...' });
+        setAnalysisProgress({ 
+            current: 0, 
+            total: 100, 
+            status: 'Preparing analysis...',
+            step: 'Initializing',
+            subStatus: 'Loading employee data and configurations'
+        });
 
         try {
+            // Step 1: Preparing
             setAnalysisProgress({ 
-                current: 0, 
-                total: uniqueEmployeeIds.length, 
-                status: 'Processing on server...',
-                subStatus: 'Analysis is running in the background. This may take a few minutes.'
+                current: 10, 
+                total: 100, 
+                status: 'Preparing analysis...',
+                step: 'Loading Data',
+                subStatus: 'Fetching employee records and shift schedules'
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Step 2: Processing attendance
+            setAnalysisProgress({ 
+                current: 25, 
+                total: 100, 
+                status: 'Analyzing attendance records...',
+                step: 'Processing Attendance',
+                subStatus: `Checking ${uniqueEmployeeIds.length} employees across ${Math.ceil((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))} days`
             });
 
             const response = await base44.functions.invoke('runAnalysis', {
@@ -169,22 +188,45 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`
             });
 
+            // Step 3: Processing results
+            setAnalysisProgress({ 
+                current: 75, 
+                total: 100, 
+                status: 'Calculating attendance summary...',
+                step: 'Finalizing Results',
+                subStatus: 'Computing absences, late arrivals, and deductions'
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 300));
+
             if (response.data.success) {
+                // Step 4: Complete
+                setAnalysisProgress({ 
+                    current: 100, 
+                    total: 100, 
+                    status: 'Analysis complete!',
+                    step: 'Done',
+                    subStatus: `Successfully analyzed ${response.data.processed_count} employees`
+                });
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
                 queryClient.invalidateQueries(['results', project.id]);
                 queryClient.invalidateQueries(['reportRuns', project.id]);
                 queryClient.invalidateQueries(['project', project.id]);
                 queryClient.invalidateQueries(['projects']);
-                toast.success(response.data.message);
-                setAnalysisProgress({ 
-                    current: response.data.processed_count, 
-                    total: response.data.total_count, 
-                    status: 'Complete!',
-                    subStatus: 'Report generated successfully'
-                });
+                toast.success(`✅ ${response.data.message}`);
             } else {
                 throw new Error(response.data.error || 'Analysis failed');
             }
         } catch (error) {
+            setAnalysisProgress({ 
+                current: 0, 
+                total: 100, 
+                status: 'Analysis failed',
+                step: 'Error',
+                subStatus: error.message
+            });
             toast.error('Analysis failed: ' + error.message);
             console.error(error);
         } finally {
@@ -703,25 +745,30 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             </div>
 
                             {analysisProgress && (
-                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-                                        <div className="flex-1">
-                                            <p className="font-medium text-indigo-900">{analysisProgress.status}</p>
+                                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-5">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <Loader2 className="w-6 h-6 text-indigo-600 animate-spin flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1 space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-semibold text-indigo-900 text-lg">{analysisProgress.step}</p>
+                                                <span className="text-sm font-medium text-indigo-700">
+                                                    {analysisProgress.current}%
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-indigo-800 font-medium">{analysisProgress.status}</p>
                                             {analysisProgress.subStatus && (
-                                                <p className="text-sm text-indigo-700 mt-0.5">{analysisProgress.subStatus}</p>
+                                                <p className="text-xs text-indigo-600 mt-1">{analysisProgress.subStatus}</p>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="w-full bg-indigo-200 rounded-full h-2">
+                                    <div className="w-full bg-indigo-200 rounded-full h-3 overflow-hidden shadow-inner">
                                         <div 
-                                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                            style={{ width: `${analysisProgress.total > 0 ? (analysisProgress.current / analysisProgress.total) * 100 : 0}%` }}
-                                        />
+                                            className="bg-gradient-to-r from-indigo-600 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out relative overflow-hidden"
+                                            style={{ width: `${analysisProgress.current}%` }}
+                                        >
+                                            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-indigo-700 mt-2">
-                                        {analysisProgress.current} / {analysisProgress.total} employees processed
-                                    </p>
                                 </div>
                             )}
                         </div>
