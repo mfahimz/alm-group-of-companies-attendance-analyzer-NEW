@@ -1816,7 +1816,19 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                                     return Array.from({ length: sourceBlocksCount }, (_, i) => i + 1).map(num => {
                                                         const blockId = `block${num}`;
                                                         const range = sourceBlockRanges[blockId] || { from: sourceProj?.date_from, to: sourceProj?.date_to };
-                                                        const count = sourceProjectShifts.filter(s => s.shift_block === blockId).length;
+                                                        
+                                                        // Count shifts in this block (including legacy shifts without shift_block field)
+                                                        const count = sourceProjectShifts.filter(s => {
+                                                            if (s.shift_block === blockId) return true;
+                                                            
+                                                            // For legacy shifts without shift_block, check date ranges
+                                                            if (!s.shift_block && s.effective_from && s.effective_to && range) {
+                                                                if (s.effective_from === range.from && s.effective_to === range.to) {
+                                                                    return true;
+                                                                }
+                                                            }
+                                                            return false;
+                                                        }).length;
                                                         
                                                         return (
                                                             <SelectItem key={blockId} value={blockId}>
