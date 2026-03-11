@@ -101,25 +101,30 @@ Deno.serve(async (req) => {
             const week2 = week2Shifts[attendanceId];
             if (!week1 && !week2) continue;
 
-            // CRITICAL FIX: Calculate which week based on days elapsed since Ramadan start
-            // Week alternation happens every 7 days, starting with week 1
+            // CRITICAL: Week rotates after each Saturday (before Sunday)
+            // Track current week for this employee
+            let currentWeekIndex = 0; // 0 = week1, 1 = week2
+            
             for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
                 const dateStr = currentDate.toISOString().split('T')[0];
                 const dayOfWeek = currentDate.getDay();
                 const isSunday = dayOfWeek === 0;
                 const isFriday = dayOfWeek === 5;
-
-                // Calculate which week this date belongs to based on days since Ramadan start
-                const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
-                const weekNumber = Math.floor(daysSinceRamadanStart / 7) % 2; // 0=week1, 1=week2
+                const isSaturday = dayOfWeek === 6;
 
                 if (isSunday) {
                     continue; // Skip Sunday (weekly off)
                 }
 
                 const fridayShift = fridayShifts[attendanceId];
-                const weekShifts = isFriday && fridayShift ? fridayShift : (weekNumber === 0 ? week1 : week2);
-                if (!weekShifts) continue;
+                const weekShifts = isFriday && fridayShift ? fridayShift : (currentWeekIndex === 0 ? week1 : week2);
+                if (!weekShifts) {
+                    // Rotate week after Saturday (before Sunday)
+                    if (isSaturday) {
+                        currentWeekIndex = (currentWeekIndex + 1) % 2;
+                    }
+                    continue;
+                }
 
                 // ================================================================
                 // SIMPLE LOGIC: Determine single vs combined based on TIME FIELDS ONLY

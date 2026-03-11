@@ -89,23 +89,25 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         const preview = [];
         const startDate = new Date(ramadanOverlap.from);
         const endDate = new Date(ramadanOverlap.to);
-        const ramadanStart = new Date(ramadanOverlap.schedule.ramadan_start_date);
+        let currentWeekIndex = 0;
         
         for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
             const isSunday = dayOfWeek === 0;
-            
-            // Calculate week based on days elapsed since Ramadan start (matches backend logic)
-            const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
-            const weekNumber = Math.floor(daysSinceRamadanStart / 7) % 2; // 0=week1, 1=week2
+            const isSaturday = dayOfWeek === 6;
             
             preview.push({ 
                 date: dateStr, 
                 dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'long' }), 
                 isSunday, 
-                weekLabel: weekNumber === 0 ? 'Week 1' : 'Week 2' 
+                weekLabel: currentWeekIndex === 0 ? 'Week 1' : 'Week 2' 
             });
+            
+            // Rotate week AFTER Saturday (before Sunday)
+            if (isSaturday) {
+                currentWeekIndex = (currentWeekIndex + 1) % 2;
+            }
         }
         setRamadanPreviewData(preview);
         setShowRamadanPreview(true);

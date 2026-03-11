@@ -75,24 +75,28 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
         const start = new Date(schedule.ramadan_start_date);
         const end = new Date(schedule.ramadan_end_date);
         
+        let weekIndex = 0; // Week 1 = 0, Week 2 = 1
+        
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dayOfWeek = d.getDay();
             const isSunday = dayOfWeek === 0;
             const isFriday = dayOfWeek === 5;
-            
-            // Calculate week based on days elapsed since Ramadan start (matches backend logic)
-            const daysSinceRamadanStart = Math.floor((d - start) / (1000 * 60 * 60 * 24));
-            const weekNumber = Math.floor(daysSinceRamadanStart / 7) % 2; // 0=week1, 1=week2
+            const isSaturday = dayOfWeek === 6;
             
             days.push({
                 date: new Date(d),
                 dateStr: d.toISOString().split('T')[0],
                 day: d.getDate(),
                 month: d.getMonth(),
-                weekLabel: weekNumber === 0 ? 'W1' : 'W2',
+                weekLabel: weekIndex === 0 ? 'W1' : 'W2',
                 isSunday,
                 isFriday
             });
+            
+            // Rotate week AFTER Saturday (before Sunday)
+            if (isSaturday) {
+                weekIndex = (weekIndex + 1) % 2;
+            }
         }
         
         return days;
