@@ -851,11 +851,17 @@ Deno.serve(async (req) => {
                         const ramadanData = ramadanShiftsLookup[scheduleId];
                         if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
                             const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
+                            let weekNumber = 1;
                             
-                            // CRITICAL FIX: Calculate week number based on 7-day intervals from Ramadan start
-                            // Week 1 = Days 0-6, Week 2 = Days 7-13, Week 1 = Days 14-20, etc.
-                            const weekIndex = Math.floor(daysSinceStart / 7) % 2;
-                            const weekNumber = weekIndex === 0 ? 1 : 2;
+                            for (let i = 0; i <= daysSinceStart; i++) {
+                                const checkDate = new Date(ramadanData.start);
+                                checkDate.setDate(checkDate.getDate() + i);
+                                const checkDayOfWeek = checkDate.getUTCDay();
+                                
+                                if (checkDayOfWeek === 0 && i > 0) {
+                                    weekNumber = weekNumber === 1 ? 2 : 1;
+                                }
+                            }
                             
                             const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
                             const employeeShiftData = weekData[attendanceIdStr];
