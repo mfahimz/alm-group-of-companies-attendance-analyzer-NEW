@@ -190,6 +190,11 @@ Deno.serve(async (req) => {
                     });
                 }
                 // If no times are filled at all, skip this day for this employee
+                
+                // Rotate week AFTER Saturday (before Sunday)
+                if (isSaturday) {
+                    currentWeekIndex = (currentWeekIndex + 1) % 2;
+                }
             }
         }
 
