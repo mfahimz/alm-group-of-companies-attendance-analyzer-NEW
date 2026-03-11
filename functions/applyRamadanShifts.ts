@@ -101,20 +101,24 @@ Deno.serve(async (req) => {
             const week2 = week2Shifts[attendanceId];
             if (!week1 && !week2) continue;
 
-            let currentWeekIndex = 0;
+            // CRITICAL FIX: Calculate which week based on days elapsed since Ramadan start
+            // Week alternation happens every 7 days, starting with week 1
             for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
                 const dateStr = currentDate.toISOString().split('T')[0];
                 const dayOfWeek = currentDate.getDay();
                 const isSunday = dayOfWeek === 0;
                 const isFriday = dayOfWeek === 5;
 
+                // Calculate which week this date belongs to based on days since Ramadan start
+                const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
+                const weekNumber = Math.floor(daysSinceRamadanStart / 7) % 2; // 0=week1, 1=week2
+
                 if (isSunday) {
-                    currentWeekIndex = (currentWeekIndex + 1) % 2;
-                    continue;
+                    continue; // Skip Sunday (weekly off)
                 }
 
                 const fridayShift = fridayShifts[attendanceId];
-                const weekShifts = isFriday && fridayShift ? fridayShift : (currentWeekIndex === 0 ? week1 : week2);
+                const weekShifts = isFriday && fridayShift ? fridayShift : (weekNumber === 0 ? week1 : week2);
                 if (!weekShifts) continue;
 
                 // ================================================================
