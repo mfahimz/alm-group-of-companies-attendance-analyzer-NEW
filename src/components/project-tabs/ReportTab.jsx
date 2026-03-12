@@ -181,44 +181,64 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 subStatus: `Checking ${uniqueEmployeeIds.length} employees across ${Math.ceil((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))} days`
             });
 
-            const response = await base44.functions.invoke('runAnalysis', {
-                project_id: project.id,
-                date_from: dateFrom,
-                date_to: dateTo,
-                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`
-            });
+            const batchSize = 10;
+            let offset = 0;
+            let isComplete = false;
+            let reportRunId = null;
+            let totalProcessed = 0;
 
-            // Step 3: Processing results
-            setAnalysisProgress({ 
-                current: 75, 
-                total: 100, 
-                status: 'Calculating attendance summary...',
-                step: 'Finalizing Results',
-                subStatus: 'Computing absences, late arrivals, and deductions'
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            if (response.data.success) {
-                // Step 4: Complete
-                setAnalysisProgress({ 
-                    current: 100, 
-                    total: 100, 
-                    status: 'Analysis complete!',
-                    step: 'Done',
-                    subStatus: `Successfully analyzed ${response.data.processed_count} employees`
+            while (!isComplete) {
+                const response = await base44.functions.invoke('runAnalysis', {
+                    project_id: project.id,
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
+                    _existing_report_run_id: reportRunId,
+                    _chunk_offset: offset,
+                    _chunk_size: batchSize
                 });
 
-                await new Promise(resolve => setTimeout(resolve, 500));
+                if (response.data.success) {
+                    reportRunId = response.data.report_run_id;
+                    isComplete = response.data.is_complete;
+                    offset += batchSize;
+                    totalProcessed += response.data.processed_count;
 
-                queryClient.invalidateQueries(['results', project.id]);
-                queryClient.invalidateQueries(['reportRuns', project.id]);
-                queryClient.invalidateQueries(['project', project.id]);
-                queryClient.invalidateQueries(['projects']);
-                toast.success(`✅ ${response.data.message}`);
-            } else {
-                throw new Error(response.data.error || 'Analysis failed');
+                    const percentage = Math.round(25 + Math.min(offset / uniqueEmployeeIds.length, 1) * 50);
+
+                    // Step 3: Processing results iteration
+                    setAnalysisProgress({ 
+                        current: percentage, 
+                        total: 100, 
+                        status: 'Calculating attendance summary...',
+                        step: 'Finalizing Results',
+                        subStatus: `Analyzed ${Math.min(offset, uniqueEmployeeIds.length)} of ${uniqueEmployeeIds.length} employees`
+                    });
+
+                    if (!isComplete) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } else {
+                    throw new Error(response.data.error || 'Analysis chunk failed');
+                }
             }
+
+            // Step 4: Complete
+            setAnalysisProgress({ 
+                current: 100, 
+                total: 100, 
+                status: 'Analysis complete!',
+                step: 'Done',
+                subStatus: `Successfully analyzed ${totalProcessed} employees`
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            queryClient.invalidateQueries(['results', project.id]);
+            queryClient.invalidateQueries(['reportRuns', project.id]);
+            queryClient.invalidateQueries(['project', project.id]);
+            queryClient.invalidateQueries(['projects']);
+            toast.success(`✅ Analysis complete`);
         } catch (error) {
             setAnalysisProgress({ 
                 current: 0, 
@@ -421,7 +441,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             }
 
             // STEP 3: Create salary snapshots in batches with real progress
-            const BATCH_SIZE = 20;
+            const BATCH_SIZE = 10;
             let batchStart = 0;
             let hasMore = true;
             let totalEmployees = 0;
@@ -478,8 +498,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     batchStart = currentPos;
 
                     if (hasMore) {
-                        console.log(`[ReportTab] ⏳ Waiting 100ms before next batch...`);
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        console.log(`[ReportTab] ⏳ Waiting 300ms before next batch...`);
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     } else {
                         console.log(`[ReportTab] ✅ ALL BATCHES COMPLETE - Exiting loop`);
                     }
@@ -761,14 +781,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="w-full bg-indigo-200 rounded-full h-3 overflow-hidden shadow-inner">
-                                        <div 
-                                            className="bg-gradient-to-r from-indigo-600 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out relative overflow-hidden"
-                                            style={{ width: `${analysisProgress.current}%` }}
-                                        >
-                                            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                                        </div>
-                                    </div>
+                                    <Progress value={analysisProgress.current} className="h-2" />
                                 </div>
                             )}
                         </div>
@@ -934,7 +947,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             <div className="flex items-start gap-2 text-xs text-amber-800">
                                 <div className="animate-spin h-3 w-3 border-2 border-amber-300 border-t-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
                                 <div>
-                                    <strong>Creating salary snapshots...</strong> This takes ~2-3 seconds per 20 employees.
+                                    <strong>Creating salary snapshots...</strong> This takes ~3 seconds per 10 employees.
                                     <br />
                                     <span className="text-amber-700">⚠️ Do NOT navigate away or close this dialog until complete!</span>
                                 </div>

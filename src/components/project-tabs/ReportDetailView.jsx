@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -1206,20 +1207,50 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 throw new Error(markResult.data?.error || 'Finalization failed');
             }
 
-            // STEP 2: Create all salary snapshots in a single invoke.
-            // Backend handles chunked persistence internally to avoid API limits.
-            setFinalizationProgress(prev => ({
-                ...prev,
-                currentEmployee: 'Creating salary snapshots for all employees...',
-                status: 'Generating snapshots. This may take some time for large reports...'
-            }));
+            // STEP 2: Create all salary snapshots using batch mode
+            const BATCH_SIZE = 10;
+            let batchStart = 0;
+            let hasMore = true;
+            let totalEmployees = 0;
 
-            const snapshotResult = await base44.functions.invoke('createSalarySnapshots', {
-                project_id: project.id,
-                report_run_id: reportRun.id
-            });
+            while (hasMore) {
+                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
+                    project_id: project.id,
+                    report_run_id: reportRun.id,
+                    batch_mode: true,
+                    batch_start: batchStart,
+                    batch_size: BATCH_SIZE
+                });
 
-            console.log('[ReportDetailView] Snapshot creation result:', snapshotResult.data);
+                if (batchResult.data?.batch_mode) {
+                    totalEmployees = batchResult.data.total_employees;
+                    const currentPos = batchResult.data.current_position;
+                    const currentBatch = batchResult.data.current_batch || [];
+                    hasMore = batchResult.data.has_more;
+
+                    const percentage = totalEmployees > 0 ? Math.round(currentPos/totalEmployees*100) : 0;
+                    
+                    setFinalizationProgress(prev => ({
+                        open: true,
+                        current: currentPos,
+                        total: totalEmployees,
+                        currentEmployee: currentBatch.length > 0 
+                            ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
+                            : 'Processing...',
+                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
+                    }));
+
+                    batchStart = currentPos;
+
+                    if (hasMore) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } else {
+                    // Fallback if backend doesn't support batch_mode (unlikely)
+                    hasMore = false;
+                }
+            }
+
             console.log('[ReportDetailView] All snapshots created successfully');
             return markResult.data;
         },
@@ -1651,12 +1682,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 </p>
                             </div>
                         </div>
-                        <div className="w-full bg-green-200 rounded-full h-2">
-                            <div 
-                                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${saveProgress.total > 0 ? (saveProgress.current / saveProgress.total) * 100 : 0}%` }}
-                            />
-                        </div>
+                        <Progress value={saveProgress.total > 0 ? (saveProgress.current / saveProgress.total) * 100 : 0} className="w-full bg-green-200" />
                     </CardContent>
                 </Card>
             )}

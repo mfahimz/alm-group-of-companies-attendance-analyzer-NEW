@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Upload, AlertTriangle, Search, Trash2, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from "@/components/ui/progress";
 import SortableTableHead from '../ui/SortableTableHead';
 import TablePagination from '../ui/TablePagination';
 import { toast } from 'sonner';
@@ -257,10 +258,11 @@ export default function PunchUploadTab({ project }) {
               total: punchRecords.length 
             });
 
-            const batchSize = 100;
+            const batchSize = 10;
             for (let i = 0; i < punchRecords.length; i += batchSize) {
               const batch = punchRecords.slice(i, i + batchSize);
               await base44.entities.Punch.bulkCreate(batch);
+              await new Promise(r => setTimeout(r, 300));
               const uploaded = Math.min(i + batchSize, punchRecords.length);
               setUploadProgress({ 
                   phase: `Uploading batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(punchRecords.length / batchSize)}...`, 
@@ -317,13 +319,14 @@ export default function PunchUploadTab({ project }) {
             const total = ids.length;
             setUploadProgress({ current: 0, total, status: 'Deleting punch records...' });
             
-            const batchSize = 20;
+            const batchSize = 10;
             for (let i = 0; i < ids.length; i += batchSize) {
                 const batch = ids.slice(i, i + batchSize);
                 for (const id of batch) {
                     await base44.entities.Punch.delete(id);
                 }
-                setUploadProgress({ current: i + batch.length, total, status: `Deleting ${i + batch.length}/${total}...` });
+                await new Promise(r => setTimeout(r, 300));
+                setUploadProgress({ current: Math.min(i + batchSize, total), total, status: `Deleting ${Math.min(i + batchSize, total)}/${total}...` });
             }
         },
         onSuccess: () => {
@@ -409,18 +412,13 @@ export default function PunchUploadTab({ project }) {
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="flex-1">
-                                <p className="font-medium text-indigo-900">{uploadProgress.status}</p>
+                                <p className="font-medium text-indigo-900">{uploadProgress.status || uploadProgress.phase}</p>
                                 <p className="text-sm text-indigo-700 mt-1">
-                                    {uploadProgress.current} / {uploadProgress.total} batches completed
+                                    {uploadProgress.current} / {uploadProgress.total} records completed
                                 </p>
                             </div>
                         </div>
-                        <div className="w-full bg-indigo-200 rounded-full h-2">
-                            <div 
-                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%` }}
-                            />
-                        </div>
+                        <Progress value={uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0} />
                     </CardContent>
                 </Card>
             )}
@@ -762,15 +760,10 @@ export default function PunchUploadTab({ project }) {
 
                         {uploadProgress && (
                             <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                                <p className="text-sm font-medium text-indigo-900 mb-2">{uploadProgress.phase}</p>
-                                <div className="w-full bg-indigo-200 rounded-full h-2">
-                                    <div 
-                                        className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                        style={{ width: uploadProgress.total > 0 ? `${(uploadProgress.current / uploadProgress.total) * 100}%` : '0%' }}
-                                    />
-                                </div>
-                                <p className="text-xs text-indigo-700 mt-1">
-                                    {uploadProgress.current} / {uploadProgress.total}
+                                <p className="text-sm font-medium text-indigo-900 mb-2">{uploadProgress.phase || uploadProgress.status}</p>
+                                <Progress value={uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0} />
+                                <p className="text-xs text-indigo-700 mt-2">
+                                    {uploadProgress.current} / {uploadProgress.total} records
                                 </p>
                             </div>
                         )}

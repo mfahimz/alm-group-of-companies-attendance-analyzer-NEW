@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Play, CheckCircle, AlertCircle, Loader2, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { Progress } from "@/components/ui/progress";
 
 export default function RunAnalysisTab({ project }) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -910,7 +911,7 @@ export default function RunAnalysisTab({ project }) {
         setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Starting analysis on server...' });
 
         try {
-            // Call backend function to run analysis
+            // Call backend function to run analysis in chunks
             setProgress({ 
                 current: 0, 
                 total: uniqueEmployeeIds.length, 
@@ -918,28 +919,55 @@ export default function RunAnalysisTab({ project }) {
                 subStatus: 'Analysis is running in the background. This may take a few minutes.'
             });
 
-            const response = await base44.functions.invoke('runAnalysis', {
-                project_id: project.id,
-                date_from: dateFrom,
-                date_to: dateTo,
-                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`
-            });
+            const batchSize = 10;
+            let offset = 0;
+            let isComplete = false;
+            let reportRunId = null;
+            let totalProcessed = 0;
 
-            if (response.data.success) {
-                queryClient.invalidateQueries(['results', project.id]);
-                queryClient.invalidateQueries(['reportRuns', project.id]);
-                queryClient.invalidateQueries(['project', project.id]);
-                queryClient.invalidateQueries(['projects']);
-                toast.success(response.data.message);
-                setProgress({ 
-                    current: response.data.processed_count, 
-                    total: response.data.total_count, 
-                    status: 'Complete!',
-                    subStatus: 'Report generated successfully'
+            while (!isComplete) {
+                const response = await base44.functions.invoke('runAnalysis', {
+                    project_id: project.id,
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
+                    _existing_report_run_id: reportRunId,
+                    _chunk_offset: offset,
+                    _chunk_size: batchSize
                 });
-            } else {
-                throw new Error(response.data.error || 'Analysis failed');
+
+                if (response.data.success) {
+                    reportRunId = response.data.report_run_id;
+                    isComplete = response.data.is_complete;
+                    offset += batchSize;
+                    totalProcessed += response.data.processed_count;
+
+                    setProgress({ 
+                        current: Math.min(offset, uniqueEmployeeIds.length), 
+                        total: uniqueEmployeeIds.length, 
+                        status: 'Processing...',
+                        subStatus: `Analyzed ${Math.min(offset, uniqueEmployeeIds.length)} of ${uniqueEmployeeIds.length} employees`
+                    });
+
+                    if (!isComplete) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } else {
+                    throw new Error(response.data.error || 'Analysis chunk failed');
+                }
             }
+
+            queryClient.invalidateQueries(['results', project.id]);
+            queryClient.invalidateQueries(['reportRuns', project.id]);
+            queryClient.invalidateQueries(['project', project.id]);
+            queryClient.invalidateQueries(['projects']);
+            toast.success('Analysis complete');
+            setProgress({ 
+                current: totalProcessed, 
+                total: uniqueEmployeeIds.length, 
+                status: 'Complete!',
+                subStatus: 'Report generated successfully'
+            });
         } catch (error) {
             toast.error('Analysis failed: ' + error.message);
             console.error(error);
@@ -1054,13 +1082,8 @@ export default function RunAnalysisTab({ project }) {
                                         )}
                                     </div>
                                 </div>
-                                <div className="w-full bg-indigo-200 rounded-full h-2">
-                                    <div 
-                                        className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                        style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
-                                    />
-                                </div>
-                                <p className="text-sm text-indigo-700 mt-2">
+                                <Progress value={progress.total > 0 ? (progress.current / progress.total) * 100 : 0} className="mb-2" />
+                                <p className="text-sm text-indigo-700">
                                     {progress.current} / {progress.total} employees processed
                                 </p>
                             </div>
