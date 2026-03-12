@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -293,12 +292,21 @@ export default function Salaries() {
         if (!file) return;
 
         try {
+            toast.error('Excel upload feature requires xlsx package. Please contact administrator.');
+            setUploadProgress(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+            return;
+
+            /* DISABLED - xlsx package not available
             setUploadProgress({ status: 'Reading file...', current: 0, total: 100 });
 
             const data = await file.arrayBuffer();
             const workbook = XLSX.read(data);
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            */
 
             if (jsonData.length === 0) {
                 toast.error('No data found in file');
@@ -558,6 +566,9 @@ export default function Salaries() {
     };
 
     const downloadTemplate = () => {
+        toast.error('Template download requires xlsx package. Please contact administrator.');
+        
+        /* DISABLED - xlsx package not available
         const template = [
             {
                 'EMPLOYEE ID': '10001',
@@ -575,6 +586,7 @@ export default function Salaries() {
         XLSX.utils.book_append_sheet(wb, ws, 'Salary Template');
         XLSX.writeFile(wb, 'salary_upload_template.xlsx');
         toast.success('Template downloaded');
+        */
     };
 
     return (

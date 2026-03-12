@@ -17,6 +17,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
     const [applying, setApplying] = useState(false);
     const [undoing, setUndoing] = useState(false);
     const [showRamadanShiftsView, setShowRamadanShiftsView] = useState(false);
+    const [applyProgress, setApplyProgress] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: ramadanSchedules = [] } = useQuery({
@@ -146,11 +147,14 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
     const handleApply = async () => {
         if (!ramadanOverlap || !selectedRamadanSchedule) return;
         setApplying(true);
+        setApplyProgress({ phase: 'Initializing...', current: 0, total: 100 });
+        
         try {
             // FIX for ISSUE 3: We perform a fresh query here to confirm we are passing the 
             // most recently saved ramadanScheduleId. This prevents issues if the selected 
             // schedule ID is missing or derived from stale state and ensures we invoke 
             // the backend with the correct overlapping schedule.
+            setApplyProgress({ phase: 'Fetching schedule...', current: 10, total: 100 });
             const freshSchedules = await base44.entities.RamadanSchedule.filter({ 
                 company: project.company, 
                 active: true 
@@ -167,18 +171,24 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
             if (!validScheduleId) {
                 toast.error('Could not determine correct Ramadan schedule ID.');
                 setApplying(false);
+                setApplyProgress(null);
                 return;
             }
 
+            setApplyProgress({ phase: 'Applying shifts...', current: 30, total: 100 });
             const result = await base44.functions.invoke('applyRamadanShifts', {
                 projectId: project.id,
                 ramadanScheduleId: validScheduleId,
                 ramadanFrom: ramadanOverlap.from,
                 ramadanTo: ramadanOverlap.to
             });
+            
+            setApplyProgress({ phase: 'Finalizing...', current: 90, total: 100 });
             const d = result.data;
             if (d.success) {
-                queryClient.invalidateQueries({ queryKey: ['shifts', project.id] });
+                setApplyProgress({ phase: 'Refreshing data...', current: 95, total: 100 });
+                await queryClient.invalidateQueries({ queryKey: ['shifts', project.id] });
+                setApplyProgress({ phase: 'Complete!', current: 100, total: 100 });
                 toast.success(`Applied ${d.shiftsCreated} Ramadan shifts for ${d.employeesProcessed} employees`);
                 setShowRamadanPreview(false);
             } else if (d.error) {
@@ -191,7 +201,10 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
             const msg = error?.response?.data?.error || error.message;
             toast.error(msg);
         } finally {
-            setApplying(false);
+            setTimeout(() => {
+                setApplying(false);
+                setApplyProgress(null);
+            }, 500);
         }
     };
 
@@ -244,6 +257,22 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         </p>
                         <p className="text-xs text-purple-600 mt-2">Sundays are excluded as weekly holidays.</p>
                     </div>
+
+                    {/* Progress Bar */}
+                    {applyProgress && (
+                        <div className="bg-white border border-purple-300 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-purple-900">{applyProgress.phase}</span>
+                                <span className="text-sm text-purple-700">{Math.round((applyProgress.current / applyProgress.total) * 100)}%</span>
+                            </div>
+                            <div className="w-full bg-purple-100 rounded-full h-2.5">
+                                <div 
+                                    className="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
+                                    style={{ width: `${(applyProgress.current / applyProgress.total) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex gap-3 flex-wrap">
