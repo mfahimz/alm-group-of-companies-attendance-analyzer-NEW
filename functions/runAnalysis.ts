@@ -66,35 +66,49 @@ Deno.serve(async (req) => {
             console.warn('[runAnalysis] Could not resolve company_id, carried grace will not apply');
         }
 
-        // ================================================================
-        // DATA FETCHING — PRIMARY SOURCE OF TRUTH
-        //
-        // ShiftTiming records scoped to this project_id are the ONLY authoritative
-        // source for shift timings during analysis. This includes Ramadan shifts,
-        // which are created per-employee, per-date by the `applyRamadanShifts`
-        // function and stored as ShiftTiming records with applicable_days containing
-        // "Ramadan" (e.g. "Ramadan Day Shift", "Ramadan Combined Shift").
-        //
-        // IMPORTANT: The global RamadanSchedule entity is intentionally NOT fetched
-        // here. It exists only as a design template used by the Ramadan Calendar UI
-        // and the `applyRamadanShifts` function. Once shifts have been applied to a
-        // project, the ShiftTiming records are the sole source of truth. Reading
-        // from the global schedule during analysis would bypass any project-specific
-        // overrides or corrections that were made after shift application.
-        // ================================================================
-        const [punches, shifts, exceptions, allEmployees, rulesData, projectEmployees] = await Promise.all([
+        // Fetch all required data
+        const [punches, shifts, exceptions, allEmployees, rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
             base44.asServiceRole.entities.Punch.filter({ project_id }),
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id }),
             base44.asServiceRole.entities.Exception.filter({ project_id }),
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
-            base44.asServiceRole.entities.ProjectEmployee.filter({ project_id })
+            base44.asServiceRole.entities.ProjectEmployee.filter({ project_id }),
+            base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true })
         ]);
         
         console.log('[runAnalysis] All employees fetched:', allEmployees.length);
 
+        // Parse Ramadan schedules for shift lookup - only include schedules that overlap with project date range
         const projectStart = new Date(date_from);
         const projectEnd = new Date(date_to);
+        let ramadanShiftsLookup = {};
+        
+        for (const schedule of ramadanSchedules) {
+            try {
+                const ramadanStart = new Date(schedule.ramadan_start_date);
+                const ramadanEnd = new Date(schedule.ramadan_end_date);
+                
+                // Check if Ramadan period overlaps with project date range
+                const hasOverlap = ramadanStart <= projectEnd && ramadanEnd >= projectStart;
+                
+                if (hasOverlap) {
+                    const week1Data = schedule.week1_shifts ? JSON.parse(schedule.week1_shifts) : {};
+                    const week2Data = schedule.week2_shifts ? JSON.parse(schedule.week2_shifts) : {};
+                    
+                    ramadanShiftsLookup[schedule.id] = {
+                        start: ramadanStart,
+                        end: ramadanEnd,
+                        week1: week1Data,
+                        week2: week2Data
+                    };
+                    
+                    console.log(`[runAnalysis] Ramadan schedule ${schedule.id} overlaps with project (${ramadanStart.toISOString().split('T')[0]} to ${ramadanEnd.toISOString().split('T')[0]})`);
+                }
+            } catch (e) {
+                console.warn('[runAnalysis] Failed to parse Ramadan schedule:', schedule.id, e.message);
+            }
+        }
 
         // Parse rules
         let rules = null;
@@ -802,17 +816,9 @@ Deno.serve(async (req) => {
                 // PRIORITY 4: The general company shift (fallback if no specific days match)
                 // ================================================================
                 
-                // PRIORITY 1: Project-applied Ramadan ShiftTiming records — PRIMARY SOURCE OF TRUTH
-                //
-                // The `applyRamadanShifts` backend function writes one ShiftTiming record per
-                // employee per calendar date into this project. Those records (identified by
-                // `applicable_days` containing "Ramadan") are the EXCLUSIVE authoritative source
-                // for Ramadan shift timings. The global RamadanSchedule template is NOT consulted.
-                //
-                // If ramadanDateShifts is empty, it means `applyRamadanShifts` did not create
-                // a record for this employee on this date (e.g., it was a weekly off, a Day Swap
-                // exception, or outside the applied range). In that case, ramadanShift stays null
-                // and the regular shift hierarchy (Priority 2 → 3 → 4) takes over.
+                // PRIORITY 1: Check for date-specific Ramadan ShiftTiming records FIRST
+                // applyRamadanShifts creates separate ShiftTiming records for day and night shifts
+                // We need to merge them into a single shift object for proper punch matching
 
                 let ramadanShift = null;
                 const dateSpecificShifts = employeeShifts.filter(s => s.date === dateStr && isShiftEffective(s));
@@ -858,30 +864,68 @@ Deno.serve(async (req) => {
                     }
                 }
                 
-                // ================================================================
-                // NO GLOBAL SCHEDULE FALLBACK — PROJECT SHIFTS ARE THE SOURCE OF TRUTH
-                //
-                // If no Ramadan ShiftTiming record exists for this employee on this date,
-                // it means no Ramadan shift was applied to this project for that employee/day.
-                // We do NOT fall back to the global RamadanSchedule template JSON, because:
-                //
-                //   1. The `applyRamadanShifts` function creates explicit ShiftTiming records
-                //      per-employee, per-date within the project. Those records are the
-                //      definitive result of a deliberate admin action.
-                //
-                //   2. Reading from the global RamadanSchedule bypasses any individual
-                //      corrections, day-swap exceptions, or partial Ramadan applications
-                //      that the admin may have made after the initial apply.
-                //
-                //   3. The global schedule is a DESIGN TEMPLATE only — it is not meant
-                //      to drive analysis after shifts have been applied to a project.
-                //
-                // If ramadanShift is still null here, it simply means this date is not
-                // a Ramadan-shifted day in the project and the regular shift hierarchy
-                // (Priority 2 → 3 → 4 below) will apply.
-                // ================================================================
+                // Fallback: Build from raw Ramadan schedule JSON if no ShiftTiming records exist
                 if (!ramadanShift) {
-                    console.log(`[runAnalysis] No project-applied Ramadan ShiftTiming for Employee ${attendanceIdStr} on ${dateStr} — falling through to regular shift hierarchy.`);
+                    for (const scheduleId in ramadanShiftsLookup) {
+                        const ramadanData = ramadanShiftsLookup[scheduleId];
+                        if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
+                            // Count Saturdays passed since Ramadan start to determine week
+                            const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
+                            let saturdaysPassed = 0;
+                            
+                            for (let i = 0; i < daysSinceStart; i++) {
+                                const checkDate = new Date(ramadanData.start);
+                                checkDate.setDate(checkDate.getDate() + i);
+                                const checkDayOfWeek = checkDate.getUTCDay();
+                                
+                                // Count Saturdays (day 6) that have already passed
+                                if (checkDayOfWeek === 6) {
+                                    saturdaysPassed++;
+                                }
+                            }
+                            
+                            const weekNumber = (saturdaysPassed % 2) === 0 ? 1 : 2;
+                            
+                            const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
+                            const employeeShiftData = weekData[attendanceIdStr];
+                            
+                            if (employeeShiftData) {
+                                // Determine existence purely from shift time entries being present
+                                const hasDay = employeeShiftData.day_start && employeeShiftData.day_end && employeeShiftData.day_start !== '—' && employeeShiftData.day_end !== '—';
+                                const hasNight = employeeShiftData.night_start && employeeShiftData.night_end && employeeShiftData.night_start !== '—' && employeeShiftData.night_end !== '—';
+                                
+                                if (hasDay && hasNight) {
+                                    ramadanShift = {
+                                        am_start: employeeShiftData.day_start || '',
+                                        am_end: employeeShiftData.day_end || '',
+                                        pm_start: employeeShiftData.night_start || '',
+                                        pm_end: employeeShiftData.night_end || '',
+                                        is_single_shift: false,
+                                        _ramadan: true
+                                    };
+                                } else if (hasDay) {
+                                    ramadanShift = {
+                                        am_start: employeeShiftData.day_start || '',
+                                        am_end: '—',
+                                        pm_start: '—',
+                                        pm_end: employeeShiftData.day_end || '',
+                                        is_single_shift: true,
+                                        _ramadan: true
+                                    };
+                                } else if (hasNight) {
+                                    ramadanShift = {
+                                        am_start: employeeShiftData.night_start || '',
+                                        am_end: '—',
+                                        pm_start: '—',
+                                        pm_end: employeeShiftData.night_end || '',
+                                        is_single_shift: true,
+                                        _ramadan: true
+                                    };
+                                }
+                            }
+                            break;
+                        }
+                    }
                 }
 
                 // PRIORITY 2: A specific regular shift for that date (non-Ramadan)
