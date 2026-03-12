@@ -261,6 +261,12 @@ Deno.serve(async (req) => {
             }
         };
 
+        // Helper to get YYYY-MM-DD in local time
+        const toDateStr = (date) => {
+            const d = new Date(date);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
         const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds = false, nextDateStr = null) => {
             if (!shift || dayPunches.length === 0) return [];
             
@@ -480,7 +486,7 @@ Deno.serve(async (req) => {
             // recorded on the next calendar day (e.g., 12:05 AM, 12:15 AM, 12:20 AM)
             const dayAfterEnd = new Date(date_to);
             dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
-            const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
+            const dayAfterEndStr = toDateStr(dayAfterEnd);
             
             // MIDNIGHT FIX: Include punches from 1 day BEFORE and 1 day AFTER the range
             // - Day before: needed to check if previous day's shift ended near midnight
@@ -488,7 +494,7 @@ Deno.serve(async (req) => {
             // - Day after: needed to grab midnight crossover punch-outs from the last day
             const dayBeforeStart = new Date(date_from);
             dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
-            const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
+            const dayBeforeStartStr = toDateStr(dayBeforeStart);
             
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr && 
@@ -565,7 +571,7 @@ Deno.serve(async (req) => {
                     }
 
                     // Additionally, ensure no public holidays mark this day off
-                    const dateStr = currentDate.toISOString().split('T')[0];
+                    const dateStr = toDateStr(currentDate);
                     const matchingExceptions = employeeExceptions.filter(ex => {
                         try {
                             const exFrom = new Date(ex.date_from);
@@ -629,7 +635,7 @@ Deno.serve(async (req) => {
                     if (rangeStart <= rangeEnd) {
                         // Count each calendar day in the range
                         for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
-                            const dateStr = d.toISOString().split('T')[0];
+                            const dateStr = toDateStr(d);
                             if (!annualLeaveDatesProcessed.has(dateStr)) {
                                 annualLeaveDatesProcessed.add(dateStr);
                                 annualLeaveCount++;
@@ -649,7 +655,7 @@ Deno.serve(async (req) => {
             
             for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
                 const currentDate = new Date(d);
-                const dateStr = currentDate.toISOString().split('T')[0];
+                const dateStr = toDateStr(currentDate);
                 // CRITICAL: Use UTC day of week to avoid timezone issues
                 // new Date(dateStr) creates a date at UTC midnight, so we must use getUTCDay()
                 // Otherwise, server timezone can shift the day and cause incorrect weekly off detection
@@ -805,71 +811,62 @@ Deno.serve(async (req) => {
                     }
                     // If employee worked, continue normal analysis
                 }
-
-                // ================================================================
-                // SHIFT SELECTION PRIORITY LOGIC (TASK 3 AUDIT)
+                // SHIFT SELECTION PRIORITY LOGIC (TASK 2 CONSOLIDATION)
                 // The system must resolve which shift applies to a given employee on a given date.
-                // It strictly executes in the following fallback hierarchy:
-                // PRIORITY 1: A specific Ramadan shift for that date (applies if in Ramadan schedule)
-                // PRIORITY 2: A specific regular shift for that date (manual adjustments via 'Shift Overrides')
-                // PRIORITY 3: A shift that matches the specific day of the week (e.g. "Monday" rule)
-                // PRIORITY 4: The general company shift (fallback if no specific days match)
+                // We strictly prioritize project-specific ShiftTiming records applied manually
+                // or via 'Apply Ramadan Shifts' button as the primary source of truth.
                 // ================================================================
                 
-                // PRIORITY 1: Check for date-specific Ramadan ShiftTiming records FIRST
-                // applyRamadanShifts creates separate ShiftTiming records for day and night shifts
-                // We need to merge them into a single shift object for proper punch matching
-
-                let ramadanShift = null;
+                let shift = null;
                 const dateSpecificShifts = employeeShifts.filter(s => s.date === dateStr && isShiftEffective(s));
-                const ramadanDateShifts = dateSpecificShifts.filter(s => 
-                    s.applicable_days && s.applicable_days.includes('Ramadan')
-                );
                 
-                if (ramadanDateShifts.length > 0) {
-                    if (ramadanDateShifts.length === 1) {
-                        // Single Ramadan shift record — could be:
-                        // 1. "Combined Shift" (is_single_shift=false, has 4 time points)
-                        // 2. "Day Shift" only (is_single_shift=true, has 2 time points)
-                        // 3. "Night Shift" only (is_single_shift=true, has 2 time points)
-                        ramadanShift = ramadanDateShifts[0];
-                        console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: Single record "${ramadanShift.applicable_days}", is_single_shift=${ramadanShift.is_single_shift}, times: ${ramadanShift.am_start}/${ramadanShift.am_end}/${ramadanShift.pm_start}/${ramadanShift.pm_end}`);
+                if (dateSpecificShifts.length > 0) {
+                    // PRIORITY 1: Use project-applied date-specific records
+                    if (dateSpecificShifts.length === 1) {
+                        shift = dateSpecificShifts[0];
+                        console.log(`[runAnalysis] PROJECT SHIFT: Found specific record for ${attendanceIdStr} on ${dateStr}: "${shift.applicable_days}"`);
                     } else {
-                        // Multiple Ramadan shifts on same day — merge day + night into 4-point shift
-                        // This handles LEGACY data where day and night were stored as separate records
-                        const dayShift = ramadanDateShifts.find(s => 
-                            s.applicable_days?.includes('Day') || s.applicable_days?.includes('S1')
-                        );
-                        const nightShift = ramadanDateShifts.find(s => 
-                            s.applicable_days?.includes('Night') || s.applicable_days?.includes('S2')
+                        // MERGE LOGIC: If multiple records exist (e.g. legacy Ramadan day+night), merge them
+                        const ramadanDateShifts = dateSpecificShifts.filter(s => 
+                            String(s.applicable_days || '').includes('Ramadan')
                         );
                         
-                        if (dayShift && nightShift) {
-                            ramadanShift = {
-                                am_start: dayShift.am_start,
-                                am_end: dayShift.pm_end,    // Day shift end (stored in pm_end for single shifts)
-                                pm_start: nightShift.am_start, // Night shift start (stored in am_start for single shifts)
-                                pm_end: nightShift.pm_end,   // Night shift end
-                                is_single_shift: false,
-                                is_friday_shift: dayShift.is_friday_shift,
-                                _ramadan: true,
-                                _merged: true
-                            };
-                            console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: MERGED day+night (legacy), is_single_shift=false, times: ${ramadanShift.am_start}/${ramadanShift.am_end}/${ramadanShift.pm_start}/${ramadanShift.pm_end}`);
-                        } else {
-                            // Only one type found among multiple records — use the first one
-                            ramadanShift = ramadanDateShifts[0];
-                            console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: Multiple records but only one type found, using first: "${ramadanShift.applicable_days}"`);
+                        if (ramadanDateShifts.length >= 2) {
+                            const dayShift = ramadanDateShifts.find(s => 
+                                s.applicable_days?.includes('Day') || s.applicable_days?.includes('S1')
+                            );
+                            const nightShift = ramadanDateShifts.find(s => 
+                                s.applicable_days?.includes('Night') || s.applicable_days?.includes('S2')
+                            );
+                            
+                            if (dayShift && nightShift) {
+                                shift = {
+                                    am_start: dayShift.am_start,
+                                    am_end: dayShift.pm_end,
+                                    pm_start: nightShift.am_start,
+                                    pm_end: nightShift.pm_end,
+                                    is_single_shift: false,
+                                    applicable_days: 'Ramadan Merged Shift',
+                                    _ramadan: true,
+                                    _merged: true
+                                };
+                                console.log(`[runAnalysis] PROJECT SHIFT: Merged day+night records for ${attendanceIdStr} on ${dateStr}`);
+                            }
+                        }
+                        
+                        if (!shift) {
+                            // Default to the most recent record if no mergeable Ramadan pair found
+                            shift = dateSpecificShifts.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+                            console.log(`[runAnalysis] PROJECT SHIFT: Multiple records found for ${attendanceIdStr} on ${dateStr}, using most recent: "${shift.applicable_days}"`);
                         }
                     }
-                }
-                
-                // Fallback: Build from raw Ramadan schedule JSON if no ShiftTiming records exist
-                if (!ramadanShift) {
+                } else {
+                    // FALLBACK: Only if NO project-specific records exist, look for external logic/patterns
+                    
+                    // Fallback 1: Build from raw Ramadan schedule JSON
                     for (const scheduleId in ramadanShiftsLookup) {
                         const ramadanData = ramadanShiftsLookup[scheduleId];
                         if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
-                            // Count Saturdays passed since Ramadan start to determine week
                             const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
                             let saturdaysPassed = 0;
                             
@@ -877,25 +874,19 @@ Deno.serve(async (req) => {
                                 const checkDate = new Date(ramadanData.start);
                                 checkDate.setDate(checkDate.getDate() + i);
                                 const checkDayOfWeek = checkDate.getUTCDay();
-                                
-                                // Count Saturdays (day 6) that have already passed
-                                if (checkDayOfWeek === 6) {
-                                    saturdaysPassed++;
-                                }
+                                if (checkDayOfWeek === 6) saturdaysPassed++;
                             }
                             
                             const weekNumber = (saturdaysPassed % 2) === 0 ? 1 : 2;
-                            
                             const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
                             const employeeShiftData = weekData[attendanceIdStr];
                             
                             if (employeeShiftData) {
-                                // Determine existence purely from shift time entries being present
                                 const hasDay = employeeShiftData.day_start && employeeShiftData.day_end && employeeShiftData.day_start !== '—' && employeeShiftData.day_end !== '—';
                                 const hasNight = employeeShiftData.night_start && employeeShiftData.night_end && employeeShiftData.night_start !== '—' && employeeShiftData.night_end !== '—';
                                 
                                 if (hasDay && hasNight) {
-                                    ramadanShift = {
+                                    shift = {
                                         am_start: employeeShiftData.day_start || '',
                                         am_end: employeeShiftData.day_end || '',
                                         pm_start: employeeShiftData.night_start || '',
@@ -904,7 +895,7 @@ Deno.serve(async (req) => {
                                         _ramadan: true
                                     };
                                 } else if (hasDay) {
-                                    ramadanShift = {
+                                    shift = {
                                         am_start: employeeShiftData.day_start || '',
                                         am_end: '—',
                                         pm_start: '—',
@@ -913,7 +904,7 @@ Deno.serve(async (req) => {
                                         _ramadan: true
                                     };
                                 } else if (hasNight) {
-                                    ramadanShift = {
+                                    shift = {
                                         am_start: employeeShiftData.night_start || '',
                                         am_end: '—',
                                         pm_start: '—',
@@ -928,12 +919,13 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // PRIORITY 2: A specific regular shift for that date (non-Ramadan)
-                // This captures manual shift timings created for extraordinary cases on this particular date.
-                const nonRamadanDateShift = dateSpecificShifts.find(s => 
-                    !s.applicable_days || !s.applicable_days.includes('Ramadan')
-                );
-                let shift = ramadanShift || nonRamadanDateShift;
+                if (!shift) {
+                    // Fallback 2: Build from regular shifts (non-Ramadan)
+                    const nonRamadanDateShift = dateSpecificShifts.find(s => 
+                        !s.applicable_days || !s.applicable_days.includes('Ramadan')
+                    );
+                    shift = nonRamadanDateShift;
+                }
 
                 if (!shift) {
                     const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
@@ -1005,13 +997,13 @@ Deno.serve(async (req) => {
                 // ================================================================
                 const nextDateObj = new Date(currentDate);
                 nextDateObj.setDate(nextDateObj.getDate() + 1);
-                const nextDateStr = nextDateObj.toISOString().split('T')[0];
+                const nextDateStr = toDateStr(nextDateObj);
                 
                 // Check previous day's shift to see if IT ended near midnight
                 // If so, exclude early-morning punches that belong to the previous day
                 const prevDateObj = new Date(currentDate);
                 prevDateObj.setDate(prevDateObj.getDate() - 1);
-                const prevDateStr = prevDateObj.toISOString().split('T')[0];
+                const prevDateStr = toDateStr(prevDateObj);
                 
                 let prevShiftEndsNearMidnight = false;
                 {
@@ -1353,11 +1345,11 @@ Deno.serve(async (req) => {
                     
                     const prevDate = new Date(woDate);
                     prevDate.setDate(prevDate.getDate() - 1);
-                    const prevDateStr = prevDate.toISOString().split('T')[0];
+                    const prevDateStr = toDateStr(prevDate);
                     
                     const nextDate = new Date(woDate);
                     nextDate.setDate(nextDate.getDate() + 1);
-                    const nextDateStr = nextDate.toISOString().split('T')[0];
+                    const nextDateStr = toDateStr(nextDate);
                     
                     const prevStatus = dateStatusMap[prevDateStr];
                     const nextStatus = dateStatusMap[nextDateStr];

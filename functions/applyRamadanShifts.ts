@@ -48,8 +48,14 @@ Deno.serve(async (req) => {
 
         const startDate = ramadanFrom ? new Date(ramadanFrom) : overlapStart;
         const endDate = ramadanTo ? new Date(ramadanTo) : overlapEnd;
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
+        // Helper to get YYYY-MM-DD in local time (avoiding timezone shifts from toISOString)
+        const toDateStr = (d) => {
+            const date = new Date(d);
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        };
+
+        const startDateStr = toDateStr(startDate);
+        const endDateStr = toDateStr(endDate);
 
         // Parse week shifts and Friday shifts
         const week1Shifts = JSON.parse(schedule.week1_shifts || '{}');
@@ -133,7 +139,7 @@ Deno.serve(async (req) => {
             if (!week1 && !week2) continue;
             
             for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
-                const dateStr = currentDate.toISOString().split('T')[0];
+                const dateStr = toDateStr(currentDate);
                 const dayOfWeek = currentDate.getDay();
                 const isSunday = dayOfWeek === 0;
                 const isFriday = dayOfWeek === 5;
