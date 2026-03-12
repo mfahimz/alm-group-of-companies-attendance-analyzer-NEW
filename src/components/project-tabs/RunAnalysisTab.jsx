@@ -10,7 +10,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { Progress } from "@/components/ui/progress";
 
+// Extended midnight crossover window (120 minutes for Ramadan night shifts)
+const MIDNIGHT_BUFFER_MINUTES = 120;
+
 export default function RunAnalysisTab({ project }) {
+    const isWithinMidnightBuffer = (timestampRaw, includeSeconds = false) => {
+        if (!timestampRaw) return false;
+        const time = parseTime(timestampRaw, includeSeconds);
+        if (!time) return false;
+        const hours = time.getHours();
+        const minutes = time.getMinutes();
+        const totalMinutes = hours * 60 + minutes;
+        // Check if between 00:00 and 02:00 (120 minutes)
+        return totalMinutes >= 0 && totalMinutes <= MIDNIGHT_BUFFER_MINUTES;
+    };
+
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [progress, setProgress] = useState(null);
     const [dateFrom, setDateFrom] = useState(project.date_from);
@@ -153,21 +167,31 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
-    const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds = false) => {
+    const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr, includeSeconds = false) => {
         if (!shift || dayPunches.length === 0) return [];
         
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw, includeSeconds)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        const punchesWithTime = dayPunches.map(p => {
+            const time = parseTime(p.timestamp_raw, includeSeconds);
+            if (!time) return null;
+            const isNextDay = nextDateStr && p.punch_date === nextDateStr;
+            const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+            return { ...p, time: adjustedTime };
+        }).filter(p => p).sort((a, b) => a.time - b.time);
         
         if (punchesWithTime.length === 0) return [];
         
+        // Adjust PM_END if it's midnight (00:00)
+        const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+        let adjustedPmEnd = pmEndTime;
+        if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+            adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+        }
+
         const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
-            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+            { type: 'AM_START', time: parseTime(shift.am_start, includeSeconds), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end, includeSeconds), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
+            { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
         
         const matches = [];
@@ -179,7 +203,7 @@ export default function RunAnalysisTab({ project }) {
             let isExtendedMatch = false;
             let isFarExtendedMatch = false;
             
-            // Phase 1: Normal match (±60 minutes)
+            // Phase 1: Normal match (±60-120 minutes)
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
                 
@@ -246,25 +270,32 @@ export default function RunAnalysisTab({ project }) {
         return matches;
     };
 
-    const detectPartialDay = (dayPunches, shift, includeSeconds = false) => {
+    const detectPartialDay = (dayPunches, shift, nextDateStr, includeSeconds = false) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
         
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw, includeSeconds)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        const punchesWithTime = dayPunches.map(p => {
+            const time = parseTime(p.timestamp_raw, includeSeconds);
+            if (!time) return null;
+            const isNextDay = nextDateStr && p.punch_date === nextDateStr;
+            const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+            return { ...p, time: adjustedTime };
+        }).filter(p => p).sort((a, b) => a.time - b.time);
         
         if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
         
         const firstPunch = punchesWithTime[0].time;
         const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
         
-        const amStart = parseTime(shift.am_start);
-        const pmEnd = parseTime(shift.pm_end);
+        const amStart = parseTime(shift.am_start, includeSeconds);
+        const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+        let adjustedPmEnd = pmEndTime;
+        if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+            adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+        }
         
-        if (!amStart || !pmEnd) return { isPartial: false, reason: null };
+        if (!amStart || !adjustedPmEnd) return { isPartial: false, reason: null };
         
-        const expectedMinutes = (pmEnd - amStart) / (1000 * 60);
+        const expectedMinutes = (adjustedPmEnd - amStart) / (1000 * 60);
         const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
         
         if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
@@ -515,15 +546,73 @@ export default function RunAnalysisTab({ project }) {
                 }
             }
 
-            const dayPunches = employeePunches
-                .filter(p => p.punch_date === dateStr)
-                .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
-                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
-                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
-                });
+            const toDateStr = (date) => date.toISOString().split('T')[0];
+            const nextDateObj = new Date(currentDate);
+            nextDateObj.setDate(nextDateObj.getDate() + 1);
+            const nextDateStr = toDateStr(nextDateObj);
 
-            let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
+            const prevDateObj = new Date(currentDate);
+            prevDateObj.setDate(prevDateObj.getDate() - 1);
+            const prevDateStr = toDateStr(prevDateObj);
+
+            // Check if previous day's shift ended near midnight
+            let prevShiftEndsNearMidnight = false;
+            {
+                const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
+                const prevGeneralShifts = employeeShifts.filter(s => !s.date);
+                const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
+                for (const ps of prevShiftCandidates) {
+                    const pEndTime = parseTime(ps.pm_end, includeSeconds);
+                    if (pEndTime) {
+                        const h = pEndTime.getHours();
+                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
+                    }
+                }
+            }
+
+            let rawDayPunches = punches.filter(p => 
+                String(p.attendance_id) === attendanceIdStr && 
+                p.punch_date === dateStr
+            ).sort((a, b) => {
+                const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+            });
+
+            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
+            if (prevShiftEndsNearMidnight) {
+                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+            }
+
+            // MIDNIGHT FIX: Check if THIS shift ends near midnight → grab next-day crossover punches
+            let shiftEndsNearMidnight = false;
+            if (shift) {
+                const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+                if (pmEndTime) {
+                    const h = pmEndTime.getHours();
+                    if (h === 23 || h === 0) shiftEndsNearMidnight = true;
+                }
+            }
+
+            if (shiftEndsNearMidnight) {
+                const nextDayPunches = punches
+                    .filter(p => String(p.attendance_id) === attendanceIdStr && p.punch_date === nextDateStr)
+                    .filter(p => isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+                const seenIds = new Set(rawDayPunches.map(p => p.id));
+                const uniqueNextDayPunches = nextDayPunches.filter(p => !seenIds.has(p.id));
+                if (uniqueNextDayPunches.length > 0) {
+                    rawDayPunches = [...rawDayPunches, ...uniqueNextDayPunches];
+                    rawDayPunches.sort((a, b) => {
+                        const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                        const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                        const aTime = (timeA?.getTime() || 0) + (a.punch_date === nextDateStr ? 86400000 : 0);
+                        const bTime = (timeB?.getTime() || 0) + (b.punch_date === nextDateStr ? 86400000 : 0);
+                        return aTime - bTime;
+                    });
+                }
+            }
+
+            let filteredPunches = filterMultiplePunches(rawDayPunches, shift, includeSeconds);
             
             // Check if this is a weekly off or holiday for overtime premium calculation
             let isWeeklyOffForOT = false;
@@ -539,7 +628,7 @@ export default function RunAnalysisTab({ project }) {
             let punchMatches = [];
             let hasUnmatchedPunch = false;
             if (shift && filteredPunches.length > 0) {
-                punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds);
+                punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, nextDateStr, includeSeconds);
                 hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
             }
             
@@ -549,7 +638,7 @@ export default function RunAnalysisTab({ project }) {
                                    shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(filteredPunches, shift, includeSeconds);
+            const partialDayResult = detectPartialDay(filteredPunches, shift, nextDateStr, includeSeconds);
 
             // Handle manual late/early exceptions marking day as present
             if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {

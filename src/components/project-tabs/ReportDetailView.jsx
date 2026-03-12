@@ -208,6 +208,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     }, [reportRun]);
 
+    // Midnight buffer: 2 hours (120 minutes) for Ramadan night shifts crossover
+    const MIDNIGHT_BUFFER_MINUTES = 120;
+
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
         if (/AM|PM/i.test(timeStr)) return timeStr;
@@ -293,24 +296,49 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     };
 
-    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+    const isWithinMidnightBuffer = (timestampRaw, includeSecondsFlag) => {
+        const parsed = parseTime(timestampRaw, includeSecondsFlag);
+        if (!parsed) return false;
+        const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
+        return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
+    };
+
+    const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr = null) => {
         if (!shift || dayPunches.length === 0) return [];
         
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
         
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw, includeSeconds)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        const punchesWithTime = dayPunches.map(p => {
+            const time = parseTime(p.timestamp_raw, includeSeconds);
+            if (!time) return null;
+            
+            // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
+            // add 24 hours to its time so it matches correctly against PM_END
+            const isNextDayPunch = nextDateStr && p.punch_date === nextDateStr;
+            const adjustedTime = isNextDayPunch ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+            
+            return {
+                ...p,
+                time: adjustedTime,
+                _isNextDayPunch: isNextDayPunch
+            };
+        }).filter(p => p).sort((a, b) => a.time - b.time);
         
         if (punchesWithTime.length === 0) return [];
         
+        // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
+        const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+        let adjustedPmEnd = pmEndTime;
+        if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+            adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+        }
+        
         const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
-            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+            { type: 'AM_START', time: parseTime(shift.am_start, includeSeconds), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end, includeSeconds), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
+            { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
         
         const matches = [];
@@ -386,7 +414,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         return matches;
     };
 
-    const detectPartialDay = (dayPunches, shift) => {
+
+    const detectPartialDay = (dayPunches, shift, nextDateStr = null) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
         const incSec = project.company === 'Al Maraghi Automotive';
         const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw, incSec) })).filter(p => p.time).sort((a, b) => a.time - b.time);
@@ -451,10 +480,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         
         // NON-FINALIZED ONLY: Recalculate from live punch data
         const attendanceIdStr = String(result.attendance_id);
+        
+        const dayBeforeStart = new Date(dateFrom);
+        dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+        const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
+        
+        const dayAfterEnd = new Date(dateTo);
+        dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+        const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
+
         const employeePunches = punches.filter(p => 
             String(p.attendance_id) === attendanceIdStr &&
-            p.punch_date >= dateFrom && 
-            p.punch_date <= dateTo
+            p.punch_date >= dayBeforeStartStr && 
+            p.punch_date <= dayAfterEndStr
         );
         const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
         const employeeExceptions = exceptions.filter(e => 
@@ -537,12 +575,41 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             workingDays++;
 
-            const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
+            const toDateStr = (date) => date.toISOString().split('T')[0];
+            const nextDateObj = new Date(currentDate);
+            nextDateObj.setDate(nextDateObj.getDate() + 1);
+            const nextDateStr = toDateStr(nextDateObj);
+
+            const prevDateObj = new Date(currentDate);
+            prevDateObj.setDate(prevDateObj.getDate() - 1);
+            const prevDateStr = toDateStr(prevDateObj);
+
+            // Check if previous day's shift ended near midnight
+            let prevShiftEndsNearMidnight = false;
+            {
+                const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
+                const prevGeneralShifts = employeeShifts.filter(s => !s.date);
+                const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
+                for (const ps of prevShiftCandidates) {
+                    const pEndTime = parseTime(ps.pm_end, includeSeconds);
+                    if (pEndTime) {
+                        const h = pEndTime.getHours();
+                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
+                    }
+                }
+            }
+
+            let rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
                     const timeA = parseTime(a.timestamp_raw, includeSeconds);
                     const timeB = parseTime(b.timestamp_raw, includeSeconds);
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
+
+            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
+            if (prevShiftEndsNearMidnight) {
+                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+            }
 
             // Find all matching exceptions and get the latest one by created_date (calculateEmployeeTotals)
             const matchingExceptionsCalc = employeeExceptions.filter(ex => {
@@ -665,6 +732,34 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 };
             }
 
+            // MIDNIGHT FIX: Check if THIS shift ends near midnight → grab next-day crossover punches
+            let shiftEndsNearMidnight = false;
+            if (shift) {
+                const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+                if (pmEndTime) {
+                    const h = pmEndTime.getHours();
+                    if (h === 23 || h === 0) shiftEndsNearMidnight = true;
+                }
+            }
+
+            if (shiftEndsNearMidnight) {
+                const nextDayPunches = employeePunches
+                    .filter(p => p.punch_date === nextDateStr)
+                    .filter(p => isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+                const seenIds = new Set(rawDayPunches.map(p => p.id));
+                const uniqueNextDayPunches = nextDayPunches.filter(p => !seenIds.has(p.id));
+                if (uniqueNextDayPunches.length > 0) {
+                    rawDayPunches = [...rawDayPunches, ...uniqueNextDayPunches];
+                    rawDayPunches.sort((a, b) => {
+                        const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                        const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                        const aTime = (timeA?.getTime() || 0) + (a.punch_date === nextDateStr ? 86400000 : 0);
+                        const bTime = (timeB?.getTime() || 0) + (b.punch_date === nextDateStr ? 86400000 : 0);
+                        return aTime - bTime;
+                    });
+                }
+            }
+
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
             const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
                                    shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
@@ -672,7 +767,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                    shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(dayPunches, shift);
+            let punchMatchesTotals = [];
+            if (shift && dayPunches.length > 0) {
+                punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift, nextDateStr);
+            }
+
+            const partialDayResult = detectPartialDay(dayPunches, shift, nextDateStr);
 
             // Track allowed minutes from ALLOWED_MINUTES exception
             let allowedMinutesForDay = 0;
@@ -740,10 +840,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
-            let punchMatchesTotals = [];
-            if (shift && dayPunches.length > 0) {
-                punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift);
-            }
+
 
             const shouldSkipTimeCalc = dateException && [
                 'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
@@ -781,7 +878,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         fullAbsenceCount++;
                     }
                 } else if (dayPunches.length > 0) {
-                    const partialDayResult = detectPartialDay(dayPunches, shift);
+
                     if (partialDayResult.isPartial) {
                         presentDays++;
                         halfAbsenceCount++;

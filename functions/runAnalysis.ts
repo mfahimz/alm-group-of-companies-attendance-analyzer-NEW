@@ -4,7 +4,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * Backend function to run attendance analysis for a project
  * This contains the complete analysis logic moved from frontend
  */
-Deno.serve(async (req) => {
+// @ts-ignore: Deno
+Deno.serve(async (req: Request) => {
     try {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
@@ -82,7 +83,7 @@ Deno.serve(async (req) => {
         // Parse Ramadan schedules for shift lookup - only include schedules that overlap with project date range
         const projectStart = new Date(date_from);
         const projectEnd = new Date(date_to);
-        let ramadanShiftsLookup = {};
+        let ramadanShiftsLookup: any = {};
         
         for (const schedule of ramadanSchedules) {
             try {
@@ -137,7 +138,7 @@ Deno.serve(async (req) => {
             console.log('[runAnalysis] Custom HRMS IDs:', customHrmsIds.length);
             
             // Filter employees by HRMS ID - string comparison
-            filteredEmployees = allEmployees.filter(e => 
+            filteredEmployees = allEmployees.filter((e: any) => 
                 customHrmsIds.includes(String(e.hrms_id))
             );
         }
@@ -145,9 +146,9 @@ Deno.serve(async (req) => {
         // Get attendance IDs of filtered employees - keep as strings
         // CRITICAL BUG FIX #4: Filter out employees without attendance_id UNLESS they have has_attendance_tracking=false (salary-only)
         const activeEmployeeAttendanceIds = filteredEmployees
-            .filter(e => e.attendance_id && e.attendance_id !== null && e.attendance_id !== undefined)
-            .filter(e => String(e.attendance_id).trim() !== '')
-            .map(e => String(e.attendance_id));
+            .filter((e: any) => e.attendance_id && e.attendance_id !== null && e.attendance_id !== undefined)
+            .filter((e: any) => String(e.attendance_id).trim() !== '')
+            .map((e: any) => String(e.attendance_id));
         
         // CRITICAL: Include ALL active employees, not just those with punches
         // Employees may have exceptions (annual leave, sick leave, LOP) even without any punches
@@ -157,9 +158,9 @@ Deno.serve(async (req) => {
         // Add project-specific employee overrides (for unmatched attendance IDs)
         // CRITICAL: Filter out project employees without attendance_id
         const projectEmployeeIds = projectEmployees
-            .filter(pe => pe.attendance_id && pe.attendance_id !== null && pe.attendance_id !== undefined)
-            .filter(pe => String(pe.attendance_id).trim() !== '')
-            .map(pe => String(pe.attendance_id));
+            .filter((pe: any) => pe.attendance_id && pe.attendance_id !== null && pe.attendance_id !== undefined)
+            .filter((pe: any) => String(pe.attendance_id).trim() !== '')
+            .map((pe: any) => String(pe.attendance_id));
         for (const peId of projectEmployeeIds) {
             if (!uniqueEmployeeIds.includes(peId)) {
                 uniqueEmployeeIds.push(peId);
@@ -209,7 +210,7 @@ Deno.serve(async (req) => {
         }
 
         // Helper functions (moved from frontend)
-        const parseTime = (timeStr, includeSeconds = false) => {
+        const parseTime = (timeStr: any, includeSeconds = false) => {
             try {
                 if (!timeStr || timeStr === '—') return null;
                 
@@ -262,15 +263,15 @@ Deno.serve(async (req) => {
         };
 
         // Helper to get YYYY-MM-DD in local time
-        const toDateStr = (date) => {
+        const toDateStr = (date: any) => {
             const d = new Date(date);
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         };
 
-        const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds = false, nextDateStr = null) => {
+        const matchPunchesToShiftPoints = (dayPunches: any[], shift: any, includeSeconds = false, nextDateStr: string | null = null) => {
             if (!shift || dayPunches.length === 0) return [];
             
-            const punchesWithTime = dayPunches.map(p => {
+            const punchesWithTime = dayPunches.map((p: any) => {
                 const time = parseTime(p.timestamp_raw, includeSeconds);
                 if (!time) return null;
                 
@@ -315,7 +316,7 @@ Deno.serve(async (req) => {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
                     
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
                     
                     if (distance <= 60 && distance < minDistance) {
                         minDistance = distance;
@@ -440,8 +441,9 @@ Deno.serve(async (req) => {
         };
 
         // MIDNIGHT BUFFER: Helper to check if a punch timestamp falls within the midnight buffer window
-        // (i.e., between 12:00 AM and 1:00 AM = 60 minutes after midnight)
-        const MIDNIGHT_BUFFER_MINUTES = 60;
+        // (i.e., between 12:00 AM and 02:00 AM = 120 minutes after midnight)
+        // This is specifically extended to 2 hours for Ramadan night shifts crossover support.
+        const MIDNIGHT_BUFFER_MINUTES = 120;
         const isWithinMidnightBuffer = (timestampRaw, includeSecondsFlag) => {
             const parsed = parseTime(timestampRaw, includeSecondsFlag);
             if (!parsed) return false;
@@ -1024,8 +1026,8 @@ Deno.serve(async (req) => {
                         if (pEndTime) {
                             const pEndHour = pEndTime.getHours();
                             const pEndMin = pEndTime.getMinutes();
-                            // Shift ends near midnight: 11 PM (hour 23) or exactly 12:00 AM (hour 0, minute 0)
-                            if (pEndHour === 23 || (pEndHour === 0 && pEndMin === 0)) {
+                            // Shift ends near midnight: 11 PM (hour 23) or any time in 12 AM hour (hour 0)
+                            if (pEndHour === 23 || pEndHour === 0) {
                                 prevShiftEndsNearMidnight = true;
                                 break;
                             }
@@ -1047,8 +1049,8 @@ Deno.serve(async (req) => {
                     if (pmEndTime) {
                         const endHour = pmEndTime.getHours();
                         const endMinute = pmEndTime.getMinutes();
-                        // Shift ends near midnight if pm_end is 11:00 PM - 11:59 PM or exactly 12:00 AM (0:00)
-                        if (endHour === 23 || (endHour === 0 && endMinute === 0)) {
+                        // Shift ends near midnight if pm_end is in 11 PM hour (23) or 12 AM hour (0)
+                        if (endHour === 23 || endHour === 0) {
                             shiftEndsNearMidnight = true;
                         }
                     }
@@ -1059,7 +1061,7 @@ Deno.serve(async (req) => {
                     .filter(p => p.punch_date === dateStr);
                 
                 // MIDNIGHT FIX: If PREVIOUS day's shift ended near midnight,
-                // exclude early-morning punches (12:00 AM - 1:00 AM) from THIS day's punches
+                // exclude early-morning punches (12:00 AM - 02:00 AM) from THIS day's punches
                 // because those belong to the previous day's shift as punch-outs
                 if (prevShiftEndsNearMidnight) {
                     const beforeFilter = dayPunches.length;
@@ -1082,8 +1084,8 @@ Deno.serve(async (req) => {
                     const seenIds = new Set(dayPunches.map(p => p.id));
                     const uniqueNextDayPunches = nextDayAllPunches.filter(p => !seenIds.has(p.id));
                     
-                    // Include next-day punches that are within 60 minutes of midnight
-                    // (i.e., punches between 12:00 AM and 1:00 AM)
+                    // Include next-day punches that are within 120 minutes of midnight
+                    // (i.e., punches between 12:00 AM and 02:00 AM)
                     const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
                     
                     if (midnightCrossoverPunches.length > 0) {

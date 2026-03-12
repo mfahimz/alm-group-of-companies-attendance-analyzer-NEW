@@ -7,9 +7,10 @@ import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient } from '@tanstack/react-query';
 
 /**
- * Midnight buffer: punches between 12:00 AM and 1:00 AM (60 min after midnight)
+ * Midnight buffer: punches between 12:00 AM and 02:00 AM (120 min after midnight).
+ * Extended to 2 hours for Ramadan night shifts crossover support.
  */
-const MIDNIGHT_BUFFER_MINUTES = 60;
+const MIDNIGHT_BUFFER_MINUTES = 120;
 
 export default function DailyBreakdownDialog({
     open,
@@ -197,8 +198,8 @@ export default function DailyBreakdownDialog({
                 for (const ps of prevShiftCandidates) {
                     const pEndTime = parseTime(ps.pm_end, includeSeconds);
                     if (pEndTime) {
-                        const h = pEndTime.getHours(), m = pEndTime.getMinutes();
-                        if (h === 23 || (h === 0 && m === 0)) { prevShiftEndsNearMidnight = true; break; }
+                        const h = pEndTime.getHours();
+                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
                     }
                 }
             }
@@ -276,8 +277,8 @@ export default function DailyBreakdownDialog({
             if (shift) {
                 const pmEndTime = parseTime(shift.pm_end, includeSeconds);
                 if (pmEndTime) {
-                    const h = pmEndTime.getHours(), m = pmEndTime.getMinutes();
-                    if (h === 23 || (h === 0 && m === 0)) shiftEndsNearMidnight = true;
+                    const h = pmEndTime.getHours();
+                    if (h === 23 || h === 0) shiftEndsNearMidnight = true;
                 }
             }
 
@@ -580,7 +581,7 @@ export default function DailyBreakdownDialog({
             let isExtendedMatch = false;
             let isFarExtendedMatch = false;
 
-            // Try 60 min window
+            // Try 120 min window (Extended for Ramadan shifts)
             for (const sp of shiftPoints) {
                 if (usedShiftPoints.has(sp.type)) continue;
                 const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
