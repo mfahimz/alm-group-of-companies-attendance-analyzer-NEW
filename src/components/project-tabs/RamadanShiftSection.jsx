@@ -292,10 +292,10 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
 
                         <Button
                             onClick={handleApply}
-                            disabled={!selectedRamadanSchedule || isBusy || ramadanShiftsApplied}
-                            className={ramadanShiftsApplied ? "bg-green-600 hover:bg-green-700" : "bg-purple-600 hover:bg-purple-700"}
+                            disabled={!selectedRamadanSchedule || isBusy}
+                            className="bg-purple-600 hover:bg-purple-700"
                         >
-                            {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : ramadanShiftsApplied ? <><Play className="w-4 h-4 mr-2" />Already Applied</> : <><Play className="w-4 h-4 mr-2" />Apply Ramadan Shifts</>}
+                            {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : <><Play className="w-4 h-4 mr-2" />{ramadanShiftsApplied ? 'Sync/Apply More Shifts' : 'Apply Ramadan Shifts'}</>}
                         </Button>
                     </div>
 
@@ -305,7 +305,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-green-800 font-medium">✓ Ramadan shifts active ({ramadanShiftCount} shifts)</p>
-                                    <p className="text-xs text-green-700 mt-1">To update from Ramadan Schedule: click "Undo" first, then "Apply" again with latest schedule.</p>
+                                    <p className="text-xs text-green-700 mt-1">Click "Sync/Apply More Shifts" to fill any missing records or continue if the operation was interrupted. Already-applied shifts will be skipped.</p>
                                 </div>
                                 {Object.keys(parsedRamadanShifts.week1).length > 0 && (
                                     <Button size="sm" variant="outline" onClick={() => setShowRamadanShiftsView(!showRamadanShiftsView)} className="text-purple-700 border-purple-300 hover:bg-purple-50">
@@ -395,8 +395,8 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         </div>
                         <div className="flex gap-3 pt-4 border-t mt-4">
                             <Button variant="outline" onClick={() => setShowRamadanPreview(false)}>Close</Button>
-                            <Button onClick={handleApply} disabled={ramadanShiftsApplied || applying} className="bg-purple-600 hover:bg-purple-700">
-                                {applying ? 'Applying...' : ramadanShiftsApplied ? 'Already Applied' : 'Apply Ramadan Shifts'}
+                            <Button onClick={handleApply} disabled={applying} className="bg-purple-600 hover:bg-purple-700">
+                                {applying ? 'Applying...' : ramadanShiftsApplied ? 'Sync/Apply More Shifts' : 'Apply Ramadan Shifts'}
                             </Button>
                         </div>
                     </div>
