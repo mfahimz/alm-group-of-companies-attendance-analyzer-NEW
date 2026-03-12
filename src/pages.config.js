@@ -48,6 +48,7 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import AIPayrollInsights from './pages/AIPayrollInsights';
+import AgentsDocumentation from './pages/AgentsDocumentation';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import AppDocumentation from './pages/AppDocumentation';
 import AuditLogs from './pages/AuditLogs';
@@ -83,12 +84,12 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestDataViewer from './pages/TestDataViewer';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import AgentsDocumentation from './pages/AgentsDocumentation';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AIPayrollInsights": AIPayrollInsights,
+    "AgentsDocumentation": AgentsDocumentation,
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "AppDocumentation": AppDocumentation,
     "AuditLogs": AuditLogs,
@@ -124,7 +125,6 @@ export const PAGES = {
     "TestDataViewer": TestDataViewer,
     "UserProfile": UserProfile,
     "Users": Users,
-    "AgentsDocumentation": AgentsDocumentation,
 }
 
 export const pagesConfig = {
