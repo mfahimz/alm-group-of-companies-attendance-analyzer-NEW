@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
         const existingShifts = await base44.asServiceRole.entities.ShiftTiming.filter({ project_id: projectId });
         const shiftsToDelete = existingShifts.filter(s =>
             attendanceIds.includes(String(s.attendance_id)) &&
-            s.date >= startDateStr && s.date <= endDateStr
+            s.date >= startDateStr && s.date <= endDateStr &&
+            String(s.applicable_days || '').includes('Ramadan')
         );
         
         if (shiftsToDelete.length > 0) {
@@ -130,17 +131,19 @@ Deno.serve(async (req) => {
             const week1 = week1Shifts[attendanceId];
             const week2 = week2Shifts[attendanceId];
             if (!week1 && !week2) continue;
-
-            // CRITICAL: Week rotates after each Saturday (before Sunday)
-            // Track current week for this employee
-            let currentWeekIndex = 0; // 0 = week1, 1 = week2
             
             for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
                 const dateStr = currentDate.toISOString().split('T')[0];
                 const dayOfWeek = currentDate.getDay();
                 const isSunday = dayOfWeek === 0;
                 const isFriday = dayOfWeek === 5;
-                const isSaturday = dayOfWeek === 6;
+
+                // Sync the week rotation logic EXACTLY as it appears in the Ramadan Calendar
+                const dDate = new Date(currentDate);
+                const rStart = new Date(ramadanStart);
+                const daysSinceStart = Math.floor((dDate.getTime() - rStart.getTime()) / (1000 * 60 * 60 * 24));
+                const saturdaysPassed = Math.floor((daysSinceStart + (7 - rStart.getDay() + 6) % 7) / 7);
+                const currentWeekIndex = saturdaysPassed % 2; // 0 = week1, 1 = week2
 
                 // Check for Day Swap exception override
                 const hasDaySwap = daySwapExceptions.some(ex => {
@@ -166,10 +169,6 @@ Deno.serve(async (req) => {
                 const fridayShift = fridayShifts[attendanceId];
                 const weekShifts = isFriday && fridayShift ? fridayShift : (currentWeekIndex === 0 ? week1 : week2);
                 if (!weekShifts) {
-                    // Rotate week after Saturday (before Sunday)
-                    if (isSaturday) {
-                        currentWeekIndex = (currentWeekIndex + 1) % 2;
-                    }
                     continue;
                 }
 
@@ -230,11 +229,6 @@ Deno.serve(async (req) => {
                     });
                 }
                 // If no times are filled at all, skip this day for this employee
-                
-                // Rotate week AFTER Saturday (before Sunday)
-                if (isSaturday) {
-                    currentWeekIndex = (currentWeekIndex + 1) % 2;
-                }
             }
         }
 
