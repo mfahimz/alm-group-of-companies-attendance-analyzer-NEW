@@ -83,6 +83,7 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import TestDataViewer from './pages/TestDataViewer';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import AgentsDocumentation from './pages/AgentsDocumentation';
 import __Layout from './Layout.jsx';
 
 
@@ -123,6 +124,7 @@ export const PAGES = {
     "TestDataViewer": TestDataViewer,
     "UserProfile": UserProfile,
     "Users": Users,
+    "AgentsDocumentation": AgentsDocumentation,
 }
 
 export const pagesConfig = {
