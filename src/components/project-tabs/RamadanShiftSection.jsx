@@ -147,15 +147,38 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         if (!ramadanOverlap || !selectedRamadanSchedule) return;
         setApplying(true);
         try {
+            // FIX for ISSUE 3: We perform a fresh query here to confirm we are passing the 
+            // most recently saved ramadanScheduleId. This prevents issues if the selected 
+            // schedule ID is missing or derived from stale state and ensures we invoke 
+            // the backend with the correct overlapping schedule.
+            const freshSchedules = await base44.entities.RamadanSchedule.filter({ 
+                company: project.company, 
+                active: true 
+            });
+            const projectStart = new Date(project.date_from);
+            const projectEnd = new Date(project.date_to);
+            const freshOverlapping = freshSchedules.find((schedule) => {
+                const ramadanStart = new Date(schedule.ramadan_start_date);
+                const ramadanEnd = new Date(schedule.ramadan_end_date);
+                return projectStart <= ramadanEnd && projectEnd >= ramadanStart;
+            });
+            const validScheduleId = selectedRamadanSchedule?.id || freshOverlapping?.id;
+
+            if (!validScheduleId) {
+                toast.error('Could not determine correct Ramadan schedule ID.');
+                setApplying(false);
+                return;
+            }
+
             const result = await base44.functions.invoke('applyRamadanShifts', {
                 projectId: project.id,
-                ramadanScheduleId: selectedRamadanSchedule.id,
+                ramadanScheduleId: validScheduleId,
                 ramadanFrom: ramadanOverlap.from,
                 ramadanTo: ramadanOverlap.to
             });
             const d = result.data;
             if (d.success) {
-                queryClient.invalidateQueries(['shifts', project.id]);
+                queryClient.invalidateQueries({ queryKey: ['shifts', project.id] });
                 toast.success(`Applied ${d.shiftsCreated} Ramadan shifts for ${d.employeesProcessed} employees`);
                 setShowRamadanPreview(false);
             } else if (d.error) {
