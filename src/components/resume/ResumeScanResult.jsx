@@ -213,6 +213,13 @@ export default function ResumeScanResultView({ result, onNewScan }) {
                     {result.applicant_name && result.applicant_name !== 'Unknown' && (
                         <p className="font-semibold text-[#1F2937] text-base mb-1">{result.applicant_name}</p>
                     )}
+                    {/* Display candidate nationality prominently as requested by business logic */}
+                    <div className="mb-2">
+                        <span className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded text-sm font-semibold">
+                            <Globe className="w-4 h-4 text-amber-700" />
+                            Nationality: {result.nationality || extractedData?.nationality || 'Not Specified'}
+                        </span>
+                    </div>
                     {result.applicant_email && <p className="text-xs text-[#6B7280] mb-2">{result.applicant_email}</p>}
                     <div className="flex items-center gap-2 justify-center sm:justify-start mb-2">
                         <RecommendIcon className={`w-4 h-4 ${config.iconColor}`} />

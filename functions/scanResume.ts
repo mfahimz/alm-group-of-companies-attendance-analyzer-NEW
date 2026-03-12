@@ -225,7 +225,9 @@ Deno.serve(async (req) => {
                     }
                 },
                 certifications: { type: "array", items: { type: "string" } },
-                languages: { type: "array", items: { type: "string" } }
+                languages: { type: "array", items: { type: "string" } },
+                // Business logic: Extract nationality to display prominently at the top of the scan results
+                nationality: { type: "string", description: "The candidate's nationality, e.g., Syrian, Egyptian, Indian, etc. If not explicitly found, return null or an empty string." }
             }
         };
 
@@ -346,6 +348,8 @@ Output a JSON with these exact fields:
                 experience_years: aiResponse?.experience_years ?? 0,
                 applicant_name: extractedData?.full_name || 'Unknown',
                 applicant_email: extractedData?.email || '',
+                // Pass the scanned nationality to the frontend; use placeholder if missing
+                nationality: extractedData?.nationality || 'Not Specified',
                 file_url: fileUrl,
                 file_name: fileName,
                 extracted_data: JSON.stringify(extractedData),

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, ChevronRight, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ChevronRight, ArrowLeft, Globe } from 'lucide-react';
 import ResumeScanResultView from './ResumeScanResult';
 import { Button } from '@/components/ui/button';
 
@@ -91,9 +91,16 @@ export default function BatchScanResults({ results, onNewScan }) {
                                             ? result.applicant_name
                                             : result.file_name || 'Unknown Candidate'}
                                     </p>
-                                    {result.applicant_email && (
-                                        <p className="text-xs text-[#9CA3AF] truncate">{result.applicant_email}</p>
-                                    )}
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        {result.applicant_email && (
+                                            <p className="text-xs text-[#9CA3AF] truncate">{result.applicant_email}</p>
+                                        )}
+                                        {/* Display candidate nationality prominently as required by business logic */}
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-semibold">
+                                            <Globe className="w-3 h-3 text-amber-700" />
+                                            Nat: {result.nationality || JSON.parse(result.extracted_data || '{}')?.nationality || 'Not Specified'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {/* Score Bar */}
