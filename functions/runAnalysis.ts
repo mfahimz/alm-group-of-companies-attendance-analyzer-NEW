@@ -806,9 +806,20 @@ Deno.serve(async (req) => {
                     // If employee worked, continue normal analysis
                 }
 
-                // Check for date-specific Ramadan ShiftTiming records FIRST
+                // ================================================================
+                // SHIFT SELECTION PRIORITY LOGIC (TASK 3 AUDIT)
+                // The system must resolve which shift applies to a given employee on a given date.
+                // It strictly executes in the following fallback hierarchy:
+                // PRIORITY 1: A specific Ramadan shift for that date (applies if in Ramadan schedule)
+                // PRIORITY 2: A specific regular shift for that date (manual adjustments via 'Shift Overrides')
+                // PRIORITY 3: A shift that matches the specific day of the week (e.g. "Monday" rule)
+                // PRIORITY 4: The general company shift (fallback if no specific days match)
+                // ================================================================
+                
+                // PRIORITY 1: Check for date-specific Ramadan ShiftTiming records FIRST
                 // applyRamadanShifts creates separate ShiftTiming records for day and night shifts
                 // We need to merge them into a single shift object for proper punch matching
+
                 let ramadanShift = null;
                 const dateSpecificShifts = employeeShifts.filter(s => s.date === dateStr && isShiftEffective(s));
                 const ramadanDateShifts = dateSpecificShifts.filter(s => 
@@ -915,7 +926,8 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Use Ramadan shift, or fall back to non-Ramadan date-specific shift
+                // PRIORITY 2: A specific regular shift for that date (non-Ramadan)
+                // This captures manual shift timings created for extraordinary cases on this particular date.
                 const nonRamadanDateShift = dateSpecificShifts.find(s => 
                     !s.applicable_days || !s.applicable_days.includes('Ramadan')
                 );
@@ -924,6 +936,8 @@ Deno.serve(async (req) => {
                 if (!shift) {
                     const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
                     
+                    // PRIORITY 3: A shift that explicitly matches the specific day of the week 
+                    // (e.g., applicable_days includes "Monday")
                     for (const s of applicableShifts) {
                         if (s.applicable_days) {
                             try {
@@ -941,6 +955,8 @@ Deno.serve(async (req) => {
                     }
                     
                     if (!shift) {
+                        // PRIORITY 4: The general company shift logic
+                        // If it's a Friday, we check for a general Friday shift, otherwise we grab the first general shift
                         if (dayOfWeek === 5) {
                             shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
                             if (!shift) {
@@ -980,10 +996,10 @@ Deno.serve(async (req) => {
                 const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
                 
                 // ================================================================
-                // MIDNIGHT SHIFT FIX: Collect punches for this date
-                // If shift ends at or near midnight (12:00 AM / 00:00), 
-                // also include early-morning punches from the NEXT day
-                // that are actually the punch-out for THIS day's shift.
+                // MIDNIGHT SHIFT HANDLING (TASK 3 AUDIT)
+                // If a shift ends at or near midnight (12:00 AM / 00:00), 
+                // the system must correctly include early-morning punches from the NEXT chronological day
+                // (e.g. 00:15 AM punch) because they belong to THIS date's shift.
                 // ================================================================
                 const nextDateObj = new Date(currentDate);
                 nextDateObj.setDate(nextDateObj.getDate() + 1);

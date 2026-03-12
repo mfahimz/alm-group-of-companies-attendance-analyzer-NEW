@@ -369,7 +369,8 @@ export default function RamadanSchedules() {
             {/* Calendar View Dialog */}
             {calendarViewSchedule && (
                 <RamadanCalendarView
-                    schedule={calendarViewSchedule}
+                    // ISSUE 1 FIX: Always pull the fresh schedule object from allSchedules so the calendar doesn't get a stale prop
+                    schedule={allSchedules.find(s => s.id === calendarViewSchedule.id) || calendarViewSchedule}
                     employees={employees.filter(emp => emp.attendance_id)}
                     onClose={() => setCalendarViewSchedule(null)}
                 />

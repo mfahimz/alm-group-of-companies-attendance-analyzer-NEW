@@ -69,19 +69,39 @@ Deno.serve(async (req) => {
             employees = await base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true });
         }
 
-        // Check if any Ramadan shifts already exist (should have been undone first)
+        // OVERWRITE RULE: If an admin has already manually adjusted an employee's 
+        // shift in the calendar, this action should overwrite those changes.
+        // We delete ANY existing ShiftTiming records for the target employees 
+        // within the date range, regardless of whether they are Ramadan or regular.
+        const attendanceIds = employees.map(e => String(e.attendance_id));
         const existingShifts = await base44.asServiceRole.entities.ShiftTiming.filter({ project_id: projectId });
-        const existingRamadan = existingShifts.filter(s =>
-            s.applicable_days?.includes('Ramadan') &&
+        const shiftsToDelete = existingShifts.filter(s =>
+            attendanceIds.includes(String(s.attendance_id)) &&
             s.date >= startDateStr && s.date <= endDateStr
         );
         
-        if (existingRamadan.length > 0) {
-            return Response.json({ 
-                error: `${existingRamadan.length} Ramadan shifts already exist. Please undo first before re-applying.`,
-                existingCount: existingRamadan.length
-            }, { status: 400 });
+        if (shiftsToDelete.length > 0) {
+            console.log(`[applyRamadanShifts] Overwriting ${shiftsToDelete.length} existing shifts...`);
+            // Delete them so we can cleanly recreate the new Ramadan pattern
+            for (let i = 0; i < shiftsToDelete.length; i += 10) {
+                const batchIds = shiftsToDelete.slice(i, i + 10).map(s => s.id);
+                try {
+                    await Promise.all(batchIds.map(id => base44.asServiceRole.entities.ShiftTiming.delete(id)));
+                    await new Promise(res => setTimeout(res, 300));
+                } catch (err) {
+                    console.warn('[applyRamadanShifts] Failed to delete some existing shifts:', err);
+                }
+            }
         }
+        
+        // CONFLICT RESOLUTION: If an employee has a Day Swap exception on a Ramadan day,
+        // prioritize the Swapped timing over the Ramadan timing (do not create a Ramadan shift)
+        const allExceptions = await base44.asServiceRole.entities.Exception.filter({ project_id: projectId });
+        const daySwapExceptions = allExceptions.filter(e => 
+            e.type === 'DAY_SWAP' && 
+            e.approval_status === 'approved' &&
+            e.use_in_analysis !== false
+        );
 
         // ================================================================
         // Helper: Check if a time value is actually filled (non-empty, non-dash)
@@ -111,6 +131,23 @@ Deno.serve(async (req) => {
                 const isSunday = dayOfWeek === 0;
                 const isFriday = dayOfWeek === 5;
                 const isSaturday = dayOfWeek === 6;
+
+                // Check for Day Swap exception override
+                const hasDaySwap = daySwapExceptions.some(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    // Match employee ID and explicitly check date applicability
+                    const matchesEmployee = String(ex.attendance_id) === 'ALL' || String(ex.attendance_id) === attendanceId;
+                    return matchesEmployee && currentDate >= exFrom && currentDate <= exTo;
+                });
+
+                if (hasDaySwap) {
+                    // CONFLICT RESOLUTION: Priority goes to Swapped timing. 
+                    // By skipping, we allow the main attendance analysis to apply the Day Swap's exception details
+                    // instead of falling back to the standard Ramadan pattern.
+                    console.log(`[applyRamadanShifts] Skipping ${dateStr} for ${attendanceId} due to DAY_SWAP priority.`);
+                    continue;
+                }
 
                 if (isSunday) {
                     continue; // Skip Sunday (weekly off)
@@ -199,8 +236,9 @@ Deno.serve(async (req) => {
         }
 
         // Bulk create with rate limit protection
+        // SAFETY RULE: Batch size 10 with 300ms delay to maintain system stability
         let createdCount = 0;
-        const batchSize = 25;
+        const batchSize = 10;
         for (let i = 0; i < shiftsToCreate.length; i += batchSize) {
             const batch = shiftsToCreate.slice(i, i + batchSize);
             let retries = 3;
