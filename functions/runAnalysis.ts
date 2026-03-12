@@ -889,10 +889,12 @@ Deno.serve(async (req) => {
                             const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
                             const employeeShiftData = weekData[attendanceIdStr];
                             
-                            if (employeeShiftData && employeeShiftData.active_shifts && employeeShiftData.active_shifts.length > 0) {
-                                const activeShifts = employeeShiftData.active_shifts;
+                            if (employeeShiftData) {
+                                // Determine existence purely from shift time entries being present
+                                const hasDay = employeeShiftData.day_start && employeeShiftData.day_end && employeeShiftData.day_start !== '—' && employeeShiftData.day_end !== '—';
+                                const hasNight = employeeShiftData.night_start && employeeShiftData.night_end && employeeShiftData.night_start !== '—' && employeeShiftData.night_end !== '—';
                                 
-                                if (activeShifts.includes('day') && activeShifts.includes('night')) {
+                                if (hasDay && hasNight) {
                                     ramadanShift = {
                                         am_start: employeeShiftData.day_start || '',
                                         am_end: employeeShiftData.day_end || '',
@@ -901,7 +903,7 @@ Deno.serve(async (req) => {
                                         is_single_shift: false,
                                         _ramadan: true
                                     };
-                                } else if (activeShifts.includes('day')) {
+                                } else if (hasDay) {
                                     ramadanShift = {
                                         am_start: employeeShiftData.day_start || '',
                                         am_end: '—',
@@ -910,7 +912,7 @@ Deno.serve(async (req) => {
                                         is_single_shift: true,
                                         _ramadan: true
                                     };
-                                } else if (activeShifts.includes('night')) {
+                                } else if (hasNight) {
                                     ramadanShift = {
                                         am_start: employeeShiftData.night_start || '',
                                         am_end: '—',

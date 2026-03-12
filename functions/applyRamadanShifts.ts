@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
                 //   - If only day_start + day_end have values (2 times) → SINGLE SHIFT
                 //   - If only night_start + night_end have values (2 times) → SINGLE SHIFT  
                 //   - If all 4 fields have values → COMBINED SHIFT (two shifts)
-                //   - active_shifts array is used as a secondary check, but TIME FIELDS are primary
+                //   - The UI 'active_shifts' is ignored; TIME FIELDS are the sole source of truth
                 //
                 // For Al Maraghi Automotive (non-Friday):
                 //   S1/S2 are stored in day_start/day_end only. Night fields are always empty.
@@ -182,19 +182,12 @@ Deno.serve(async (req) => {
                 const hasDayTimes = isTimeFilled(weekShifts.day_start) && isTimeFilled(weekShifts.day_end);
                 const hasNightTimes = isTimeFilled(weekShifts.night_start) && isTimeFilled(weekShifts.night_end);
                 
-                // Also check active_shifts as a secondary signal
-                const activeShifts = weekShifts.active_shifts || [];
-                const dayActive = activeShifts.includes('day');
-                const nightActive = activeShifts.includes('night');
-                
-                // Primary: TIME FIELDS are the source of truth
-                // If all 4 time fields are filled → combined shift, regardless of active_shifts checkboxes
-                // active_shifts only matters when deciding between day-only vs night-only (when only 2 fields filled)
+                // Primary: TIME FIELDS are the absolute source of truth, ignoring active_shifts entirely
                 const hasBothShifts = hasDayTimes && hasNightTimes;
-                const hasDayShift = hasDayTimes && !hasBothShifts && (activeShifts.length === 0 || dayActive);
-                const hasNightShift = hasNightTimes && !hasBothShifts && (activeShifts.length === 0 || nightActive);
+                const hasDayShift = hasDayTimes && !hasBothShifts;
+                const hasNightShift = hasNightTimes && !hasBothShifts;
 
-                console.log(`[applyRamadanShifts] Employee ${attendanceId}, Date ${dateStr}: dayTimes=${hasDayTimes}(${weekShifts.day_start}|${weekShifts.day_end}), nightTimes=${hasNightTimes}(${weekShifts.night_start}|${weekShifts.night_end}), activeShifts=${JSON.stringify(activeShifts)}, hasBoth=${hasBothShifts}`);
+                console.log(`[applyRamadanShifts] Employee ${attendanceId}, Date ${dateStr}: dayTimes=${hasDayTimes}(${weekShifts.day_start}|${weekShifts.day_end}), nightTimes=${hasNightTimes}(${weekShifts.night_start}|${weekShifts.night_end}), hasBoth=${hasBothShifts}`);
 
                 if (hasBothShifts) {
                     // FOUR time fields filled → Combined shift (is_single_shift=false)

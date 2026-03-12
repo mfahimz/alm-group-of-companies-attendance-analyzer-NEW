@@ -300,15 +300,16 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                                         {Object.entries(parsedRamadanShifts[weekKey]).slice(0, 50).map(([attendanceId, shift]) => {
                                             const emp = employees.find(e => e.attendance_id === attendanceId);
                                             if (!emp) return null;
-                                            const activeShifts = shift.active_shifts || [];
+                                            const hasDay = shift.day_start && shift.day_end && shift.day_start !== '—';
+                                            const hasNight = shift.night_start && shift.night_end && shift.night_start !== '—';
                                             return (
                                                 <div key={attendanceId} className="text-xs text-slate-700 flex justify-between items-center py-1 border-b border-purple-100">
                                                     <span className="font-medium">{emp.name} ({attendanceId})</span>
                                                     <span className="text-purple-700">
-                                                        {activeShifts.includes('day') && shift.day_start && shift.day_end && `Day: ${shift.day_start}-${shift.day_end}`}
-                                                        {activeShifts.includes('day') && activeShifts.includes('night') && ' | '}
-                                                        {activeShifts.includes('night') && shift.night_start && shift.night_end && `Night: ${shift.night_start}-${shift.night_end}`}
-                                                        {activeShifts.length === 0 && '—'}
+                                                        {hasDay && `Day: ${shift.day_start}-${shift.day_end}`}
+                                                        {hasDay && hasNight && ' | '}
+                                                        {hasNight && `Night: ${shift.night_start}-${shift.night_end}`}
+                                                        {!hasDay && !hasNight && '—'}
                                                     </span>
                                                 </div>
                                             );
