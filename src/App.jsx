@@ -6,7 +6,7 @@ import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
-import Layout from '../layout';
+import Layout from '@/layout';
 
 // Import all pages
 import Dashboard from './pages/Dashboard';
