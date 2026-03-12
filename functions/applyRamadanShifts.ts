@@ -83,13 +83,23 @@ Deno.serve(async (req) => {
         if (shiftsToDelete.length > 0) {
             console.log(`[applyRamadanShifts] Overwriting ${shiftsToDelete.length} existing shifts...`);
             // Delete them so we can cleanly recreate the new Ramadan pattern
-            for (let i = 0; i < shiftsToDelete.length; i += 10) {
-                const batchIds = shiftsToDelete.slice(i, i + 10).map(s => s.id);
+            // CRITICAL: Serialize deletions to avoid rate limiting
+            for (let i = 0; i < shiftsToDelete.length; i += 5) {
+                const batchIds = shiftsToDelete.slice(i, i + 5).map(s => s.id);
                 try {
-                    await Promise.all(batchIds.map(id => base44.asServiceRole.entities.ShiftTiming.delete(id)));
-                    await new Promise(res => setTimeout(res, 300));
+                    // Delete sequentially within batch to avoid overwhelming the API
+                    for (const id of batchIds) {
+                        await base44.asServiceRole.entities.ShiftTiming.delete(id);
+                        await new Promise(res => setTimeout(res, 100));
+                    }
+                    // Longer delay between batches
+                    if (i + 5 < shiftsToDelete.length) {
+                        await new Promise(res => setTimeout(res, 500));
+                    }
                 } catch (err) {
                     console.warn('[applyRamadanShifts] Failed to delete some existing shifts:', err);
+                    // Add recovery delay on error
+                    await new Promise(res => setTimeout(res, 1000));
                 }
             }
         }
@@ -229,9 +239,9 @@ Deno.serve(async (req) => {
         }
 
         // Bulk create with rate limit protection
-        // SAFETY RULE: Batch size 10 with 300ms delay to maintain system stability
+        // SAFETY RULE: Smaller batch size with longer delays to prevent rate limiting
         let createdCount = 0;
-        const batchSize = 10;
+        const batchSize = 5;
         for (let i = 0; i < shiftsToCreate.length; i += batchSize) {
             const batch = shiftsToCreate.slice(i, i + batchSize);
             let retries = 3;
@@ -243,14 +253,15 @@ Deno.serve(async (req) => {
                 } catch (err) {
                     retries--;
                     if (retries === 0) throw err;
-                    const delay = retries === 2 ? 2000 : 4000;
+                    // Exponential backoff: 2s, 4s, 8s
+                    const delay = 2000 * Math.pow(2, 3 - retries);
                     console.warn(`[applyRamadanShifts] Batch failed, retrying in ${delay/1000}s...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
             console.log(`[applyRamadanShifts] Created ${createdCount}/${shiftsToCreate.length}`);
             if (i + batchSize < shiftsToCreate.length) {
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
 
