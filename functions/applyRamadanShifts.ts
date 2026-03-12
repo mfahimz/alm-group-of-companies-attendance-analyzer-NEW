@@ -20,6 +20,7 @@ Deno.serve(async (req) => {
         // Consolidate all primary data fetching into bulk queries at the start.
         // This minimizes external API calls and ensures all context is available
         // in memory before entering the heavy processing and parallel write phases.
+        // Logic Guard: Operations are strictly scoped to the Project's associated Company.
         // ================================================================
         
         // Initial wave: Fetch the project configuration and existing data linked to it
@@ -30,11 +31,13 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id: projectId })
         ]);
 
-        if (!project || !schedule) {
-            return Response.json({ error: 'Project or schedule not found' }, { status: 404 });
+        // Logic Guard: Ensure the project has a valid company association to maintain scoping
+        if (!project || !project.company) {
+            return Response.json({ error: 'Project or associated company not found' }, { status: 404 });
         }
 
         // Secondary wave: Fetch context-dependent entities (Companies and Employees)
+        // Strictly scoped to the project's company to prevent cross-tenant leaked data
         const [allCompanies, rawEmployees] = await Promise.all([
             base44.asServiceRole.entities.Company.filter({ name: project.company }),
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true })
@@ -82,44 +85,24 @@ Deno.serve(async (req) => {
         }
 
         // ================================================================
-        // 2. SHIFT CLEANUP (Parallel Deletion strategy)
-        // Clear any existing Ramadan shifts for the target employees and range.
-        // We use the same parallel strategy here to ensure large volumes (1,000+)
-        // are processed without timing out or hitting rate limits.
+        // 2. DELTA PROCESSING (Sync/Merge Logic)
+        // Instead of wiping existing data, we identify existing Ramadan shift
+        // records for the target employees and range. The "Sync" behavior 
+        // ensures we only fill in missing records, maintaining merge integrity.
         // ================================================================
         const attendanceIds = employees.map(e => String(e.attendance_id));
-        const shiftsToDelete = existingShifts.filter(s =>
-            attendanceIds.includes(String(s.attendance_id)) &&
-            s.date >= startDateStr && s.date <= endDateStr &&
-            String(s.applicable_days || '').includes('Ramadan')
+        const existingRamadanShiftMap = new Set(
+            existingShifts
+                .filter(s => 
+                    attendanceIds.includes(String(s.attendance_id)) &&
+                    s.date >= startDateStr && s.date <= endDateStr &&
+                    String(s.applicable_days || '').includes('Ramadan')
+                )
+                .map(s => `${s.attendance_id}_${s.date}`)
         );
         
-        if (shiftsToDelete.length > 0) {
-            console.log(`[applyRamadanShifts] Overwriting ${shiftsToDelete.length} existing shifts using parallel batches...`);
-            
-            // Execute parallel batch strategy for deletions (5 simultaneous batches of 10)
-            for (let i = 0; i < shiftsToDelete.length; i += 50) { 
-                const wave = shiftsToDelete.slice(i, i + 50);
-                const batches = [];
-                for (let j = 0; j < wave.length; j += 10) {
-                    batches.push(wave.slice(j, j + 10));
-                }
-                
-                await Promise.all(batches.map(async (batch) => {
-                    for (const shift of batch) {
-                        try {
-                            await base44.asServiceRole.entities.ShiftTiming.delete(shift.id);
-                        } catch (err) {
-                            console.warn(`[applyRamadanShifts] Failed to delete shift ${shift.id}:`, err);
-                        }
-                    }
-                }));
-                
-                // Throttling: Mandatory 500ms delay between 50-record waves
-                if (i + 50 < shiftsToDelete.length) {
-                    await new Promise(res => setTimeout(res, 500));
-                }
-            }
+        if (existingRamadanShiftMap.size > 0) {
+            console.log(`[applyRamadanShifts] Found ${existingRamadanShiftMap.size} existing Ramadan shifts. Operation will proceed in Sync/Merge mode.`);
         }
         
         // Pre-process exceptions in memory to minimize calculations inside the 1,000-shift loop
@@ -164,6 +147,14 @@ Deno.serve(async (req) => {
                 const saturdaysPassed = Math.floor((daysSinceStart + (7 - rStart.getDay() + 6) % 7) / 7);
                 const currentWeekIndex = saturdaysPassed % 2; // 0 = week1, 1 = week2
 
+                // Delta Check: Ensure we don't duplicate existing records (Requirement 1 & 3)
+                // If a record already exists for this day, skip it to act as a missing-record filler.
+                const shiftKey = `${attendanceId}_${dateStr}`;
+                if (existingRamadanShiftMap.has(shiftKey)) {
+                    // console.log(`[applyRamadanShifts] Skipping existing record for ${attendanceId} on ${dateStr}`);
+                    continue;
+                }
+
                 // Check for Day Swap exception using pre-processed memory lookup
                 const currentMillis = currentDate.getTime();
                 const hasDaySwap = daySwapExceptions.some(ex => {
@@ -172,9 +163,8 @@ Deno.serve(async (req) => {
                 });
 
                 if (hasDaySwap) {
-                    // CONFLICT RESOLUTION: Priority goes to Swapped timing. 
-                    // By skipping, we allow the main attendance analysis to apply the Day Swap's exception details
-                    // instead of falling back to the standard Ramadan pattern.
+                    // CONFLICT RESOLUTION: Priority goes to Swapped timing even during merge (Requirement 3). 
+                    // By skipping, we allow the main attendance analysis to apply the Day Swap's exception details.
                     console.log(`[applyRamadanShifts] Skipping ${dateStr} for ${attendanceId} due to DAY_SWAP priority.`);
                     continue;
                 }
@@ -282,9 +272,10 @@ Deno.serve(async (req) => {
 
             console.log(`[applyRamadanShifts] Created ${createdCount}/${shiftsToCreate.length} shifts...`);
 
-            // Throttling: Mandatory 500ms delay after each 50-record wave
+            // Throttling: Mandatory 600ms delay after each 50-record wave (Requirement 2)
+            // This delay respects platform write limits for high-throughput parallel operations.
             if (i + WAVE_SIZE < shiftsToCreate.length) {
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 600));
             }
         }
 
