@@ -2,15 +2,17 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
  * AUDIT DEDUCTIBLE MISMATCH SCANNER
- * 
- * Compares deductible_minutes across three sources:
- * 1. AnalysisResult (finalized attendance)
- * 2. SalarySnapshot (database entity)
- * 3. SalaryReport.snapshot_data (frozen JSON at report generation)
- * 
- * Identifies WHERE data integrity breaks.
+ *
+ * This serverless function audits deductible minute data consistency across three data sources:
+ *   1. **AnalysisResult** – the finalized attendance records.
+ *   2. **SalarySnapshot** – the persisted snapshot of salary‑related data.
+ *   3. **SalaryReport.snapshot_data** – a frozen JSON snapshot captured when the salary report was generated.
+ *
+ * It identifies mismatches where the deductible minutes (or derived hours) diverge between these sources,
+ * providing a detailed report for downstream investigation.
  */
 
+// Entry point: HTTP handler invoked by Deno Deploy or local dev server.
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -27,6 +29,10 @@ Deno.serve(async (req) => {
         }
 
         // Fetch all three data sources
+        // Fetch the three relevant data sets in parallel for the given report_run_id.
+        //   - analysisResults: attendance analysis records.
+        //   - salarySnapshots: stored salary snapshot entities.
+        //   - salaryReports: salary report entities containing a JSON snapshot of data.
         const [analysisResults, salarySnapshots, salaryReports] = await Promise.all([
             base44.asServiceRole.entities.AnalysisResult.filter({ report_run_id }),
             base44.asServiceRole.entities.SalarySnapshot.filter({ report_run_id }),
@@ -39,7 +45,8 @@ Deno.serve(async (req) => {
             }, { status: 404 });
         }
 
-        // Parse SalaryReport.snapshot_data
+        // Parse the JSON snapshot data from the first SalaryReport (if present).
+        // This data mirrors the state of deductible minutes at report generation time.
         let reportSnapshotData = [];
         if (salaryReports.length > 0 && salaryReports[0].snapshot_data) {
             try {
@@ -93,6 +100,7 @@ Deno.serve(async (req) => {
                 deltaStage = deltaStage ? deltaStage + ' + CONVERSION_ERROR' : 'CONVERSION_ERROR';
             }
 
+            // Assemble a record summarising the comparison for this employee.
             const record = {
                 attendance_id: attendanceId,
                 name: analysis.name || snapshot?.name || reportRow?.name || 'Unknown',
@@ -114,7 +122,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Summary
+        // Build a high‑level summary of the audit operation.
         const summary = {
             total_employees: analysisResults.length,
             total_mismatches: mismatches.length,
@@ -134,6 +142,7 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
+        // Log unexpected errors and return a generic 500 response.
         console.error('Audit deductible mismatch error:', error);
         return Response.json({ 
             error: error.message 
