@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
         // Bulk create with rate limit protection
         // SAFETY RULE: Smaller batch size with longer delays to prevent rate limiting
         let createdCount = 0;
-        const batchSize = 5;
+        const batchSize = 10;
         for (let i = 0; i < shiftsToCreate.length; i += batchSize) {
             const batch = shiftsToCreate.slice(i, i + batchSize);
             let retries = 3;
@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
             }
             console.log(`[applyRamadanShifts] Created ${createdCount}/${shiftsToCreate.length}`);
             if (i + batchSize < shiftsToCreate.length) {
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 600));
             }
         }
 
