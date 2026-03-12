@@ -15,32 +15,41 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
         }
 
-        // Fetch project and schedule
-        const [project] = await base44.asServiceRole.entities.Project.filter({ id: projectId });
-        const [schedule] = await base44.asServiceRole.entities.RamadanSchedule.filter({ id: ramadanScheduleId });
+        // ================================================================
+        // 1. DATA PREPARATION (Bulk Fetching)
+        // Consolidate all primary data fetching into bulk queries at the start.
+        // This minimizes external API calls and ensures all context is available
+        // in memory before entering the heavy processing and parallel write phases.
+        // ================================================================
+        
+        // Initial wave: Fetch the project configuration and existing data linked to it
+        const [project, schedule, allExceptions, existingShifts] = await Promise.all([
+            base44.asServiceRole.entities.Project.filter({ id: projectId }).then(res => res[0]),
+            base44.asServiceRole.entities.RamadanSchedule.filter({ id: ramadanScheduleId }).then(res => res[0]),
+            base44.asServiceRole.entities.Exception.filter({ project_id: projectId }),
+            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: projectId })
+        ]);
 
         if (!project || !schedule) {
             return Response.json({ error: 'Project or schedule not found' }, { status: 404 });
         }
 
-        // Detect if this is Al Maraghi Automotive (company_id=3)
-        let isAlMaraghiAutomotive = false;
-        try {
-            const companies = await base44.asServiceRole.entities.Company.filter({ name: project.company });
-            if (companies.length > 0 && companies[0].company_id === 3) {
-                isAlMaraghiAutomotive = true;
-            }
-        } catch (e) {
-            console.log('Could not determine company_id, proceeding with standard logic');
-        }
+        // Secondary wave: Fetch context-dependent entities (Companies and Employees)
+        const [allCompanies, rawEmployees] = await Promise.all([
+            base44.asServiceRole.entities.Company.filter({ name: project.company }),
+            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true })
+        ]);
+
+        // Audit check for Al Maraghi Automotive identity
+        const isAlMaraghiAutomotive = allCompanies.some(c => c.company_id === 3);
 
         // Calculate date overlap
         const projectStart = new Date(project.date_from);
         const projectEnd = new Date(project.date_to);
         const ramadanStart = new Date(schedule.ramadan_start_date);
         const ramadanEnd = new Date(schedule.ramadan_end_date);
-        const overlapStart = new Date(Math.max(projectStart, ramadanStart));
-        const overlapEnd = new Date(Math.min(projectEnd, ramadanEnd));
+        const overlapStart = new Date(Math.max(projectStart.getTime(), ramadanStart.getTime()));
+        const overlapEnd = new Date(Math.min(projectEnd.getTime(), ramadanEnd.getTime()));
 
         if (overlapStart > overlapEnd) {
             return Response.json({ success: true, shiftsCreated: 0, message: 'No overlap between project and Ramadan dates' });
@@ -62,25 +71,23 @@ Deno.serve(async (req) => {
         const week2Shifts = JSON.parse(schedule.week2_shifts || '{}');
         const fridayShifts = JSON.parse(schedule.friday_shifts || '{}');
 
-        // Get employees
-        let employees;
+        // Process employee selection logic in memory using fetched records
+        let employees = rawEmployees;
         if (project.custom_employee_ids) {
             const employeeIds = project.custom_employee_ids.split(',').map(id => String(id).trim()).filter(Boolean);
-            employees = await base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true });
-            employees = employees.filter(e => {
+            employees = rawEmployees.filter(e => {
                 const hrmsStr = String(e.hrms_id).replace('.0', '').trim();
                 return employeeIds.includes(hrmsStr);
             });
-        } else {
-            employees = await base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true });
         }
 
-        // OVERWRITE RULE: If an admin has already manually adjusted an employee's 
-        // shift in the calendar, this action should overwrite those changes.
-        // We delete ANY existing ShiftTiming records for the target employees 
-        // within the date range, regardless of whether they are Ramadan or regular.
+        // ================================================================
+        // 2. SHIFT CLEANUP (Parallel Deletion strategy)
+        // Clear any existing Ramadan shifts for the target employees and range.
+        // We use the same parallel strategy here to ensure large volumes (1,000+)
+        // are processed without timing out or hitting rate limits.
+        // ================================================================
         const attendanceIds = employees.map(e => String(e.attendance_id));
-        const existingShifts = await base44.asServiceRole.entities.ShiftTiming.filter({ project_id: projectId });
         const shiftsToDelete = existingShifts.filter(s =>
             attendanceIds.includes(String(s.attendance_id)) &&
             s.date >= startDateStr && s.date <= endDateStr &&
@@ -88,37 +95,43 @@ Deno.serve(async (req) => {
         );
         
         if (shiftsToDelete.length > 0) {
-            console.log(`[applyRamadanShifts] Overwriting ${shiftsToDelete.length} existing shifts...`);
-            // Delete them so we can cleanly recreate the new Ramadan pattern
-            // CRITICAL: Serialize deletions to avoid rate limiting
-            for (let i = 0; i < shiftsToDelete.length; i += 5) {
-                const batchIds = shiftsToDelete.slice(i, i + 5).map(s => s.id);
-                try {
-                    // Delete sequentially within batch to avoid overwhelming the API
-                    for (const id of batchIds) {
-                        await base44.asServiceRole.entities.ShiftTiming.delete(id);
-                        await new Promise(res => setTimeout(res, 100));
+            console.log(`[applyRamadanShifts] Overwriting ${shiftsToDelete.length} existing shifts using parallel batches...`);
+            
+            // Execute parallel batch strategy for deletions (5 simultaneous batches of 10)
+            for (let i = 0; i < shiftsToDelete.length; i += 50) { 
+                const wave = shiftsToDelete.slice(i, i + 50);
+                const batches = [];
+                for (let j = 0; j < wave.length; j += 10) {
+                    batches.push(wave.slice(j, j + 10));
+                }
+                
+                await Promise.all(batches.map(async (batch) => {
+                    for (const shift of batch) {
+                        try {
+                            await base44.asServiceRole.entities.ShiftTiming.delete(shift.id);
+                        } catch (err) {
+                            console.warn(`[applyRamadanShifts] Failed to delete shift ${shift.id}:`, err);
+                        }
                     }
-                    // Longer delay between batches
-                    if (i + 5 < shiftsToDelete.length) {
-                        await new Promise(res => setTimeout(res, 500));
-                    }
-                } catch (err) {
-                    console.warn('[applyRamadanShifts] Failed to delete some existing shifts:', err);
-                    // Add recovery delay on error
-                    await new Promise(res => setTimeout(res, 1000));
+                }));
+                
+                // Throttling: Mandatory 500ms delay between 50-record waves
+                if (i + 50 < shiftsToDelete.length) {
+                    await new Promise(res => setTimeout(res, 500));
                 }
             }
         }
         
-        // CONFLICT RESOLUTION: If an employee has a Day Swap exception on a Ramadan day,
-        // prioritize the Swapped timing over the Ramadan timing (do not create a Ramadan shift)
-        const allExceptions = await base44.asServiceRole.entities.Exception.filter({ project_id: projectId });
+        // Pre-process exceptions in memory to minimize calculations inside the 1,000-shift loop
         const daySwapExceptions = allExceptions.filter(e => 
             e.type === 'DAY_SWAP' && 
             e.approval_status === 'approved' &&
             e.use_in_analysis !== false
-        );
+        ).map(ex => ({
+            fromTime: new Date(ex.date_from).getTime(),
+            toTime: new Date(ex.date_to).getTime(),
+            attendanceId: String(ex.attendance_id)
+        }));
 
         // ================================================================
         // Helper: Check if a time value is actually filled (non-empty, non-dash)
@@ -151,13 +164,11 @@ Deno.serve(async (req) => {
                 const saturdaysPassed = Math.floor((daysSinceStart + (7 - rStart.getDay() + 6) % 7) / 7);
                 const currentWeekIndex = saturdaysPassed % 2; // 0 = week1, 1 = week2
 
-                // Check for Day Swap exception override
+                // Check for Day Swap exception using pre-processed memory lookup
+                const currentMillis = currentDate.getTime();
                 const hasDaySwap = daySwapExceptions.some(ex => {
-                    const exFrom = new Date(ex.date_from);
-                    const exTo = new Date(ex.date_to);
-                    // Match employee ID and explicitly check date applicability
-                    const matchesEmployee = String(ex.attendance_id) === 'ALL' || String(ex.attendance_id) === attendanceId;
-                    return matchesEmployee && currentDate >= exFrom && currentDate <= exTo;
+                    const matchesEmployee = ex.attendanceId === 'ALL' || ex.attendanceId === attendanceId;
+                    return matchesEmployee && currentMillis >= ex.fromTime && currentMillis <= ex.toTime;
                 });
 
                 if (hasDaySwap) {
@@ -188,10 +199,6 @@ Deno.serve(async (req) => {
                 //   - If only night_start + night_end have values (2 times) → SINGLE SHIFT  
                 //   - If all 4 fields have values → COMBINED SHIFT (two shifts)
                 //   - The UI 'active_shifts' is ignored; TIME FIELDS are the sole source of truth
-                //
-                // For Al Maraghi Automotive (non-Friday):
-                //   S1/S2 are stored in day_start/day_end only. Night fields are always empty.
-                //   So it's ALWAYS a single shift for non-Friday.
                 // ================================================================
                 
                 const hasDayTimes = isTimeFilled(weekShifts.day_start) && isTimeFilled(weekShifts.day_end);
@@ -202,11 +209,8 @@ Deno.serve(async (req) => {
                 const hasDayShift = hasDayTimes && !hasBothShifts;
                 const hasNightShift = hasNightTimes && !hasBothShifts;
 
-                console.log(`[applyRamadanShifts] Employee ${attendanceId}, Date ${dateStr}: dayTimes=${hasDayTimes}(${weekShifts.day_start}|${weekShifts.day_end}), nightTimes=${hasNightTimes}(${weekShifts.night_start}|${weekShifts.night_end}), hasBoth=${hasBothShifts}`);
-
                 if (hasBothShifts) {
                     // FOUR time fields filled → Combined shift (is_single_shift=false)
-                    // am_start=day_start, am_end=day_end, pm_start=night_start, pm_end=night_end
                     const label = isFriday ? 'Ramadan Friday Combined Shift' : 'Ramadan Combined Shift';
                     shiftsToCreate.push({
                         project_id: projectId, attendance_id: attendanceId, date: dateStr,
@@ -234,34 +238,53 @@ Deno.serve(async (req) => {
                         am_start: weekShifts.night_start, am_end: '—', pm_start: '—', pm_end: weekShifts.night_end
                     });
                 }
-                // If no times are filled at all, skip this day for this employee
             }
         }
 
-        // Bulk create with rate limit protection
-        // SAFETY RULE: Smaller batch size with longer delays to prevent rate limiting
+        // ================================================================
+        // 3. PARALLEL EXECUTION LOGIC (Write Phase)
+        // Group the workload into batches of 10. Execute 5 of these batches
+        // (50 records total) simultaneously using parallel promises.
+        // This high-performance strategy ensures up to 1,000 shifts are 
+        // processed efficiently while maintaining API rate limit safety.
+        // ================================================================
         let createdCount = 0;
-        const batchSize = 10;
-        for (let i = 0; i < shiftsToCreate.length; i += batchSize) {
-            const batch = shiftsToCreate.slice(i, i + batchSize);
-            let retries = 3;
-            while (retries > 0) {
-                try {
-                    await base44.asServiceRole.entities.ShiftTiming.bulkCreate(batch);
-                    createdCount += batch.length;
-                    break;
-                } catch (err) {
-                    retries--;
-                    if (retries === 0) throw err;
-                    // Exponential backoff: 2s, 4s, 8s
-                    const delay = 2000 * Math.pow(2, 3 - retries);
-                    console.warn(`[applyRamadanShifts] Batch failed, retrying in ${delay/1000}s...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
+        const BATCH_SIZE = 10;
+        const WAVE_SIZE = 50; // 5 batches of 10
+
+        for (let i = 0; i < shiftsToCreate.length; i += WAVE_SIZE) {
+            const wave = shiftsToCreate.slice(i, i + WAVE_SIZE);
+            const waveBatches = [];
+            for (let j = 0; j < wave.length; j += BATCH_SIZE) {
+                waveBatches.push(wave.slice(j, j + BATCH_SIZE));
             }
-            console.log(`[applyRamadanShifts] Created ${createdCount}/${shiftsToCreate.length}`);
-            if (i + batchSize < shiftsToCreate.length) {
-                await new Promise(resolve => setTimeout(resolve, 600));
+
+            // Execute 5 batches (50 records total) simultaneously using parallel promises
+            await Promise.all(waveBatches.map(async (batch) => {
+                let retries = 3;
+                while (retries > 0) {
+                    try {
+                        await base44.asServiceRole.entities.ShiftTiming.bulkCreate(batch);
+                        createdCount += batch.length;
+                        break;
+                    } catch (err) {
+                        retries--;
+                        if (retries === 0) {
+                            console.error(`[applyRamadanShifts] Final batch failure after retries:`, err);
+                            throw err;
+                        }
+                        // Exponential backoff: 1s, 2s, 4s
+                        const delay = 1000 * Math.pow(2, 3 - retries);
+                        await new Promise(res => setTimeout(res, delay));
+                    }
+                }
+            }));
+
+            console.log(`[applyRamadanShifts] Created ${createdCount}/${shiftsToCreate.length} shifts...`);
+
+            // Throttling: Mandatory 500ms delay after each 50-record wave
+            if (i + WAVE_SIZE < shiftsToCreate.length) {
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
 
