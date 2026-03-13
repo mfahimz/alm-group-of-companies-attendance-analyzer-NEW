@@ -137,7 +137,7 @@ export default function ResumeScanForm({ onScanComplete }) {
             criteria: criteriaArg
         });
         if (!response.data?.success) throw new Error(response.data?.error || 'Scan failed');
-        return response.data.result;
+        return { ...response.data.result, id: response.data.scanId };
     };
 
     const handleScan = async () => {

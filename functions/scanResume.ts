@@ -228,7 +228,9 @@ Deno.serve(async (req) => {
                 },
                 certifications: { type: "array", items: { type: "string" } },
                 languages: { type: "array", items: { type: "string" } },
-                nationality: { type: "string", description: "The candidate's nationality, e.g., Syrian, Egyptian, Indian, etc. If not explicitly found, return null or an empty string." }
+                nationality: { type: "string", description: "The candidate's nationality, e.g., Syrian, Egyptian, Indian, etc. If not explicitly found, return null or an empty string." },
+                current_location: { type: "string", description: "The candidate's current city and country of residence." },
+                gender: { type: "string", description: "The candidate's gender (Male/Female). If not explicitly found, return null or an empty string." }
             }
         };
 
@@ -347,6 +349,10 @@ Output a JSON with these exact fields:
             years_experience: best.aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
             scanned_by: user.email,
             status: 'completed',
+            evaluation_status: 'Pending', // Default status for manual evaluation
+            nationality: extractedData?.nationality || 'Not Specified',
+            location: extractedData?.current_location || 'Not Specified',
+            gender: extractedData?.gender || 'Not Specified',
             evaluated_template_name: best.criteria.position_name || ''
         });
 

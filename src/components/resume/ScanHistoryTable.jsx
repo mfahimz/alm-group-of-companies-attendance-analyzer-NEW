@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Loader2, X, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Loader2, X, Trash2, CheckSquare, Square, Filter, UserCheck, UserX, Globe, MapPin, Briefcase, Users } from 'lucide-react';
 import ResumeScanResultView from './ResumeScanResult';
+import { Button } from '@/components/ui/button';
 
 const RECOMMENDATION_COLORS = {
     'Highly Recommended': 'bg-green-100 text-green-800',
@@ -75,12 +76,32 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [confirmDelete, setConfirmDelete] = useState(null); // 'single' | 'bulk'
     const [deletingId, setDeletingId] = useState(null);
+    const [filters, setFilters] = useState({
+        nationality: '',
+        location: '',
+        minExperience: '',
+        gender: ''
+    });
     const queryClient = useQueryClient();
 
     const { data: scans, isLoading } = useQuery({
         queryKey: ['resumeScans', refreshKey],
         queryFn: () => base44.entities.ResumeScanResult.list('-created_date', 100),
         staleTime: 0
+    });
+
+    const updateStatusMutation = useMutation({
+        /**
+         * Persists the manual evaluation status (Selected/Rejected) to the database.
+         * This ensures the choice remains persistent across sessions.
+         */
+        mutationFn: async ({ id, status }) => {
+            await base44.entities.ResumeScanResult.update(id, { evaluation_status: status });
+        },
+        onSuccess: () => {
+            // Re-fetch scan history to sync the UI with the latest database state
+            queryClient.invalidateQueries({ queryKey: ['resumeScans'] });
+        }
     });
 
     const deleteMutation = useMutation({
@@ -146,9 +167,109 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
         ? scans.find(s => s.id === deletingId)?.applicant_name || 'this record'
         : `${selectedIds.size} selected records`;
 
+    // Advanced filtering logic
+    const filteredScans = (scans || []).filter(scan => {
+        const nationality = (scan.nationality || '').toLowerCase();
+        const location = (scan.location || '').toLowerCase();
+        const gender = (scan.gender || '').toLowerCase();
+        const experience = scan.years_experience || 0;
+
+        // Nationality filter
+        if (filters.nationality && !nationality.includes(filters.nationality.toLowerCase())) return false;
+        
+        // Location filter
+        if (filters.location && !location.includes(filters.location.toLowerCase())) return false;
+        
+        // Gender filter
+        if (filters.gender && filters.gender !== 'All' && gender !== filters.gender.toLowerCase()) return false;
+        
+        // Years of Experience filter (minimum)
+        if (filters.minExperience && experience < parseInt(filters.minExperience)) return false;
+
+        return true;
+    });
+
+    /**
+     * Unique values for dropdowns are derived from the current dataset
+     * to ensure the filter options are always relevant.
+     */
+    const uniqueNationalities = Array.from(new Set(scans.map(s => s.nationality).filter(Boolean))).sort();
+
     return (
-        <>
+        <div className="flex flex-col h-full">
             {selectedScan && <ScanDetailDialog scan={selectedScan} onClose={() => setSelectedScan(null)} />}
+
+            {/* Filter Bar */}
+            <div className="bg-[#F9FAFB] border-b border-[#E2E6EC] px-6 py-4 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2 text-[#4B5563]">
+                    <Filter className="w-4 h-4" />
+                    <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
+                </div>
+
+                <div className="flex flex-wrap gap-3 flex-1">
+                    {/* Nationality Filter */}
+                    <div className="relative min-w-[140px]">
+                        <Globe className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <select
+                            value={filters.nationality}
+                            onChange={(e) => setFilters(f => ({ ...f, nationality: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36] appearance-none"
+                        >
+                            <option value="">Nationality (All)</option>
+                            {uniqueNationalities.map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Location Filter */}
+                    <div className="relative min-w-[140px]">
+                        <MapPin className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <input
+                            type="text"
+                            placeholder="Current Location..."
+                            value={filters.location}
+                            onChange={(e) => setFilters(f => ({ ...f, location: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36]"
+                        />
+                    </div>
+
+                    {/* Experience Filter */}
+                    <div className="relative min-w-[120px]">
+                        <Briefcase className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <input
+                            type="number"
+                            placeholder="Min Exp Yrs"
+                            value={filters.minExperience}
+                            onChange={(e) => setFilters(f => ({ ...f, minExperience: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36]"
+                        />
+                    </div>
+
+                    {/* Gender Filter */}
+                    <div className="relative min-w-[110px]">
+                        <Users className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <select
+                            value={filters.gender}
+                            onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36] appearance-none"
+                        >
+                            <option value="All">Gender (All)</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={() => setFilters({ nationality: '', location: '', minExperience: '', gender: 'All' })}
+                        className="text-xs text-[#6B7280] hover:text-[#1F2937] px-2 transition-colors"
+                    >
+                        Reset
+                    </button>
+                </div>
+
+                <div className="text-[10px] text-[#9CA3AF] font-medium">
+                    Showing {filteredScans.length} of {scans.length} candidates
+                </div>
+            </div>
 
             {/* Confirm Delete Dialog */}
             {confirmDelete && (
@@ -209,18 +330,18 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                                 </th>
                             )}
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Applicant</th>
+                            <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Nationality & Loc</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Position</th>
-                            <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Dept</th>
                             <th className="text-center px-4 py-3 font-semibold text-[#4B5563] text-xs">Score</th>
-                            <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Matched Position</th>
+                            <th className="text-center px-4 py-3 font-semibold text-[#4B5563] text-xs">Exp</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Recommendation</th>
-                            <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Scanned By</th>
+                            <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs whitespace-nowrap">Manual Evaluation</th>
                             <th className="text-left px-4 py-3 font-semibold text-[#4B5563] text-xs">Date</th>
                             {isAdmin && <th className="px-3 py-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody>
-                        {scans.map((scan, idx) => (
+                        {filteredScans.map((scan, idx) => (
                             <tr
                                 key={scan.id}
                                 onClick={() => setSelectedScan(scan)}
@@ -237,18 +358,55 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                                     <p className="font-medium text-[#1F2937]">{scan.applicant_name || '—'}</p>
                                     {scan.applicant_email && <p className="text-xs text-[#9CA3AF]">{scan.applicant_email}</p>}
                                 </td>
-                                <td className="px-4 py-3 text-[#4B5563]">{scan.position_applied || '—'}</td>
-                                <td className="px-4 py-3 text-[#4B5563]">{scan.department || '—'}</td>
+                                <td className="px-4 py-3">
+                                    <div className="flex flex-col gap-0.5">
+                                        <div className="flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 w-fit">
+                                            <Globe className="w-2.5 h-2.5" />
+                                            {scan.nationality || 'Not specified'}
+                                        </div>
+                                        <div className="flex items-center gap-1 text-[10px] text-[#6B7280]">
+                                            <MapPin className="w-2.5 h-2.5" />
+                                            <span className="truncate max-w-[100px]">{scan.location || 'Unknown'}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3 text-[#4B5563] font-medium">{scan.position_applied || '—'}</td>
                                 <td className="px-4 py-3 text-center">
                                     <span className={SCORE_COLOR(scan.ai_score)}>{scan.ai_score ?? '—'}</span>
                                 </td>
-                                {/* evaluated_template_name holds the highest-scoring position template
-                                    determined after multi-template evaluation. Empty for single-template scans. */}
-                                <td className="px-4 py-3 text-xs text-[#4B5563]">{scan.evaluated_template_name || '—'}</td>
+                                <td className="px-4 py-3 text-center text-[#4B5563]">
+                                    {scan.years_experience ?? '—'}y
+                                </td>
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RECOMMENDATION_COLORS[scan.ai_recommendation] || 'bg-gray-100 text-gray-700'}`}>
                                         {scan.ai_recommendation || '—'}
                                     </span>
+                                </td>
+                                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            onClick={() => updateStatusMutation.mutate({ id: scan.id, status: 'Selected' })}
+                                            className={`p-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-tight border ${
+                                                scan.evaluation_status === 'Selected'
+                                                    ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                                                    : 'bg-white border-[#E2E6EC] text-[#6B7280] hover:border-green-500 hover:text-green-600'
+                                            }`}
+                                        >
+                                            <UserCheck className="w-3.5 h-3.5" />
+                                            {scan.evaluation_status === 'Selected' ? 'Selected' : 'Select'}
+                                        </button>
+                                        <button
+                                            onClick={() => updateStatusMutation.mutate({ id: scan.id, status: 'Rejected' })}
+                                            className={`p-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-tight border ${
+                                                scan.evaluation_status === 'Rejected'
+                                                    ? 'bg-red-600 border-red-600 text-white shadow-sm'
+                                                    : 'bg-white border-[#E2E6EC] text-[#6B7280] hover:border-red-500 hover:text-red-600'
+                                            }`}
+                                        >
+                                            <UserX className="w-3.5 h-3.5" />
+                                            {scan.evaluation_status === 'Rejected' ? 'Rejected' : 'Reject'}
+                                        </button>
+                                    </div>
                                 </td>
                                 <td className="px-4 py-3 text-xs text-[#6B7280]">{scan.scanned_by?.split('@')[0] || '—'}</td>
                                 <td className="px-4 py-3 text-xs text-[#6B7280]">
@@ -266,6 +424,6 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                     </tbody>
                 </table>
             </div>
-        </>
+        </div>
     );
 }
