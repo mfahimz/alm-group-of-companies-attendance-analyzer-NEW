@@ -361,12 +361,11 @@ export default function DailyBreakdownDialog({
             // This is a display-only breakdown — edit actions are already gated by project.status !== 'closed'.
             // For closed/finalized projects, we still compute per-day late/early from punches so that
             // department heads and admins can see *which day* the minutes came from, not just the stored total.
-            const shouldSkipPunchCalc = shouldSkipTimeCalc || hasExceptionMinutes;
+            let dayLateMinutes = 0;
+            let dayEarlyMinutes = 0;
 
-            if (shift && punchMatches.length > 0 && !shouldSkipPunchCalc) {
-                let dayLateMinutes = 0;
-                let dayEarlyMinutes = 0;
-
+            // 1. Calculation phase: Compute from punches if valid shift exists
+            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
                 for (const match of punchMatches) {
                     if (!match.matchedTo) continue;
                     const punchTime = match.punch.time;
@@ -376,9 +375,6 @@ export default function DailyBreakdownDialog({
                         if (punchTime > shiftTime) {
                             const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                             dayLateMinutes += minutes;
-                            const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
-                            if (lateInfo) lateInfo += ' | ';
-                            lateInfo += `${label}: ${minutes} min late`;
                         }
                     }
 
@@ -386,28 +382,50 @@ export default function DailyBreakdownDialog({
                         if (punchTime < shiftTime) {
                             const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                             dayEarlyMinutes += minutes;
-                            if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
-                                earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
-                            } else {
-                                earlyCheckoutInfo = `${minutes} min`;
-                            }
                         }
                     }
                 }
+            }
 
-                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
-                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                    const lateRatio = totalDayMinutes > 0 ? dayLateMinutes / totalDayMinutes : 0;
-                    const earlyRatio = totalDayMinutes > 0 ? dayEarlyMinutes / totalDayMinutes : 0;
-                    const adjustedLate = Math.round(remaining * lateRatio);
-                    const adjustedEarly = Math.round(remaining * earlyRatio);
-                    lateMinutesTotal = adjustedLate;
-                    lateInfo = adjustedLate > 0 ? `${adjustedLate} min (after ${allowedMinutesForDay} allowed)` : '-';
-                    earlyCheckoutInfo = adjustedEarly > 0 ? `${adjustedEarly} min (after ${allowedMinutesForDay} allowed)` : '-';
-                } else {
-                    lateMinutesTotal = dayLateMinutes;
+            // 2. Override phase: Specific manual adjustments (if present and > 0)
+            let isLateOverridden = false;
+            let isEarlyOverridden = false;
+            
+            if (dateException && !shouldSkipTimeCalc) {
+                if (exceptionLateMinutes > 0) {
+                    dayLateMinutes = exceptionLateMinutes;
+                    isLateOverridden = true;
                 }
+                if (exceptionEarlyMinutes > 0) {
+                    dayEarlyMinutes = exceptionEarlyMinutes;
+                    isEarlyOverridden = true;
+                }
+            }
+
+            // 3. Deduction Reduction phase: Apply allowed minutes
+            const rawDayMinutes = dayLateMinutes + dayEarlyMinutes;
+            if (allowedMinutesForDay > 0 && rawDayMinutes > 0) {
+                const remaining = Math.max(0, rawDayMinutes - allowedMinutesForDay);
+                const lateRatio = dayLateMinutes / rawDayMinutes;
+                const earlyRatio = dayEarlyMinutes / rawDayMinutes;
+                dayLateMinutes = Math.round(remaining * lateRatio);
+                dayEarlyMinutes = Math.round(remaining * earlyRatio);
+            }
+
+            // 4. Formatting phase: Build info strings for UI display
+            lateMinutesTotal = dayLateMinutes;
+            if (dayLateMinutes > 0) {
+                const source = isLateOverridden ? '(from exception)' : (allowedMinutesForDay > 0 ? `(after ${allowedMinutesForDay} allowed)` : '');
+                lateInfo = `${dayLateMinutes} min ${source}`.trim();
+            } else {
+                lateInfo = '-';
+            }
+
+            if (dayEarlyMinutes > 0) {
+                const source = isEarlyOverridden ? '(from exception)' : (allowedMinutesForDay > 0 ? `(after ${allowedMinutesForDay} allowed)` : '');
+                earlyCheckoutInfo = `${dayEarlyMinutes} min ${source}`.trim();
+            } else {
+                earlyCheckoutInfo = '-';
             }
 
             // Determine status
@@ -448,32 +466,36 @@ export default function DailyBreakdownDialog({
                         punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
                         hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                         lateInfo = ''; lateMinutesTotal = 0; earlyCheckoutInfo = '';
-                        if (!shouldSkipPunchCalc) {
-                            for (const match of punchMatches) {
-                                if (!match.matchedTo) continue;
-                                const punchTime = match.punch.time;
-                                const shiftTime = match.shiftTime;
-                                if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                                    if (punchTime > shiftTime) {
-                                        const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
-                                        lateMinutesTotal += minutes;
-                                        const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
-                                        if (lateInfo) lateInfo += ' | ';
-                                        lateInfo += `${label}: ${minutes} min late`;
-                                    }
+                        
+                        let overLate = 0;
+                        let overEarly = 0;
+
+                        for (const match of punchMatches) {
+                            if (!match.matchedTo) continue;
+                            const punchTime = match.punch.time;
+                            const shiftTime = match.shiftTime;
+                            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                                if (punchTime > shiftTime) {
+                                    const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                                    overLate += minutes;
+                                    const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
+                                    if (lateInfo) lateInfo += ' | ';
+                                    lateInfo += `${label}: ${minutes} min late`;
                                 }
-                                if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                                    if (punchTime < shiftTime) {
-                                        const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
-                                        if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
-                                            earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
-                                        } else {
-                                            earlyCheckoutInfo = `${minutes} min`;
-                                        }
+                            }
+                            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                                if (punchTime < shiftTime) {
+                                    const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                                    overEarly += minutes;
+                                    if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
+                                        earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
+                                    } else {
+                                        earlyCheckoutInfo = `${minutes} min`;
                                     }
                                 }
                             }
                         }
+                        lateMinutesTotal = overLate;
                     }
                 }
                 if (dayOverride.type === 'MANUAL_PRESENT') status = 'Present (Edited)';

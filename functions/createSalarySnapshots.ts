@@ -832,18 +832,13 @@ Deno.serve(async (req) => {
                     presentDays++;
                 }
 
-                // Calculate time issues
-                if (hasManualTimeException && !shouldSkipTimeCalc) {
-                    if (dateException.late_minutes > 0) lateMinutes += dateException.late_minutes;
-                    if (dateException.early_checkout_minutes > 0) earlyCheckoutMinutes += dateException.early_checkout_minutes;
-                    if (dateException.other_minutes > 0) otherMinutes += dateException.other_minutes;
-                } else if (shift && dayPunches.length > 0 && !shouldSkipTimeCalc) {
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+
+                // 1. Calculation phase: Compute from punches if valid shift exists
+                if (shift && dayPunches.length > 0 && !shouldSkipTimeCalc) {
                     const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
 
-                    let dayLateMinutes = 0;
-                    let dayEarlyMinutes = 0;
-
-                    // BUG FIX #2: Use Math.abs on RESULT of time difference, not individual components
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         const punchTime = match.punch.time;
@@ -856,25 +851,33 @@ Deno.serve(async (req) => {
                             dayEarlyMinutes += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
                         }
                     }
-
-                    // Apply allowed minutes offset
-                    if (allowedMinutesForDay > 0) {
-                        const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                        const excessMinutes = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                        if (totalDayMinutes > 0 && excessMinutes > 0) {
-                            const lateRatio = dayLateMinutes / totalDayMinutes;
-                            const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                            dayLateMinutes = Math.round(excessMinutes * lateRatio);
-                            dayEarlyMinutes = Math.round(excessMinutes * earlyRatio);
-                        } else {
-                            dayLateMinutes = 0;
-                            dayEarlyMinutes = 0;
-                        }
-                    }
-
-                    lateMinutes += dayLateMinutes;
-                    earlyCheckoutMinutes += dayEarlyMinutes;
                 }
+
+                // 2. Override phase: Specific manual adjustments (if provided)
+                if (dateException && !shouldSkipTimeCalc) {
+                    if (dateException.late_minutes > 0) {
+                        dayLateMinutes = dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes > 0) {
+                        dayEarlyMinutes = dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes > 0) {
+                        otherMinutes += dateException.other_minutes;
+                    }
+                }
+
+                // 3. Deduction Reduction phase: Apply allowed minutes
+                const rawTotalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                if (allowedMinutesForDay > 0 && rawTotalDayMinutes > 0) {
+                    const remaining = Math.max(0, rawTotalDayMinutes - allowedMinutesForDay);
+                    const lateRatio = dayLateMinutes / rawTotalDayMinutes;
+                    const earlyRatio = dayEarlyMinutes / rawTotalDayMinutes;
+                    dayLateMinutes = Math.round(remaining * lateRatio);
+                    dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                }
+
+                lateMinutes += dayLateMinutes;
+                earlyCheckoutMinutes += dayEarlyMinutes;
             }
 
             // Get grace minutes

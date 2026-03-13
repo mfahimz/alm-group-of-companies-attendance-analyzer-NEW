@@ -1267,23 +1267,12 @@ Deno.serve(async (req: Request) => {
                     'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
                 ].includes(dateException.type);
 
-                if (hasManualTimeException) {
-                    if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        lateMinutes += Math.abs(dateException.late_minutes);
-                    }
-                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        earlyCheckoutMinutes += Math.abs(dateException.early_checkout_minutes);
-                    }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        otherMinutes += Math.abs(dateException.other_minutes);
-                        // Track that these other minutes came FROM an existing exception
-                        // so we do NOT re-create them at the end of analysis
-                        otherMinutesFromExceptions[dateStr] = Math.abs(dateException.other_minutes);
-                    }
-                } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !hasSkipPunchApplied) {
-                    let dayLateMinutes = 0;
-                    let dayEarlyMinutes = 0;
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+                let dayOtherMinutes = 0;
 
+                // 1. Calculation phase: Calculate from punches if valid shift/punches exist
+                if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !hasSkipPunchApplied) {
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
 
@@ -1304,25 +1293,48 @@ Deno.serve(async (req: Request) => {
                             }
                         }
                     }
+                }
 
-                    // FIX: Apply approved minutes PER-DAY before accumulating.
-                    // Reduce this day's late+early by the approved amount (floor at 0 each).
-                    // This means lateMinutes/earlyCheckoutMinutes in AnalysisResult are ALREADY
-                    // net of approved minutes. totalApprovedMinutes tracks the sum for display.
-                    if (approvedMinutesForDay > 0) {
-                        const dayTotal = dayLateMinutes + dayEarlyMinutes;
+                // 2. Override phase: If manual adjustment exists, it takes precedence for that SPECIFIC field.
+                // This ensures that a manual "Late" override doesn't wipe out punch-based "Early Checkout" minutes.
+                if (dateException && !shouldSkipTimeCalculation) {
+                    // Specific manual overrides
+                    if (dateException.late_minutes !== undefined && dateException.late_minutes > 0) {
+                        dayLateMinutes = Math.abs(dateException.late_minutes);
+                    }
+                    if (dateException.early_checkout_minutes !== undefined && dateException.early_checkout_minutes > 0) {
+                        dayEarlyMinutes = Math.abs(dateException.early_checkout_minutes);
+                    }
+                    if (dateException.other_minutes !== undefined && dateException.other_minutes > 0) {
+                        dayOtherMinutes = Math.abs(dateException.other_minutes);
+                        // Track that these other minutes came FROM an existing exception
+                        otherMinutesFromExceptions[dateStr] = dayOtherMinutes;
+                    }
+
+                    // MANUAL types (e.g. MANUAL_LATE) often indicate the day is present even if no punches
+                    if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && filteredPunches.length === 0) {
+                        // Handled above in presentDays increment block, but here we ensure minutes are counted
+                    }
+                }
+
+                // 3. Deduction Reduction phase: Apply approved/allowed minutes (Al Maraghi Motors)
+                if (approvedMinutesForDay > 0) {
+                    const dayTotal = dayLateMinutes + dayEarlyMinutes;
+                    if (dayTotal > 0) {
                         const reduction = Math.min(approvedMinutesForDay, dayTotal);
-                        const lateRatio = dayTotal > 0 ? dayLateMinutes / dayTotal : 0;
-                        const earlyRatio = dayTotal > 0 ? dayEarlyMinutes / dayTotal : 0;
+                        const lateRatio = dayLateMinutes / dayTotal;
+                        const earlyRatio = dayEarlyMinutes / dayTotal;
                         dayLateMinutes = Math.max(0, dayLateMinutes - Math.round(reduction * lateRatio));
                         dayEarlyMinutes = Math.max(0, dayEarlyMinutes - Math.round(reduction * earlyRatio));
                         totalApprovedMinutes += reduction; // track actual reduction for display
                         console.log(`[runAnalysis] ALLOWED_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: approved=${approvedMinutesForDay}, reduced by ${reduction} (late: ${dayLateMinutes}, early: ${dayEarlyMinutes})`);
                     }
-
-                    lateMinutes += dayLateMinutes;
-                    earlyCheckoutMinutes += dayEarlyMinutes;
                 }
+
+                // 4. Accumulation phase: Add to the final employee totals
+                lateMinutes += dayLateMinutes;
+                earlyCheckoutMinutes += dayEarlyMinutes;
+                otherMinutes += dayOtherMinutes;
 
                 const expectedPunches = isSingleShift ? 2 : 4;
 

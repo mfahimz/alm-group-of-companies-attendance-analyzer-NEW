@@ -916,38 +916,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
-            // Check if exception has manual time values - if so, skip punch calculation for this day
-            const hasManualExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
+            let dayLateMinutes = 0;
+            let dayEarlyMinutes = 0;
 
-            // Apply manual time adjustments from exception fields (exclusive - don't recalculate from punches)
-            if (hasManualExceptionMinutes) {
-                if (dateException.type !== 'OFF' &&
-                    dateException.type !== 'PUBLIC_HOLIDAY' &&
-                    dateException.type !== 'MANUAL_ABSENT' &&
-                    dateException.type !== 'SICK_LEAVE') {
-                    // Manual late/early exceptions should mark day as present
-                    if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && dayPunches.length === 0) {
-                        presentDays++;
-                    }
-
-                    // Apply ALL manual time fields from exception (already stored in variables)
-                    if (exceptionLateMinutes > 0) {
-                        totalLateMinutes += Math.abs(exceptionLateMinutes);
-                    }
-                    if (exceptionEarlyMinutes > 0) {
-                        totalEarlyCheckout += Math.abs(exceptionEarlyMinutes);
-                    }
-                    if (currentOtherMinutes > 0) {
-                        totalOtherMinutes += Math.abs(currentOtherMinutes);
-                    }
-                }
-            }
-
-            // Calculate times from punches ONLY if no manual exception minutes exist
-            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc && !hasManualExceptionMinutes) {
-                let dayLateMinutes = 0;
-                let dayEarlyMinutes = 0;
-
+            // 1. Calculation phase: Calculate from punches if valid shift/punches exist
+            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc) {
                 for (const match of punchMatchesTotals) {
                     if (!match.matchedTo) continue;
 
@@ -968,23 +941,39 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         }
                     }
                 }
+            }
 
-                // Apply allowed minutes - subtract from late/early
-                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
-                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                    // Proportionally reduce late and early
-                    if (totalDayMinutes > 0) {
-                        const lateRatio = dayLateMinutes / totalDayMinutes;
-                        const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                        dayLateMinutes = Math.round(remaining * lateRatio);
-                        dayEarlyMinutes = Math.round(remaining * earlyRatio);
-                    }
+            // 2. Override phase: If manual adjustment exists, it takes precedence for that SPECIFIC field.
+            // This ensures that a manual "Late" override doesn't wipe out punch-based "Early Checkout" minutes.
+            if (dateException && !shouldSkipTimeCalc) {
+                // If it's a manual type and we have no punches, mark as present (if not already handled)
+                if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && dayPunches.length === 0 && !dayOverride) {
+                    // pre-incremented presentDays logic exists above
                 }
 
-                totalLateMinutes += dayLateMinutes;
-                totalEarlyCheckout += dayEarlyMinutes;
+                if (exceptionLateMinutes > 0) {
+                    dayLateMinutes = Math.abs(exceptionLateMinutes);
+                }
+                if (exceptionEarlyMinutes > 0) {
+                    dayEarlyMinutes = Math.abs(exceptionEarlyMinutes);
+                }
+                if (currentOtherMinutes > 0) {
+                    totalOtherMinutes += Math.abs(currentOtherMinutes);
+                }
             }
+
+            // 3. Deduction Reduction phase: Apply allowed minutes
+            const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+            if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
+                const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
+                const lateRatio = dayLateMinutes / totalDayMinutes;
+                const earlyRatio = dayEarlyMinutes / totalDayMinutes;
+                dayLateMinutes = Math.round(remaining * lateRatio);
+                dayEarlyMinutes = Math.round(remaining * earlyRatio);
+            }
+
+            totalLateMinutes += dayLateMinutes;
+            totalEarlyCheckout += dayEarlyMinutes;
         }
 
         return {
