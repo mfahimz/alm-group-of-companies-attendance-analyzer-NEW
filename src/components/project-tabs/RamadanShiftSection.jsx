@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true })
     });
 
-    const selectedOrOverlappingSchedule = React.useMemo(() => {
+    const selectedOrOverlappingSchedule = useMemo(() => {
         if (ramadanSchedules.length === 0) return null;
         if (selectedRamadanSchedule?.id) {
             const selected = ramadanSchedules.find(s => s.id === selectedRamadanSchedule.id);
@@ -41,7 +41,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         return overlapping || ramadanSchedules[0];
     }, [ramadanSchedules, selectedRamadanSchedule?.id, project.date_from, project.date_to]);
 
-    const ramadanOverlap = React.useMemo(() => {
+    const ramadanOverlap = useMemo(() => {
         if (!selectedOrOverlappingSchedule) return null;
         const projectStart = new Date(project.date_from);
         const projectEnd = new Date(project.date_to);
@@ -57,7 +57,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         };
     }, [selectedOrOverlappingSchedule, project.date_from, project.date_to]);
 
-    const ramadanShiftCount = React.useMemo(() => {
+    const ramadanShiftCount = useMemo(() => {
         if (!ramadanOverlap) return 0;
         return shifts.filter(s =>
             s.applicable_days?.includes('Ramadan') &&
@@ -68,14 +68,14 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
 
     const ramadanShiftsApplied = ramadanShiftCount > 0;
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (ramadanSchedules.length === 0) { setSelectedRamadanSchedule(null); return; }
         if (!selectedRamadanSchedule || !ramadanSchedules.some(s => s.id === selectedRamadanSchedule.id)) {
             setSelectedRamadanSchedule(selectedOrOverlappingSchedule || ramadanSchedules[0]);
         }
     }, [ramadanSchedules, selectedRamadanSchedule, selectedOrOverlappingSchedule]);
 
-    const parsedRamadanShifts = React.useMemo(() => {
+    const parsedRamadanShifts = useMemo(() => {
         if (!ramadanOverlap?.schedule) return { week1: {}, week2: {} };
         try {
             return {
