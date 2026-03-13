@@ -168,7 +168,8 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Invalid file type. Only PDF and DOCX resumes are accepted.' }, { status: 400 });
         }
 
-        if (!criteria || !criteria.position_name) {
+        const criteriaList = Array.isArray(criteria) ? criteria : [criteria];
+        if (criteriaList.length === 0 || !criteriaList[0]?.position_name) {
             return Response.json({ error: 'Position criteria is required' }, { status: 400 });
         }
 
@@ -181,11 +182,12 @@ Deno.serve(async (req) => {
         const mimeType = fileType || 'application/octet-stream';
         const fileObj = new File([bytes], fileName, { type: mimeType });
 
-        // Step 1: Upload file
+        // Step 1: Upload file (once per resume)
         const uploadResult = await base44.integrations.Core.UploadFile({ file: fileObj });
         const fileUrl = uploadResult.file_url;
 
-        // Step 2: Extract structured data from resume
+        // Step 2: Extract structured data from resume (once per resume)
+        // We use the first criteria's position name for context in extraction
         const extractionSchema = {
             type: "object",
             properties: {
@@ -195,7 +197,7 @@ Deno.serve(async (req) => {
                 total_years_experience: { type: "number", description: "Total years across all jobs" },
                 relevant_years_experience: {
                     type: "number",
-                    description: `Years of experience in roles directly similar to "${criteria.position_name}" in the ${criteria.department || 'relevant'} field. Count only roles where the job title, responsibilities, or industry closely match this position. Do NOT count unrelated roles.`
+                    description: `Years of experience in roles directly similar to "${criteriaList[0].position_name}" in the ${criteriaList[0].department || 'relevant'} field. Count only roles where the job title, responsibilities, or industry closely match this position. Do NOT count unrelated roles.`
                 },
                 current_or_last_position: { type: "string" },
                 current_or_last_company: { type: "string" },
@@ -226,7 +228,6 @@ Deno.serve(async (req) => {
                 },
                 certifications: { type: "array", items: { type: "string" } },
                 languages: { type: "array", items: { type: "string" } },
-                // Business logic: Extract nationality to display prominently at the top of the scan results
                 nationality: { type: "string", description: "The candidate's nationality, e.g., Syrian, Egyptian, Indian, etc. If not explicitly found, return null or an empty string." }
             }
         };
@@ -244,18 +245,22 @@ Deno.serve(async (req) => {
             console.error('Extraction failed:', extractErr.message);
         }
 
-        // Step 3: Code-based comparison
-        const codeComparison = buildCodeComparison(extractedData || {}, criteria);
+        const evaluations = [];
 
-        // Step 4: AI Evaluation
-        const criteriaText = buildCriteriaText(criteria);
-        const resumeDataStr = extractedData
-            ? JSON.stringify(extractedData, null, 2)
-            : `File uploaded but could not be parsed. File: ${fileName}`;
+        // Step 3 & 4: Evaluate for each criteria
+        for (const crit of criteriaList) {
+            // Code-based comparison
+            const codeComparison = buildCodeComparison(extractedData || {}, crit);
 
-        const prompt = `You are an expert HR recruiter and ATS evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
+            // AI Evaluation
+            const criteriaText = buildCriteriaText(crit);
+            const resumeDataStr = extractedData
+                ? JSON.stringify(extractedData, null, 2)
+                : `File uploaded but could not be parsed. File: ${fileName}`;
 
-You are evaluating this candidate specifically for the role of: ${criteria.position_name}. All scoring, skill matching, and recommendations must be made relative to the requirements of this position only.
+            const prompt = `You are an expert HR recruiter and ATS evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
+
+You are evaluating this candidate specifically for the role of: ${crit.position_name}. All scoring, skill matching, and recommendations must be made relative to the requirements of this position only.
 
 Evaluate the following resume against the structured screening criteria for this role.
 
@@ -283,78 +288,93 @@ Output a JSON with these exact fields:
 - missing_skills: array of strings - important requirements the candidate lacks
 - strengths: array of 3 specific strings from the resume data
 - concerns: array of strings - specific red flags (empty array if none)
-- experience_years: number - years in roles RELEVANT to "${criteria.position_name}" only, not total career years`;
+- experience_years: number - years in roles RELEVANT to "${crit.position_name}" only, not total career years`;
 
-        const aiResponse = await base44.integrations.Core.InvokeLLM({
-            prompt,
-            response_json_schema: {
-                type: "object",
-                properties: {
-                    score: { type: "number" },
-                    recommendation: { type: "string" },
-                    summary: { type: "string" },
-                    matched_skills: { type: "array", items: { type: "string" } },
-                    missing_skills: { type: "array", items: { type: "string" } },
-                    strengths: { type: "array", items: { type: "string" } },
-                    concerns: { type: "array", items: { type: "string" } },
-                    experience_years: { type: "number" }
+            const aiResponse = await base44.integrations.Core.InvokeLLM({
+                prompt,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        score: { type: "number" },
+                        recommendation: { type: "string" },
+                        summary: { type: "string" },
+                        matched_skills: { type: "array", items: { type: "string" } },
+                        missing_skills: { type: "array", items: { type: "string" } },
+                        strengths: { type: "array", items: { type: "string" } },
+                        concerns: { type: "array", items: { type: "string" } },
+                        experience_years: { type: "number" }
+                    }
                 }
-            }
-        });
+            });
 
-        // Properly distinguish score=0 from missing score
-        const aiScore = aiResponse?.score != null ? aiResponse.score : 0;
+            const aiScore = aiResponse?.score != null ? aiResponse.score : 0;
+            evaluations.push({
+                criteria: crit,
+                criteriaText,
+                codeComparison,
+                aiResponse,
+                aiScore
+            });
 
-        // Step 5: Save result — consistent JSON array storage for all list fields
+            // If we have more criteria, we should ideally sleep here to avoid rate limits
+            // but since this is a backend function, we should be careful with timeout.
+            // For now, we proceed.
+        }
+
+        // Find the best evaluation (highest score)
+        const best = evaluations.reduce((prev, current) => (current.aiScore > prev.aiScore ? current : prev), evaluations[0]);
+
+        // Step 5: Save only the best result to history
         const scanRecord = await base44.entities.ResumeScanResult.create({
             applicant_name: extractedData?.full_name || 'Unknown',
             applicant_email: extractedData?.email || '',
             applicant_phone: extractedData?.phone || '',
-            position_applied: criteria.position_name || '',
-            department: criteria.department || '',
+            position_applied: best.criteria.position_name || '',
+            department: best.criteria.department || '',
             file_url: fileUrl,
             file_name: fileName,
             extracted_data: JSON.stringify(extractedData),
-            code_comparison: JSON.stringify(codeComparison),
-            criteria_used: criteriaText,
-            criteria_data: JSON.stringify(criteria), // structured criteria for audit/re-run
-            ai_score: aiScore,
-            ai_recommendation: aiResponse?.recommendation || 'Consider',
-            ai_summary: aiResponse?.summary || '',
-            matched_skills: JSON.stringify(aiResponse?.matched_skills || []),
-            missing_skills: JSON.stringify(aiResponse?.missing_skills || []),
-            strengths: JSON.stringify(aiResponse?.strengths || []),
-            concerns: JSON.stringify(aiResponse?.concerns || []),
-            years_experience: aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
+            code_comparison: JSON.stringify(best.codeComparison),
+            criteria_used: best.criteriaText,
+            criteria_data: JSON.stringify(best.criteria),
+            ai_score: best.aiScore,
+            ai_recommendation: best.aiResponse?.recommendation || 'Consider',
+            ai_summary: best.aiResponse?.summary || '',
+            matched_skills: JSON.stringify(best.aiResponse?.matched_skills || []),
+            missing_skills: JSON.stringify(best.aiResponse?.missing_skills || []),
+            strengths: JSON.stringify(best.aiResponse?.strengths || []),
+            concerns: JSON.stringify(best.aiResponse?.concerns || []),
+            years_experience: best.aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
             scanned_by: user.email,
             status: 'completed',
-            // evaluated_template_name records which template (position) was used in this
-            // specific scan call. The frontend uses this in multi-template mode to map
-            // each independent scan result back to the template that produced it.
-            evaluated_template_name: criteria.position_name || ''
+            evaluated_template_name: best.criteria.position_name || ''
         });
 
         return Response.json({
             success: true,
             scanId: scanRecord.id,
             result: {
-                score: aiScore,
-                recommendation: aiResponse?.recommendation || 'Consider',
-                summary: aiResponse?.summary || '',
-                matched_skills: aiResponse?.matched_skills || [],
-                missing_skills: aiResponse?.missing_skills || [],
-                strengths: aiResponse?.strengths || [],
-                concerns: aiResponse?.concerns || [],
-                experience_years: aiResponse?.experience_years ?? 0,
+                score: best.aiScore,
+                recommendation: best.aiResponse?.recommendation || 'Consider',
+                summary: best.aiResponse?.summary || '',
+                matched_skills: best.aiResponse?.matched_skills || [],
+                missing_skills: best.aiResponse?.missing_skills || [],
+                strengths: best.aiResponse?.strengths || [],
+                concerns: best.aiResponse?.concerns || [],
+                experience_years: best.aiResponse?.experience_years ?? 0,
                 applicant_name: extractedData?.full_name || 'Unknown',
                 applicant_email: extractedData?.email || '',
-                // Pass the scanned nationality to the frontend; use placeholder if missing
                 nationality: extractedData?.nationality || 'Not Specified',
                 file_url: fileUrl,
                 file_name: fileName,
                 extracted_data: JSON.stringify(extractedData),
-                code_comparison: codeComparison,
-                evaluated_template_name: criteria.position_name || ''
+                code_comparison: best.codeComparison,
+                matched_template_name: best.criteria.position_name || '',
+                // If multiple criteria were provided, return the scores for all
+                template_scores: criteriaList.length > 1 ? evaluations.map(e => ({
+                    template_name: e.criteria.position_name,
+                    score: e.aiScore
+                })) : undefined
             }
         });
 
