@@ -19,7 +19,8 @@ const EMPTY_TEMPLATE = {
     required_languages: '',
     industry_experience: '',
     notes: '',
-    is_active: true
+    is_active: true,
+    mandatory_rules: [] // Array of field names that are mandatory
 };
 
 function TemplateForm({ template, onSave, onCancel, isSaving }) {
@@ -27,6 +28,16 @@ function TemplateForm({ template, onSave, onCancel, isSaving }) {
     const [quickText, setQuickText] = useState('');
     const [quickParsing, setQuickParsing] = useState(false);
     const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
+    const toggleMandatory = (field) => {
+        setForm(f => {
+            const rules = f.mandatory_rules || [];
+            if (rules.includes(field)) {
+                return { ...f, mandatory_rules: rules.filter(r => r !== field) };
+            } else {
+                return { ...f, mandatory_rules: [...rules, field] };
+            }
+        });
+    };
 
     const handleQuickFill = async () => {
         if (!quickText.trim()) { toast.error('Please enter a description'); return; }
@@ -155,11 +166,29 @@ Return JSON with these fields (use empty string if not mentioned):
             {/* Experience & Education */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Minimum Experience (years) *</Label>
+                    <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-xs font-medium text-[#4B5563]">Minimum Experience (years) *</Label>
+                        <button
+                            type="button"
+                            onClick={() => toggleMandatory('min_experience_years')}
+                            className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${form.mandatory_rules?.includes('min_experience_years') ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                        >
+                            {form.mandatory_rules?.includes('min_experience_years') ? 'Mandatory (Knock-out)' : 'Mark Mandatory'}
+                        </button>
+                    </div>
                     <Input type="number" min="0" max="30" placeholder="e.g. 3" value={form.min_experience_years} onChange={e => set('min_experience_years', e.target.value)} />
                 </div>
                 <div>
-                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Required Education *</Label>
+                    <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-xs font-medium text-[#4B5563]">Required Education *</Label>
+                        <button
+                            type="button"
+                            onClick={() => toggleMandatory('required_education')}
+                            className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${form.mandatory_rules?.includes('required_education') ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                        >
+                            {form.mandatory_rules?.includes('required_education') ? 'Mandatory (Knock-out)' : 'Mark Mandatory'}
+                        </button>
+                    </div>
                     <Input placeholder="e.g. Bachelor's in Mechanical Engineering" value={form.required_education} onChange={e => set('required_education', e.target.value)} />
                 </div>
             </div>
@@ -231,7 +260,14 @@ function TemplateCard({ template, onEdit, onDelete }) {
                     </div>
                     <div>
                         <p className="text-sm font-semibold text-[#1F2937]">{template.position_name}</p>
-                        <p className="text-xs text-[#6B7280]">{template.department}{template.min_experience_years ? ` • ${template.min_experience_years}+ yrs exp` : ''}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs text-[#6B7280]">{template.department}{template.min_experience_years ? ` • ${template.min_experience_years}+ yrs exp` : ''}</p>
+                            {template.mandatory_rules?.length > 0 && (
+                                <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
+                                    {template.mandatory_rules.length} Mandatory Rules
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">

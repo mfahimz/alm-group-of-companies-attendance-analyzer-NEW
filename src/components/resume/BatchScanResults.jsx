@@ -161,6 +161,29 @@ export default function BatchScanResults({ results, onNewScan }) {
                     <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
                         {sorted.filter(r => r.recommendation === 'Not Recommended').length} Not Recommended
                     </span>
+                    {sorted.some(r => r.evaluation_status === 'Rejected') && (
+                        <span className="px-2 py-1 bg-red-600 text-white rounded-full font-bold animate-pulse">
+                            {sorted.filter(r => r.evaluation_status === 'Rejected').length} Knock-outs
+                        </span>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => sorted.forEach(r => r.id && updateStatusMutation.mutate({ id: r.id, status: 'Selected' }))}
+                        className="text-xs text-indigo-600 hover:bg-indigo-50"
+                    >
+                        Bulk Select All
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => sorted.forEach(r => r.id && updateStatusMutation.mutate({ id: r.id, status: 'Rejected' }))}
+                        className="text-xs text-red-600 hover:bg-red-50"
+                    >
+                        Bulk Reject All
+                    </Button>
                 </div>
             </div>
 
@@ -211,9 +234,16 @@ export default function BatchScanResults({ results, onNewScan }) {
                                 </div>
 
                                 {/* Recommendation Badge */}
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium border hidden md:inline ${rec.color}`}>
-                                    {result.recommendation}
-                                </span>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border hidden md:inline ${rec.color}`}>
+                                        {result.recommendation}
+                                    </span>
+                                    {result.evaluation_status === 'Rejected' && (
+                                        <span className="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold uppercase tracking-tight hidden md:inline animate-pulse">
+                                            Knock-out Failed
+                                        </span>
+                                    )}
+                                </div>
 
                                 {/* Mobile score */}
                                 <span className="text-sm font-bold text-[#1F2937] sm:hidden">{result.score}</span>

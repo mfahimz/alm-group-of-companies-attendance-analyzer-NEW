@@ -32,13 +32,15 @@ function ScanDetailDialog({ scan, onClose }) {
     })();
 
     const result = {
+        ...scan,
         score: scan.ai_score || 0,
         recommendation: scan.ai_recommendation,
         summary: scan.ai_summary,
-        matched_skills: (() => { try { const p = JSON.parse(scan.matched_skills); return Array.isArray(p) ? p : (scan.matched_skills ? scan.matched_skills.split(', ').filter(Boolean) : []); } catch { return scan.matched_skills ? scan.matched_skills.split(', ').filter(Boolean) : []; } })(),
-        missing_skills: (() => { try { const p = JSON.parse(scan.missing_skills); return Array.isArray(p) ? p : (scan.missing_skills ? scan.missing_skills.split(', ').filter(Boolean) : []); } catch { return scan.missing_skills ? scan.missing_skills.split(', ').filter(Boolean) : []; } })(),
-        strengths: (() => { try { return scan.strengths ? JSON.parse(scan.strengths) : []; } catch { return []; } })(),
-        concerns: (() => { try { return scan.concerns ? JSON.parse(scan.concerns) : []; } catch { return []; } })(),
+        // The View component now handles parsing for these
+        ai_strengths: scan.ai_strengths,
+        ai_concerns: scan.ai_concerns,
+        matched_skills: scan.matched_skills,
+        missing_skills: scan.missing_skills,
         experience_years: scan.years_experience || 0,
         applicant_name: scan.applicant_name,
         applicant_email: scan.applicant_email,
@@ -379,9 +381,16 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                                     {scan.years_experience ?? '—'}y
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-tight uppercase ${RECOMMENDATION_COLORS[scan.ai_recommendation] || 'bg-gray-100 text-gray-700'}`}>
-                                        {scan.ai_recommendation || '—'}
-                                    </span>
+                                    <div className="flex flex-col gap-1">
+                                        <span className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-tight uppercase w-fit ${RECOMMENDATION_COLORS[scan.ai_recommendation] || 'bg-gray-100 text-gray-700'}`}>
+                                            {scan.ai_recommendation || '—'}
+                                        </span>
+                                        {scan.evaluation_status === 'Rejected' && (
+                                            <span className="text-[9px] font-bold text-red-600 uppercase tracking-tighter animate-pulse ml-1">
+                                                Knock-out Failure
+                                            </span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-2">

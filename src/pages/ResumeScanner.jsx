@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ScanLine, History, Plus, Settings } from 'lucide-react';
+import { ScanLine, History, Plus, Settings, User } from 'lucide-react';
 import ResumeScanForm from '../components/resume/ResumeScanForm';
 import BatchScanResults from '../components/resume/BatchScanResults';
 import ScanHistoryTable from '../components/resume/ScanHistoryTable';
 import JobTemplateManager from '../components/resume/JobTemplateManager';
+import TalentPool from '../components/resume/TalentPool';
 import { base44 } from '@/api/base44Client';
 
 export default function ResumeScanner() {
@@ -29,6 +30,7 @@ export default function ResumeScanner() {
 
     const tabs = [
         { key: 'scan', label: 'New Scan', icon: Plus },
+        { key: 'pool', label: 'Talent Pool', icon: User },
         { key: 'history', label: 'Scan History', icon: History },
         { key: 'templates', label: 'Position Templates', icon: Settings },
     ];
@@ -77,6 +79,12 @@ export default function ResumeScanner() {
                         ) : (
                             <ResumeScanForm onScanComplete={handleScanComplete} />
                         )}
+                    </div>
+                )}
+
+                {activeTab === 'pool' && (
+                    <div className="bg-white rounded-xl border border-[#E2E6EC] shadow-sm p-6">
+                        <TalentPool />
                     </div>
                 )}
 

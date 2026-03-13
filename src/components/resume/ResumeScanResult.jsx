@@ -203,6 +203,26 @@ export default function ResumeScanResultView({ result, onNewScan }) {
     })();
 
     const comparison = result.code_comparison || null;
+    
+    const strengths = (() => {
+        try { return typeof result.ai_strengths === 'string' ? JSON.parse(result.ai_strengths) : (result.ai_strengths || []); }
+        catch { return []; }
+    })();
+    
+    const concerns = (() => {
+        try { return typeof result.ai_concerns === 'string' ? JSON.parse(result.ai_concerns) : (result.ai_concerns || []); }
+        catch { return []; }
+    })();
+
+    const matchedSkills = (() => {
+        try { return typeof result.matched_skills === 'string' ? JSON.parse(result.matched_skills) : (result.matched_skills || []); }
+        catch { return []; }
+    })();
+
+    const missingSkills = (() => {
+        try { return typeof result.missing_skills === 'string' ? JSON.parse(result.missing_skills) : (result.missing_skills || []); }
+        catch { return []; }
+    })();
 
     return (
         <div className="space-y-4">
@@ -228,7 +248,17 @@ export default function ResumeScanResultView({ result, onNewScan }) {
                             <span className="text-xs text-[#6B7280]">{result.experience_years} yrs experience</span>
                         )}
                     </div>
-                    <p className="text-sm text-[#4B5563] leading-relaxed">{result.summary}</p>
+                    <p className="text-sm text-[#4B5563] leading-relaxed">{result.summary || result.ai_summary}</p>
+                    
+                    {result.evaluation_status === 'Rejected' && (
+                        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-3">
+                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                            <div>
+                                <p className="text-xs font-bold text-red-700 uppercase tracking-tight">Mandatory Knock-out Rule Failed</p>
+                                <p className="text-[11px] text-red-600">Candidate was automatically rejected because they did not meet one or more mandatory requirements.</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -297,21 +327,21 @@ export default function ResumeScanResultView({ result, onNewScan }) {
             <Section title="🤖 AI Evaluation Report" defaultOpen={true}>
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {result.strengths?.length > 0 && (
+                        {strengths.length > 0 && (
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                                 <h4 className="text-xs font-semibold text-green-800 mb-2 flex items-center gap-1"><Star className="w-3.5 h-3.5" />Strengths</h4>
                                 <ul className="space-y-1">
-                                    {result.strengths.map((s, i) => (
+                                    {strengths.map((s, i) => (
                                         <li key={i} className="text-xs text-green-700 flex items-start gap-1"><ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0" />{s}</li>
                                     ))}
                                 </ul>
                             </div>
                         )}
-                        {result.concerns?.length > 0 && (
+                        {concerns.length > 0 && (
                             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                 <h4 className="text-xs font-semibold text-red-800 mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />Concerns</h4>
                                 <ul className="space-y-1">
-                                    {result.concerns.map((c, i) => (
+                                    {concerns.map((c, i) => (
                                         <li key={i} className="text-xs text-red-700 flex items-start gap-1"><ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0" />{c}</li>
                                     ))}
                                 </ul>
@@ -323,16 +353,16 @@ export default function ResumeScanResultView({ result, onNewScan }) {
                         <div>
                             <p className="text-xs font-medium text-green-700 mb-2">✓ Matched Criteria</p>
                             <div className="flex flex-wrap gap-1.5">
-                                {result.matched_skills?.length > 0
-                                    ? result.matched_skills.map((s, i) => <span key={i} className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full border border-green-200">{s}</span>)
+                                {matchedSkills.length > 0
+                                    ? matchedSkills.map((s, i) => <span key={i} className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full border border-green-200">{s}</span>)
                                     : <span className="text-xs text-[#9CA3AF]">None identified</span>}
                             </div>
                         </div>
                         <div>
                             <p className="text-xs font-medium text-red-600 mb-2">✗ Missing Criteria</p>
                             <div className="flex flex-wrap gap-1.5">
-                                {result.missing_skills?.length > 0
-                                    ? result.missing_skills.map((s, i) => <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full border border-red-200">{s}</span>)
+                                {missingSkills.length > 0
+                                    ? missingSkills.map((s, i) => <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full border border-red-200">{s}</span>)
                                     : <span className="text-xs text-[#9CA3AF]">No gaps identified</span>}
                             </div>
                         </div>
