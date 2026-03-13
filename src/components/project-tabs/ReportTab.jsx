@@ -1054,13 +1054,19 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
+                                                        {/* 
+                                                          BUSINESS LOGIC: Status-based Labeling
+                                                          - 'Final' badge: Strictly based on 'is_final' field (marked for salary)
+                                                          - 'Saved' badge: Strictly based on 'is_saved' field (edits persisted)
+                                                          These labels persist based on DB state, not latest-report defaults.
+                                                        */}
                                                         {run.is_final && (
                                                             <Badge className="bg-green-100 text-green-700 border-green-300">
                                                                 <Star className="w-3 h-3 mr-1 fill-green-700" />
                                                                 Final
                                                             </Badge>
                                                         )}
-                                                        {project.last_saved_report_id === run.id && (
+                                                        {run.is_saved && (
                                                             <Badge className="bg-blue-100 text-blue-700 border-blue-300">
                                                                 <Save className="w-3 h-3 mr-1" />
                                                                 Saved

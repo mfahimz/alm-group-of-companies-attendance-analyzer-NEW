@@ -83,6 +83,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         refetchOnMount: false
     });
 
+    const { data: allReportRuns = [] } = useQuery({
+        queryKey: ['reportRuns', project.id],
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
+        enabled: !!project?.id
+    });
+
     const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company }),
@@ -1315,12 +1321,47 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
+            setSaveProgress({ current: 0, total: 100, status: 'Validating date range...' });
+
+            // BUSINESS LOGIC: Date-Range Protection & Conflict Prevention
+            const newFrom = new Date(reportRun.date_from);
+            const newTo = new Date(reportRun.date_to);
+            const projectFrom = new Date(project.date_from);
+            const projectTo = new Date(project.date_to);
+
+            // Exception: If the report covers the entire project range, bypass the blocking rule
+            const isFullProjectRange = 
+                newFrom.toLocaleDateString() === projectFrom.toLocaleDateString() && 
+                newTo.toLocaleDateString() === projectTo.toLocaleDateString();
+
+            if (!isFullProjectRange) {
+                // Blocking Rule: Check for overlaps with already saved reports
+                const overlappingReport = allReportRuns.find(run => {
+                    // Only check reports marked as saved, and exclude the current report
+                    if (!run.is_saved || run.id === reportRun.id) return false;
+                    
+                    const savedFrom = new Date(run.date_from);
+                    const savedTo = new Date(run.date_to);
+                    
+                    // Standard overlap formula: (StartA <= EndB) and (EndA >= StartB)
+                    return (newFrom <= savedTo) && (newTo >= savedFrom);
+                });
+
+                if (overlappingReport) {
+                    const rangeText = `${new Date(overlappingReport.date_from).toLocaleDateString()} - ${new Date(overlappingReport.date_to).toLocaleDateString()}`;
+                    const errorMsg = `Overlap Detected: A saved report already exists for part of this period (${rangeText}). Save blocked to prevent data conflicts.`;
+                    throw new Error(errorMsg);
+                }
+            }
+
             setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
 
-            // Set this as the last saved report
-            await base44.entities.Project.update(project.id, {
-                last_saved_report_id: reportRun.id
-            });
+            // Set this as a saved report (persists regardless of newer reports)
+            // Also maintain last_saved_report_id on project for legacy support
+            await Promise.all([
+                base44.entities.ReportRun.update(reportRun.id, { is_saved: true }),
+                base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id })
+            ]);
 
             // Delete existing report-generated exceptions for this report to prevent duplicates
             const existingReportExceptions = exceptions.filter(e =>
