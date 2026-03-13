@@ -60,6 +60,11 @@
             "type": "string",
             "default": null,
             "description": "Additional notes or context for the task. For auto-created tasks, this contains detailed calculation breakdowns and source metadata."
+        },
+        "fingerprint": {
+            "type": "string",
+            "default": null,
+            "description": "A unique identifier used to prevent duplicate auto-created tasks. Format: {task_type}_{project_id}_{source_id}_{value_hash}"
         }
     }
 }
