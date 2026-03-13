@@ -37,7 +37,7 @@ export default function ResumeScanner() {
         <div className="min-h-screen bg-[#F4F6F9]">
             {/* Page Header */}
             <div className="bg-white border-b border-[#E2E6EC] px-6 py-4">
-                <div className="max-w-5xl mx-auto flex items-center gap-3">
+                <div className="max-w-[1600px] mx-auto flex items-center gap-3">
                     <div className="w-9 h-9 bg-[#EEF2FF] rounded-lg flex items-center justify-center">
                         <ScanLine className="w-5 h-5 text-[#0F1E36]" />
                     </div>
@@ -50,11 +50,11 @@ export default function ResumeScanner() {
 
             {/* Mini Nav Tabs */}
             <div className="bg-white border-b border-[#E2E6EC] px-6">
-                <div className="max-w-5xl mx-auto flex gap-0">
+                <div className="max-w-[1600px] mx-auto flex gap-0">
                     {tabs.map(({ key, label, icon: Icon }) => (
                         <button
                             key={key}
-                            onClick={() => { setActiveTab(key); if (key === 'scan') setScanResult(null); }}
+                            onClick={() => { setActiveTab(key); if (key === 'scan') setScanResults(null); }}
                             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                                 activeTab === key
                                     ? 'border-[#0F1E36] text-[#0F1E36]'
@@ -69,7 +69,7 @@ export default function ResumeScanner() {
             </div>
 
             {/* Content */}
-            <div className="max-w-5xl mx-auto px-6 py-6">
+            <div className="max-w-[1600px] mx-auto px-6 py-6">
                 {activeTab === 'scan' && (
                     <div className="bg-white rounded-xl border border-[#E2E6EC] shadow-sm p-6">
                         {scanResults ? (

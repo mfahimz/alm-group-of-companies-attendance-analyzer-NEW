@@ -65,9 +65,9 @@ export default function BatchScanResults({ results, onNewScan }) {
 
     const filteredResults = [...results].filter(r => {
         const nationality = (r.nationality || '').toLowerCase();
-        const location = (JSON.parse(r.extracted_data || '{}')?.current_location || '').toLowerCase();
-        const gender = (JSON.parse(r.extracted_data || '{}')?.gender || '').toLowerCase();
-        const experience = r.experience_years || 0;
+        const location = (r.location || '').toLowerCase();
+        const gender = (r.gender || '').toLowerCase();
+        const experience = r.years_experience || 0;
 
         if (filters.nationality && !nationality.includes(filters.nationality.toLowerCase())) return false;
         if (filters.location && !location.includes(filters.location.toLowerCase())) return false;
@@ -200,7 +200,7 @@ export default function BatchScanResults({ results, onNewScan }) {
                                         {/* Display candidate nationality prominently as required by business logic */}
                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-semibold">
                                             <Globe className="w-3 h-3 text-amber-700" />
-                                            Nat: {result.nationality || JSON.parse(result.extracted_data || '{}')?.nationality || 'Not Specified'}
+                                            Nat: {result.nationality || 'Not Specified'}
                                         </span>
                                     </div>
                                 </div>
@@ -257,10 +257,10 @@ export default function BatchScanResults({ results, onNewScan }) {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] text-[#9CA3AF] font-medium italic">
-                                        Exp: {result.experience_years ?? 0}y
+                                        Exp: {result.years_experience ?? 0}y
                                     </span>
                                     <span className="text-[10px] text-[#9CA3AF] font-medium italic truncate max-w-[120px]">
-                                        Loc: {JSON.parse(result.extracted_data || '{}')?.current_location || 'Not Specified'}
+                                        Loc: {result.location || 'Not Specified'}
                                     </span>
                                 </div>
                             </div>
