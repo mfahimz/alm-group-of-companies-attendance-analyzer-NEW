@@ -210,28 +210,28 @@ Deno.serve(async (req: Request) => {
         }
 
         // Helper functions (moved from frontend)
-        const parseTime = (timeStr: any, includeSeconds = false) => {
+        const parseTime = (timeStr: any) => {
             try {
                 if (!timeStr || timeStr === '—') return null;
 
-                if (includeSeconds) {
-                    let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-                    if (timeMatch) {
-                        let hours = parseInt(timeMatch[1]);
-                        const minutes = parseInt(timeMatch[2]);
-                        const seconds = parseInt(timeMatch[3]);
-                        const period = timeMatch[4].toUpperCase();
+                // Priority 1: Format with seconds (e.g., "12:00:00 AM")
+                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = parseInt(timeMatch[3]);
+                    const period = timeMatch[4].toUpperCase();
 
-                        if (period === 'PM' && hours !== 12) hours += 12;
-                        if (period === 'AM' && hours === 12) hours = 0;
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
 
-                        const date = new Date();
-                        date.setHours(hours, minutes, seconds, 0);
-                        return date;
-                    }
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
                 }
 
-                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+                // Priority 2: Standard AM/PM (e.g., "12:00 AM")
+                timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                 if (timeMatch) {
                     let hours = parseInt(timeMatch[1]);
                     const minutes = parseInt(timeMatch[2]);
@@ -245,6 +245,7 @@ Deno.serve(async (req: Request) => {
                     return date;
                 }
 
+                // Priority 3: 24-hour format with optional seconds (e.g., "14:28" or "14:28:05")
                 timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
                 if (timeMatch) {
                     const hours = parseInt(timeMatch[1]);
@@ -283,7 +284,7 @@ Deno.serve(async (req: Request) => {
             if (!shift || dayPunches.length === 0) return [];
 
             const punchesWithTime = dayPunches.map((p: any) => {
-                const time = parseTime(p.timestamp_raw, includeSeconds);
+                const time = parseTime(p.timestamp_raw);
                 if (!time) return null;
 
                 // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
@@ -302,16 +303,16 @@ Deno.serve(async (req: Request) => {
             if (punchesWithTime.length === 0) return [];
 
             // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
-            const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+            const pmEndTime = parseTime(shift.pm_end);
             let adjustedPmEnd = pmEndTime;
             if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
                 adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
             }
 
             const shiftPoints = [
-                { type: 'AM_START', time: parseTime(shift.am_start, includeSeconds), label: shift.am_start },
-                { type: 'AM_END', time: parseTime(shift.am_end, includeSeconds), label: shift.am_end },
-                { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
+                { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+                { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+                { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
                 { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
             ].filter(sp => sp.time);
 
@@ -363,32 +364,6 @@ Deno.serve(async (req: Request) => {
                     }
                 }
 
-                // Phase 4: Extreme match (±240 min)
-                if (!closestMatch) {
-                    for (const shiftPoint of shiftPoints) {
-                        if (usedShiftPoints.has(shiftPoint.type)) continue;
-                        const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                        if (distance <= 240 && distance < minDistance) {
-                            minDistance = distance;
-                            closestMatch = shiftPoint;
-                            isFarExtendedMatch = true;
-                        }
-                    }
-                }
-
-                // Phase 5: Maximum matching window (±300 min)
-                if (!closestMatch) {
-                    for (const shiftPoint of shiftPoints) {
-                        if (usedShiftPoints.has(shiftPoint.type)) continue;
-                        const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                        if (distance <= 300 && distance < minDistance) {
-                            minDistance = distance;
-                            closestMatch = shiftPoint;
-                            isFarExtendedMatch = true;
-                        }
-                    }
-                }
-
                 if (closestMatch) {
                     matches.push({
                         punch,
@@ -424,11 +399,11 @@ Deno.serve(async (req: Request) => {
          * 3. If actual worked time is < 50% of expected, it's flagged as a partial day.
          * 4. PRECISION: Shift times must be parsed with 'includeSeconds' to avoid "null" shift points.
          */
-        const detectPartialDay = (dayPunches, shift, includeSeconds = false, nextDateStr = null) => {
+        const detectPartialDay = (dayPunches: any[], shift: any, nextDateStr: string | null = null) => {
             if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
 
             const punchesWithTime = dayPunches.map(p => {
-                const time = parseTime(p.timestamp_raw, includeSeconds);
+                const time = parseTime(p.timestamp_raw);
                 if (!time) return null;
                 // MIDNIGHT FIX: Adjust time for next-day crossover punches
                 const isNextDay = nextDateStr && p.punch_date === nextDateStr;
@@ -441,10 +416,10 @@ Deno.serve(async (req: Request) => {
             const firstPunch = punchesWithTime[0].time;
             const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
 
-            const amStart = parseTime(shift.am_start, includeSeconds);
-            const amEnd = parseTime(shift.am_end, includeSeconds);
-            const pmStart = parseTime(shift.pm_start, includeSeconds);
-            let pmEnd = parseTime(shift.pm_end, includeSeconds);
+            const amStart = parseTime(shift.am_start);
+            const amEnd = parseTime(shift.am_end);
+            const pmStart = parseTime(shift.pm_start);
+            let pmEnd = parseTime(shift.pm_end);
 
             if (!amStart || !pmEnd) return { isPartial: false, reason: null };
 
@@ -491,8 +466,8 @@ Deno.serve(async (req: Request) => {
         // (i.e., between 12:00 AM and 02:00 AM = 120 minutes after midnight)
         // This is specifically extended to 2 hours for Ramadan night shifts crossover support.
         const MIDNIGHT_BUFFER_MINUTES = 120;
-        const isWithinMidnightBuffer = (timestampRaw, includeSecondsFlag) => {
-            const parsed = parseTime(timestampRaw, includeSecondsFlag);
+        const isWithinMidnightBuffer = (timestampRaw) => {
+            const parsed = parseTime(timestampRaw);
             if (!parsed) return false;
             const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
             return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
@@ -503,7 +478,7 @@ Deno.serve(async (req: Request) => {
 
             const punchesWithTime = punchList.map(p => ({
                 ...p,
-                time: parseTime(p.timestamp_raw, includeSeconds)
+                time: parseTime(p.timestamp_raw)
             })).filter(p => p.time);
 
             if (punchesWithTime.length === 0) return punchList;
@@ -568,7 +543,7 @@ Deno.serve(async (req: Request) => {
             });
 
             const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-            const includeSeconds = project.company === 'Al Maraghi Automotive';
+            const includeSeconds = true; // Unified: always support high-precision parsing
 
             console.log(`[runAnalysis] Employee ${attendanceIdStr}: carried_grace_minutes = ${employee?.carried_grace_minutes || 0}`);
 
@@ -1112,7 +1087,7 @@ Deno.serve(async (req: Request) => {
                 // because those belong to the previous day's shift as punch-outs
                 if (prevShiftEndsNearMidnight) {
                     const beforeFilter = dayPunches.length;
-                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
                     if (dayPunches.length < beforeFilter) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Excluded ${beforeFilter - dayPunches.length} early AM punch(es) that belong to prev day ${prevDateStr}`);
                     }
@@ -1133,7 +1108,7 @@ Deno.serve(async (req: Request) => {
 
                     // Include next-day punches that are within 120 minutes of midnight
                     // (i.e., punches between 12:00 AM and 02:00 AM)
-                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw));
 
                     if (midnightCrossoverPunches.length > 0) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Found ${midnightCrossoverPunches.length} crossover punch(es) from next day ${nextDateStr}`);
@@ -1142,8 +1117,8 @@ Deno.serve(async (req: Request) => {
                 }
 
                 dayPunches = dayPunches.sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
-                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
                     // For midnight crossover, punches from next day (hour 0) should sort AFTER today's punches
                     // We adjust by adding 24h offset if the punch is from the next day
                     const aIsNextDay = a.punch_date === nextDateStr;
@@ -1196,7 +1171,7 @@ Deno.serve(async (req: Request) => {
                 // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches
                 const partialDayResult = hasSkipPunchApplied
                     ? { isPartial: false, reason: '' }
-                    : detectPartialDay(filteredPunches, shift, includeSeconds, nextDateStr);
+                    : detectPartialDay(filteredPunches, shift, nextDateStr);
 
                 if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
                     if (filteredPunches.length === 0) {

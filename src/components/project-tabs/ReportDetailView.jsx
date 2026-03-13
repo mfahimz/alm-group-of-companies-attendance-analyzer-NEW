@@ -234,63 +234,54 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         return `${hours}:${minutes} ${period}`;
     };
 
-    const parseTime = (timeStr, includeSeconds = false) => {
+    const parseTime = (timeStr) => {
         try {
-            if (!timeStr || timeStr === '—') return null;
+            if (!timeStr || timeStr === '—' || timeStr === '-') return null;
 
-            // For Al Maraghi Automotive: Match with seconds (HH:MM:SS AM/PM)
-            if (includeSeconds) {
-                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-                if (timeMatch) {
-                    let hours = parseInt(timeMatch[1]);
-                    const minutes = parseInt(timeMatch[2]);
-                    const seconds = parseInt(timeMatch[3]);
-                    const period = timeMatch[4].toUpperCase();
-
-                    if (period === 'PM' && hours !== 12) hours += 12;
-                    if (period === 'AM' && hours === 12) hours = 0;
-
-                    const date = new Date();
-                    date.setHours(hours, minutes, seconds, 0);
-                    return date;
-                }
-            }
-
-            // Standard format with AM/PM
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            // Priority 1: Format with seconds
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
-                const period = timeMatch[3].toUpperCase();
-
+                const seconds = parseInt(timeMatch[3]);
+                const period = timeMatch[4].toUpperCase();
                 if (period === 'PM' && hours !== 12) hours += 12;
                 if (period === 'AM' && hours === 12) hours = 0;
-
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-
-            // Handle timestamp_raw format: "1/16/2026 8:37" or "1/16/2026 14:28" (24-hour without AM/PM)
-            // Extract time part from date/time string
-            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-            if (dateTimeMatch) {
-                const hours = parseInt(dateTimeMatch[1]);
-                const minutes = parseInt(dateTimeMatch[2]);
-                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
-
                 const date = new Date();
                 date.setHours(hours, minutes, seconds, 0);
                 return date;
             }
 
-            // Pure 24-hour format: "8:37" or "14:28" or "8:37:00"
+            // Priority 2: Standard AM/PM
+            timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = timeMatch[3].toUpperCase();
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+
+            // Priority 3: 24-hour with optional seconds
             timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
                 const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
+                const date = new Date();
+                date.setHours(hours, minutes, seconds, 0);
+                return date;
+            }
 
+            // Handle timestamp_raw format: "1/16/2026 8:37"
+            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (dateTimeMatch) {
+                const hours = parseInt(dateTimeMatch[1]);
+                const minutes = parseInt(dateTimeMatch[2]);
+                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
                 const date = new Date();
                 date.setHours(hours, minutes, seconds, 0);
                 return date;
@@ -302,8 +293,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     };
 
-    const isWithinMidnightBuffer = (timestampRaw, includeSecondsFlag) => {
-        const parsed = parseTime(timestampRaw, includeSecondsFlag);
+    const isWithinMidnightBuffer = (timestampRaw) => {
+        const parsed = parseTime(timestampRaw);
         if (!parsed) return false;
         const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
         return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
@@ -313,10 +304,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (!shift || dayPunches.length === 0) return [];
 
         // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive';
+        const includeSeconds = project.company === 'Al Maraghi Automotive' || project.company === 'Al Maraghi Motors';
 
         const punchesWithTime = dayPunches.map(p => {
-            const time = parseTime(p.timestamp_raw, includeSeconds);
+            const time = parseTime(p.timestamp_raw);
             if (!time) return null;
 
             // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
@@ -334,16 +325,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (punchesWithTime.length === 0) return [];
 
         // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
-        const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+        const pmEndTime = parseTime(shift.pm_end);
         let adjustedPmEnd = pmEndTime;
         if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
             adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
         }
 
         const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start, includeSeconds), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end, includeSeconds), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
             { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
 
@@ -395,32 +386,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
-            // Phase 4: Extreme match (±240 min)
-            if (!closestMatch) {
-                for (const shiftPoint of shiftPoints) {
-                    if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    if (distance <= 240 && distance < minDistance) {
-                        minDistance = distance;
-                        closestMatch = shiftPoint;
-                        isFarExtendedMatch = true;
-                    }
-                }
-            }
-
-            // Phase 5: Maximum matching window (±300 min)
-            if (!closestMatch) {
-                for (const shiftPoint of shiftPoints) {
-                    if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    if (distance <= 300 && distance < minDistance) {
-                        minDistance = distance;
-                        closestMatch = shiftPoint;
-                        isFarExtendedMatch = true;
-                    }
-                }
-            }
-
             if (closestMatch) {
                 matches.push({
                     punch,
@@ -449,11 +414,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const detectPartialDay = (dayPunches, shift, nextDateStr = null) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-        const incSec = project.company === 'Al Maraghi Automotive';
-        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw, incSec) })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time).sort((a, b) => a.time - b.time);
         if (pts.length < 2) return { isPartial: false, reason: null };
-        const amStart = parseTime(shift.am_start, incSec), amEnd = parseTime(shift.am_end, incSec), pmStart = parseTime(shift.pm_start, incSec);
-        let pmEnd = parseTime(shift.pm_end, incSec);
+        const amStart = parseTime(shift.am_start), amEnd = parseTime(shift.am_end), pmStart = parseTime(shift.pm_start);
+        let pmEnd = parseTime(shift.pm_end);
         if (!amStart || !pmEnd) return { isPartial: false, reason: null };
         if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
         const mid = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
@@ -467,12 +431,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const filterMultiplePunches = (punchList, shift) => {
         if (punchList.length <= 1) return punchList;
 
-        // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive';
-
         const punchesWithTime = punchList.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw, includeSeconds)
+            time: parseTime(p.timestamp_raw)
         })).filter(p => p.time);
 
         if (punchesWithTime.length === 0) return punchList;
@@ -536,7 +497,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
 
         // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive';
+        const includeSeconds = project.company === 'Al Maraghi Automotive' || project.company === 'Al Maraghi Motors';
 
         let dayOverrides = {};
         if (result.day_overrides) {
@@ -589,19 +550,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
         annualLeaveCount = annualLeaveDatesProcessed.size;
 
-        const isShiftEffective = (s) => {
-            if (!s.effective_from || !s.effective_to) return true;
-            const from = new Date(s.effective_from);
-            const to = new Date(s.effective_to);
-            const currentDateOnly = new Date(currentDate);
-            currentDateOnly.setHours(0, 0, 0, 0);
-            const fromDateOnly = new Date(from);
-            fromDateOnly.setHours(0, 0, 0, 0);
-            const toDateOnly = new Date(to);
-            toDateOnly.setHours(0, 0, 0, 0);
-            return currentDateOnly >= fromDateOnly && currentDateOnly <= toDateOnly;
-        };
-
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
@@ -652,7 +600,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const prevGeneralShifts = employeeShifts.filter(s => !s.date);
                 const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
                 for (const ps of prevShiftCandidates) {
-                    const pEndTime = parseTime(ps.pm_end, includeSeconds);
+                    const pEndTime = parseTime(ps.pm_end);
                     if (pEndTime) {
                         const h = pEndTime.getHours();
                         if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
@@ -662,14 +610,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             let rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
-                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
 
             // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
             if (prevShiftEndsNearMidnight) {
-                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
             }
 
             const matchingExceptionsCalc = employeeExceptions.filter(ex => {
@@ -752,7 +700,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             let shiftEndsNearMidnight = false;
             if (shift) {
-                const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+                const pmEndTime = parseTime(shift.pm_end);
                 if (pmEndTime) {
                     const h = pmEndTime.getHours();
                     if (h === 23 || h === 0) shiftEndsNearMidnight = true;
@@ -762,14 +710,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             if (shiftEndsNearMidnight) {
                 const nextDayPunches = employeePunches
                     .filter(p => p.punch_date === nextDateStr)
-                    .filter(p => isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+                    .filter(p => isWithinMidnightBuffer(p.timestamp_raw));
                 const seenIds = new Set(rawDayPunches.map(p => p.id));
                 const uniqueNextDayPunches = nextDayPunches.filter(p => !seenIds.has(p.id));
                 if (uniqueNextDayPunches.length > 0) {
                     rawDayPunches = [...rawDayPunches, ...uniqueNextDayPunches];
                     rawDayPunches.sort((a, b) => {
-                        const timeA = parseTime(a.timestamp_raw, includeSeconds);
-                        const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                        const timeA = parseTime(a.timestamp_raw);
+                        const timeB = parseTime(b.timestamp_raw);
                         const aTime = (timeA?.getTime() || 0) + (a.punch_date === nextDateStr ? 86400000 : 0);
                         const bTime = (timeB?.getTime() || 0) + (b.punch_date === nextDateStr ? 86400000 : 0);
                         return aTime - bTime;

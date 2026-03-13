@@ -31,7 +31,7 @@ export default function DailyBreakdownDialog({
 }) {
     const [editingDay, setEditingDay] = useState(null);
     const queryClient = useQueryClient();
-    const includeSeconds = project.company === 'Al Maraghi Automotive';
+    const includeSeconds = true; // Unified
     const isFinalized = reportRun.is_final || project.status === 'closed';
 
     const isWithinMidnightBuffer = (timestampRaw) => {
@@ -275,7 +275,7 @@ export default function DailyBreakdownDialog({
             // Check if THIS shift ends near midnight → grab next-day crossover punches
             let shiftEndsNearMidnight = false;
             if (shift) {
-                const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+                const pmEndTime = parseTime(shift.pm_end);
                 if (pmEndTime) {
                     const h = pmEndTime.getHours();
                     if (h === 23 || h === 0) shiftEndsNearMidnight = true;
@@ -570,7 +570,7 @@ export default function DailyBreakdownDialog({
         if (!shift || dayPunches.length === 0) return [];
 
         const punchesWithTime = dayPunches.map(p => {
-            const time = parseTime(p.timestamp_raw, includeSeconds);
+            const time = parseTime(p.timestamp_raw);
             if (!time) return null;
             // If punch is from next day (midnight crossover), add 24h
             const isNextDay = nextDateStr && p.punch_date === nextDateStr;
@@ -581,16 +581,16 @@ export default function DailyBreakdownDialog({
         if (punchesWithTime.length === 0) return [];
 
         // Adjust PM_END if it's midnight (00:00)
-        const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+        const pmEndTime = parseTime(shift.pm_end);
         let adjustedPmEnd = pmEndTime;
         if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
             adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
         }
 
         const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start, includeSeconds), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end, includeSeconds), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
             { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
 
