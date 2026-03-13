@@ -62,7 +62,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         queryFn: async () => {
             // Primary: fetch by report_run_id
             const results = await base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000);
-            
+
             // Fallback for closed projects: if no results found by report_run_id,
             // try fetching by project_id (covers cases where finalized results stored under a different run id)
             if (results.length === 0 && project?.id && (project.status === 'closed' || reportRun.is_final)) {
@@ -73,7 +73,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (matchingRun.length > 0) return matchingRun;
                 if (byProject.length > 0) return byProject;
             }
-            
+
             return results;
         },
         staleTime: 5 * 60 * 1000,
@@ -123,17 +123,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (!isDepartmentHead || !deptHeadVerification?.verified) {
             return allEmployees;
         }
-        
-        const managedIds = deptHeadVerification.assignment.managed_employee_ids 
+
+        const managedIds = deptHeadVerification.assignment.managed_employee_ids
             ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
             : [];
-        
+
         if (managedIds.length === 0) return [];
-        
+
         // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
         // CRITICAL: Exclude department head from the list
-        return allEmployees.filter(emp => 
-            managedIds.includes(String(emp.id)) && 
+        return allEmployees.filter(emp =>
+            managedIds.includes(String(emp.id)) &&
             String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
         );
     }, [allEmployees, isDepartmentHead, deptHeadVerification]);
@@ -142,7 +142,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (!isDepartmentHead || !deptHeadVerification?.verified) {
             return allResults;
         }
-        
+
         // For finalized/closed projects, prioritize results that have deductible_minutes stored
         // (i.e. results that belong to the actual finalized report run)
         const isFinalized = reportRun.is_final || project.status === 'closed';
@@ -155,7 +155,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
         // Filter results to only show department head's subordinates
         const departmentAttendanceIds = employees.map(emp => String(emp.attendance_id));
-        return sourceResults.filter(result => 
+        return sourceResults.filter(result =>
             departmentAttendanceIds.includes(String(result.attendance_id))
         );
     }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, project]);
@@ -214,17 +214,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
         if (/AM|PM/i.test(timeStr)) return timeStr;
-        
+
         const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
         if (!match) return '—';
-        
+
         let hours = parseInt(match[1]);
         const minutes = match[2];
-        
+
         const period = hours >= 12 ? 'PM' : 'AM';
         if (hours > 12) hours -= 12;
         if (hours === 0) hours = 12;
-        
+
         return `${hours}:${minutes} ${period}`;
     };
 
@@ -305,68 +305,68 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr = null) => {
         if (!shift || dayPunches.length === 0) return [];
-        
+
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
-        
+
         const punchesWithTime = dayPunches.map(p => {
             const time = parseTime(p.timestamp_raw, includeSeconds);
             if (!time) return null;
-            
+
             // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
             // add 24 hours to its time so it matches correctly against PM_END
             const isNextDayPunch = nextDateStr && p.punch_date === nextDateStr;
             const adjustedTime = isNextDayPunch ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
-            
+
             return {
                 ...p,
                 time: adjustedTime,
                 _isNextDayPunch: isNextDayPunch
             };
         }).filter(p => p).sort((a, b) => a.time - b.time);
-        
+
         if (punchesWithTime.length === 0) return [];
-        
+
         // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
         const pmEndTime = parseTime(shift.pm_end, includeSeconds);
         let adjustedPmEnd = pmEndTime;
         if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
             adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
         }
-        
+
         const shiftPoints = [
             { type: 'AM_START', time: parseTime(shift.am_start, includeSeconds), label: shift.am_start },
             { type: 'AM_END', time: parseTime(shift.am_end, includeSeconds), label: shift.am_end },
             { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
             { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
-        
+
         const matches = [];
         const usedShiftPoints = new Set();
-        
+
         for (const punch of punchesWithTime) {
             let closestMatch = null;
             let minDistance = Infinity;
             let isExtendedMatch = false;
             let isFarExtendedMatch = false;
-            
+
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
-                
+
                 const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                
+
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
                     closestMatch = shiftPoint;
                 }
             }
-            
+
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
+
                     const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
+
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
@@ -374,13 +374,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     }
                 }
             }
-            
+
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
+
                     const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
+
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
@@ -388,7 +388,33 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     }
                 }
             }
-            
+
+            // Phase 4: Extreme match (±240 min)
+            if (!closestMatch) {
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    if (distance <= 240 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                        isFarExtendedMatch = true;
+                    }
+                }
+            }
+
+            // Phase 5: Maximum matching window (±300 min)
+            if (!closestMatch) {
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    if (distance <= 300 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                        isFarExtendedMatch = true;
+                    }
+                }
+            }
+
             if (closestMatch) {
                 matches.push({
                     punch,
@@ -410,7 +436,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 });
             }
         }
-        
+
         return matches;
     };
 
@@ -420,11 +446,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const incSec = project.company === 'Al Maraghi Automotive';
         const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw, incSec) })).filter(p => p.time).sort((a, b) => a.time - b.time);
         if (pts.length < 2) return { isPartial: false, reason: null };
-        const amStart = parseTime(shift.am_start), amEnd = parseTime(shift.am_end), pmStart = parseTime(shift.pm_start);
-        let pmEnd = parseTime(shift.pm_end);
+        const amStart = parseTime(shift.am_start, incSec), amEnd = parseTime(shift.am_end, incSec), pmStart = parseTime(shift.pm_start, incSec);
+        let pmEnd = parseTime(shift.pm_end, incSec);
         if (!amStart || !pmEnd) return { isPartial: false, reason: null };
         if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
-        const mid = amEnd && pmStart && String(shift.am_end||'').trim() !== '' && String(shift.pm_start||'').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
+        const mid = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
         const single = shift.is_single_shift === true || !mid;
         const expected = single ? (pmEnd - amStart) / 60000 : ((amEnd ? (amEnd - amStart) / 60000 : 0) + (pmStart ? (pmEnd - pmStart) / 60000 : 0));
         const actual = (pts[pts.length - 1].time - pts[0].time) / 60000;
@@ -462,7 +488,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         // CRITICAL FIX: For finalized reports, return stored values WITHOUT recalculation
         // Finalized reports must be immutable - no punch/shift/exception recalculation
         const isFinalized = reportRun.is_final || project.status === 'closed';
-        
+
         if (isFinalized) {
             // Return stored values AS-IS from finalized AnalysisResult
             return {
@@ -477,32 +503,32 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annualLeaveCount: result.annual_leave_count || 0
             };
         }
-        
+
         // NON-FINALIZED ONLY: Recalculate from live punch data
         const attendanceIdStr = String(result.attendance_id);
-        
+
         const dayBeforeStart = new Date(dateFrom);
         dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
         const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
-        
+
         const dayAfterEnd = new Date(dateTo);
         dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
         const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
 
-        const employeePunches = punches.filter(p => 
+        const employeePunches = punches.filter(p =>
             String(p.attendance_id) === attendanceIdStr &&
-            p.punch_date >= dayBeforeStartStr && 
+            p.punch_date >= dayBeforeStartStr &&
             p.punch_date <= dayAfterEndStr
         );
         const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-        const employeeExceptions = exceptions.filter(e => 
+        const employeeExceptions = exceptions.filter(e =>
             (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
             e.use_in_analysis !== false &&
             e.is_custom_type !== true
         );
 
         const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-        
+
         // Enable seconds parsing for Al Maraghi Automotive
         const includeSeconds = project.company === 'Al Maraghi Automotive';
 
@@ -510,7 +536,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (result.day_overrides) {
             try {
                 dayOverrides = JSON.parse(result.day_overrides);
-            } catch (e) {}
+            } catch (e) { }
         }
 
         let totalLateMinutes = 0;
@@ -534,16 +560,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         // Calculate annual leave as CALENDAR DAYS (not working days) - same as salary calculation
         const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
         const annualLeaveDatesProcessed = new Set();
-        
+
         for (const alEx of annualLeaveExceptions) {
             try {
                 const exFrom = new Date(alEx.date_from);
                 const exTo = new Date(alEx.date_to);
-                
+
                 // Clamp to report date range
                 const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
                 const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
-                
+
                 if (rangeStart <= rangeEnd) {
                     // Count each calendar day individually
                     for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
@@ -568,7 +594,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             } else if (employee?.weekly_off) {
                 weeklyOffDay = dayNameToNumber[employee.weekly_off];
             }
-            
+
             if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                 continue;
             }
@@ -641,16 +667,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             let shift = null;
             shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
-            
+
             if (!shift) {
                 // Try to find a general shift that applies to this day by checking applicable_days
                 const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
-                
+
                 for (const s of applicableShifts) {
                     // Check if shift has applicable_days specified
                     if (s.applicable_days) {
                         const appDays = s.applicable_days;
-                        
+
                         // Try JSON array first
                         try {
                             const applicableDaysArray = JSON.parse(appDays);
@@ -664,17 +690,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         } catch (e) {
                             // Not JSON, try string matching
                         }
-                        
+
                         // Handle string format like "Monday to Thursday and Saturday" or "Friday"
                         const appDaysLower = appDays.toLowerCase();
                         const dayLower = currentDayName.toLowerCase();
-                        
+
                         // Direct match (e.g., "Friday")
                         if (appDaysLower.includes(dayLower)) {
                             shift = s;
                             break;
                         }
-                        
+
                         // Handle range patterns like "Monday to Thursday"
                         const rangeMatch = appDaysLower.match(/(\w+)\s+to\s+(\w+)/);
                         if (rangeMatch) {
@@ -682,7 +708,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             const startIdx = dayOrder.indexOf(rangeMatch[1]);
                             const endIdx = dayOrder.indexOf(rangeMatch[2]);
                             const currentIdx = dayOrder.indexOf(dayLower);
-                            
+
                             if (startIdx !== -1 && endIdx !== -1 && currentIdx !== -1) {
                                 if (currentIdx >= startIdx && currentIdx <= endIdx) {
                                     shift = s;
@@ -692,7 +718,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         }
                     }
                 }
-                
+
                 // If no applicable_days match found, fall back to is_friday_shift logic
                 if (!shift) {
                     if (dayOfWeek === 5) {
@@ -709,7 +735,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
                 const isFriday = dayOfWeek === 5;
                 const shouldApplyOverride = dateException.include_friday || !isFriday;
-                
+
                 if (shouldApplyOverride) {
                     shift = {
                         am_start: dateException.new_am_start,
@@ -761,10 +787,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }
 
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
-            const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
-                                   shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
-                                   shift.am_end !== '—' && shift.pm_start !== '—' &&
-                                   shift.am_end !== '-' && shift.pm_start !== '-';
+            const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+                shift.am_end !== '—' && shift.pm_start !== '—' &&
+                shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
             let punchMatchesTotals = [];
@@ -787,9 +813,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             // Capture exception minutes for this specific date
             if (dateException && !dayOverride) {
-                if (dateException.type !== 'OFF' && 
-                    dateException.type !== 'PUBLIC_HOLIDAY' && 
-                    dateException.type !== 'MANUAL_ABSENT' && 
+                if (dateException.type !== 'OFF' &&
+                    dateException.type !== 'PUBLIC_HOLIDAY' &&
+                    dateException.type !== 'MANUAL_ABSENT' &&
                     dateException.type !== 'SICK_LEAVE') {
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
                         exceptionLateMinutes = dateException.late_minutes;
@@ -889,15 +915,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     fullAbsenceCount++;
                 }
             }
-            
+
             // Check if exception has manual time values - if so, skip punch calculation for this day
             const hasManualExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
 
             // Apply manual time adjustments from exception fields (exclusive - don't recalculate from punches)
             if (hasManualExceptionMinutes) {
-                if (dateException.type !== 'OFF' && 
-                    dateException.type !== 'PUBLIC_HOLIDAY' && 
-                    dateException.type !== 'MANUAL_ABSENT' && 
+                if (dateException.type !== 'OFF' &&
+                    dateException.type !== 'PUBLIC_HOLIDAY' &&
+                    dateException.type !== 'MANUAL_ABSENT' &&
                     dateException.type !== 'SICK_LEAVE') {
                     // Manual late/early exceptions should mark day as present
                     if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && dayPunches.length === 0) {
@@ -916,25 +942,25 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     }
                 }
             }
-            
+
             // Calculate times from punches ONLY if no manual exception minutes exist
             if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc && !hasManualExceptionMinutes) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
-                
+
                 for (const match of punchMatchesTotals) {
                     if (!match.matchedTo) continue;
-                    
+
                     const punchTime = match.punch.time;
                     const shiftTime = match.shiftTime;
-                    
+
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                         if (punchTime > shiftTime) {
                             const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                             dayLateMinutes += minutes;
                         }
                     }
-                    
+
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                         if (punchTime < shiftTime) {
                             const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
@@ -942,7 +968,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         }
                     }
                 }
-                
+
                 // Apply allowed minutes - subtract from late/early
                 const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
                 if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
@@ -955,20 +981,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         dayEarlyMinutes = Math.round(remaining * earlyRatio);
                     }
                 }
-                
+
                 totalLateMinutes += dayLateMinutes;
                 totalEarlyCheckout += dayEarlyMinutes;
             }
         }
 
-        return { 
-            totalLateMinutes: Math.max(0, totalLateMinutes), 
-            totalEarlyCheckout: Math.max(0, totalEarlyCheckout), 
+        return {
+            totalLateMinutes: Math.max(0, totalLateMinutes),
+            totalEarlyCheckout: Math.max(0, totalEarlyCheckout),
             totalOtherMinutes: Math.max(0, totalOtherMinutes),
-            workingDays: Math.max(0, workingDays), 
-            presentDays: Math.max(0, presentDays), 
-            fullAbsenceCount: Math.max(0, fullAbsenceCount), 
-            halfAbsenceCount: Math.max(0, halfAbsenceCount), 
+            workingDays: Math.max(0, workingDays),
+            presentDays: Math.max(0, presentDays),
+            fullAbsenceCount: Math.max(0, fullAbsenceCount),
+            halfAbsenceCount: Math.max(0, halfAbsenceCount),
             sickLeaveCount: Math.max(0, sickLeaveCount),
             annualLeaveCount: Math.max(0, annualLeaveCount)
         };
@@ -993,7 +1019,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // so the summary table matches the daily breakdown the user sees.
     const baseEnrichedResults = React.useMemo(() => {
         const isFinalized = reportRun.is_final || project.status === 'closed';
-        
+
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
@@ -1007,7 +1033,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             if (isFinalized) {
                 // FINALIZED: Use stored values AS-IS — never recalculate
                 const storedDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? null;
-                
+
                 // If stored deductible is null/missing but we have late+early data, compute it
                 // This handles the case where results were fetched from wrong report run via fallback
                 const lateMin = result.late_minutes || 0;
@@ -1015,9 +1041,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const graceMin = result.grace_minutes ?? 15;
                 const approvedMin = result.approved_minutes || 0;
                 const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
-                
-                const effectiveDeductible = storedDeductible !== null 
-                    ? storedDeductible 
+
+                const effectiveDeductible = storedDeductible !== null
+                    ? storedDeductible
                     : computedDeductible;
 
                 return {
@@ -1043,14 +1069,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }
 
             // NON-FINALIZED: Recalculate from live punch data + day_overrides
-            const { 
-                totalLateMinutes, 
-                totalEarlyCheckout, 
+            const {
+                totalLateMinutes,
+                totalEarlyCheckout,
                 totalOtherMinutes,
-                workingDays, 
-                presentDays, 
-                fullAbsenceCount, 
-                halfAbsenceCount, 
+                workingDays,
+                presentDays,
+                fullAbsenceCount,
+                halfAbsenceCount,
                 sickLeaveCount,
                 annualLeaveCount
             } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
@@ -1086,9 +1112,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             .filter(result => {
                 const matchesSearch = String(result.attendance_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                     result.name.toLowerCase().includes(searchTerm.toLowerCase());
-                
+
                 if (!matchesSearch) return false;
-                
+
                 // Risk-based filtering
                 if (riskFilter === 'high-risk') {
                     const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
@@ -1101,31 +1127,31 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 } else if (riskFilter === 'unverified') {
                     return !result.isVerified;
                 }
-                
+
                 return true;
             })
             .sort((a, b) => {
                 // Always push "no punches" employees to the end
                 if (a.has_no_punches && !b.has_no_punches) return 1;
                 if (!a.has_no_punches && b.has_no_punches) return -1;
-                
+
                 let aVal = a[sort.key];
                 let bVal = b[sort.key];
-                
+
                 // For deductible sorting, use effective deductible if available
                 if (sort.key === 'deductible_minutes') {
                     aVal = a.effective_deductible_minutes ?? a.deductible_minutes ?? 0;
                     bVal = b.effective_deductible_minutes ?? b.deductible_minutes ?? 0;
                 }
-                
+
                 // Handle null/undefined values - push them to the end
                 if (aVal == null && bVal == null) return 0;
                 if (aVal == null) return 1;
                 if (bVal == null) return -1;
-                
+
                 if (typeof aVal === 'string') aVal = aVal.toLowerCase();
                 if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-                
+
                 if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
                 if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
                 return 0;
@@ -1151,24 +1177,24 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // Debounce verification updates to prevent rate limiting
     const debounceTimeoutRef = React.useRef(null);
     const pendingVerifiedRef = React.useRef(null);
-    
+
     const toggleVerification = (attendanceId) => {
         const attendanceIdStr = String(attendanceId);
-        const newVerified = verifiedEmployees.includes(attendanceIdStr) 
+        const newVerified = verifiedEmployees.includes(attendanceIdStr)
             ? verifiedEmployees.filter(id => id !== attendanceIdStr)
             : [...verifiedEmployees, attendanceIdStr];
-        
+
         // Update local state immediately for instant UI feedback
         setVerifiedEmployees(newVerified);
-        
+
         // Store pending changes
         pendingVerifiedRef.current = newVerified;
-        
+
         // Clear existing timeout
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
         }
-        
+
         // Debounce the API call by 1.5 seconds to batch multiple clicks
         debounceTimeoutRef.current = setTimeout(() => {
             if (pendingVerifiedRef.current) {
@@ -1198,7 +1224,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return r.full_absence_count === 0 && total === 0;
             })
             .map(r => String(r.attendance_id));
-        
+
         const newVerified = [...new Set([...verifiedEmployees, ...cleanEmployees])];
         setVerifiedEmployees(newVerified);
         updateVerificationMutation.mutate(newVerified);
@@ -1230,7 +1256,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const finalizeReportMutation = useMutation({
         mutationFn: async () => {
             console.log('[ReportDetailView] Starting finalization...');
-            
+
             // Show progress dialog
             setFinalizationProgress({
                 open: true,
@@ -1248,17 +1274,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             console.log('[ReportDetailView] Step 0: Writing UI values to AnalysisResult...');
             const currentEnriched = baseEnrichedResults;
             let updatedCount = 0;
-            
+
             for (const row of currentEnriched) {
                 // Build update payload with the EXACT values shown in the UI table
                 const updates = {};
                 let needsUpdate = false;
-                
+
                 // Compare UI values with stored AnalysisResult values
                 // Find the raw result to compare against
                 const rawResult = results.find(r => r.id === row.id);
                 if (!rawResult) continue;
-                
+
                 const fieldsToSync = [
                     { uiKey: 'working_days', dbKey: 'working_days' },
                     { uiKey: 'present_days', dbKey: 'present_days' },
@@ -1272,7 +1298,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     { uiKey: 'deductible_minutes', dbKey: 'deductible_minutes' },
                     { uiKey: 'grace_minutes', dbKey: 'grace_minutes' },
                 ];
-                
+
                 for (const f of fieldsToSync) {
                     const uiVal = row[f.uiKey] ?? 0;
                     const dbVal = rawResult[f.dbKey] ?? 0;
@@ -1281,7 +1307,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         needsUpdate = true;
                     }
                 }
-                
+
                 if (needsUpdate) {
                     console.log(`[ReportDetailView] Syncing UI→DB for ${row.attendance_id}:`, updates);
                     await base44.entities.AnalysisResult.update(row.id, updates);
@@ -1325,13 +1351,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     const currentBatch = batchResult.data.current_batch || [];
                     hasMore = batchResult.data.has_more;
 
-                    const percentage = totalEmployees > 0 ? Math.round(currentPos/totalEmployees*100) : 0;
-                    
+                    const percentage = totalEmployees > 0 ? Math.round(currentPos / totalEmployees * 100) : 0;
+
                     setFinalizationProgress(prev => ({
                         open: true,
                         current: currentPos,
                         total: totalEmployees,
-                        currentEmployee: currentBatch.length > 0 
+                        currentEmployee: currentBatch.length > 0
                             ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
                             : 'Processing...',
                         status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
@@ -1373,19 +1399,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         },
         onError: async (error) => {
             console.error('[ReportDetailView] Finalization error:', error);
-            
+
             setFinalizationProgress({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
 
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id], refetchType: 'all' }),
                 queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' })
             ]);
-            
+
             const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
             const actionRequired = error?.response?.data?.action_required;
-            
+
             console.error('[ReportDetailView] Error details:', { errorMsg, actionRequired });
-            
+
             if (actionRequired) {
                 toast.error(`${errorMsg}\n\nAction required: ${actionRequired}`, {
                     duration: 10000
@@ -1402,32 +1428,32 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         mutationFn: async () => {
             setIsSaving(true);
             setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
-            
+
             // Set this as the last saved report
             await base44.entities.Project.update(project.id, {
                 last_saved_report_id: reportRun.id
             });
-            
+
             // Delete existing report-generated exceptions for this report to prevent duplicates
-            const existingReportExceptions = exceptions.filter(e => 
+            const existingReportExceptions = exceptions.filter(e =>
                 e.created_from_report && e.report_run_id === reportRun.id
             );
-            
+
             if (existingReportExceptions.length > 0) {
                 setSaveProgress({ current: 0, total: 100, status: 'Removing old exceptions...' });
                 for (const ex of existingReportExceptions) {
                     await base44.entities.Exception.delete(ex.id);
                 }
             }
-            
+
             const exceptionsToCreate = [];
-            
+
             // Determine if current user made any edits that need approval
             const isCurrentUserRegular = userRole === 'user' && !isSupervisor;
-            
+
             for (const result of results) {
                 if (!result.day_overrides) continue;
-                
+
                 let dayOverrides = {};
                 try {
                     dayOverrides = JSON.parse(result.day_overrides);
@@ -1444,10 +1470,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     // Group by type, minutes, and shift override to create separate exceptions
                     const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
                     if (!datesByType[key]) {
-                        datesByType[key] = { 
-                            dates: [], 
-                            data: override, 
-                            attendance_id: result.attendance_id 
+                        datesByType[key] = {
+                            dates: [],
+                            data: override,
+                            attendance_id: result.attendance_id
                         };
                     }
                     datesByType[key].dates.push(dateStr);
@@ -1455,12 +1481,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                 for (const group of Object.values(datesByType)) {
                     const sortedDates = group.dates.sort();
-                    
+
                     // CRITICAL FIX: Time-based exceptions (late/early/other min) must be per-date,
                     // not spanning ranges — otherwise minutes apply to every day in the range.
                     const hasTimeMins = (group.data.lateMinutes > 0) || (group.data.earlyCheckoutMinutes > 0) || (group.data.otherMinutes > 0);
                     const ranges = [];
-                    
+
                     if (hasTimeMins) {
                         sortedDates.forEach(d => ranges.push({ start: d, end: d }));
                     } else {
@@ -1495,7 +1521,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             detailsParts.push(group.data.details);
                         }
 
-                        const detailsText = detailsParts.length > 0 
+                        const detailsText = detailsParts.length > 0
                             ? `Report edit: ${detailsParts.join(' | ')}`
                             : 'Report edit: Manual adjustment from report';
 
@@ -1550,7 +1576,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const batchSize = 10;
                 const totalBatches = Math.ceil(exceptionsToCreate.length / batchSize);
                 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-                
+
                 // Retry helper with backoff
                 const retryWithBackoff = async (fn, maxRetries = 3) => {
                     for (let i = 0; i < maxRetries; i++) {
@@ -1567,17 +1593,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         }
                     }
                 };
-                
+
                 for (let i = 0; i < exceptionsToCreate.length; i += batchSize) {
                     const batch = exceptionsToCreate.slice(i, i + batchSize);
                     const batchNumber = Math.floor(i / batchSize) + 1;
-                    
-                    setSaveProgress({ 
-                        current: batchNumber, 
-                        total: totalBatches, 
-                        status: `Saving exceptions ${batchNumber}/${totalBatches}...` 
+
+                    setSaveProgress({
+                        current: batchNumber,
+                        total: totalBatches,
+                        status: `Saving exceptions ${batchNumber}/${totalBatches}...`
                     });
-                    
+
                     try {
                         await retryWithBackoff(() => base44.entities.Exception.bulkCreate(batch));
                         await delay(1500); // Delay between batches
@@ -1602,9 +1628,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
-            
+
             // Note: Approval links functionality removed - department heads now use pre-approval system
-            
+
             setIsSaving(false);
             setSaveProgress(null);
         },
@@ -1627,78 +1653,78 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 toast.error('No data to export');
                 return;
             }
-        
-        const includeRamadanGiftInExport = showRamadanGiftColumn;
 
-        // Build headers matching the visible table columns - using Hours instead of Minutes
-        const headers = [
-            'Attendance ID',
-            'Name',
-            'Has Punches',
-            'Working Days',
-            'Present Days',
-            'Annual Leave',
-            'Sick Leave',
-            'LOP Days',
-            'Half Days',
-            'Late (Hours)',
-            'Early Checkout (Hours)',
-            ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
-            'Other (Hours)',
-            'Grace (Hours)',
-            ...(includeRamadanGiftInExport ? ['Ramadan Gift (min)'] : []),
-            'Deductible (Hours)',
-            'Notes'
-        ];
+            const includeRamadanGiftInExport = showRamadanGiftColumn;
 
-        const rows = filteredResults.map(r => {
-            // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
-            // For non-finalized reports, use the recalculated values from enrichedResults
-            const deductible = (r.effective_deductible_minutes ?? r.deductible_minutes) || 0;
-            const late = r.late_minutes || 0;
-            const early = r.early_checkout_minutes || 0;
-            const grace = r.grace_minutes ?? 15;
-
-            const baseRow = [
-                r.attendance_id,
-                r.name,
-                r.has_no_punches ? 'No' : 'Yes',
-                Math.max(0, r.working_days || 0),
-                Math.max(0, (r.manual_present_days ?? r.present_days) || 0),
-                Math.max(0, r.manual_annual_leave_count ?? r.annual_leave_count ?? 0),
-                Math.max(0, r.manual_sick_leave_count ?? r.sick_leave_count ?? 0),
-                Math.max(0, (r.manual_full_absence_count ?? r.full_absence_count) || 0),
-                Math.max(0, r.half_absence_count || 0),
-                minutesToHours(Math.max(0, late)),
-                minutesToHours(Math.max(0, early))
+            // Build headers matching the visible table columns - using Hours instead of Minutes
+            const headers = [
+                'Attendance ID',
+                'Name',
+                'Has Punches',
+                'Working Days',
+                'Present Days',
+                'Annual Leave',
+                'Sick Leave',
+                'LOP Days',
+                'Half Days',
+                'Late (Hours)',
+                'Early Checkout (Hours)',
+                ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
+                'Other (Hours)',
+                'Grace (Hours)',
+                ...(includeRamadanGiftInExport ? ['Ramadan Gift (min)'] : []),
+                'Deductible (Hours)',
+                'Notes'
             ];
 
-            // Add approved minutes only if company allows it
-            if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
-                baseRow.push(minutesToHours(Math.max(0, r.approved_minutes || 0)));
-            }
+            const rows = filteredResults.map(r => {
+                // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
+                // For non-finalized reports, use the recalculated values from enrichedResults
+                const deductible = (r.effective_deductible_minutes ?? r.deductible_minutes) || 0;
+                const late = r.late_minutes || 0;
+                const early = r.early_checkout_minutes || 0;
+                const grace = r.grace_minutes ?? 15;
 
-            baseRow.push(
-                minutesToHours(Math.max(0, r.other_minutes || 0)),
-                minutesToHours(Math.max(0, grace))
-            );
+                const baseRow = [
+                    r.attendance_id,
+                    r.name,
+                    r.has_no_punches ? 'No' : 'Yes',
+                    Math.max(0, r.working_days || 0),
+                    Math.max(0, (r.manual_present_days ?? r.present_days) || 0),
+                    Math.max(0, r.manual_annual_leave_count ?? r.annual_leave_count ?? 0),
+                    Math.max(0, r.manual_sick_leave_count ?? r.sick_leave_count ?? 0),
+                    Math.max(0, (r.manual_full_absence_count ?? r.full_absence_count) || 0),
+                    Math.max(0, r.half_absence_count || 0),
+                    minutesToHours(Math.max(0, late)),
+                    minutesToHours(Math.max(0, early))
+                ];
 
-            if (includeRamadanGiftInExport) {
-                baseRow.push(Math.max(0, r.ramadan_gift_minutes || 0));
-            }
+                // Add approved minutes only if company allows it
+                if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
+                    baseRow.push(minutesToHours(Math.max(0, r.approved_minutes || 0)));
+                }
 
-            baseRow.push(
-                minutesToHours(Math.max(0, deductible)),
-                r.notes || ''
-            );
+                baseRow.push(
+                    minutesToHours(Math.max(0, r.other_minutes || 0)),
+                    minutesToHours(Math.max(0, grace))
+                );
 
-            return baseRow;
-        });
+                if (includeRamadanGiftInExport) {
+                    baseRow.push(Math.max(0, r.ramadan_gift_minutes || 0));
+                }
 
-        const data = [headers, ...rows];
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
+                baseRow.push(
+                    minutesToHours(Math.max(0, deductible)),
+                    r.notes || ''
+                );
+
+                return baseRow;
+            });
+
+            const data = [headers, ...rows];
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
             XLSX.writeFile(wb, `attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
             toast.success('Attendance report exported');
         } catch (error) {
@@ -1754,7 +1780,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
 
         if (oldValue !== newValue) {
-            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(()=>{});
+            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(() => { });
         }
 
         toast.success('Ramadan gift saved');
@@ -1807,63 +1833,63 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             )}
                         </div>
                         <div className="flex gap-2">
-                           <Button
-                               onClick={exportToExcel}
-                               variant="outline"
-                           >
-                               <Download className="w-4 h-4 mr-2" />
-                               Export
-                           </Button>
-                           {project.status !== 'closed' && (
-                               <>
-                                   <Button
-                                       onClick={() => setShowSaveConfirmation(true)}
-                                       disabled={isSaving}
-                                       className="bg-green-600 hover:bg-green-700"
-                                   >
-                                       <Save className="w-4 h-4 mr-2" />
-                                       {isSaving ? 'Saving...' : 'Save Report'}
-                                   </Button>
-                                   {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
-                                       <Button
-                                           onClick={() => finalizeReportMutation.mutate()}
-                                           disabled={finalizeReportMutation.isPending}
-                                           className="bg-purple-600 hover:bg-purple-700"
-                                           title="Finalize report without generating approval links"
-                                       >
-                                           {finalizeReportMutation.isPending ? (
-                                               <>
-                                                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                   Finalizing...
-                                               </>
-                                           ) : (
-                                               <>
-                                                   <CheckCircle className="w-4 h-4 mr-2" />
-                                                   Finalize Report
-                                               </>
-                                           )}
-                                       </Button>
-                                   )}
-                                   {isAdmin && reportRun.is_final && (
-                                       <Button
-                                           onClick={() => unfinalizeReportMutation.mutate()}
-                                           disabled={unfinalizeReportMutation.isPending}
-                                           variant="outline"
-                                           className="border-red-300 text-red-600 hover:bg-red-50"
-                                           title="Un-finalize report (admin only)"
-                                       >
-                                           {unfinalizeReportMutation.isPending ? (
-                                               <>
-                                                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                   Un-finalizing...
-                                               </>
-                                           ) : (
-                                               <>Un-finalize Report</>
-                                           )}
-                                       </Button>
-                                   )}
-                               </>
-                           )}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Export
+                            </Button>
+                            {project.status !== 'closed' && (
+                                <>
+                                    <Button
+                                        onClick={() => setShowSaveConfirmation(true)}
+                                        disabled={isSaving}
+                                        className="bg-green-600 hover:bg-green-700"
+                                    >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {isSaving ? 'Saving...' : 'Save Report'}
+                                    </Button>
+                                    {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
+                                        <Button
+                                            onClick={() => finalizeReportMutation.mutate()}
+                                            disabled={finalizeReportMutation.isPending}
+                                            className="bg-purple-600 hover:bg-purple-700"
+                                            title="Finalize report without generating approval links"
+                                        >
+                                            {finalizeReportMutation.isPending ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Finalizing...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                                    Finalize Report
+                                                </>
+                                            )}
+                                        </Button>
+                                    )}
+                                    {isAdmin && reportRun.is_final && (
+                                        <Button
+                                            onClick={() => unfinalizeReportMutation.mutate()}
+                                            disabled={unfinalizeReportMutation.isPending}
+                                            variant="outline"
+                                            className="border-red-300 text-red-600 hover:bg-red-50"
+                                            title="Un-finalize report (admin only)"
+                                        >
+                                            {unfinalizeReportMutation.isPending ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Un-finalizing...
+                                                </>
+                                            ) : (
+                                                <>Un-finalize Report</>
+                                            )}
+                                        </Button>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
                 </CardContent>
@@ -1968,19 +1994,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <tbody className="[&_tr:last-child]:border-0">
                                 {filteredResults.map((result) => (
                                     <ReportTableRow
-                                    key={result.id}
-                                    result={result}
-                                    isAdmin={isAdmin}
-                                    isSupervisor={isSupervisor}
-                                    isDepartmentHead={isDepartmentHead}
-                                    project={project}
-                                    reportRun={reportRun}
-                                    showRamadanGiftColumn={showRamadanGiftColumn}
-                                    onToggleVerification={toggleVerification}
-                                    onEditGrace={setEditingGraceMinutes}
-                                    onShowBreakdown={showDailyBreakdown}
-                                    onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
-                                    onSaveRamadanGift={saveRamadanGift}
+                                        key={result.id}
+                                        result={result}
+                                        isAdmin={isAdmin}
+                                        isSupervisor={isSupervisor}
+                                        isDepartmentHead={isDepartmentHead}
+                                        project={project}
+                                        reportRun={reportRun}
+                                        showRamadanGiftColumn={showRamadanGiftColumn}
+                                        onToggleVerification={toggleVerification}
+                                        onEditGrace={setEditingGraceMinutes}
+                                        onShowBreakdown={showDailyBreakdown}
+                                        onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
+                                        onSaveRamadanGift={saveRamadanGift}
                                     />
                                 ))}
                             </tbody>

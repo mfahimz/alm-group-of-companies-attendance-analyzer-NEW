@@ -82,7 +82,7 @@ export default function DailyBreakdownDialog({
         }
 
         const attendanceIdStr = String(currentResult.attendance_id);
-        
+
         // MIDNIGHT FIX: Fetch punches including day before and day after for crossover
         const dayBeforeStart = new Date(startDate);
         dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
@@ -90,13 +90,13 @@ export default function DailyBreakdownDialog({
         const dayAfterEnd = new Date(endDate);
         dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
         const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
-        
+
         const allEmployeePunchesExtended = punches.filter(p =>
             String(p.attendance_id) === attendanceIdStr &&
             p.punch_date >= dayBeforeStartStr &&
             p.punch_date <= dayAfterEndStr
         );
-        
+
         const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
         const employeeExceptions = exceptions.filter(e =>
             (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
@@ -114,15 +114,15 @@ export default function DailyBreakdownDialog({
             if (!s.effective_from || !s.effective_to) return true;
             const from = new Date(s.effective_from);
             const to = new Date(s.effective_to);
-            const cd = new Date(new Date().setHours(0,0,0,0)); // placeholder, overridden below
+            const cd = new Date(new Date().setHours(0, 0, 0, 0)); // placeholder, overridden below
             return true; // simplified - actual check done inline
         };
 
         const checkShiftEffective = (s, currentDate) => {
             if (!s.effective_from || !s.effective_to) return true;
-            const from = new Date(s.effective_from); from.setHours(0,0,0,0);
-            const to = new Date(s.effective_to); to.setHours(0,0,0,0);
-            const cd = new Date(currentDate); cd.setHours(0,0,0,0);
+            const from = new Date(s.effective_from); from.setHours(0, 0, 0, 0);
+            const to = new Date(s.effective_to); to.setHours(0, 0, 0, 0);
+            const cd = new Date(currentDate); cd.setHours(0, 0, 0, 0);
             return cd >= from && cd <= to;
         };
 

@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     try {
         console.log('[backfillSalaryExtraPrevMonth] Function invoked');
         const base44 = createClientFromRequest(req);
-        
+
         const user = await base44.auth.me();
         if (!user || user.role !== 'admin') {
             return Response.json({ error: 'Admin access required' }, { status: 403 });
@@ -28,8 +28,8 @@ Deno.serve(async (req) => {
         console.log('[backfillSalaryExtraPrevMonth] Params:', { project_id, report_run_id, mode });
 
         if (!project_id || !report_run_id) {
-            return Response.json({ 
-                error: 'project_id and report_run_id are required' 
+            return Response.json({
+                error: 'project_id and report_run_id are required'
             }, { status: 400 });
         }
 
@@ -42,16 +42,16 @@ Deno.serve(async (req) => {
 
         // Guard: Only Al Maraghi Motors
         if (project.company !== 'Al Maraghi Motors') {
-            return Response.json({ 
+            return Response.json({
                 error: 'This function only applies to Al Maraghi Motors projects',
                 company: project.company
             }, { status: 400 });
         }
 
         // Verify report is final
-        const reports = await base44.asServiceRole.entities.ReportRun.filter({ 
-            id: report_run_id, 
-            project_id: project_id 
+        const reports = await base44.asServiceRole.entities.ReportRun.filter({
+            id: report_run_id,
+            project_id: project_id
         });
         if (reports.length === 0) {
             return Response.json({ error: 'Report not found for this project' }, { status: 404 });
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
         const projectDateTo = new Date(project.date_to);
         const salaryMonthStart = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth(), 1);
         const salaryMonthEnd = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth() + 1, 0);
-        
+
         const salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
         const salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
 
@@ -118,8 +118,8 @@ Deno.serve(async (req) => {
         }
 
         // Filter snapshots that need updating
-        const snapshotsToUpdate = snapshots.filter(s => 
-            s.salary_month_start === null || 
+        const snapshotsToUpdate = snapshots.filter(s =>
+            s.salary_month_start === null ||
             s.salary_month_start === undefined ||
             s.extra_prev_month_deductible_minutes === null ||
             s.extra_prev_month_deductible_minutes === undefined
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
                 updated_snapshots: mode === 'APPLY' ? snapshotsToUpdate.length : 0,
                 skipped_snapshots: snapshots.length - snapshotsToUpdate.length,
                 dry_run: mode === 'DRY_RUN',
-                message: mode === 'DRY_RUN' 
+                message: mode === 'DRY_RUN'
                     ? `Would update ${snapshotsToUpdate.length} snapshots (no extra prev month range)`
                     : `Updated ${snapshotsToUpdate.length} snapshots (no extra prev month range)`
             });
@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
         const parseTime = (timeStr, includeSeconds = false) => {
             try {
                 if (!timeStr || timeStr === '—' || timeStr === '-') return null;
-                
+
                 if (includeSeconds) {
                     let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
                     if (timeMatch) {
@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
                         return date;
                     }
                 }
-                
+
                 let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                 if (timeMatch) {
                     let hours = parseInt(timeMatch[1]);
@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
                     date.setHours(hours, minutes, 0, 0);
                     return date;
                 }
-                
+
                 timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
                 if (timeMatch) {
                     const hours = parseInt(timeMatch[1]);
@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
                     date.setHours(hours, minutes, seconds, 0);
                     return date;
                 }
-                
+
                 return null;
             } catch {
                 return null;
@@ -259,28 +259,28 @@ Deno.serve(async (req) => {
 
         const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds) => {
             if (!shift || dayPunches.length === 0) return [];
-            
+
             const punchesWithTime = dayPunches.map(p => ({
                 ...p,
                 time: p.time || parseTime(p.timestamp_raw, includeSeconds)
             })).filter(p => p.time).sort((a, b) => a.time - b.time);
-            
+
             if (punchesWithTime.length === 0) return [];
-            
+
             const shiftPoints = [
                 { type: 'AM_START', time: parseTime(shift.am_start) },
                 { type: 'AM_END', time: parseTime(shift.am_end) },
                 { type: 'PM_START', time: parseTime(shift.pm_start) },
                 { type: 'PM_END', time: parseTime(shift.pm_end) }
             ].filter(sp => sp.time);
-            
+
             const matches = [];
             const usedShiftPoints = new Set();
-            
+
             for (const punch of punchesWithTime) {
                 let closestMatch = null;
                 let minDistance = Infinity;
-                
+
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
                     const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
@@ -289,13 +289,13 @@ Deno.serve(async (req) => {
                         closestMatch = shiftPoint;
                     }
                 }
-                
+
                 if (closestMatch) {
                     matches.push({ punch, matchedTo: closestMatch.type, shiftTime: closestMatch.time });
                     usedShiftPoints.add(closestMatch.type);
                 }
             }
-            
+
             return matches;
         };
 
@@ -303,14 +303,14 @@ Deno.serve(async (req) => {
         const calculateExtraPrevMonthMinutes = (attendanceId, empData) => {
             const attendanceIdStr = String(attendanceId);
             const includeSeconds = false; // Al Maraghi Motors doesn't use seconds
-            
-            const employeePunches = punches.filter(p => 
+
+            const employeePunches = punches.filter(p =>
                 String(p.attendance_id) === attendanceIdStr &&
-                p.punch_date >= extraPrevMonthFrom && 
+                p.punch_date >= extraPrevMonthFrom &&
                 p.punch_date <= extraPrevMonthTo
             );
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-            const employeeExceptions = allExceptions.filter(e => 
+            const employeeExceptions = allExceptions.filter(e =>
                 (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
                 e.use_in_analysis !== false &&
                 e.is_custom_type !== true
@@ -344,7 +344,7 @@ Deno.serve(async (req) => {
                 } else if (empData?.weekly_off) {
                     weeklyOffDay = dayNameToNumber[empData.weekly_off];
                 }
-                
+
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                     continue; // Skip weekly off
                 }
@@ -358,7 +358,7 @@ Deno.serve(async (req) => {
                     } catch { return false; }
                 });
 
-                const hasPublicHoliday = matchingExceptions.some(ex => 
+                const hasPublicHoliday = matchingExceptions.some(ex =>
                     ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                 );
                 if (hasPublicHoliday) continue;
@@ -376,7 +376,7 @@ Deno.serve(async (req) => {
 
                 // Get punches for this day
                 const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
-                
+
                 // NO PUNCHES = 0 minutes (strict rule from spec)
                 if (rawDayPunches.length === 0) {
                     continue;
@@ -404,13 +404,13 @@ Deno.serve(async (req) => {
                                     shift = s;
                                     break;
                                 }
-                            } catch {}
+                            } catch { }
                         }
                     }
                     if (!shift) {
                         if (dayOfWeek === 5) {
                             shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s)) ||
-                                    employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                                employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                         } else {
                             shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                         }
@@ -437,7 +437,7 @@ Deno.serve(async (req) => {
                 // Track allowed minutes
                 let allowedMinutesForDay = 0;
                 let approvedMinutesForDay = 0;
-                if (dateException && dateException.type === 'ALLOWED_MINUTES' && 
+                if (dateException && dateException.type === 'ALLOWED_MINUTES' &&
                     dateException.approval_status === 'approved_dept_head') {
                     allowedMinutesForDay = dateException.allowed_minutes || 0;
                     approvedMinutesForDay = allowedMinutesForDay;
@@ -445,7 +445,7 @@ Deno.serve(async (req) => {
 
                 // Check for manual time exception
                 const hasManualTimeException = dateException && (
-                    dateException.type === 'MANUAL_LATE' || 
+                    dateException.type === 'MANUAL_LATE' ||
                     dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
                     (dateException.late_minutes > 0) ||
                     (dateException.early_checkout_minutes > 0) ||
@@ -462,12 +462,12 @@ Deno.serve(async (req) => {
                     if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
                 } else if (dayPunches.length > 0) {
                     const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
-                    
+
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         const punchTime = match.punch.time;
                         const shiftTime = match.shiftTime;
-                        
+
                         if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
                             dayLateMinutes += Math.round((punchTime - shiftTime) / (1000 * 60));
                         }
@@ -475,7 +475,7 @@ Deno.serve(async (req) => {
                             dayEarlyMinutes += Math.round((shiftTime - punchTime) / (1000 * 60));
                         }
                     }
-                    
+
                     // Apply allowed minutes offset
                     if (allowedMinutesForDay > 0) {
                         const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
@@ -493,7 +493,7 @@ Deno.serve(async (req) => {
                 }
 
                 // Calculate day deductible: max(0, late + early + other - grace - approved)
-                const dayDeductible = Math.max(0, 
+                const dayDeductible = Math.max(0,
                     dayLateMinutes + dayEarlyMinutes + dayOtherMinutes - graceMinutesPerDay - approvedMinutesForDay
                 );
                 totalExtraDeductibleMinutes += dayDeductible;
@@ -508,7 +508,7 @@ Deno.serve(async (req) => {
 
         for (const snapshot of snapshotsToUpdate) {
             // Find employee data
-            const emp = employees.find(e => 
+            const emp = employees.find(e =>
                 String(e.attendance_id) === String(snapshot.attendance_id) ||
                 String(e.hrms_id) === String(snapshot.hrms_id)
             );
@@ -544,7 +544,7 @@ Deno.serve(async (req) => {
             skipped_snapshots: snapshots.length - snapshotsToUpdate.length,
             dry_run: mode === 'DRY_RUN',
             details: mode === 'DRY_RUN' ? results : undefined,
-            message: mode === 'DRY_RUN' 
+            message: mode === 'DRY_RUN'
                 ? `Would update ${snapshotsToUpdate.length} snapshots`
                 : `Updated ${updatedCount} snapshots`
         });

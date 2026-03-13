@@ -115,7 +115,7 @@ export default function RunAnalysisTab({ project }) {
     const parseTime = (timeStr, includeSeconds = false) => {
         try {
             if (!timeStr || timeStr === '—') return null;
-            
+
             // For Al Maraghi Automotive: Match with seconds (HH:MM:SS AM/PM)
             if (includeSeconds) {
                 let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
@@ -124,43 +124,43 @@ export default function RunAnalysisTab({ project }) {
                     const minutes = parseInt(timeMatch[2]);
                     const seconds = parseInt(timeMatch[3]);
                     const period = timeMatch[4].toUpperCase();
-                    
+
                     if (period === 'PM' && hours !== 12) hours += 12;
                     if (period === 'AM' && hours === 12) hours = 0;
-                    
+
                     const date = new Date();
                     date.setHours(hours, minutes, seconds, 0);
                     return date;
                 }
             }
-            
+
             // Standard format: HH:MM AM/PM (without seconds)
             let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
                 const period = timeMatch[3].toUpperCase();
-                
+
                 if (period === 'PM' && hours !== 12) hours += 12;
                 if (period === 'AM' && hours === 12) hours = 0;
-                
+
                 const date = new Date();
                 date.setHours(hours, minutes, 0, 0);
                 return date;
             }
-            
+
             // 24-hour format with optional seconds
             timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
                 const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
-                
+
                 const date = new Date();
                 date.setHours(hours, minutes, seconds, 0);
                 return date;
             }
-            
+
             return null;
         } catch {
             return null;
@@ -169,7 +169,7 @@ export default function RunAnalysisTab({ project }) {
 
     const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr, includeSeconds = false) => {
         if (!shift || dayPunches.length === 0) return [];
-        
+
         const punchesWithTime = dayPunches.map(p => {
             const time = parseTime(p.timestamp_raw, includeSeconds);
             if (!time) return null;
@@ -177,9 +177,9 @@ export default function RunAnalysisTab({ project }) {
             const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
             return { ...p, time: adjustedTime };
         }).filter(p => p).sort((a, b) => a.time - b.time);
-        
+
         if (punchesWithTime.length === 0) return [];
-        
+
         // Adjust PM_END if it's midnight (00:00)
         const pmEndTime = parseTime(shift.pm_end, includeSeconds);
         let adjustedPmEnd = pmEndTime;
@@ -193,35 +193,35 @@ export default function RunAnalysisTab({ project }) {
             { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
             { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
-        
+
         const matches = [];
         const usedShiftPoints = new Set();
-        
+
         for (const punch of punchesWithTime) {
             let closestMatch = null;
             let minDistance = Infinity;
             let isExtendedMatch = false;
             let isFarExtendedMatch = false;
-            
+
             // Phase 1: Normal match (±60-120 minutes)
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
-                
+
                 const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                
+
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
                     closestMatch = shiftPoint;
                 }
             }
-            
+
             // Phase 2: Extended match (±120 minutes)
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
+
                     const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
+
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
@@ -229,14 +229,14 @@ export default function RunAnalysisTab({ project }) {
                     }
                 }
             }
-            
+
             // Phase 3: Far extended match (±180 minutes)
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
+
                     const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
+
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
@@ -244,7 +244,7 @@ export default function RunAnalysisTab({ project }) {
                     }
                 }
             }
-            
+
             if (closestMatch) {
                 matches.push({
                     punch,
@@ -266,13 +266,13 @@ export default function RunAnalysisTab({ project }) {
                 });
             }
         }
-        
+
         return matches;
     };
 
     const detectPartialDay = (dayPunches, shift, nextDateStr, includeSeconds = false) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-        
+
         const punchesWithTime = dayPunches.map(p => {
             const time = parseTime(p.timestamp_raw, includeSeconds);
             if (!time) return null;
@@ -280,31 +280,31 @@ export default function RunAnalysisTab({ project }) {
             const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
             return { ...p, time: adjustedTime };
         }).filter(p => p).sort((a, b) => a.time - b.time);
-        
+
         if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
-        
+
         const firstPunch = punchesWithTime[0].time;
         const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
-        
+
         const amStart = parseTime(shift.am_start, includeSeconds);
         const pmEndTime = parseTime(shift.pm_end, includeSeconds);
         let adjustedPmEnd = pmEndTime;
         if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
             adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
         }
-        
+
         if (!amStart || !adjustedPmEnd) return { isPartial: false, reason: null };
-        
+
         const expectedMinutes = (adjustedPmEnd - amStart) / (1000 * 60);
         const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
-        
+
         if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
-            return { 
-                isPartial: true, 
-                reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)` 
+            return {
+                isPartial: true,
+                reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)`
             };
         }
-        
+
         return { isPartial: false, reason: null };
     };
 
@@ -333,33 +333,33 @@ export default function RunAnalysisTab({ project }) {
 
     const analyzeEmployee = async (attendance_id) => {
         const attendanceIdStr = String(attendance_id);
-        const employeePunches = punches.filter(p => 
-            String(p.attendance_id) === attendanceIdStr && 
-            p.punch_date >= dateFrom && 
+        const employeePunches = punches.filter(p =>
+            String(p.attendance_id) === attendanceIdStr &&
+            p.punch_date >= dateFrom &&
             p.punch_date <= dateTo
         );
         const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
 
         // Filter exceptions - no approval workflow needed, use immediately
-         const employeeExceptions = exceptions.filter(e => {
-                       try {
-                           const matches = (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
-                                  e.use_in_analysis !== false &&
-                                  e.is_custom_type !== true;
-                           if (matches && e.type === 'SICK_LEAVE') {
-                               console.log(`Found SICK_LEAVE exception for attendance_id ${attendanceIdStr}:`, e);
-                           }
-                           return matches;
-                       } catch (error) {
-                           console.error(`Error filtering exception ${e.id}:`, error);
-                           return false;
-                       }
-                   });
-         console.log(`Employee ${attendanceIdStr} - Total exceptions: ${employeeExceptions.length}, SICK_LEAVE: ${employeeExceptions.filter(e => e.type === 'SICK_LEAVE').length}`);
-        
+        const employeeExceptions = exceptions.filter(e => {
+            try {
+                const matches = (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+                    e.use_in_analysis !== false &&
+                    e.is_custom_type !== true;
+                if (matches && e.type === 'SICK_LEAVE') {
+                    console.log(`Found SICK_LEAVE exception for attendance_id ${attendanceIdStr}:`, e);
+                }
+                return matches;
+            } catch (error) {
+                console.error(`Error filtering exception ${e.id}:`, error);
+                return false;
+            }
+        });
+        console.log(`Employee ${attendanceIdStr} - Total exceptions: ${employeeExceptions.length}, SICK_LEAVE: ${employeeExceptions.filter(e => e.type === 'SICK_LEAVE').length}`);
+
         // Get employee to determine weekly off day
         const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-        
+
         // Enable seconds parsing for Al Maraghi Automotive only
         const includeSeconds = project.company === 'Al Maraghi Automotive';
 
@@ -378,13 +378,13 @@ export default function RunAnalysisTab({ project }) {
 
         const startDate = new Date(dateFrom);
         const endDate = new Date(dateTo);
-        
+
         // Map day names to numbers
         const dayNameToNumber = {
             'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
             'Thursday': 4, 'Friday': 5, 'Saturday': 6
         };
-        
+
         for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
@@ -397,7 +397,7 @@ export default function RunAnalysisTab({ project }) {
             } else if (employee?.weekly_off) {
                 weeklyOffDay = dayNameToNumber[employee.weekly_off];
             }
-            
+
             // Skip weekly off day (don't count as working day or absence)
             if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                 continue;
@@ -406,27 +406,27 @@ export default function RunAnalysisTab({ project }) {
             working_days++;
 
             // Find all matching exceptions and get the latest one by created_date (with error handling)
-             let dateException = null;
-             try {
-                 const matchingExceptions = employeeExceptions.filter(ex => {
-                     try {
-                         const exFrom = new Date(ex.date_from);
-                         const exTo = new Date(ex.date_to);
-                         return currentDate >= exFrom && currentDate <= exTo && 
-                                (String(ex.attendance_id) === 'ALL' || String(ex.attendance_id) === attendanceIdStr);
-                     } catch (error) {
-                         console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
-                         return false;
-                     }
-                 });
+            let dateException = null;
+            try {
+                const matchingExceptions = employeeExceptions.filter(ex => {
+                    try {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        return currentDate >= exFrom && currentDate <= exTo &&
+                            (String(ex.attendance_id) === 'ALL' || String(ex.attendance_id) === attendanceIdStr);
+                    } catch (error) {
+                        console.error(`Error matching exception ${ex.id} for date ${dateStr}:`, error);
+                        return false;
+                    }
+                });
 
-                 dateException = matchingExceptions.length > 0
-                     ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
-                     : null;
-             } catch (error) {
-                 console.error(`Error processing exceptions for date ${dateStr}:`, error);
-                 dateException = null;
-             }
+                dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                    : null;
+            } catch (error) {
+                console.error(`Error processing exceptions for date ${dateStr}:`, error);
+                dateException = null;
+            }
 
             if (dateException) {
                 if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
@@ -495,7 +495,7 @@ export default function RunAnalysisTab({ project }) {
             if (!shift) {
                 // Try to find a general shift that applies to this day by checking applicable_days
                 const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
-                
+
                 for (const s of applicableShifts) {
                     // Check if shift has applicable_days specified
                     if (s.applicable_days) {
@@ -513,7 +513,7 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
                 }
-                
+
                 // If no applicable_days match found, fall back to is_friday_shift logic
                 if (!shift) {
                     if (dayOfWeek === 5) {
@@ -570,8 +570,8 @@ export default function RunAnalysisTab({ project }) {
                 }
             }
 
-            let rawDayPunches = punches.filter(p => 
-                String(p.attendance_id) === attendanceIdStr && 
+            let rawDayPunches = punches.filter(p =>
+                String(p.attendance_id) === attendanceIdStr &&
                 p.punch_date === dateStr
             ).sort((a, b) => {
                 const timeA = parseTime(a.timestamp_raw, includeSeconds);
@@ -613,29 +613,29 @@ export default function RunAnalysisTab({ project }) {
             }
 
             let filteredPunches = filterMultiplePunches(rawDayPunches, shift, includeSeconds);
-            
+
             // Check if this is a weekly off or holiday for overtime premium calculation
             let isWeeklyOffForOT = false;
             let isHolidayForOT = false;
-            
+
             if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                 isWeeklyOffForOT = true;
             }
             if (dateException && (dateException.type === 'PUBLIC_HOLIDAY' || dateException.type === 'OFF')) {
                 isHolidayForOT = true;
             }
-            
+
             let punchMatches = [];
             let hasUnmatchedPunch = false;
             if (shift && filteredPunches.length > 0) {
                 punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, nextDateStr, includeSeconds);
                 hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
             }
-            
-            const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
-                                   shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
-                                   shift.am_end !== '—' && shift.pm_start !== '—' &&
-                                   shift.am_end !== '-' && shift.pm_start !== '-';
+
+            const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+                shift.am_end !== '—' && shift.pm_start !== '—' &&
+                shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
             const partialDayResult = detectPartialDay(filteredPunches, shift, nextDateStr, includeSeconds);
@@ -673,9 +673,9 @@ export default function RunAnalysisTab({ project }) {
             // ONLY for Al Maraghi Auto Repairs - approved minutes reduce deductible amount
             let approvedMinutesForDay = 0;
             try {
-                if (project.company === 'Al Maraghi Auto Repairs' && 
-                    dateException && 
-                    dateException.type === 'ALLOWED_MINUTES' && 
+                if (project.company === 'Al Maraghi Auto Repairs' &&
+                    dateException &&
+                    dateException.type === 'ALLOWED_MINUTES' &&
                     dateException.approval_status === 'approved_dept_head') {
                     approvedMinutesForDay = dateException.allowed_minutes || 0;
                 }
@@ -686,13 +686,13 @@ export default function RunAnalysisTab({ project }) {
 
             // Skip time calculation if there's an exception that handles attendance status OR has manual time values
             const hasManualTimeException = dateException && (
-                dateException.type === 'MANUAL_LATE' || 
+                dateException.type === 'MANUAL_LATE' ||
                 dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
                 (dateException.late_minutes && dateException.late_minutes > 0) ||
                 (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) ||
                 (dateException.other_minutes && dateException.other_minutes > 0)
             );
-            
+
             const shouldSkipTimeCalculation = dateException && [
                 'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
@@ -712,20 +712,20 @@ export default function RunAnalysisTab({ project }) {
             } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
-                
+
                 for (const match of punchMatches) {
                     if (!match.matchedTo) continue;
-                    
+
                     const punchTime = match.punch.time;
                     const shiftTime = match.shiftTime;
-                    
+
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                         if (punchTime > shiftTime) {
                             const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
                             dayLateMinutes += minutes;
                         }
                     }
-                    
+
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                         if (punchTime < shiftTime) {
                             const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
@@ -733,7 +733,7 @@ export default function RunAnalysisTab({ project }) {
                         }
                     }
                 }
-                
+
                 // NEW LOGIC for Al Maraghi Auto Repairs:
                 // 1. Calculate total actual late+early minutes
                 // 2. Subtract approved minutes FIRST (don't deduct these at all)
@@ -743,7 +743,7 @@ export default function RunAnalysisTab({ project }) {
                     const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
                     // Subtract approved minutes from total
                     const excessMinutes = Math.max(0, totalDayMinutes - approvedMinutesForDay);
-                    
+
                     // Proportionally distribute excess back to late and early
                     if (totalDayMinutes > 0 && excessMinutes > 0) {
                         const lateRatio = dayLateMinutes / totalDayMinutes;
@@ -756,13 +756,13 @@ export default function RunAnalysisTab({ project }) {
                         dayEarlyMinutes = 0;
                     }
                 }
-                
+
                 late_minutes += dayLateMinutes;
                 early_checkout_minutes += dayEarlyMinutes;
-                }
+            }
 
             const expectedPunches = isSingleShift ? 2 : 4;
-            
+
             // Mark as abnormal if any punch couldn't be matched or needed extended matching
             const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
             const hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
@@ -786,17 +786,17 @@ export default function RunAnalysisTab({ project }) {
                 abnormal_dates_list.push(dateStr);
                 // Extra punches are warning (YELLOW), not critical
             }
-            
+
             // Detect extremely late punches (beyond extended match window)
             if (shift && filteredPunches.length > 0) {
                 for (const punch of filteredPunches) {
                     const punchTime = parseTime(punch.timestamp_raw, includeSeconds);
                     if (!punchTime) continue;
-                    
+
                     // Check against shift start times
                     const amStartTime = parseTime(shift.am_start);
                     const pmStartTime = parseTime(shift.pm_start);
-                    
+
                     if (amStartTime) {
                         const latenessMinutes = (punchTime - amStartTime) / (1000 * 60);
                         if (latenessMinutes > 120 && latenessMinutes < 480) { // Between 2-8 hours late
@@ -804,11 +804,11 @@ export default function RunAnalysisTab({ project }) {
                             auto_resolutions.push({
                                 date: dateStr,
                                 type: 'EXTREME_LATENESS',
-                                details: `Punch at ${Math.round(latenessMinutes)} minutes (${Math.floor(latenessMinutes/60)}h ${Math.round(latenessMinutes%60)}m) past AM start`
+                                details: `Punch at ${Math.round(latenessMinutes)} minutes (${Math.floor(latenessMinutes / 60)}h ${Math.round(latenessMinutes % 60)}m) past AM start`
                             });
                         }
                     }
-                    
+
                     if (pmStartTime) {
                         const latenessMinutes = (punchTime - pmStartTime) / (1000 * 60);
                         if (latenessMinutes > 120 && latenessMinutes < 480) { // Between 2-8 hours late
@@ -816,7 +816,7 @@ export default function RunAnalysisTab({ project }) {
                             auto_resolutions.push({
                                 date: dateStr,
                                 type: 'EXTREME_LATENESS',
-                                details: `Punch at ${Math.round(latenessMinutes)} minutes (${Math.floor(latenessMinutes/60)}h ${Math.round(latenessMinutes%60)}m) past PM start`
+                                details: `Punch at ${Math.round(latenessMinutes)} minutes (${Math.floor(latenessMinutes / 60)}h ${Math.round(latenessMinutes % 60)}m) past PM start`
                             });
                         }
                     }
@@ -837,14 +837,14 @@ export default function RunAnalysisTab({ project }) {
         const criticalDatesFormatted = critical_abnormal_dates.length > 0
             ? [...new Set(critical_abnormal_dates)].map(d => new Date(d).toLocaleDateString()).join(', ')
             : '';
-        const autoResolutionNotes = auto_resolutions.length > 0 
+        const autoResolutionNotes = auto_resolutions.length > 0
             ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
             : '';
-        
+
         const dept = employee?.department || 'Admin';
         const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
         const carriedGrace = project.use_carried_grace_minutes ? (employee?.carried_grace_minutes || 0) : 0;
-        
+
         return {
             attendance_id,
             working_days,
@@ -865,28 +865,28 @@ export default function RunAnalysisTab({ project }) {
 
     const performDataQualityCheck = () => {
         const issues = [];
-        
+
         // Check for employees without shifts
         const employeesWithoutShifts = employees.filter(emp => {
             const hasShift = shifts.some(s => String(s.attendance_id) === String(emp.attendance_id));
             return !hasShift;
         });
-        
+
         if (employeesWithoutShifts.length > 0) {
             issues.push({
                 type: 'error',
                 title: `${employeesWithoutShifts.length} employees have no shift timings`,
-                details: employeesWithoutShifts.slice(0, 5).map(e => `${e.attendance_id} - ${e.name}`).join(', ') + 
-                         (employeesWithoutShifts.length > 5 ? ` and ${employeesWithoutShifts.length - 5} more` : '')
+                details: employeesWithoutShifts.slice(0, 5).map(e => `${e.attendance_id} - ${e.name}`).join(', ') +
+                    (employeesWithoutShifts.length > 5 ? ` and ${employeesWithoutShifts.length - 5} more` : '')
             });
         }
-        
+
         // Check for unusual punch counts
         const punchCounts = {};
         punches.forEach(p => {
             punchCounts[p.punch_date] = (punchCounts[p.punch_date] || 0) + 1;
         });
-        
+
         const unusualDates = Object.entries(punchCounts).filter(([date, count]) => count < 10 || count > 500);
         if (unusualDates.length > 0) {
             issues.push({
@@ -895,17 +895,17 @@ export default function RunAnalysisTab({ project }) {
                 details: unusualDates.slice(0, 3).map(([d, c]) => `${d}: ${c} punches`).join(', ')
             });
         }
-        
+
         // Check for date gaps in punches
         const punchDates = [...new Set(punches.map(p => p.punch_date))].sort();
         if (punchDates.length > 0) {
             const gaps = [];
             for (let i = 1; i < punchDates.length; i++) {
-                const prev = new Date(punchDates[i-1]);
+                const prev = new Date(punchDates[i - 1]);
                 const curr = new Date(punchDates[i]);
                 const dayDiff = (curr - prev) / (1000 * 60 * 60 * 24);
                 if (dayDiff > 3) {
-                    gaps.push(`${punchDates[i-1]} to ${punchDates[i]} (${Math.floor(dayDiff)} days)`);
+                    gaps.push(`${punchDates[i - 1]} to ${punchDates[i]} (${Math.floor(dayDiff)} days)`);
                 }
             }
             if (gaps.length > 0) {
@@ -916,7 +916,7 @@ export default function RunAnalysisTab({ project }) {
                 });
             }
         }
-        
+
         // Auto-fix: Count duplicate punches that will be removed
         let duplicateCount = 0;
         const punchsByDate = {};
@@ -924,7 +924,7 @@ export default function RunAnalysisTab({ project }) {
             if (!punchsByDate[p.punch_date]) punchsByDate[p.punch_date] = [];
             punchsByDate[p.punch_date].push(p);
         });
-        
+
         Object.values(punchsByDate).forEach(dayPunches => {
             if (dayPunches.length > 1) {
                 const sorted = dayPunches.sort((a, b) => {
@@ -932,9 +932,9 @@ export default function RunAnalysisTab({ project }) {
                     const timeB = parseTime(b.timestamp_raw, project.company === 'Al Maraghi Automotive');
                     return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
                 });
-                
+
                 for (let i = 1; i < sorted.length; i++) {
-                    const prevTime = parseTime(sorted[i-1].timestamp_raw, project.company === 'Al Maraghi Automotive');
+                    const prevTime = parseTime(sorted[i - 1].timestamp_raw, project.company === 'Al Maraghi Automotive');
                     const currTime = parseTime(sorted[i].timestamp_raw, project.company === 'Al Maraghi Automotive');
                     if (prevTime && currTime) {
                         const minutesDiff = Math.abs((currTime - prevTime) / (1000 * 60));
@@ -943,7 +943,7 @@ export default function RunAnalysisTab({ project }) {
                 }
             }
         });
-        
+
         if (duplicateCount > 0) {
             issues.push({
                 type: 'info',
@@ -951,7 +951,7 @@ export default function RunAnalysisTab({ project }) {
                 details: 'Punches within 10 minutes of each other are automatically filtered'
             });
         }
-        
+
         setDataQualityIssues(issues);
         return issues;
     };
@@ -961,21 +961,21 @@ export default function RunAnalysisTab({ project }) {
             toast.error('Please select date range');
             return;
         }
-        
+
         // Perform data quality check
         const issues = performDataQualityCheck();
         const hasErrors = issues.some(i => i.type === 'error');
-        
+
         if (hasErrors && !isAdmin) {
             setShowQualityCheck(true);
             return;
         }
-        
+
         if (hasErrors && isAdmin) {
             setShowQualityCheck(true);
             return;
         }
-        
+
         // Proceed to run analysis
         await runAnalysis();
     };
@@ -1001,9 +1001,9 @@ export default function RunAnalysisTab({ project }) {
 
         try {
             // Call backend function to run analysis in chunks
-            setProgress({ 
-                current: 0, 
-                total: uniqueEmployeeIds.length, 
+            setProgress({
+                current: 0,
+                total: uniqueEmployeeIds.length,
                 status: 'Processing on server...',
                 subStatus: 'Analysis is running in the background. This may take a few minutes.'
             });
@@ -1031,9 +1031,9 @@ export default function RunAnalysisTab({ project }) {
                     offset += batchSize;
                     totalProcessed += response.data.processed_count;
 
-                    setProgress({ 
-                        current: Math.min(offset, uniqueEmployeeIds.length), 
-                        total: uniqueEmployeeIds.length, 
+                    setProgress({
+                        current: Math.min(offset, uniqueEmployeeIds.length),
+                        total: uniqueEmployeeIds.length,
                         status: 'Processing...',
                         subStatus: `Analyzed ${Math.min(offset, uniqueEmployeeIds.length)} of ${uniqueEmployeeIds.length} employees`
                     });
@@ -1051,9 +1051,9 @@ export default function RunAnalysisTab({ project }) {
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['projects']);
             toast.success('Analysis complete');
-            setProgress({ 
-                current: totalProcessed, 
-                total: uniqueEmployeeIds.length, 
+            setProgress({
+                current: totalProcessed,
+                total: uniqueEmployeeIds.length,
                 status: 'Complete!',
                 subStatus: 'Report generated successfully'
             });
@@ -1182,7 +1182,7 @@ export default function RunAnalysisTab({ project }) {
 
 
                     <div className="flex gap-2">
-                        <Button 
+                        <Button
                             onClick={() => {
                                 performDataQualityCheck();
                                 setShowQualityCheck(true);
@@ -1213,98 +1213,95 @@ export default function RunAnalysisTab({ project }) {
             {/* Data Quality Check Dialog */}
             <Dialog open={showQualityCheck} onOpenChange={setShowQualityCheck}>
                 <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Data Quality Check</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    {dataQualityIssues.length === 0 ? (
-                        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <CheckCircle className="w-6 h-6 text-green-600" />
-                            <div>
-                                <p className="font-medium text-green-900">All checks passed!</p>
-                                <p className="text-sm text-green-700">Your data is ready for analysis.</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {dataQualityIssues.map((issue, idx) => (
-                                <div 
-                                    key={idx}
-                                    className={`flex items-start gap-3 p-4 rounded-lg border ${
-                                        issue.type === 'error' ? 'bg-red-50 border-red-200' :
-                                        issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
-                                        'bg-blue-50 border-blue-200'
-                                    }`}
-                                >
-                                    {issue.type === 'error' && <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
-                                    {issue.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />}
-                                    {issue.type === 'info' && <Info className="w-5 h-5 text-blue-600 mt-0.5" />}
-                                    <div className="flex-1">
-                                        <p className={`font-medium ${
-                                            issue.type === 'error' ? 'text-red-900' :
-                                            issue.type === 'warning' ? 'text-amber-900' :
-                                            'text-blue-900'
-                                        }`}>
-                                            {issue.title}
-                                        </p>
-                                        <p className={`text-sm mt-1 ${
-                                            issue.type === 'error' ? 'text-red-700' :
-                                            issue.type === 'warning' ? 'text-amber-700' :
-                                            'text-blue-700'
-                                        }`}>
-                                            {issue.details}
-                                        </p>
-                                    </div>
+                    <DialogHeader>
+                        <DialogTitle>Data Quality Check</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {dataQualityIssues.length === 0 ? (
+                            <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <CheckCircle className="w-6 h-6 text-green-600" />
+                                <div>
+                                    <p className="font-medium text-green-900">All checks passed!</p>
+                                    <p className="text-sm text-green-700">Your data is ready for analysis.</p>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {dataQualityIssues.map((issue, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`flex items-start gap-3 p-4 rounded-lg border ${issue.type === 'error' ? 'bg-red-50 border-red-200' :
+                                                issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                                                    'bg-blue-50 border-blue-200'
+                                            }`}
+                                    >
+                                        {issue.type === 'error' && <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
+                                        {issue.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />}
+                                        {issue.type === 'info' && <Info className="w-5 h-5 text-blue-600 mt-0.5" />}
+                                        <div className="flex-1">
+                                            <p className={`font-medium ${issue.type === 'error' ? 'text-red-900' :
+                                                    issue.type === 'warning' ? 'text-amber-900' :
+                                                        'text-blue-900'
+                                                }`}>
+                                                {issue.title}
+                                            </p>
+                                            <p className={`text-sm mt-1 ${issue.type === 'error' ? 'text-red-700' :
+                                                    issue.type === 'warning' ? 'text-amber-700' :
+                                                        'text-blue-700'
+                                                }`}>
+                                                {issue.details}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
-                    {dataQualityIssues.some(i => i.type === 'error') && !isAdmin && (
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                            <p className="text-sm text-slate-700">
-                                <strong>Action Required:</strong> Please fix the errors above before running analysis. 
-                                Go to the Shifts tab to add missing shift timings.
-                            </p>
-                        </div>
-                    )}
-                    {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <p className="text-sm text-amber-700">
-                                <strong>Admin Override Available:</strong> Errors detected, but as an admin you can proceed anyway. 
-                                Results may be inaccurate for affected employees.
-                            </p>
-                        </div>
-                    )}
-                </div>
-                <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setShowQualityCheck(false)}>
-                        Close
-                    </Button>
-                    {!dataQualityIssues.some(i => i.type === 'error') && (
-                        <Button 
-                            onClick={() => {
-                                setShowQualityCheck(false);
-                                runAnalysis();
-                            }}
-                            className="bg-indigo-600 hover:bg-indigo-700"
-                        >
-                            Proceed with Analysis
+                        {dataQualityIssues.some(i => i.type === 'error') && !isAdmin && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                <p className="text-sm text-slate-700">
+                                    <strong>Action Required:</strong> Please fix the errors above before running analysis.
+                                    Go to the Shifts tab to add missing shift timings.
+                                </p>
+                            </div>
+                        )}
+                        {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <p className="text-sm text-amber-700">
+                                    <strong>Admin Override Available:</strong> Errors detected, but as an admin you can proceed anyway.
+                                    Results may be inaccurate for affected employees.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setShowQualityCheck(false)}>
+                            Close
                         </Button>
-                    )}
-                    {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
-                        <Button 
-                            onClick={() => {
-                                setShowQualityCheck(false);
-                                runAnalysis();
-                            }}
-                            className="bg-amber-600 hover:bg-amber-700"
-                        >
-                            Proceed Anyway (Admin Override)
-                        </Button>
-                    )}
-                </div>
-            </DialogContent>
+                        {!dataQualityIssues.some(i => i.type === 'error') && (
+                            <Button
+                                onClick={() => {
+                                    setShowQualityCheck(false);
+                                    runAnalysis();
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                Proceed with Analysis
+                            </Button>
+                        )}
+                        {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
+                            <Button
+                                onClick={() => {
+                                    setShowQualityCheck(false);
+                                    runAnalysis();
+                                }}
+                                className="bg-amber-600 hover:bg-amber-700"
+                            >
+                                Proceed Anyway (Admin Override)
+                            </Button>
+                        )}
+                    </div>
+                </DialogContent>
             </Dialog>
         </div>
     );
