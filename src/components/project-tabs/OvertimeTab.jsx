@@ -349,6 +349,23 @@ export default function OvertimeTab({ project }) {
         return editableAdjustments[row.attendance_id]?.[field] ?? row[field] ?? 0;
     };
 
+    /**
+     * Flatten entries array to a single numeric sum for backend compatibility.
+     * The frontend uses arrays for multi-entry UI, but flattens them to a single sum for backend.
+     * Logs metadata for record-keeping until separate metadata entity is available.
+     */
+    const flattenToSum = (val, fieldName, empName) => {
+        if (Array.isArray(val)) {
+            val.forEach(entry => {
+                if (entry.desc) {
+                    console.log(`[Adjustment Metadata] Employee: ${empName}, Field: ${fieldName}, Amount: ${entry.amount}, Desc: ${entry.desc}`);
+                }
+            });
+            return val.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+        }
+        return parseFloat(val) || 0;
+    };
+
     const handleSave = async () => {
         if (Object.keys(editableData).length === 0) {
             toast.info('No changes to save');
@@ -373,17 +390,16 @@ export default function OvertimeTab({ project }) {
                     hrms_id: String(employee.hrms_id || ''),
                     name: employee.name,
                     department: employee.department || '',
-                    // ...
-                    // Combine multiple entries into a single total for DB fields (Payroll Sync)
-                    normalOtHours: Array.isArray(edits.normalOtHours) ? edits.normalOtHours.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.normalOtHours !== undefined ? edits.normalOtHours : (persistedOtRecord?.normalOtHours ?? 0)),
-                    specialOtHours: Array.isArray(edits.specialOtHours) ? edits.specialOtHours.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.specialOtHours !== undefined ? edits.specialOtHours : (persistedOtRecord?.specialOtHours ?? 0)),
-                    // Preserve existing adjustment values when saving OT
-                    bonus: Array.isArray(employee.bonus) ? employee.bonus.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (persistedOtRecord?.bonus ?? employee.bonus ?? 0),
-                    incentive: Array.isArray(employee.incentive) ? employee.incentive.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (persistedOtRecord?.incentive ?? employee.incentive ?? 0),
-                    open_leave_salary: Array.isArray(employee.open_leave_salary) ? employee.open_leave_salary.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (persistedOtRecord?.open_leave_salary ?? employee.open_leave_salary ?? 0),
-                    variable_salary: Array.isArray(employee.variable_salary) ? employee.variable_salary.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (persistedOtRecord?.variable_salary ?? employee.variable_salary ?? 0),
-                    otherDeduction: Array.isArray(employee.otherDeduction) ? employee.otherDeduction.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (persistedOtRecord?.otherDeduction ?? employee.otherDeduction ?? 0),
-                    advanceSalaryDeduction: Array.isArray(employee.advanceSalaryDeduction) ? employee.advanceSalaryDeduction.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (persistedOtRecord?.advanceSalaryDeduction ?? employee.advanceSalaryDeduction ?? 0)
+                    // Flatten arrays to single numeric sums for backend compatibility
+                    normalOtHours: flattenToSum(edits.normalOtHours ?? persistedOtRecord?.normalOtHours ?? 0, 'Normal OT', employee.name),
+                    specialOtHours: flattenToSum(edits.specialOtHours ?? persistedOtRecord?.specialOtHours ?? 0, 'Special OT', employee.name),
+                    // Preserve and flatten existing adjustment values when saving OT
+                    bonus: flattenToSum(employee.bonus, 'Bonus', employee.name),
+                    incentive: flattenToSum(employee.incentive, 'Incentive', employee.name),
+                    open_leave_salary: flattenToSum(employee.open_leave_salary, 'Open Leave Salary', employee.name),
+                    variable_salary: flattenToSum(employee.variable_salary, 'Variable Salary', employee.name),
+                    otherDeduction: flattenToSum(employee.otherDeduction, 'Other Deduction', employee.name),
+                    advanceSalaryDeduction: flattenToSum(employee.advanceSalaryDeduction, 'Advance Salary Deduction', employee.name)
                 };
 
                 if (employee.otRecordId) {
@@ -490,12 +506,13 @@ export default function OvertimeTab({ project }) {
                 if (!employee) return;
 
                 const adjustmentData = {
-                    bonus: Array.isArray(edits.bonus) ? edits.bonus.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.bonus ?? employee.bonus ?? 0),
-                    incentive: Array.isArray(edits.incentive) ? edits.incentive.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.incentive ?? employee.incentive ?? 0),
-                    open_leave_salary: Array.isArray(edits.open_leave_salary) ? edits.open_leave_salary.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.open_leave_salary ?? employee.open_leave_salary ?? 0),
-                    variable_salary: Array.isArray(edits.variable_salary) ? edits.variable_salary.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.variable_salary ?? employee.variable_salary ?? 0),
-                    otherDeduction: Array.isArray(edits.otherDeduction) ? edits.otherDeduction.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.otherDeduction ?? employee.otherDeduction ?? 0),
-                    advanceSalaryDeduction: Array.isArray(edits.advanceSalaryDeduction) ? edits.advanceSalaryDeduction.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0) : (edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction ?? 0)
+                    // Flatten arrays to single numeric sums for backend compatibility
+                    bonus: flattenToSum(edits.bonus ?? employee.bonus, 'Bonus', employee.name),
+                    incentive: flattenToSum(edits.incentive ?? employee.incentive, 'Incentive', employee.name),
+                    open_leave_salary: flattenToSum(edits.open_leave_salary ?? employee.open_leave_salary, 'Open Leave Salary', employee.name),
+                    variable_salary: flattenToSum(edits.variable_salary ?? employee.variable_salary, 'Variable Salary', employee.name),
+                    otherDeduction: flattenToSum(edits.otherDeduction ?? employee.otherDeduction, 'Other Deduction', employee.name),
+                    advanceSalaryDeduction: flattenToSum(edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction, 'Advance Salary Deduction', employee.name)
                 };
 
                 // Save to OvertimeData (always)
