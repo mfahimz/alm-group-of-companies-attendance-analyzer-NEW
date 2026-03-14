@@ -194,6 +194,30 @@ export default function Salaries() {
         }
     });
 
+    const syncAllEmployeesMutation = useMutation({
+        mutationFn: async () => {
+            // First invalidate employees to get the latest master data
+            await queryClient.invalidateQueries(['employees']);
+            
+            const response = await base44.functions.invoke('syncAllEmployeesToSalary', {});
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['salaries']);
+            queryClient.invalidateQueries(['employees']);
+            if (data.success) {
+                toast.success(data.message, {
+                    description: `Updated: ${data.updated_count}, Skipped: ${data.skipped_count}, Errors: ${data.error_count}`
+                });
+            } else {
+                toast.error('Sync failed: ' + data.error);
+            }
+        },
+        onError: (error) => {
+            toast.error('Failed to sync employee data: ' + error.message);
+        }
+    });
+
     const resetForm = () => {
         setFormData({
             employee_id: '',
@@ -527,41 +551,9 @@ export default function Salaries() {
         }
     };
 
-    const handleSyncAll = async () => {
-        if (!window.confirm('Sync all salary records with latest employee data (attendance IDs, names, companies)?')) {
-            return;
-        }
-
-        try {
-            let syncedCount = 0;
-            const errors = [];
-
-            for (const employee of employees) {
-                try {
-                    const response = await base44.functions.invoke('syncEmployeeToSalary', {
-                        hrms_id: String(employee.hrms_id),
-                        attendance_id: String(employee.attendance_id),
-                        name: employee.name,
-                        company: employee.company
-                    });
-
-                    if (response.data.updated_count > 0) {
-                        syncedCount += response.data.updated_count;
-                    }
-                } catch (error) {
-                    errors.push({ employee: employee.name, error: error.message });
-                }
-            }
-
-            queryClient.invalidateQueries(['salaries']);
-            
-            if (errors.length > 0) {
-                toast.warning(`Synced ${syncedCount} records. ${errors.length} had errors.`);
-            } else {
-                toast.success(`Successfully synced ${syncedCount} salary records with employee data`);
-            }
-        } catch (error) {
-            toast.error('Sync failed: ' + error.message);
+    const handleSyncAll = () => {
+        if (window.confirm('Sync all salary records with latest employee data (attendance IDs, names, companies)?')) {
+            syncAllEmployeesMutation.mutate();
         }
     };
 
@@ -623,8 +615,13 @@ export default function Salaries() {
                             onChange={handleFileUpload}
                             className="hidden"
                         />
-                        <Button onClick={handleSyncAll} variant="outline" title="Sync employee data to salary records">
-                            <Search className="w-4 h-4 mr-2" />
+                        <Button 
+                            onClick={handleSyncAll} 
+                            variant="outline" 
+                            title="Sync employee data to salary records"
+                            disabled={syncAllEmployeesMutation.isPending}
+                        >
+                            <Search className={`w-4 h-4 mr-2 ${syncAllEmployeesMutation.isPending ? 'animate-spin' : ''}`} />
                             Sync Employee Data
                         </Button>
                         <Button 
