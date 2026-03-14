@@ -18,12 +18,14 @@ import ModuleDives from '../components/softwaredoc/ModuleDives';
 import CompanyRules from '../components/softwaredoc/CompanyRules';
 import SpecializedTweaks from '../components/softwaredoc/SpecializedTweaks';
 import MetadataCenter from '../components/softwaredoc/MetadataCenter';
+import DataIntegrityRules from '../components/softwaredoc/DataIntegrityRules';
 
 const sections = [
     { id: 'system', title: 'System Status', icon: LayoutDashboard, component: SystemStatus },
     { id: 'modules', title: 'Module Deep-Dives', icon: BookOpen, component: ModuleDives },
     { id: 'rules', title: 'Company Rules', icon: ShieldCheck, component: CompanyRules },
     { id: 'tweaks', title: 'Specialized Tweaks', icon: Zap, component: SpecializedTweaks },
+    { id: 'integrity', title: 'Data Integrity Rules', icon: ShieldCheck, component: DataIntegrityRules },
     { id: 'metadata', title: 'Metadata & Roadmap', icon: History, component: MetadataCenter }
 ];
 

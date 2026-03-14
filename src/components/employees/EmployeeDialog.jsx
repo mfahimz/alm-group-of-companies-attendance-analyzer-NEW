@@ -249,13 +249,24 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             return;
         }
 
-        // Check for duplicate hrms_id
+        // Check for duplicate hrms_id within same company
         const duplicateHrms = existingEmployees.find(
-            emp => emp.hrms_id === formData.hrms_id && emp.id !== employee?.id
+            emp => emp.company === formData.company && emp.hrms_id === formData.hrms_id && emp.id !== employee?.id
         );
         if (duplicateHrms) {
-            toast.error('HRMS ID already exists');
+            toast.error(`Validation Error: HRMS ID ${formData.hrms_id} is already in use in this company.`);
             return;
+        }
+
+        // Check for duplicate attendance_id within same company
+        if (formData.attendance_id) {
+            const duplicateAttendance = existingEmployees.find(
+                emp => emp.company === formData.company && emp.attendance_id === formData.attendance_id && emp.id !== employee?.id
+            );
+            if (duplicateAttendance) {
+                toast.error(`Validation Error: Attendance ID ${formData.attendance_id} is already assigned to another employee in this company.`);
+                return;
+            }
         }
 
         // Ensure hrms_id and attendance_id are strings

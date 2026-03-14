@@ -866,6 +866,42 @@ export default function RunAnalysisTab({ project }) {
     const performDataQualityCheck = () => {
         const issues = [];
 
+        // Check for duplicate HRMS IDs in this company
+        const hrmsIds = {};
+        employees.forEach(emp => {
+            if (emp.hrms_id) {
+                if (!hrmsIds[emp.hrms_id]) hrmsIds[emp.hrms_id] = [];
+                hrmsIds[emp.hrms_id].push(emp.name);
+            }
+        });
+
+        const duplicateHrms = Object.entries(hrmsIds).filter(([, names]) => names.length > 1);
+        if (duplicateHrms.length > 0) {
+            issues.push({
+                type: 'error',
+                title: `Duplicate HRMS IDs found in ${project.company}`,
+                details: duplicateHrms.map(([id, names]) => `ID ${id} used by: ${names.join(', ')}`).join(' | ')
+            });
+        }
+
+        // Check for duplicate Attendance IDs in this company
+        const attIds = {};
+        employees.forEach(emp => {
+            if (emp.attendance_id) {
+                if (!attIds[emp.attendance_id]) attIds[emp.attendance_id] = [];
+                attIds[emp.attendance_id].push(emp.name);
+            }
+        });
+
+        const duplicateAtt = Object.entries(attIds).filter(([, names]) => names.length > 1);
+        if (duplicateAtt.length > 0) {
+            issues.push({
+                type: 'error',
+                title: `Duplicate Attendance IDs found in ${project.company}`,
+                details: duplicateAtt.map(([id, names]) => `ID ${id} used by: ${names.join(', ')}`).join(' | ')
+            });
+        }
+
         // Check for employees without shifts
         const employeesWithoutShifts = employees.filter(emp => {
             const hasShift = shifts.some(s => String(s.attendance_id) === String(emp.attendance_id));

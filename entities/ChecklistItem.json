@@ -61,6 +61,11 @@
             "default": null,
             "description": "Additional notes or context for the task. For auto-created tasks, this contains detailed calculation breakdowns and source metadata."
         },
+        "linked_entity_id": {
+            "type": "string",
+            "default": null,
+            "description": "Generic ID to link this checklist item to another entity (e.g. Salary Snapshot, Project, etc). Used for system-generated tasks to maintain traceability."
+        },
         "fingerprint": {
             "type": "string",
             "default": null,
