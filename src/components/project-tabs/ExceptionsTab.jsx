@@ -1411,47 +1411,66 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
             const workbook = XLSX.utils.book_new();
             
-            // Export Exceptions Sheet
-            if (sortedExceptions.length > 0) {
-                const exceptionsData = sortedExceptions.map(ex => {
-                    const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
-                    return {
-                        'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
-                        'Employee Name': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
-                        'Department': ex.attendance_id === 'ALL' ? '—' : (employee?.department || '—'),
-                        'Type': ex.is_custom_type ? ex.custom_type_name || 'Custom' : ex.type.replace(/_/g, ' '),
-                        'From Date': ex.is_custom_type && (!ex.date_from || ex.date_from === project.date_from) ? '—' : new Date(ex.date_from).toLocaleDateString(),
-                        'To Date': ex.is_custom_type && (!ex.date_to || ex.date_to === project.date_to) ? '—' : new Date(ex.date_to).toLocaleDateString(),
-                        'Details': ex.details || '',
-                        'Use in Analysis': ex.use_in_analysis !== false ? 'Yes' : 'No',
-                        'From Report': ex.created_from_report ? 'Yes' : 'No'
-                    };
+            const unifiedData = [];
+
+            // 1. Process Exceptions
+            sortedExceptions.forEach(ex => {
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
+                unifiedData.push({
+                    'Category': 'Attendance Exception',
+                    'ID / Type': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
+                    'Employee / Task': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
+                    'Department': ex.attendance_id === 'ALL' ? '—' : (employee?.department || '—'),
+                    'Details / Description': ex.details || '',
+                    'From Date': ex.is_custom_type && (!ex.date_from || ex.date_from === project.date_from) ? '—' : new Date(ex.date_from).toLocaleDateString(),
+                    'To Date / Completed': ex.is_custom_type && (!ex.date_to || ex.date_to === project.date_to) ? '—' : new Date(ex.date_to).toLocaleDateString(),
+                    'Status': ex.use_in_analysis !== false ? 'Active' : 'Ignored',
+                    'Additional Context': `${ex.type.replace(/_/g, ' ')}${ex.created_from_report ? ' (From Report)' : ''}`
                 });
-                
-                const exceptionsSheet = XLSX.utils.json_to_sheet(exceptionsData);
-                XLSX.utils.book_append_sheet(workbook, exceptionsSheet, 'Exceptions');
-            }
-            
-            // Export Checklist Sheet
-            if (checklistItems.length > 0) {
-                const checklistData = checklistItems.map(task => ({
-                    'Task Type': task.task_type,
-                    'Description': task.task_description,
+            });
+
+            // 2. Process Checklist Items (placed after exceptions)
+            checklistItems.forEach(task => {
+                unifiedData.push({
+                    'Category': 'Checklist Task',
+                    'ID / Type': task.task_type,
+                    'Employee / Task': task.task_description,
+                    'Department': '—',
+                    'Details / Description': task.notes || '—',
+                    'From Date': '—',
+                    'To Date / Completed': task.completed_date ? formatInUAE(new Date(task.completed_date), 'dd/MM/yyyy HH:mm') : '—',
                     'Status': task.status === 'completed' ? 'Completed' : task.status === 'in_progress' ? 'In Progress' : 'Pending',
-                    'Completed By': task.completed_by || '—',
-                    'Completed Date': task.completed_date ? formatInUAE(new Date(task.completed_date), 'dd/MM/yyyy HH:mm') : '—',
-                    'Notes': task.notes || '—',
-                    'Is Predefined': task.is_predefined ? 'Yes' : 'No'
-                }));
-                
-                const checklistSheet = XLSX.utils.json_to_sheet(checklistData);
-                XLSX.utils.book_append_sheet(workbook, checklistSheet, 'Checklist');
+                    'Additional Context': `${task.is_predefined ? 'Predefined' : 'Project Task'}${task.completed_by ? ` (By: ${task.completed_by})` : ''}`
+                });
+            });
+
+            if (unifiedData.length === 0) {
+                toast.error('No data to export');
+                return;
             }
+
+            const worksheet = XLSX.utils.json_to_sheet(unifiedData);
             
-            const filename = `${project.name}_exceptions_checklist_${new Date().toISOString().split('T')[0]}.xlsx`;
+            // Set column widths for better readability
+            const wscols = [
+                { wch: 20 }, // Category
+                { wch: 15 }, // ID / Type
+                { wch: 35 }, // Employee / Task
+                { wch: 20 }, // Department
+                { wch: 40 }, // Details / Description
+                { wch: 15 }, // From Date
+                { wch: 20 }, // To Date / Completed
+                { wch: 15 }, // Status
+                { wch: 30 }  // Additional Context
+            ];
+            worksheet['!cols'] = wscols;
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Consolidated Export');
+            
+            const filename = `${project.name}_consolidated_data_${new Date().toISOString().split('T')[0]}.xlsx`;
             XLSX.writeFile(workbook, filename);
             
-            toast.success(`Exported exceptions and checklist data`);
+            toast.success(`Exported ${unifiedData.length} records in a single sheet`);
         } catch (error) {
             toast.error('Failed to export: ' + error.message);
         }
@@ -1465,7 +1484,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="font-medium text-slate-900">Export All Data</p>
-                            <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in one file</p>
+                            <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in a single consolidated sheet</p>
                         </div>
                         <Button
                             onClick={handleGroupExport}
@@ -1473,7 +1492,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             className="bg-gradient-to-r from-indigo-600 to-green-600 hover:from-indigo-700 hover:to-green-700"
                         >
                             <Download className="w-4 h-4 mr-2" />
-                            Export All
+                            Export Unified
                         </Button>
                     </div>
                 </CardContent>
