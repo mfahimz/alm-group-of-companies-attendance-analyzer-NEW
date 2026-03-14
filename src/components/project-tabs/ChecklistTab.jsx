@@ -378,12 +378,12 @@ export default function ChecklistTab({ project }) {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="w-10">
+                                        <TableHead className="w-10 px-4">
                                             <Checkbox
-                                                checked={allSelected}
-                                                data-state={someSelected ? 'indeterminate' : undefined}
+                                                checked={someSelected ? 'indeterminate' : allSelected}
                                                 onCheckedChange={handleSelectAll}
                                                 aria-label="Select all rows"
+                                                className="cursor-pointer"
                                             />
                                         </TableHead>
                                         <TableHead className="w-12">Status</TableHead>
@@ -402,11 +402,12 @@ export default function ChecklistTab({ project }) {
                                                 selectedIds.has(task.id) ? 'ring-1 ring-inset ring-indigo-300 bg-indigo-50/40' : ''
                                             ].join(' ')}
                                         >
-                                            <TableCell>
+                                            <TableCell className="px-4">
                                                 <Checkbox
-                                                    checked={selectedIds.has(task.id)}
-                                                    onCheckedChange={(checked) => handleSelectRow(task.id, checked)}
+                                                    checked={!!selectedIds.has(task.id)}
+                                                    onCheckedChange={(checked) => handleSelectRow(task.id, !!checked)}
                                                     aria-label={`Select row ${task.id}`}
+                                                    className="cursor-pointer"
                                                 />
                                             </TableCell>
                                             <TableCell>
