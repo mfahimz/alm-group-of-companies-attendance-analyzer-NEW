@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
 import { Plus, Trash2, Search, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
@@ -42,6 +42,8 @@ function ChecklistSection({ project, checklistItems = [] }) {
     const queryClient = useQueryClient();
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [newTask, setNewTask] = useState({
         task_type: '',
         task_description: '',
@@ -117,6 +119,22 @@ function ChecklistSection({ project, checklistItems = [] }) {
         }
     });
 
+    // Bulk delete selected checklist tasks
+    const bulkDeleteTasksMutation = useMutation({
+        mutationFn: async (ids) => {
+            await Promise.all([...ids].map(id => base44.entities.ChecklistItem.delete(id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success(`${selectedIds.size} task(s) deleted`);
+            setSelectedIds(new Set());
+            setShowBulkDeleteConfirm(false);
+        },
+        onError: (error) => {
+            toast.error('Bulk delete failed: ' + error.message);
+        }
+    });
+
     const handleToggleStatus = (task) => {
         const newStatus = task.status === 'completed' ? 'pending' : 'completed';
         const updates = {
@@ -147,6 +165,26 @@ function ChecklistSection({ project, checklistItems = [] }) {
             }
         }
         deleteTaskMutation.mutate(task.id);
+    };
+
+    // Selection helpers
+    const allSelected = checklistItems.length > 0 && selectedIds.size === checklistItems.length;
+    const someSelected = selectedIds.size > 0 && selectedIds.size < checklistItems.length;
+
+    const handleSelectAll = (checked) => {
+        if (checked) {
+            setSelectedIds(new Set(checklistItems.map(t => t.id)));
+        } else {
+            setSelectedIds(new Set());
+        }
+    };
+
+    const handleSelectRow = (id, checked) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (checked) next.add(id); else next.delete(id);
+            return next;
+        });
     };
 
     const taskTypeStats = PREDEFINED_TASKS.reduce((acc, predefinedTask) => {
@@ -200,8 +238,26 @@ function ChecklistSection({ project, checklistItems = [] }) {
         <Card className="border-0 shadow-sm bg-green-50/30">
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle>Checklist</CardTitle>
+                    <div className="flex items-center gap-3">
+                        <CardTitle>Checklist</CardTitle>
+                        {selectedIds.size > 0 && (
+                            <span className="text-xs font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                                {selectedIds.size} selected
+                            </span>
+                        )}
+                    </div>
                     <div className="flex gap-2">
+                        {selectedIds.size > 0 && (
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setShowBulkDeleteConfirm(true)}
+                                disabled={bulkDeleteTasksMutation.isPending}
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Selected ({selectedIds.size})
+                            </Button>
+                        )}
                         {checklistItems.length > 0 && (
                             <Button
                                 onClick={handleExportChecklist}
@@ -283,6 +339,14 @@ function ChecklistSection({ project, checklistItems = [] }) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-10 px-4">
+                                        <Checkbox
+                                            checked={someSelected ? 'indeterminate' : allSelected}
+                                            onCheckedChange={handleSelectAll}
+                                            aria-label="Select all tasks"
+                                            className="cursor-pointer"
+                                        />
+                                    </TableHead>
                                     <TableHead>Task Type</TableHead>
                                     <TableHead>Description</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -290,7 +354,21 @@ function ChecklistSection({ project, checklistItems = [] }) {
                             </TableHeader>
                             <TableBody>
                                 {checklistItems.map((task) => (
-                                    <TableRow key={task.id} className={task.status === 'completed' ? 'bg-green-50' : ''}>
+                                    <TableRow
+                                        key={task.id}
+                                        className={[
+                                            task.status === 'completed' ? 'bg-green-50' : '',
+                                            selectedIds.has(task.id) ? 'ring-1 ring-inset ring-green-400 bg-green-50/60' : ''
+                                        ].join(' ')}
+                                    >
+                                        <TableCell className="px-4">
+                                            <Checkbox
+                                                checked={!!selectedIds.has(task.id)}
+                                                onCheckedChange={(checked) => handleSelectRow(task.id, !!checked)}
+                                                aria-label={`Select task ${task.id}`}
+                                                className="cursor-pointer"
+                                            />
+                                        </TableCell>
                                         <TableCell className="font-medium">{task.task_type}</TableCell>
                                         <TableCell className={task.status === 'completed' ? 'line-through text-slate-500' : ''}>
                                             {task.task_description}
@@ -323,6 +401,31 @@ function ChecklistSection({ project, checklistItems = [] }) {
                     </div>
                 )}
             </CardContent>
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Delete {selectedIds.size} task(s)?</DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone. The selected checklist tasks will be permanently removed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => bulkDeleteTasksMutation.mutate(selectedIds)}
+                            disabled={bulkDeleteTasksMutation.isPending}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {bulkDeleteTasksMutation.isPending ? 'Deleting...' : 'Yes, Delete All'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Add Task Dialog */}
             <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
