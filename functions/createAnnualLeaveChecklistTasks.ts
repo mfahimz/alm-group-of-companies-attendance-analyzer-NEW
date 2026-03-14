@@ -116,14 +116,13 @@ Deno.serve(async (req) => {
             const effectiveStart = leaveStart > projectStart ? leaveStart : projectStart;
             const effectiveEnd = leaveEnd < projectEnd ? leaveEnd : projectEnd;
 
-            // Al Maraghi Motors Exception: Full enrollment if leave extends beyond project
             const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
             const leaveExtendsBeyond = leaveEnd > projectEnd;
-            
             let leaveDays = 0;
             const leaveDatesInRange: string[] = [];
             
             // Calculate days ONLY for the Current Month fragment
+            // Note: We count ALL days irrespective of holidays/offs as per user requirement.
             const dayCursor = new Date(effectiveStart);
             while (dayCursor <= effectiveEnd) {
                 if (dayCursor.getFullYear() === currentYear && dayCursor.getMonth() === currentMonthIdx) {
@@ -133,18 +132,14 @@ Deno.serve(async (req) => {
                 dayCursor.setDate(dayCursor.getDate() + 1);
             }
 
-            if (isAlMaraghiMotors && leaveExtendsBeyond) {
-                leaveDays = leave.total_days;
-            }
-
-            if (leaveDays === 0 && !isAlMaraghiMotors) {
+            if (leaveDays === 0) {
                 skippedCount++;
                 continue; 
             }
 
             const dateRangeStr = leaveDatesInRange.length > 0 
                 ? (leaveDatesInRange.length === 1 ? leaveDatesInRange[0] : `${leaveDatesInRange[0]} to ${leaveDatesInRange[leaveDatesInRange.length - 1]}`)
-                : "Included from Leave Record";
+                : "N/A";
 
             // --- FINGERPRINT: Type + Project + LeaveId + Days + Name (for updates) ---
             const nameKey = (leave.employee_name || '').replace(/\s+/g, '');
@@ -170,7 +165,10 @@ Deno.serve(async (req) => {
             const rejoiningDateStr = rejoiningDate.toISOString().split('T')[0];
             const rejoiningFingerprint = `RejoiningDate_${projectId}_${leave.id}_${rejoiningDateStr}_${nameKey}`;
 
-            if (!existingFingerprints.has(rejoiningFingerprint)) {
+            // --- REJOINING DATE CONDITION: Only if within project range ---
+            const isRejoiningInProject = rejoiningDate >= projectStart && rejoiningDate <= projectEnd;
+
+            if (isRejoiningInProject && !existingFingerprints.has(rejoiningFingerprint)) {
                 await base44.asServiceRole.entities.ChecklistItem.create({
                     project_id: projectId,
                     task_type: 'Rejoining Date',
@@ -193,16 +191,6 @@ Deno.serve(async (req) => {
         return Response.json({ error: error.message }, { status: 500 });
     }
 });
-
-function calculateCurrentMonthLeaveDays(start: Date, end: Date, curMonthIdx: number, curMonthYr: number): number {
-    let count = 0;
-    const cur = new Date(start);
-    while (cur <= end) {
-        if (cur.getMonth() === curMonthIdx && cur.getFullYear() === curMonthYr) count++;
-        cur.setDate(cur.getDate() + 1);
-    }
-    return count;
-}
 
 function calculateRejoiningDate(endDate: Date, emp: any, publicHolidayDates: Set<string>): Date {
     const dayMap: Record<string, number> = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
