@@ -85,23 +85,66 @@ Deno.serve(async (req) => {
             if (employees.length > 0) employeeMap[attId] = employees[0];
         }
 
-        const daysInMonth1 = getDaysInMonth(projectStart);
-        const daysInMonth2 = getDaysInMonth(projectEnd);
-        const previousMonthIndex = daysInMonth1 <= daysInMonth2 ? projectStart.getMonth() : projectEnd.getMonth();
-        const previousMonthYear = daysInMonth1 <= daysInMonth2 ? projectStart.getFullYear() : projectEnd.getFullYear();
+        // Determine "Current Month" as the month with the HIGHEST number of days in the project range
+        const projectDates: Record<string, number> = {};
+        const cursor = new Date(projectStart);
+        while (cursor <= projectEnd) {
+            const key = `${cursor.getFullYear()}-${cursor.getMonth()}`;
+            projectDates[key] = (projectDates[key] || 0) + 1;
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        let currentMonthKey = '';
+        let maxDays = -1;
+        for (const key in projectDates) {
+            if (projectDates[key] > maxDays) {
+                maxDays = projectDates[key];
+                currentMonthKey = key;
+            }
+        }
+        
+        const [currentYear, currentMonthIdx] = currentMonthKey.split('-').map(Number);
 
         let createdCount = 0;
         let skippedCount = 0;
 
         for (const leave of relevantLeaves) {
+            const leaveStart = parseISO(leave.date_from);
             const leaveEnd = parseISO(leave.date_to);
-            const effectiveStart = parseISO(leave.date_from) > projectStart ? parseISO(leave.date_from) : projectStart;
+            
+            // Effective range: intersection of Leave and Project
+            const effectiveStart = leaveStart > projectStart ? leaveStart : projectStart;
             const effectiveEnd = leaveEnd < projectEnd ? leaveEnd : projectEnd;
 
+            // Al Maraghi Motors Exception: Full enrollment if leave extends beyond project
             const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
-            const leaveDays = (isAlMaraghiMotors && leaveEnd > projectEnd) 
-                ? leave.total_days 
-                : calculateCurrentMonthLeaveDays(effectiveStart, effectiveEnd, previousMonthIndex, previousMonthYear);
+            const leaveExtendsBeyond = leaveEnd > projectEnd;
+            
+            let leaveDays = 0;
+            const leaveDatesInRange: string[] = [];
+            
+            // Calculate days ONLY for the Current Month fragment
+            const dayCursor = new Date(effectiveStart);
+            while (dayCursor <= effectiveEnd) {
+                if (dayCursor.getFullYear() === currentYear && dayCursor.getMonth() === currentMonthIdx) {
+                    leaveDays++;
+                    leaveDatesInRange.push(dayCursor.toISOString().split('T')[0]);
+                }
+                dayCursor.setDate(dayCursor.getDate() + 1);
+            }
+
+            if (isAlMaraghiMotors && leaveExtendsBeyond) {
+                leaveDays = leave.total_days;
+            }
+
+            if (leaveDays === 0 && !isAlMaraghiMotors) {
+                skippedCount++;
+                continue; 
+            }
+
+            const dateRangeStr = leaveDatesInRange.length > 0 
+                ? (leaveDatesInRange.length === 1 ? leaveDatesInRange[0] : `${leaveDatesInRange[0]} to ${leaveDatesInRange[leaveDatesInRange.length - 1]}`)
+                : "Included from Leave Record";
 
             // --- FINGERPRINT: Type + Project + LeaveId + Days + Name (for updates) ---
             const nameKey = (leave.employee_name || '').replace(/\s+/g, '');
@@ -111,13 +154,13 @@ Deno.serve(async (req) => {
                 await base44.asServiceRole.entities.ChecklistItem.create({
                     project_id: projectId,
                     task_type: 'Annual Leave',
-                    task_description: `${leave.employee_name} | Leave: ${leave.date_from} to ${leave.date_to} | Days: ${leaveDays}`,
+                    task_description: `${leave.employee_name} | ${dateRangeStr} | Days: ${leaveDays}`,
                     status: 'pending',
                     is_predefined: false,
                     is_auto_created: true,
                     linked_annual_leave_id: String(leave.id),
                     fingerprint: leaveFingerprint,
-                    notes: buildTaskNotes(leave, leaveDays, isAlMaraghiMotors, leaveEnd > projectEnd, previousMonthIndex, previousMonthYear)
+                    notes: buildTaskNotes(leave, leaveDays, isAlMaraghiMotors, leaveExtendsBeyond, currentMonthIdx, currentYear)
                 });
                 createdCount++;
             } else { skippedCount++; }
@@ -143,7 +186,7 @@ Deno.serve(async (req) => {
             } else { skippedCount++; }
         }
 
-        return Response.json({ success: true, created: createdCount, skipped: skippedCount });
+        return Response.json({ success: true, created: createdCount, skipped: skippedCount, currentMonth: `${currentYear}-${currentMonthIdx + 1}` });
 
     } catch (error) {
         console.error('Error:', error);
@@ -151,11 +194,11 @@ Deno.serve(async (req) => {
     }
 });
 
-function calculateCurrentMonthLeaveDays(start: Date, end: Date, prevMonthIdx: number, prevMonthYr: number): number {
+function calculateCurrentMonthLeaveDays(start: Date, end: Date, curMonthIdx: number, curMonthYr: number): number {
     let count = 0;
     const cur = new Date(start);
     while (cur <= end) {
-        if (!(cur.getMonth() === prevMonthIdx && cur.getFullYear() === prevMonthYr)) count++;
+        if (cur.getMonth() === curMonthIdx && cur.getFullYear() === curMonthYr) count++;
         cur.setDate(cur.getDate() + 1);
     }
     return count;

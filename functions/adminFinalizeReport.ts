@@ -81,6 +81,17 @@ Deno.serve(async (req) => {
             console.warn('Failed to log audit:', auditError.message);
         }
 
+        // --- NEW: Create Checklist Tasks for LOP and Other Minutes ---
+        try {
+            await base44.asServiceRole.functions.invoke('createReportChecklistTasks', {
+                reportRunId: report_run_id,
+                action: 'upsert'
+            });
+            console.log('[adminFinalizeReport] Auto-checklist tasks triggered successfully');
+        } catch (checklistError) {
+            console.warn('[adminFinalizeReport] Failed to trigger auto-checklist tasks:', checklistError.message);
+        }
+
         return Response.json({ 
             success: true,
             message: 'Report finalized successfully by admin (without approval links)',

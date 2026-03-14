@@ -3,40 +3,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 /**
  * createReportChecklistTasks
  *
- * Entity automation function triggered on SalaryReport create and update events.
- * Automatically creates "LOP Days" and "Other Minutes" checklist tasks for 
- * each employee in the report whose values exceed zero.
- *
- * ============================================================================
- * EXHAUSTIVE BUSINESS LOGIC AUDIT & USE CASES (2026-03-13)
- * ============================================================================
- * 
- * 1. SCOPE:
- *    Generalized for all companies. Any saved SalaryReport triggers checklist 
- *    generation for LOP Days and Other Minutes.
- *
- * 2. TASK TYPES:
- *    - "LOP Days": Created if `full_absence_count > 0`.
- *    - "Other Minutes": Created if `other_minutes > 0`.
- *
- * 3. DUPLICATE PREVENTION (UNIQUE FINGERPRINTS):
- *    - Format: `{Type}_{ProjectId}_{AttendanceId}_{Value}_{NormalizedName}`
- *    - Logic: On save, the system calculates all "Expected Fingerprints". 
- *      It deletes existing auto-created tasks for the project that are NOT 
- *      in the expected set, and creates only the missing ones.
- *    - Benefit: If a report is saved multiple times with IDENTICAL data, 
- *      the fingerprints match existing tasks, so NO deletions or creations 
- *      occur. This is the "Unique Fingerprint" check.
- *
- * 4. DATA MAPPING:
- *    - Description: `Employee Name | Metric: Value | Report Context`
- *    - Notes: Includes Department, Present Days, and Action Required guidance.
- *
- * 5. REVISIONS:
- *    If a value or name changes, the fingerprint changes, the old task is 
- *    removed as "stale" and a new one is created.
- *
- * ============================================================================
+ * Automatically creates or deletes LOP and Other Minutes checklist tasks
+ * triggered by ReportRun (Attendance Report) finalization/un-finalization.
  */
 
 const BATCH_DELAY_MS = 150;
@@ -48,38 +16,49 @@ function sleep(ms: number): Promise<void> {
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-        const body = await req.json();
-        const event = body?.event;
+        const { reportRunId, action = 'upsert' } = await req.json();
 
-        if (!event || !event.entity_id) return Response.json({ error: 'Missing event' }, { status: 400 });
+        if (!reportRunId) return Response.json({ error: 'Missing reportRunId' }, { status: 400 });
 
-        const salaryReportId = event.entity_id;
-        let reportData = event.data;
-
-        if (!reportData?.snapshot_data || !reportData?.project_id) {
-            const reports = await base44.asServiceRole.entities.SalaryReport.filter({ id: salaryReportId });
-            if (reports.length === 0) return Response.json({ message: 'Not found' });
-            reportData = reports[0];
-        }
-
+        const reports = await base44.asServiceRole.entities.ReportRun.filter({ id: reportRunId });
+        if (reports.length === 0) return Response.json({ message: 'Report run not found' });
+        const reportData = reports[0];
         const projectId = reportData.project_id;
+
         const [project] = await base44.asServiceRole.entities.Project.filter({ id: projectId });
         if (!project) return Response.json({ message: 'Project not found' });
 
-        let snapshotRows: any[] = [];
-        try { snapshotRows = JSON.parse(reportData.snapshot_data || '[]'); } catch (e) { return Response.json({ error: 'JSON error' }, { status: 500 }); }
-        if (!Array.isArray(snapshotRows) || snapshotRows.length === 0) return Response.json({ success: true, message: 'No rows' });
+        // --- ACTION: DELETE ---
+        if (action === 'delete') {
+            const existingTasks = await base44.asServiceRole.entities.ChecklistItem.filter({ 
+                project_id: projectId, 
+                is_auto_created: true 
+            });
+            const relevant = existingTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes');
+            
+            let deletedCount = 0;
+            for (const task of relevant) {
+                await base44.asServiceRole.entities.ChecklistItem.delete(task.id);
+                deletedCount++;
+                await sleep(BATCH_DELAY_MS);
+            }
+            return Response.json({ success: true, action: 'delete', deleted: deletedCount });
+        }
 
-        const reportName = reportData.report_name || 'Salary Report';
+        // --- ACTION: UPSERT ---
+        const analysisResults = await base44.asServiceRole.entities.AnalysisResult.filter({ report_run_id: reportRunId });
+        if (analysisResults.length === 0) return Response.json({ success: true, message: 'No analysis results found' });
+
+        const reportName = reportData.report_name || 'Attendance Report';
         const reportPeriod = reportData.date_from && reportData.date_to ? `${reportData.date_from} to ${reportData.date_to}` : 'N/A';
         
         const expectedTasks: Array<{ fingerprint: string, type: string, description: string, notes: string }> = [];
 
-        for (const emp of snapshotRows) {
-            const name = emp.name || emp.attendance_id || 'Unknown';
-            const attId = emp.attendance_id || '';
-            const lop = Number(emp.full_absence_count) || 0;
-            const other = Number(emp.other_minutes) || 0;
+        for (const res of analysisResults) {
+            const name = res.employee_name || res.attendance_id || 'Unknown';
+            const attId = res.attendance_id || '';
+            const lop = Number(res.full_absence_count) || 0;
+            const other = Number(res.other_minutes) || 0;
             const nameKey = name.replace(/\s+/g, '');
 
             if (lop > 0) {
@@ -88,7 +67,7 @@ Deno.serve(async (req) => {
                     fingerprint: fp,
                     type: 'LOP Days',
                     description: `${name} | LOP Days: ${lop} | Report: ${reportName}`,
-                    notes: `Employee: ${name}\nID: ${attId}\nLOP: ${lop}\nPeriod: ${reportPeriod}\n[Auto-created]`
+                    notes: `Employee: ${name}\nID: ${attId}\nLOP: ${lop}\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
                 });
             }
 
@@ -98,7 +77,7 @@ Deno.serve(async (req) => {
                     fingerprint: fp,
                     type: 'Other Minutes',
                     description: `${name} | Other Minutes: ${other} min | Report: ${reportName}`,
-                    notes: `Employee: ${name}\nID: ${attId}\nOther: ${other} min\nPeriod: ${reportPeriod}\n[Auto-created]`
+                    notes: `Employee: ${name}\nID: ${attId}\nOther: ${other} min\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
                 });
             }
         }
@@ -135,10 +114,10 @@ Deno.serve(async (req) => {
             }
         }
 
-        return Response.json({ success: true, deleted, created });
+        return Response.json({ success: true, action: 'upsert', deleted, created });
 
     } catch (error: any) {
-        console.error('Error:', error);
+        console.error('Error in createReportChecklistTasks:', error);
         return Response.json({ error: error.message }, { status: 500 });
     }
 });

@@ -55,24 +55,10 @@ Deno.serve(async (req) => {
             reportData = reports[0];
         }
 
-        // --- Forwarding to createReportChecklistTasks ---
-        // Note: Guard against non-Al Maraghi was removed here to generalize the feature.
-        const forwardedEvent = {
-            entity_id: salaryReportId,
-            event_type: eventType,
-            data: reportData
-        };
-
-        const result = await base44.asServiceRole.functions.invoke(
-            'createReportChecklistTasks',
-            { event: forwardedEvent }
-        );
-
         return Response.json({
             success: true,
             salary_report_id: salaryReportId,
-            function_result: result,
-            message: `Processed ${eventType} for SalaryReport ${salaryReportId}. Logic forwarded to createReportChecklistTasks.`
+            message: `Processed ${eventType} for SalaryReport ${salaryReportId}. Logic for auto-checklist tasks is now handled during Attendance Report finalization.`
         });
 
     } catch (error: any) {
