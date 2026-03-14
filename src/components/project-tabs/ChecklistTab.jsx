@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CheckCircle2, Circle, Clock, Plus, Trash2, Edit, Save } from 'lucide-react';
 import { toast } from 'sonner';
@@ -73,6 +74,8 @@ export default function ChecklistTab({ project }) {
     const queryClient = useQueryClient();
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [newTask, setNewTask] = useState({
         task_type: '',
         task_description: '',
@@ -150,7 +153,7 @@ export default function ChecklistTab({ project }) {
         }
     });
 
-    // Delete task
+    // Delete single task
     const deleteTaskMutation = useMutation({
         mutationFn: (id) => base44.entities.ChecklistItem.delete(id),
         onSuccess: () => {
@@ -159,6 +162,22 @@ export default function ChecklistTab({ project }) {
         },
         onError: (error) => {
             toast.error('Failed to delete task: ' + error.message);
+        }
+    });
+
+    // Bulk delete selected tasks
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (ids) => {
+            await Promise.all([...ids].map(id => base44.entities.ChecklistItem.delete(id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success(`${selectedIds.size} task(s) deleted`);
+            setSelectedIds(new Set());
+            setShowBulkDeleteConfirm(false);
+        },
+        onError: (error) => {
+            toast.error('Bulk delete failed: ' + error.message);
         }
     });
 
@@ -197,6 +216,26 @@ export default function ChecklistTab({ project }) {
     const completedCount = checklistItems.filter(t => t.status === 'completed').length;
     const totalCount = checklistItems.length;
     const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    // Selection helpers
+    const allSelected = checklistItems.length > 0 && selectedIds.size === checklistItems.length;
+    const someSelected = selectedIds.size > 0 && selectedIds.size < checklistItems.length;
+
+    const handleSelectAll = (checked) => {
+        if (checked) {
+            setSelectedIds(new Set(checklistItems.map(t => t.id)));
+        } else {
+            setSelectedIds(new Set());
+        }
+    };
+
+    const handleSelectRow = (id, checked) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (checked) next.add(id); else next.delete(id);
+            return next;
+        });
+    };
 
     // Group tasks by type for overview - include all predefined task types
     const taskTypeStats = PREDEFINED_TASKS.reduce((acc, predefinedTask) => {
@@ -285,8 +324,25 @@ export default function ChecklistTab({ project }) {
             {/* Main Checklist */}
             <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Payroll Checklist</CardTitle>
+                    <div className="flex items-center gap-3">
+                        <CardTitle>Payroll Checklist</CardTitle>
+                        {selectedIds.size > 0 && (
+                            <span className="text-xs font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                                {selectedIds.size} selected
+                            </span>
+                        )}
+                    </div>
                     <div className="flex gap-2">
+                        {selectedIds.size > 0 && (
+                            <Button
+                                variant="destructive"
+                                onClick={() => setShowBulkDeleteConfirm(true)}
+                                disabled={bulkDeleteMutation.isPending}
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Selected ({selectedIds.size})
+                            </Button>
+                        )}
                         {checklistItems.length === 0 && (
                             <Button
                                 onClick={() => initializePredefinedTasksMutation.mutate()}
@@ -322,6 +378,14 @@ export default function ChecklistTab({ project }) {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead className="w-10">
+                                            <Checkbox
+                                                checked={allSelected}
+                                                data-state={someSelected ? 'indeterminate' : undefined}
+                                                onCheckedChange={handleSelectAll}
+                                                aria-label="Select all rows"
+                                            />
+                                        </TableHead>
                                         <TableHead className="w-12">Status</TableHead>
                                         <TableHead>Task Type</TableHead>
                                         <TableHead>Description</TableHead>
@@ -331,7 +395,20 @@ export default function ChecklistTab({ project }) {
                                 </TableHeader>
                                 <TableBody>
                                     {checklistItems.map((task) => (
-                                        <TableRow key={task.id} className={task.status === 'completed' ? 'bg-green-50' : ''}>
+                                        <TableRow
+                                            key={task.id}
+                                            className={[
+                                                task.status === 'completed' ? 'bg-green-50' : '',
+                                                selectedIds.has(task.id) ? 'ring-1 ring-inset ring-indigo-300 bg-indigo-50/40' : ''
+                                            ].join(' ')}
+                                        >
+                                            <TableCell>
+                                                <Checkbox
+                                                    checked={selectedIds.has(task.id)}
+                                                    onCheckedChange={(checked) => handleSelectRow(task.id, checked)}
+                                                    aria-label={`Select row ${task.id}`}
+                                                />
+                                            </TableCell>
                                             <TableCell>
                                                 <button
                                                     onClick={() => handleToggleStatus(task)}
@@ -392,6 +469,31 @@ export default function ChecklistTab({ project }) {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Delete {selectedIds.size} task(s)?</DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone. The selected tasks will be permanently removed from the checklist.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => bulkDeleteMutation.mutate(selectedIds)}
+                            disabled={bulkDeleteMutation.isPending}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {bulkDeleteMutation.isPending ? 'Deleting...' : 'Yes, Delete All'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Add Task Dialog */}
             <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
