@@ -856,7 +856,8 @@ export default function RunAnalysisTab({ project }) {
             late_minutes,
             early_checkout_minutes,
             other_minutes,
-            grace_minutes: baseGrace + carriedGrace,
+            // Al Maraghi Rule: Grace is 15 minutes per working day
+            grace_minutes: (project.company === 'Al Maraghi Auto Repairs' || project.company === 'Al Maraghi Motors') ? (baseGrace * working_days) + carriedGrace : baseGrace + carriedGrace,
             abnormal_dates: [...new Set(abnormal_dates_list)].join(', '),
             notes: criticalDatesFormatted, // Only RED (critical) exceptions
             auto_resolutions: autoResolutionNotes

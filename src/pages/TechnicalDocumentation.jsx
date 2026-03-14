@@ -464,6 +464,7 @@ export default function TechnicalDocumentation() {
                             <li>Only runs on project close (via closeProject backend function)</li>
                             <li>Only if checkbox "Carry forward unused grace minutes" is checked (default: unchecked)</li>
                             <li>Only for company "Al Maraghi Auto Repairs"</li>
+                            <li><strong>Daily Accrual Rule:</strong> Grace is 15 minutes per working day. Annual Leave days with zero punches accrue 0 minutes.</li>
                             <li>Idempotent: Checks for existing records before creating new ones</li>
                         </ul>
                         <p className="text-sm text-amber-800 mt-3"><strong>Data Flow:</strong></p>

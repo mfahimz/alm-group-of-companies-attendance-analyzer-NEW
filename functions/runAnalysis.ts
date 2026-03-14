@@ -57,14 +57,14 @@ Deno.serve(async (req: Request) => {
 
         // Resolve company_id for stable company identification
         const AL_MARAGHI_MOTORS_COMPANY_ID = 2;
-        let isAlMaraghiMotors = false;
+        let isAlMaraghiMotors = project.company === 'Al Maraghi Motors' || project.company === 'Al Maraghi Auto Repairs';
         try {
             const companyRecords = await base44.asServiceRole.entities.Company.filter({ name: project.company }, null, 5);
             if (companyRecords.length > 0 && companyRecords[0].company_id === AL_MARAGHI_MOTORS_COMPANY_ID) {
                 isAlMaraghiMotors = true;
             }
         } catch (e) {
-            console.warn('[runAnalysis] Could not resolve company_id, carried grace will not apply');
+            console.warn('[runAnalysis] Could not resolve company_id, name-based check used');
         }
 
         // Fetch all required data
@@ -1451,13 +1451,16 @@ Deno.serve(async (req: Request) => {
             //   Where late_minutes and early_checkout_minutes are the RAW values stored here.
             //   No other fields (approved, other, deductible, ramadan_gift) are involved.
             // ============================================================================
-            const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
+            // Al Maraghi Rule: Grace carry-forward is 15 minutes per working day.
+            // Annual Leave days with zero punches are excluded from workingDays (see line 832).
+            const effectiveBaseGrace = isAlMaraghiMotors ? (baseGrace * workingDays) : baseGrace;
+            const totalGraceMinutes = Math.max(0, effectiveBaseGrace) + Math.max(0, carriedGrace);
             // lateMinutes and earlyCheckoutMinutes are ALREADY net of per-day approved reductions.
             // Do NOT subtract totalApprovedMinutes again — that would be double-dipping.
             const rawLateEarly = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);
             const deductibleMinutes = Math.max(0, rawLateEarly - totalGraceMinutes);
 
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, WorkingDays=${workingDays}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
 
             // Build set of LOP-adjacent weekly off dates for storage
             const lopAdjacentWeeklyOffDates = Object.entries(dateStatusMap)
