@@ -164,11 +164,21 @@ function calculateCurrentMonthLeaveDays(start: Date, end: Date, prevMonthIdx: nu
 function calculateRejoiningDate(endDate: Date, emp: any, publicHolidayDates: Set<string>): Date {
     const dayMap: Record<string, number> = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
     const weeklyOff = dayMap[emp?.weekly_off || 'Sunday'] ?? 0;
+    
+    // Start by moving one day forward from the end date
     const cand = new Date(endDate);
     cand.setDate(cand.getDate() + 1);
+
     let i = 0;
     while (i < 30) {
-        if (cand.getUTCDay() !== weeklyOff && !publicHolidayDates.has(cand.toISOString().split('T')[0])) break;
+        const dateStr = [
+            cand.getFullYear(),
+            String(cand.getMonth() + 1).padStart(2, '0'),
+            String(cand.getDate()).padStart(2, '0')
+        ].join('-');
+
+        if (cand.getDay() !== weeklyOff && !publicHolidayDates.has(dateStr)) break;
+        
         cand.setDate(cand.getDate() + 1);
         i++;
     }
