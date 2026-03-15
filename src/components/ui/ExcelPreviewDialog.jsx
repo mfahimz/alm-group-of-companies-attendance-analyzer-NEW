@@ -34,7 +34,8 @@ export default function ExcelPreviewDialog({
     data = [],
     headers = [],
     fileName = "Export",
-    onConfirm
+    onConfirm,
+    simulateMergeColumns = []
 }) {
     // Limit preview to first 20 rows as per requirements
     const displayLimit = 20;
@@ -120,10 +121,23 @@ export default function ExcelPreviewDialog({
                                                             // For objects, prioritize matching header as key
                                                             value = row[header];
                                                         }
+
+                                                        // Logic for simulating cell merging in the UI
+                                                        const isMergedColumn = simulateMergeColumns.includes(header);
+                                                        let shouldHideValue = false;
+                                                        if (isMergedColumn && rowIdx > 0) {
+                                                            const prevRow = previewRows[rowIdx - 1];
+                                                            const prevValue = Array.isArray(prevRow) ? prevRow[colIdx] : prevRow[header];
+                                                            if (value === prevValue && value !== null && value !== undefined) {
+                                                                shouldHideValue = true;
+                                                            }
+                                                        }
                                                         
                                                         return (
                                                             <TableCell key={colIdx} className="whitespace-nowrap px-4 py-3 border-r border-slate-100 last:border-r-0 text-sm text-slate-600 font-medium">
-                                                                {value === null || value === undefined ? (
+                                                                {shouldHideValue ? (
+                                                                    <span className="opacity-0">—</span>
+                                                                ) : value === null || value === undefined ? (
                                                                     <span className="text-slate-300">-</span>
                                                                 ) : typeof value === 'number' ? (
                                                                     <span className="font-mono text-slate-800">

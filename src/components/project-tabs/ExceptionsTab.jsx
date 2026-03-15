@@ -210,8 +210,8 @@ function ChecklistSection({ project, checklistItems = [] }) {
     const handleExportChecklist = async () => {
         // Checklist items are already sorted via props
         const exportData = checklistItems.map(task => ({
+            'Task Type': task.task_type, // Moved to first for merging logic
             'ID': task.id?.substring(0, 8),
-            'Task Type': task.task_type,
             'Description': task.task_description,
             'Status': task.status,
             'Completed By': task.completed_by || '—',
@@ -226,13 +226,17 @@ function ChecklistSection({ project, checklistItems = [] }) {
     const executeChecklistDownload = async () => {
         if (previewData.length === 0) return;
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            // Use xlsx-js-style for cell styling support
+            const XLSX = await import('xlsx-js-style');
             const worksheet = XLSX.utils.json_to_sheet(previewData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Checklist");
             
+            // Apply Dynamic Merging and Formatting
+            formatMergedWorksheet(worksheet, previewData, XLSX);
+
             const wscols = [
-                { wch: 10 }, { wch: 20 }, { wch: 60 }, { wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 40 }
+                { wch: 20 }, { wch: 10 }, { wch: 60 }, { wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 40 }
             ];
             worksheet['!cols'] = wscols;
 
@@ -593,13 +597,59 @@ function ChecklistSection({ project, checklistItems = [] }) {
                 isOpen={isPreviewOpen}
                 onClose={() => setIsPreviewOpen(false)}
                 data={previewData}
-                headers={['ID', 'Task Type', 'Description', 'Status', 'Completed By', 'Completed Date', 'Notes']}
+                headers={['Task Type', 'ID', 'Description', 'Status', 'Completed By', 'Completed Date', 'Notes']}
                 fileName={`Checklist_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`}
                 onConfirm={executeChecklistDownload}
+                simulateMergeColumns={['Task Type']}
             />
         </Card>
     );
 }
+
+/**
+ * Executive Formatting Engine for Excel
+ * Groups consecutive identical values in the first column and applies styling.
+ */
+const formatMergedWorksheet = (worksheet, data, XLSX) => {
+    if (!worksheet || !worksheet['!ref'] || !data || data.length === 0) return;
+
+    const merges = [];
+    const firstColKey = Object.keys(data[0])[0];
+    
+    let groupStart = 1; // Start from Row 1 (skipping header at Row 0)
+
+    for (let i = 0; i < data.length; i++) {
+        const currentValue = String(data[i][firstColKey] || '').trim();
+        const nextValue = i < data.length - 1 ? String(data[i + 1][firstColKey] || '').trim() : null;
+
+        // Apply alignment and wrapText to the first column cells regardless of merging
+        const cellRef = { r: i + 1, c: 0 };
+        const cellAddress = XLSX && XLSX.utils 
+            ? XLSX.utils.encode_cell(cellRef) 
+            : `A${i + 2}`;
+        
+        if (worksheet[cellAddress]) {
+            worksheet[cellAddress].s = {
+                alignment: { vertical: "center", horizontal: "center", wrapText: true }
+            };
+        }
+
+        if (currentValue === nextValue && currentValue !== '') {
+            // Group continues
+        } else {
+            // Group ends
+            if (i + 1 > groupStart) {
+                merges.push({
+                    s: { r: groupStart, c: 0 },
+                    e: { r: i + 1, c: 0 }
+                });
+            }
+            groupStart = i + 2;
+        }
+    }
+
+    worksheet['!merges'] = merges;
+};
 
 // Map user-friendly names to system type codes
 const TYPE_MAP = {
@@ -1465,16 +1515,26 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     );
 
     const handleGroupExport = async () => {
+        // Step 3: Annual Leave Source Filter
+        // Filter out "Annual Leave" from exceptions if it already exists in checklist or just by rule.
+        // Result: Only "Annual Leave" from Checklist remains.
+        
+        const filteredExceptionsForExport = sortedExceptions.filter(ex => {
+            const typeName = (ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' ')).toLowerCase().trim();
+            return typeName !== 'annual leave';
+        });
+
         // Combine both sources for intermingled hierarchical sorting
         const combinedData = [
-            ...sortedExceptions.map(ex => {
+            ...filteredExceptionsForExport.map(ex => {
                 const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id) && e.company === project.company);
                 const typeName = ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' ');
                 const empName = ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—');
                 
                 return {
+                    type: typeName, // Moved to first for merging
                     category: 'Attendance Exception',
-                    idType: ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
+                    id: ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
                     employeeTask: empName,
                     details: ex.details || '-',
                     context: `${typeName}${ex.created_from_report ? ' (From Report)' : ''}`,
@@ -1487,8 +1547,9 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 const taskDesc = task.task_description || '—';
                 
                 return {
+                    type: taskType, // Moved to first for merging
                     category: 'Checklist Task',
-                    idType: taskType,
+                    id: taskType,
                     employeeTask: taskDesc,
                     details: task.notes || '-',
                     context: `${task.is_predefined ? 'Predefined' : 'Project Task'}${task.completed_by ? ` (By: ${task.completed_by})` : ''}`,
@@ -1508,8 +1569,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
         });
 
         const exportRows = combinedData.map(item => ({
+            'Type': item.type,
             'Category': item.category,
-            'ID / Type': item.idType,
             'Employee / Task': item.employeeTask,
             'Details': item.details,
             'Additional Context': item.context
@@ -1518,27 +1579,34 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
         setPreviewConfig({
             isOpen: true,
             data: exportRows,
-            headers: ['Category', 'ID / Type', 'Employee / Task', 'Details', 'Additional Context'],
+            headers: ['Type', 'Category', 'Employee / Task', 'Details', 'Additional Context'],
             fileName: `Unified_Export_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`,
-            onConfirm: executeGroupExportDownload
+            onConfirm: executeGroupExportDownload,
+            simulateMergeColumns: ['Type']
         });
     };
 
     const executeGroupExportDownload = async () => {
         if (previewConfig.data.length === 0) return;
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            // Use xlsx-js-style for cell styling support
+            const XLSX = await import('xlsx-js-style');
+            
+            // Create worksheet from JSON
             const worksheet = XLSX.utils.json_to_sheet(previewConfig.data);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Unified Export");
             
+            // Apply Dynamic Merging and Formatting
+            formatMergedWorksheet(worksheet, previewConfig.data, XLSX);
+            
             const wscols = [
-                { wch: 20 }, { wch: 20 }, { wch: 60 }, { wch: 40 }, { wch: 40 }
+                { wch: 25 }, { wch: 25 }, { wch: 60 }, { wch: 40 }, { wch: 40 }
             ];
             worksheet['!cols'] = wscols;
 
             XLSX.writeFile(workbook, previewConfig.fileName);
-            toast.success('Unified export downloaded');
+            toast.success('Unified export downloaded with dynamic grouping');
         } catch (error) {
             console.error('[Unified] Export failed:', error);
             toast.error('Export failed: ' + error.message);
@@ -2831,6 +2899,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 headers={previewConfig.headers}
                 fileName={previewConfig.fileName}
                 onConfirm={previewConfig.onConfirm}
+                simulateMergeColumns={previewConfig.simulateMergeColumns}
             />
         </div>
     );
