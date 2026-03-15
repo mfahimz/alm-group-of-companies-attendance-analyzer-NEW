@@ -226,8 +226,8 @@ function ChecklistSection({ project, checklistItems = [] }) {
     const executeChecklistDownload = async () => {
         if (previewData.length === 0) return;
         try {
-            // Use xlsx-js-style for cell styling support
-            const XLSX = await import('xlsx-js-style');
+            // Use xlsx for export
+            const XLSX = await import('xlsx');
             const worksheet = XLSX.utils.json_to_sheet(previewData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Checklist");
@@ -1589,8 +1589,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const executeGroupExportDownload = async () => {
         if (previewConfig.data.length === 0) return;
         try {
-            // Use xlsx-js-style for cell styling support
-            const XLSX = await import('xlsx-js-style');
+            // Use xlsx for export
+            const XLSX = await import('xlsx');
             
             // Create worksheet from JSON
             const worksheet = XLSX.utils.json_to_sheet(previewConfig.data);
