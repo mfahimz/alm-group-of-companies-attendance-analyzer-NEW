@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import SortableTableHead from '../ui/SortableTableHead';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 
 /**
@@ -163,6 +164,10 @@ export default function OvertimeTab({ project }) {
     const [isSavingAdjustments, setIsSavingAdjustments] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
+
+    // Preview States
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewData, setPreviewData] = useState([]);
 
     // ============================================
     // QUERIES
@@ -431,7 +436,10 @@ export default function OvertimeTab({ project }) {
     };
 
     const handleExportTemplate = () => {
-        const templateData = filteredData.map(row => ({
+        // Sort by Employee Name (A-Z) by default for preview
+        const sortedData = [...filteredData].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        
+        const templateData = sortedData.map(row => ({
             'Attendance ID': row.attendance_id,
             'HRMS ID': row.hrms_id,
             'Name': row.name,
@@ -441,11 +449,22 @@ export default function OvertimeTab({ project }) {
             'Special OT Hours': row.specialOtHours || 0
         }));
 
-        const ws = XLSX.utils.json_to_sheet(templateData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
-        XLSX.writeFile(wb, `OT_Template_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
-        toast.success('Template downloaded');
+        setPreviewData(templateData);
+        setIsPreviewOpen(true);
+    };
+
+    const executeDownload = () => {
+        if (previewData.length === 0) return;
+        try {
+            const ws = XLSX.utils.json_to_sheet(previewData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
+            XLSX.writeFile(wb, `OT_Template_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast.success('Template downloaded');
+        } catch (error) {
+            console.error('[OvertimeTab] Download failed:', error);
+            toast.error('Failed to export template');
+        }
     };
 
     const handleImportOT = async (e) => {
@@ -1024,6 +1043,16 @@ export default function OvertimeTab({ project }) {
                 </CardContent>
             </Card>
             </div>
+
+            {/* Excel Export Preview Dialog */}
+            <ExcelPreviewDialog
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                data={previewData}
+                headers={['Attendance ID', 'HRMS ID', 'Name', 'Department', 'Attendance Source', 'Normal OT Hours', 'Special OT Hours']}
+                fileName={`OT_Template_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`}
+                onConfirm={executeDownload}
+            />
         </>
     );
 }

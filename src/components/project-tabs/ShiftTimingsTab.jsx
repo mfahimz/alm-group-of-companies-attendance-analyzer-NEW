@@ -18,6 +18,7 @@ import BulkEditShiftDialog from '../shifts/BulkEditShiftDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import TimePicker from '../ui/TimePicker';
 import RamadanShiftSection from './RamadanShiftSection';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 export default function ShiftTimingsTab({ project }) {
      const [file, setFile] = useState(null);
@@ -62,6 +63,15 @@ export default function ShiftTimingsTab({ project }) {
         is_single_shift: false,
         is_friday_shift: false,
         applicable_days: []
+    });
+
+    // Export Preview State
+    const [exportPreviewConfig, setExportPreviewConfig] = useState({
+        isOpen: false,
+        data: [],
+        headers: [],
+        fileName: '',
+        onConfirm: () => {}
     });
     const queryClient = useQueryClient();
 
@@ -708,8 +718,6 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
         }
 
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-            
             const data = shifts.map(shift => {
                 const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                 return {
@@ -733,14 +741,30 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                 };
             });
 
-            const worksheet = XLSX.utils.json_to_sheet(data);
+            setExportPreviewConfig({
+                isOpen: true,
+                data: data,
+                headers: ['Attendance ID', 'Employee Name', 'Department', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Weekly Off', 'Shift Type', 'Applicable Days'],
+                fileName: `${project.name}_shift_timings.xlsx`,
+                onConfirm: executeExportDownload
+            });
+        } catch (error) {
+            toast.error('Failed to prepare export');
+            console.error(error);
+        }
+    };
+
+    const executeExportDownload = async () => {
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            const worksheet = XLSX.utils.json_to_sheet(exportPreviewConfig.data);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Shift Timings');
-            
-            XLSX.writeFile(workbook, `${project.name}_shift_timings.xlsx`);
-            toast.success('Shift timings exported to Excel');
+            XLSX.writeFile(workbook, exportPreviewConfig.fileName);
+            toast.success('Excel file downloaded');
+            setExportPreviewConfig(prev => ({ ...prev, isOpen: false }));
         } catch (error) {
-            toast.error('Failed to export');
+            toast.error('Download failed');
             console.error(error);
         }
     };
@@ -754,8 +778,6 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
         }
 
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-            
             const data = blockShifts.map(shift => {
                 const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                 return {
@@ -779,15 +801,27 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                 };
             });
 
-            const worksheet = XLSX.utils.json_to_sheet(data);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, blockId.replace('block', 'Block '));
-            
-            XLSX.writeFile(workbook, `${project.name}_${blockId}_shifts.xlsx`);
-            toast.success(`${blockId.replace('block', 'Block ')} shifts exported to Excel`);
+            setExportPreviewConfig({
+                isOpen: true,
+                data: data,
+                headers: ['Attendance ID', 'Employee Name', 'Department', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Weekly Off', 'Shift Type', 'Applicable Days'],
+                fileName: `${project.name}_${blockId}_shifts.xlsx`,
+                onConfirm: async () => {
+                    try {
+                        const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+                        const worksheet = XLSX.utils.json_to_sheet(data);
+                        const workbook = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(workbook, worksheet, blockId.replace('block', 'Block '));
+                        XLSX.writeFile(workbook, `${project.name}_${blockId}_shifts.xlsx`);
+                        toast.success(`${blockId.replace('block', 'Block ')} shifts exported to Excel`);
+                        setExportPreviewConfig(prev => ({ ...prev, isOpen: false }));
+                    } catch (error) {
+                        toast.error('Download failed');
+                    }
+                }
+            });
         } catch (error) {
-            toast.error('Failed to export');
-            console.error(error);
+            toast.error('Failed to prepare export');
         }
     };
 
@@ -1904,6 +1938,14 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                     </div>
                 </DialogContent>
             </Dialog>
+            <ExcelPreviewDialog
+                isOpen={exportPreviewConfig.isOpen}
+                onClose={() => setExportPreviewConfig(prev => ({ ...prev, isOpen: false }))}
+                data={exportPreviewConfig.data}
+                headers={exportPreviewConfig.headers}
+                fileName={exportPreviewConfig.fileName}
+                onConfirm={exportPreviewConfig.onConfirm}
+            />
         </div>
     );
 }

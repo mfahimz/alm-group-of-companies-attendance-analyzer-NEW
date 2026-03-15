@@ -15,90 +15,82 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Download, X } from "lucide-react";
+import { Download, X, FileSpreadsheet } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 /**
  * ExcelPreviewDialog - A reusable dialog to preview data before exporting to Excel.
  * 
  * @param {boolean} isOpen - Whether the dialog is open.
- * @param {function} onOpenChange - Callback to change the open state.
+ * @param {function} onClose - Callback to close the dialog.
  * @param {Array} data - The data to preview (array of objects or array of arrays).
- * @param {Array} columns - Optional list of column keys/headers in order.
- * @param {function} onExport - Callback triggered when the user clicks 'Export'.
- * @param {string} title - Dialog title.
- * @param {string} description - Optional description text.
+ * @param {Array} headers - List of column headers in order.
+ * @param {string} fileName - Suggestive name of the file (displayed in header).
+ * @param {function} onConfirm - Callback triggered to execute the actual XLSX export logic.
  */
 export default function ExcelPreviewDialog({
     isOpen,
-    onOpenChange,
+    onClose,
     data = [],
-    columns,
-    onExport,
-    title = "Export Preview",
-    description
+    headers = [],
+    fileName = "Export",
+    onConfirm
 }) {
-    // Determine columns if not provided
-    const displayColumns = React.useMemo(() => {
-        if (columns && columns.length > 0) return columns;
-        if (data.length > 0) {
-            if (Array.isArray(data[0])) {
-                // If it's an array of arrays, use indices or assume first row is header?
-                // Usually XLSX.utils.aoa_to_sheet is used for AOA.
-                // For preview, we'll just show the first few rows.
-                return Object.keys(data[0]);
-            }
-            return Object.keys(data[0]);
-        }
-        return [];
-    }, [data, columns]);
+    // Limit preview to first 20 rows as per requirements
+    const displayLimit = 20;
+    const previewRows = data.slice(0, displayLimit);
+    const hasMoreRows = data.length > displayLimit;
 
-    // Limit preview to first 50 rows for performance
-    const previewRows = data.slice(0, 50);
-    const hasMoreRows = data.length > 50;
-
-    const handleExport = () => {
-        onExport();
-        onOpenChange(false);
+    const handleConfirm = () => {
+        onConfirm();
+        onClose();
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[90vw] w-[1200px] max-h-[90vh] flex flex-col p-0">
-                <DialogHeader className="p-6 pb-2">
-                    <DialogTitle className="flex items-center gap-2 text-xl">
-                        <Download className="w-5 h-5 text-indigo-600" />
-                        {title}
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-[1000px] w-full max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white rounded-xl border-none shadow-2xl">
+                <DialogHeader className="p-6 pb-4 border-b bg-white">
+                    <DialogTitle className="flex items-center gap-3 text-2xl font-bold text-slate-900">
+                        <div className="p-2 bg-green-50 rounded-lg">
+                            <FileSpreadsheet className="w-6 h-6 text-green-600" />
+                        </div>
+                        Excel Export Preview
                     </DialogTitle>
-                    {description && (
-                        <p className="text-sm text-slate-500 mt-1">{description}</p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-                            {data.length} total rows
-                        </span>
-                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
-                            {displayColumns.length} columns
-                        </span>
-                        {hasMoreRows && (
-                            <span className="text-xs text-amber-600 font-medium">
-                                Showing first 50 rows in preview
-                            </span>
-                        )}
+                    <div className="flex flex-col gap-2 mt-3">
+                        <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                            Target File: <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">{fileName}</span>
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium border border-indigo-100">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                {data.length.toLocaleString()} total entries
+                            </div>
+                            {hasMoreRows && (
+                                <div className="flex items-center gap-1.5 text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-medium border border-amber-100">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                    Showing first {displayLimit} rows of {data.length.toLocaleString()}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-hidden px-6 py-2">
-                    <div className="border rounded-md h-full bg-white relative">
-                        <ScrollArea className="h-full w-full">
-                            <div className="min-w-max">
-                                <Table>
-                                    <TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                                        <TableRow>
-                                            <TableHead className="w-[50px] text-center border-r bg-slate-50 sticky left-0 z-20">#</TableHead>
-                                            {displayColumns.map((col, idx) => (
-                                                <TableHead key={idx} className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 border-r">
-                                                    {col}
+                <div className="flex-1 overflow-hidden px-6 py-6 bg-slate-50/40">
+                    <div className="border border-slate-200 rounded-xl h-full bg-white shadow-sm overflow-hidden flex flex-col">
+                        <ScrollArea className="flex-1 w-full">
+                            <div className="min-w-full inline-block align-middle">
+                                <Table className="border-collapse table-auto w-full">
+                                    <TableHeader className="bg-slate-50 sticky top-0 z-20">
+                                        <TableRow className="hover:bg-transparent border-b border-slate-200">
+                                            <TableHead className="w-[60px] text-center border-r border-slate-200 font-bold text-slate-500 bg-slate-50 sticky left-0 z-30 px-3">
+                                                #
+                                            </TableHead>
+                                            {headers.map((header, idx) => (
+                                                <TableHead 
+                                                    key={idx} 
+                                                    className="whitespace-nowrap px-4 py-4 font-bold text-slate-700 border-r border-slate-200 last:border-r-0 min-w-[120px]"
+                                                >
+                                                    {header}
                                                 </TableHead>
                                             ))}
                                         </TableRow>
@@ -106,24 +98,37 @@ export default function ExcelPreviewDialog({
                                     <TableBody>
                                         {previewRows.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={displayColumns.length + 1} className="h-32 text-center text-slate-500">
-                                                    No data available for preview
+                                                <TableCell colSpan={headers.length + 1} className="h-48 text-center">
+                                                    <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+                                                        <FileSpreadsheet className="w-8 h-8 opacity-20" />
+                                                        <p className="italic font-medium">No data available to preview</p>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
                                             previewRows.map((row, rowIdx) => (
-                                                <TableRow key={rowIdx} className="hover:bg-slate-50/50">
-                                                    <TableCell className="text-center text-slate-400 text-xs border-r bg-slate-50/30 sticky left-0 z-5">
-                                                        {rowIdx + 1}
+                                                <TableRow key={rowIdx} className="hover:bg-blue-50/40 transition-colors border-b border-slate-100 last:border-0">
+                                                    <TableCell className="text-center text-slate-400 text-[10px] border-r border-slate-100 bg-slate-50/30 sticky left-0 z-10 font-mono">
+                                                        {(rowIdx + 1).toString().padStart(2, '0')}
                                                     </TableCell>
-                                                    {displayColumns.map((col, colIdx) => {
-                                                        const value = Array.isArray(row) ? row[col] : row[col];
+                                                    {headers.map((header, colIdx) => {
+                                                        // Handle both Array of Arrays (AOA) and Array of Objects (JSON)
+                                                        let value;
+                                                        if (Array.isArray(row)) {
+                                                            value = row[colIdx];
+                                                        } else {
+                                                            // For objects, prioritize matching header as key
+                                                            value = row[header];
+                                                        }
+                                                        
                                                         return (
-                                                            <TableCell key={colIdx} className="whitespace-nowrap px-4 py-2 border-r text-sm">
+                                                            <TableCell key={colIdx} className="whitespace-nowrap px-4 py-3 border-r border-slate-100 last:border-r-0 text-sm text-slate-600 font-medium">
                                                                 {value === null || value === undefined ? (
                                                                     <span className="text-slate-300">-</span>
                                                                 ) : typeof value === 'number' ? (
-                                                                    value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                                                    <span className="font-mono text-slate-800">
+                                                                        {value % 1 === 0 ? value : value.toFixed(2)}
+                                                                    </span>
                                                                 ) : String(value)}
                                                             </TableCell>
                                                         );
@@ -134,10 +139,12 @@ export default function ExcelPreviewDialog({
                                         {hasMoreRows && (
                                             <TableRow>
                                                 <TableCell 
-                                                    colSpan={displayColumns.length + 1} 
-                                                    className="bg-slate-50/50 text-center py-4 text-slate-500 italic text-sm"
+                                                    colSpan={headers.length + 1} 
+                                                    className="bg-slate-50/50 text-center py-6 text-slate-500 italic text-sm font-medium border-t border-slate-200"
                                                 >
-                                                    ... and {data.length - 50} more rows ...
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <span>... showing only first {displayLimit} of {data.length.toLocaleString()} total rows ...</span>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -149,14 +156,20 @@ export default function ExcelPreviewDialog({
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 pt-2 bg-slate-50 border-t mt-auto">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} className="gap-2">
-                        <X className="w-4 h-4" />
+                <DialogFooter className="p-6 bg-white border-t flex flex-row items-center justify-end gap-3 sm:gap-4">
+                    <Button 
+                        variant="ghost" 
+                        onClick={onClose} 
+                        className="px-6 text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all font-semibold"
+                    >
                         Cancel
                     </Button>
-                    <Button onClick={handleExport} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
-                        <Download className="w-4 h-4" />
-                        Confirm and Export Excel
+                    <Button 
+                        onClick={handleConfirm} 
+                        className="px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200/50 hover:shadow-blue-300/50 transform hover:-translate-y-0.5 active:translate-y-0 transition-all font-bold rounded-lg"
+                    >
+                        <Download className="w-5 h-5 mr-2" />
+                        Confirm & Download Excel
                     </Button>
                 </DialogFooter>
             </DialogContent>

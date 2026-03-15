@@ -20,6 +20,7 @@ import DailyBreakdownDialog from './DailyBreakdownDialog';
 import DeductibleCell from './DeductibleCell';
 import ReportTableRow from './ReportTableRow';
 import * as XLSX from 'xlsx';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -28,6 +29,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [editingDay, setEditingDay] = useState(null);
     const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
     const [sort, setSort] = useState({ key: 'deductible_minutes', direction: 'desc' });
+    
+    // Preview state for Excel export
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewData, setPreviewData] = useState([]);
+    const [previewHeaders, setPreviewHeaders] = useState([]);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -1598,15 +1604,26 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return baseRow;
             });
 
-            const data = [headers, ...rows];
+            setPreviewHeaders(headers);
+            setPreviewData(rows);
+            setIsPreviewOpen(true);
+        } catch (error) {
+            console.error('[ReportDetailView] Export preparation failed:', error);
+            toast.error('Failed to prepare export data');
+        }
+    };
+
+    const executeExcelDownload = () => {
+        try {
+            const data = [previewHeaders, ...previewData];
             const ws = XLSX.utils.aoa_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
             XLSX.writeFile(wb, `attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
             toast.success('Attendance report exported');
         } catch (error) {
-            console.error('[ReportDetailView] Export failed:', error);
-            toast.error('Failed to export attendance report. Please try again.');
+            console.error('[ReportDetailView] Download failed:', error);
+            toast.error('Failed to download attendance report');
         }
     };
 
@@ -1925,7 +1942,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 isUser={isUser}
                 isSupervisor={isSupervisor}
             />
-
+            <ExcelPreviewDialog
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                data={previewData}
+                headers={previewHeaders}
+                fileName={`attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`}
+                onConfirm={executeExcelDownload}
+            />
         </div>
     );
 }
