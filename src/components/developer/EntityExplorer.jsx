@@ -84,6 +84,7 @@ const ALL_ENTITIES = [
     'CalendarPayrollSnapshot',
     'CalendarSettings',
     'ChecklistItem',
+    'ChangeRequest',
     'Company',
     'CompanySettings',
     'DepartmentHead',

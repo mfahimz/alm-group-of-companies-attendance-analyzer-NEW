@@ -85,6 +85,7 @@ import TestDataViewer from './pages/TestDataViewer';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import SoftwareDoc from './pages/SoftwareDoc';
+import DevDashboard from './pages/developer/DevDashboard';
 import __Layout from './Layout.jsx';
 
 
@@ -127,6 +128,7 @@ export const PAGES = {
     "UserProfile": UserProfile,
     "Users": Users,
     "SoftwareDoc": SoftwareDoc,
+    "DevDashboard": DevDashboard,
 }
 
 export const pagesConfig = {

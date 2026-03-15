@@ -19,7 +19,8 @@ import {
     BookText,
     Lightbulb,
     FileText,
-    ScanLine
+    ScanLine,
+    Terminal
 } from 'lucide-react';
 
 /**
@@ -253,7 +254,7 @@ export const PAGES_CONFIG = {
         title: 'Development Log',
         icon: GitPullRequest,
         category: 'Developer',
-        showInNav: true,
+        showInNav: false,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin']
@@ -263,7 +264,7 @@ export const PAGES_CONFIG = {
         title: 'App Documentation',
         icon: BookText,
         category: 'Developer',
-        showInNav: true,
+        showInNav: false,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin']
@@ -272,6 +273,16 @@ export const PAGES_CONFIG = {
         name: 'FeatureRequests',
         title: 'Feature Requests',
         icon: Lightbulb,
+        category: 'Developer',
+        showInNav: false,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+    DevDashboard: {
+        name: 'DevDashboard',
+        title: 'Developer Portal',
+        icon: Terminal,
         category: 'Developer',
         showInNav: true,
         requiresAuth: true,
@@ -397,6 +408,6 @@ export const NAV_CATEGORIES = {
         label: 'Developer',
         icon: Code,
         order: 100,
-        renderAs: 'dropdown'
+        renderAs: 'direct'
     }
 };
