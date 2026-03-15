@@ -12,7 +12,7 @@ import { getPagesByCategory, NAV_CATEGORIES } from './components/config/pagesCon
 import { LogOut } from 'lucide-react';
 import { CompanyFilterProvider } from './components/context/CompanyContext';
 
-// Layout v6 - rebuild trigger
+// Layout v7 - force dep cache invalidation 2026-03-15T19:45
 export default function Layout({ children, currentPageName }) {
     const navigate = useNavigate();
     const publicPages = ['Maintenance'];
