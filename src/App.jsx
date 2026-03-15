@@ -48,9 +48,9 @@ function App() {
       <Router>
         <NavigationTracker />
         <AppRoutes />
+        <Toaster />
+        <VisualEditAgent />
       </Router>
-      <Toaster />
-      <VisualEditAgent />
     </QueryClientProvider>
   )
 }
