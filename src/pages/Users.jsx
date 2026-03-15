@@ -66,8 +66,8 @@ const DEFAULT_PAGES = [
     { page_name: 'Employees', description: 'Employee master data management', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
     { page_name: 'Salaries', description: 'Employee salary management', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
     { page_name: 'SalaryIncrements', description: 'Salary increment management', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
-    { page_name: 'AnnualLeaveManagement', description: 'Annual leave calendar', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
-    { page_name: 'RamadanSchedules', description: 'Ramadan shift schedule management', allowed_roles: 'admin,ceo,hr_manager' },
+    { page_name: 'AnnualLeaveManagement', description: 'Annual leave calendar', allowed_roles: 'admin,supervisor,user,ceo,hr_manager' },
+    { page_name: 'RamadanSchedules', description: 'Ramadan shift schedule management', allowed_roles: 'admin,user,ceo,hr_manager' },
     { page_name: 'ResumeScanner', description: 'AI resume scanner for recruitment', allowed_roles: 'admin,supervisor' },
     // Admin
     { page_name: 'HalfYearlyMinutesManagement', description: 'Half-yearly minutes allowance management', allowed_roles: 'admin,ceo' },

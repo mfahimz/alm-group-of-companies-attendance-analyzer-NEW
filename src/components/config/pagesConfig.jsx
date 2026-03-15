@@ -141,7 +141,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'hr_manager']
     },
     CompanyManagement: {
         name: 'CompanyManagement',
@@ -194,7 +194,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'user', 'ceo', 'hr_manager']
     },
     MaintenanceSettings: {
         name: 'MaintenanceSettings',
