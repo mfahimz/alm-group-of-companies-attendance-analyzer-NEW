@@ -20,7 +20,10 @@ import {
     Lightbulb,
     FileText,
     ScanLine,
-    Terminal
+    Terminal,
+    BookOpen,
+    Cpu,
+    Briefcase
 } from 'lucide-react';
 
 /**
@@ -248,59 +251,75 @@ export const PAGES_CONFIG = {
         defaultRoles: ['admin']
     },
 
-    // Developer Tools
-    DevelopmentLog: {
-        name: 'DevelopmentLog',
-        title: 'Development Log',
-        icon: GitPullRequest,
-        category: 'Developer',
-        showInNav: false,
+    // Documentation Section
+    SoftwareDoc: {
+        name: 'SoftwareDoc',
+        title: 'Software Overview',
+        icon: BookText,
+        category: 'Documentation',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+    TechnicalDocumentation: {
+        name: 'TechnicalDocumentation',
+        title: 'Technical Docs',
+        icon: Code,
+        category: 'Documentation',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+    AgentsDocumentation: {
+        name: 'AgentsDocumentation',
+        title: 'Agents Guide',
+        icon: Cpu,
+        category: 'Documentation',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
+    },
+    BusinessDocumentation: {
+        name: 'BusinessDocumentation',
+        title: 'Business Logic',
+        icon: Briefcase,
+        category: 'Documentation',
+        showInNav: true,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin']
     },
     AppDocumentation: {
         name: 'AppDocumentation',
-        title: 'App Documentation',
-        icon: BookText,
-        category: 'Developer',
-        showInNav: false,
+        title: 'App Manual',
+        icon: BookOpen,
+        category: 'Documentation',
+        showInNav: true,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin']
     },
-    FeatureRequests: {
-        name: 'FeatureRequests',
-        title: 'Feature Requests',
-        icon: Lightbulb,
-        category: 'Developer',
-        showInNav: false,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    DevDashboard: {
-        name: 'DevDashboard',
-        title: 'Developer Portal',
-        icon: Terminal,
-        category: 'Developer',
+    REPORT_ARCHITECTURE: {
+        name: 'REPORT_ARCHITECTURE',
+        title: 'Report Architecture',
+        icon: BarChart3,
+        category: 'Documentation',
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin']
     },
 
-    // Developer Module — Admin-only, NEVER shown in navigation.
-    // This page is accessed exclusively by typing the route directly in the
-    // browser. It must not appear in DesktopNav, MobileNav, any sidebar,
-    // dropdown, or menu for ANY user role including admin. The internal nav
-    // bar on this page is scoped entirely within the DeveloperModule component.
-    DeveloperModule: {
-        name: 'DeveloperModule',
-        title: 'Developer Module',
-        icon: Code,
+    // Developer Portal
+    DeveloperPortal: {
+        name: 'DeveloperPortal',
+        title: 'Developer Portal',
+        icon: Terminal,
         category: 'Developer',
-        showInNav: false,
+        showInNav: true,
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin']
@@ -405,9 +424,15 @@ export const NAV_CATEGORIES = {
         renderAs: 'dropdown'
     },
     Developer: {
-        label: 'Developer',
+        label: 'Developer Portal',
         icon: Code,
         order: 100,
         renderAs: 'direct'
+    },
+    Documentation: {
+        label: 'Knowledge Base',
+        icon: BookText,
+        order: 10,
+        renderAs: 'dropdown'
     }
 };
