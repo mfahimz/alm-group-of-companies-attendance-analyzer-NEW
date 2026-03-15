@@ -1,5 +1,5 @@
 import './App.css'
-// Cache Invalidation: Triggering full Vite rebuild for Base44 Preview stability.
+// Cache Invalidation Sync: 2026-03-15T18:07 - Forcing fresh Vite build.
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
