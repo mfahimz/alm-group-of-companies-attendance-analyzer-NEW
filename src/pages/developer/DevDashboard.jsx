@@ -35,11 +35,9 @@ import LiveLogs from '@/components/developer/LiveLogs';
 import ChangeHistory from '@/components/developer/ChangeHistory';
 import ChangeManagement from '@/components/developer/ChangeManagement';
 
-// We'll import original pages as components where possible, or recreate their simplified logic
-import TestDataViewer from '../TestDataViewer';
-import DevelopmentLog from '../DevelopmentLog';
-import FeatureRequests from '../FeatureRequests';
-import AuditLogs from '../AuditLogs';
+// Note: Original pages (TestDataViewer, DevelopmentLog, etc.) are NOT imported directly 
+// to avoid "multiple copies of React" issues caused by duplicate module resolution.
+// They are accessed via direct links within the portal.
 
 export default function DevDashboard() {
     usePageTitle('Developer Portal');
@@ -326,31 +324,69 @@ export default function DevDashboard() {
 
                 {/* Audit & Logs Tab */}
                 <TabsContent value="logs" className="space-y-6 outline-none">
-                    <Tabs defaultValue="audit" className="space-y-6">
+                    <Tabs defaultValue="live" className="space-y-6">
                         <TabsList className="bg-white border rounded-lg p-1">
-                            <TabsTrigger value="audit">System Audit Logs</TabsTrigger>
                             <TabsTrigger value="live">Live Server Logs</TabsTrigger>
                             <TabsTrigger value="history">Change History</TabsTrigger>
+                            <TabsTrigger value="audit-link">Audit Logs</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="audit"><AuditLogs /></TabsContent>
                         <TabsContent value="live"><LiveLogs /></TabsContent>
                         <TabsContent value="history"><ChangeHistory /></TabsContent>
+                        <TabsContent value="audit-link">
+                            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                                <ScrollText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">System Audit Logs</h3>
+                                <p className="text-slate-500 max-w-md mx-auto mb-6">
+                                    The Audit Log viewer is a top-level administrative tool and should be accessed in its dedicated full-screen view.
+                                </p>
+                                <Button asChild>
+                                    <a href="/AuditLogs">Open Audit Log Viewer</a>
+                                </Button>
+                            </div>
+                        </TabsContent>
                     </Tabs>
                 </TabsContent>
 
                 {/* Development Log Tab */}
                 <TabsContent value="development" className="outline-none">
-                    <DevelopmentLog />
+                    <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                        <GitPullRequest className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">Development Log</h3>
+                        <p className="text-slate-500 max-w-md mx-auto mb-6">
+                            The comprehensive development history and technical change logs are available in the dedicated module.
+                        </p>
+                        <Button asChild>
+                            <a href="/DevelopmentLog">Open Development Log</a>
+                        </Button>
+                    </div>
                 </TabsContent>
 
                 {/* Test Data Tab */}
                 <TabsContent value="test-data" className="outline-none">
-                    <TestDataViewer />
+                    <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                        <Trash2 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">Test Data Management</h3>
+                        <p className="text-slate-500 max-w-md mx-auto mb-6">
+                            Clean up sample data, reset analysis results, and manage your local development environment data.
+                        </p>
+                        <Button asChild>
+                            <a href="/TestDataViewer">Open Test Data Manager</a>
+                        </Button>
+                    </div>
                 </TabsContent>
 
                 {/* Feature Requests Tab */}
                 <TabsContent value="features" className="outline-none">
-                    <FeatureRequests />
+                    <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                        <Lightbulb className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">Feature Requests</h3>
+                        <p className="text-slate-500 max-w-md mx-auto mb-6">
+                            View and manage the product roadmap, user suggestions, and upcoming features.
+                        </p>
+                        <Button asChild>
+                            <a href="/FeatureRequests">Open Feature Portal</a>
+                        </Button>
+                    </div>
                 </TabsContent>
 
                 {/* Documentation Tab */}
