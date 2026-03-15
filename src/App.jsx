@@ -1,5 +1,5 @@
 import './App.css'
-// Cache Invalidation Sync: 2026-03-15T18:07 - Forcing fresh Vite build.
+// Cache Invalidation Sync: 2026-03-15T19:45 - Force full dep graph rebuild post xlsx-js-style removal.
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
