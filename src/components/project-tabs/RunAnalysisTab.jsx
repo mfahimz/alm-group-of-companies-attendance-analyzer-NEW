@@ -989,6 +989,88 @@ export default function RunAnalysisTab({ project }) {
             });
         }
 
+        // --- NEW: Missing Shift Detection ---
+        const missingShifts = [];
+        const dayNameToNumber = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        
+        // Group punches by employee and date
+        const punchesMap = {};
+        punches.forEach(p => {
+            if (p.punch_date >= dateFrom && p.punch_date <= dateTo) {
+                const key = `${p.attendance_id}_${p.punch_date}`;
+                punchesMap[key] = (punchesMap[key] || 0) + 1;
+            }
+        });
+
+        uniqueEmployeeIds.forEach(attId => {
+            const attIdStr = String(attId);
+            const employee = employees.find(e => String(e.attendance_id) === attIdStr);
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attIdStr);
+            
+            let weeklyOffDay = null;
+            if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+            } else if (employee?.weekly_off) {
+                weeklyOffDay = dayNameToNumber[employee.weekly_off];
+            }
+
+            for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
+                const currentDate = new Date(d);
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const dayOfWeek = currentDate.getDay();
+                
+                const punchCount = punchesMap[`${attIdStr}_${dateStr}`] || 0;
+                
+                if (punchCount > 0) {
+                    const isWeeklyHoliday = (weeklyOffDay !== null && dayOfWeek === weeklyOffDay);
+                    
+                    if (!isWeeklyHoliday) {
+                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        const currentDayName = dayNames[dayOfWeek];
+                        
+                        const hasShift = employeeShifts.some(s => {
+                            if (s.date === dateStr) return true;
+                            if (!s.date && s.applicable_days) {
+                                try {
+                                    const days = JSON.parse(s.applicable_days);
+                                    if (Array.isArray(days) && days.some(day => day.toLowerCase() === currentDayName.toLowerCase())) return true;
+                                } catch(e) {}
+                            }
+                            if (!s.date && !s.applicable_days) {
+                                if (dayOfWeek === 5 && s.is_friday_shift) return true;
+                                if (dayOfWeek !== 5 && !s.is_friday_shift) return true;
+                                if (dayOfWeek === 5 && !employeeShifts.some(ss => ss.is_friday_shift)) return true;
+                            }
+                            return false;
+                        });
+                        
+                        if (!hasShift) {
+                            missingShifts.push({
+                                name: employee?.name || `ID: ${attIdStr}`,
+                                date: dateStr
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        if (missingShifts.length > 0) {
+            const uniqueAffected = [...new Set(missingShifts.map(ms => ms.name))].length;
+            issues.push({
+                type: 'warning',
+                title: 'Missing Shift Settings Detected',
+                details: `Warning: ${uniqueAffected} employees have punches on days with no scheduled shifts. Calculations for these days may be inaccurate.`,
+                affectedList: missingShifts
+            });
+        }
+
         setDataQualityIssues(issues);
         return issues;
     };
@@ -1288,6 +1370,25 @@ export default function RunAnalysisTab({ project }) {
                                                 }`}>
                                                 {issue.details}
                                             </p>
+                                            
+                                            {issue.affectedList && (
+                                                <div className="mt-3 bg-white/50 rounded-md p-2 border border-amber-200/50 max-h-40 overflow-y-auto">
+                                                    <p className="text-xs font-semibold text-amber-800 mb-1">Affected Employees & Dates:</p>
+                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                        {issue.affectedList.slice(0, 50).map((item, i) => (
+                                                            <div key={i} className="text-[10px] text-amber-700 flex justify-between">
+                                                                <span className="truncate mr-2 font-medium">{item.name}</span>
+                                                                <span className="shrink-0 opacity-70">{item.date}</span>
+                                                            </div>
+                                                        ))}
+                                                        {issue.affectedList.length > 50 && (
+                                                            <div className="text-[10px] text-amber-600 italic col-span-2 mt-1">
+                                                                + {issue.affectedList.length - 50} more records...
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
