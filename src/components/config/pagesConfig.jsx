@@ -318,7 +318,7 @@ export const PAGES_CONFIG = {
         name: 'DeveloperPortal',
         title: 'Developer Portal',
         icon: Terminal,
-        category: 'Developer',
+        category: 'Main',
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
