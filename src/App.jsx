@@ -26,7 +26,7 @@ const AppRoutes = () => (
     {Object.entries(Pages).map(([path, Page]) => (
       <Route
         key={path}
-        path={`/${path}`}
+        path={`/${path.toLowerCase()}`}
         element={
           <LayoutWrapper currentPageName={path}>
             <Page />
