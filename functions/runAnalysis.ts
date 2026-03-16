@@ -1364,11 +1364,6 @@ Deno.serve(async (req: Request) => {
                     console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 real punches, skip applied → no time calc needed`);
                 }
 
-                // 4. Accumulation phase: Add to the final employee totals
-                lateMinutes += dayLateMinutes;
-                earlyCheckoutMinutes += dayEarlyMinutes;
-                otherMinutes += dayOtherMinutes;
-
                 const expectedPunches = isSingleShift ? 2 : 4;
 
                 const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
