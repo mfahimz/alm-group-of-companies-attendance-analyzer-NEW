@@ -1785,6 +1785,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                     <SelectContent>
                                                         <SelectItem value="AM_PUNCH_IN">AM Punch In (Morning Start)</SelectItem>
                                                         <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Evening End)</SelectItem>
+                                                        <SelectItem value="FULL_SKIP">Full Skip (Both AM & PM)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>

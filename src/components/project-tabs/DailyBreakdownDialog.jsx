@@ -411,6 +411,13 @@ export default function DailyBreakdownDialog({
 
             // Determine status
             let status = 'Absent';
+            // Check for SKIP_PUNCH exception (only for working employees)
+            const skipPunchEx = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+            const isLeaveOrHoliday = dateException && [
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF'
+            ].includes(dateException.type);
+            const hasActiveSkipPunch = skipPunchEx && !isLeaveOrHoliday && skipPunchEx.punch_to_skip;
+            
             if (dateException) {
                 if (dateException.type === 'OFF') status = 'Off';
                 else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
@@ -427,6 +434,15 @@ export default function DailyBreakdownDialog({
             } else if (dayPunches.length > 0) {
                 if (partialDayResult.isPartial) status = 'Half Day (Partial)';
                 else status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+            }
+            
+            // SKIP_PUNCH status override: if skip applied and would have been absent
+            if (hasActiveSkipPunch) {
+                if (dayPunches.length === 0 && skipPunchEx.punch_to_skip === 'FULL_SKIP') {
+                    status = 'Present (Skip Punch)';
+                } else if (status === 'Absent') {
+                    status = 'Present (Skip Punch)';
+                }
             }
 
             const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
@@ -716,7 +732,8 @@ export default function DailyBreakdownDialog({
                                             <div>
                                                 <span className={`px-2 py-1 rounded text-xs font-medium
                                                     ${day.isLopAdjacentWeeklyOff ? 'bg-rose-600 text-white' : ''}
-                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Present') && !day.status.includes('Half') ? 'bg-green-100 text-green-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Present') && !day.status.includes('Half') && !day.status.includes('Skip Punch') ? 'bg-green-100 text-green-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Skip Punch') ? 'bg-cyan-100 text-cyan-700' : ''}
                                                     ${!day.isLopAdjacentWeeklyOff && day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
                                                     ${!day.isLopAdjacentWeeklyOff && day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
                                                     ${!day.isLopAdjacentWeeklyOff && day.status.includes('Off') && !day.status.includes('LOP') ? 'bg-slate-100 text-slate-700' : ''}
