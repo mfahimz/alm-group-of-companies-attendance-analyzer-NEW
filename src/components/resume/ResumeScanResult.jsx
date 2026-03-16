@@ -194,7 +194,8 @@ function CodeComparisonSection({ comparison }) {
 export default function ResumeScanResultView({ result, onNewScan }) {
     if (!result) return null;
 
-    const config = RECOMMENDATION_CONFIG[result.recommendation] || RECOMMENDATION_CONFIG['Consider'];
+    // Unified fields: ai_recommendation and ai_score match the backend entity field names
+    const config = RECOMMENDATION_CONFIG[result.ai_recommendation] || RECOMMENDATION_CONFIG['Consider'];
     const RecommendIcon = config.icon;
 
     const extractedData = (() => {
@@ -228,7 +229,8 @@ export default function ResumeScanResultView({ result, onNewScan }) {
         <div className="space-y-4">
             {/* Summary Header */}
             <div className="bg-white border border-[#E2E6EC] rounded-xl p-5 flex flex-col sm:flex-row items-center gap-5">
-                <ScoreGauge score={result.score} />
+                {/* Unified field: ai_score is used everywhere for consistency */}
+                <ScoreGauge score={result.ai_score} />
                 <div className="flex-1 text-center sm:text-left">
                     {result.applicant_name && result.applicant_name !== 'Unknown' && (
                         <p className="font-semibold text-[#1F2937] text-base mb-1">{result.applicant_name}</p>
@@ -243,7 +245,8 @@ export default function ResumeScanResultView({ result, onNewScan }) {
                     {result.applicant_email && <p className="text-xs text-[#6B7280] mb-2">{result.applicant_email}</p>}
                     <div className="flex items-center gap-2 justify-center sm:justify-start mb-2">
                         <RecommendIcon className={`w-4 h-4 ${config.iconColor}`} />
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${config.color}`}>{result.recommendation}</span>
+                        {/* Unified field: ai_recommendation used for badge */}
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${config.color}`}>{result.ai_recommendation}</span>
                         {result.experience_years > 0 && (
                             <span className="text-xs text-[#6B7280]">{result.experience_years} yrs experience</span>
                         )}

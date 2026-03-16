@@ -80,21 +80,20 @@ export default function TalentPool() {
 
     const reMatchMutation = useMutation({
         mutationFn: async ({ candidate, template }) => {
-            const response = await fetch('/api/scanResume', {
-                method: 'POST',
-                body: JSON.stringify({
-                    mode: 'evaluation_only',
-                    existingData: JSON.parse(candidate.extracted_data),
-                    existingFileUrl: candidate.file_url,
-                    fileName: candidate.file_name,
-                    criteria: template
-                })
+            // Direct fetch calls are not permitted in this architecture.
+            // All backend calls must use base44.functions.invoke.
+            const response = await base44.functions.invoke('scanResume', {
+                mode: 'evaluation_only',
+                existingData: JSON.parse(candidate.extracted_data),
+                existingFileUrl: candidate.file_url,
+                fileName: candidate.file_name,
+                criteria: template
             });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.error || 'Matching failed');
+            
+            if (!response.data?.success) {
+                throw new Error(response.data?.error || 'Matching failed');
             }
-            return response.json();
+            return response.data;
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['talentPool'] });
@@ -185,7 +184,9 @@ export default function TalentPool() {
             if (companyName && result[companyName]) {
                 result[companyName].roles.push({
                     name: template.position_name,
-                    candidates: filteredCandidates.filter(c => c.matched_template_name === template.position_name)
+                    // Unified position check: matched_template_name is set for multi-scans, 
+                    // position_applied is set for single-scans. Checking both ensures all candidates appear.
+                    candidates: filteredCandidates.filter(c => (c.matched_template_name || c.position_applied) === template.position_name)
                 });
             }
         });
@@ -206,8 +207,8 @@ export default function TalentPool() {
         // Prepare result object for View component
         const result = {
             ...selectedCandidate,
-            score: selectedCandidate.ai_score || 0,
-            recommendation: selectedCandidate.ai_recommendation,
+            // Unified fields: ai_score and ai_recommendation are the correct field names 
+            // from the backend entity. No manual renaming to score/recommendation is needed.
             summary: selectedCandidate.ai_summary,
             ai_strengths: selectedCandidate.ai_strengths,
             ai_concerns: selectedCandidate.ai_concerns,

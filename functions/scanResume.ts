@@ -390,15 +390,19 @@ Output a JSON with these exact fields:
             nationality: extractedData?.nationality || 'Not Specified',
             location: extractedData?.current_location || 'Not Specified',
             gender: extractedData?.gender || 'Not Specified',
-            evaluated_template_name: best.criteria.position_name || ''
+            evaluated_template_name: best.criteria.position_name || '',
+            // Company is passed from the selected template at scan time and saved 
+            // directly on the result record for reliable company grouping.
+            company: best.criteria.company || ''
         });
 
         return Response.json({
             success: true,
             scanId: scanRecord.id,
             result: {
-                score: best.aiScore,
-                recommendation: best.aiResponse?.recommendation,
+                // Unified field names: matching the ResumeScanResult entity structure
+                ai_score: best.aiScore,
+                ai_recommendation: best.aiResponse?.recommendation,
                 summary: best.aiResponse?.summary,
                 matched_skills: best.aiResponse?.matched_skills,
                 missing_skills: best.aiResponse?.missing_skills,

@@ -105,9 +105,13 @@ export default function ResumeDashboard({ onNewScan }) {
         // 1. Identify templates belonging to this company via the 'company' field.
         // 2. Identify scans matching those templates via position_applied.
         const companyTemplates = templates.filter(t => t.company === companyName);
-        const templateNames = new Set(companyTemplates.map(t => t.position_name));
-
-        const filteredScans = scans.filter(s => templateNames.has(s.position_applied));
+        const templateNames = new Set(companyTemplates.map(t => (t.position_name || '').trim().toLowerCase()));
+        
+        // Match scans to templates using case-insensitive and trimmed comparison
+        const filteredScans = scans.filter(s => {
+            const pos = (s.position_applied || '').trim().toLowerCase();
+            return templateNames.has(pos);
+        });
         const selectedScans = filteredScans.filter(s => s.evaluation_status === 'Selected');
 
         // Top positions calculation

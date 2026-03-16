@@ -77,7 +77,8 @@ export default function BatchScanResults({ results, onNewScan }) {
         return true;
     });
 
-    const sorted = filteredResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+    // Unified field: ai_score is the field name used when saving to the database
+    const sorted = filteredResults.sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
     
     // Unique nationalities for dropdown
     const uniqueNationalities = Array.from(new Set(results.map(r => r.nationality).filter(Boolean))).sort();
@@ -156,10 +157,12 @@ export default function BatchScanResults({ results, onNewScan }) {
                 </div>
                 <div className="flex gap-2 text-xs text-[#6B7280]">
                     <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
-                        {sorted.filter(r => r.recommendation === 'Highly Recommended' || r.recommendation === 'Recommended').length} Recommended
+                        {/* Unified field: ai_recommendation matches the backend entity field name */}
+                        {sorted.filter(r => r.ai_recommendation === 'Highly Recommended' || r.ai_recommendation === 'Recommended').length} Recommended
                     </span>
                     <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
-                        {sorted.filter(r => r.recommendation === 'Not Recommended').length} Not Recommended
+                        {/* Unified field: ai_recommendation matches the backend entity field name */}
+                        {sorted.filter(r => r.ai_recommendation === 'Not Recommended').length} Not Recommended
                     </span>
                     {sorted.some(r => r.evaluation_status === 'Rejected') && (
                         <span className="px-2 py-1 bg-red-600 text-white rounded-full font-bold animate-pulse">
@@ -190,7 +193,8 @@ export default function BatchScanResults({ results, onNewScan }) {
             {/* Summary Cards */}
             <div className="space-y-2">
                 {sorted.map((result, idx) => {
-                    const rec = REC_CONFIG[result.recommendation] || REC_CONFIG['Consider'];
+                    // Unified field: ai_recommendation matches the backend entity field name
+                    const rec = REC_CONFIG[result.ai_recommendation] || REC_CONFIG['Consider'];
                     const originalIndex = results.indexOf(result);
                     return (
                         // Card is a div+role=button so nested interactive elements
@@ -227,16 +231,15 @@ export default function BatchScanResults({ results, onNewScan }) {
                                         </span>
                                     </div>
                                 </div>
-
-                                {/* Score Bar */}
+                                {/* Score Bar uses unified field: ai_score */}
                                 <div className="w-28 hidden sm:flex items-center">
-                                    <ScoreBar score={result.score || 0} />
+                                    <ScoreBar score={result.ai_score || 0} />
                                 </div>
-
-                                {/* Recommendation Badge */}
+                                
+                                {/* Recommendation Badge uses unified field: ai_recommendation */}
                                 <div className="flex flex-col items-end gap-1">
                                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium border hidden md:inline ${rec.color}`}>
-                                        {result.recommendation}
+                                        {result.ai_recommendation}
                                     </span>
                                     {result.evaluation_status === 'Rejected' && (
                                         <span className="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold uppercase tracking-tight hidden md:inline animate-pulse">
@@ -244,10 +247,10 @@ export default function BatchScanResults({ results, onNewScan }) {
                                         </span>
                                     )}
                                 </div>
-
-                                {/* Mobile score */}
-                                <span className="text-sm font-bold text-[#1F2937] sm:hidden">{result.score}</span>
-
+                                
+                                {/* Mobile score uses unified field: ai_score */}
+                                <span className="text-sm font-bold text-[#1F2937] sm:hidden">{result.ai_score}</span>
+                                
                                 <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#0F1E36] flex-shrink-0 transition-colors" />
                             </div>
 
@@ -295,10 +298,10 @@ export default function BatchScanResults({ results, onNewScan }) {
                                 </div>
                             </div>
 
-                            {/* Mobile recommendation */}
+                            {/* Mobile recommendation uses unified field: ai_recommendation */}
                             <div className="mt-2 sm:hidden">
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${rec.color}`}>
-                                    {result.recommendation}
+                                    {result.ai_recommendation}
                                 </span>
                             </div>
 

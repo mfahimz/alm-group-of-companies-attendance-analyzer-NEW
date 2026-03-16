@@ -29,7 +29,8 @@ export default function ResumeScanForm({ onScanComplete }) {
         required_certifications: '',
         required_languages: '',
         industry_experience: '',
-        notes: ''
+        notes: '',
+        company: '' // Passed from template for reliable company grouping
     });
     const [files, setFiles] = useState([]); // array of File objects
     const [isScanning, setIsScanning] = useState(false);
@@ -73,10 +74,11 @@ export default function ResumeScanForm({ onScanComplete }) {
                     required_certifications: t.required_certifications || '',
                     required_languages: t.required_languages || '',
                     industry_experience: t.industry_experience || '',
-                    notes: t.notes || ''
+                    notes: t.notes || '',
+                    company: t.company || ''
                 });
             } else if (next.length === 0) {
-                setCriteria({ position_name: '', department: '', min_experience_years: '', required_education: '', required_skills: '', preferred_skills: '', required_certifications: '', required_languages: '', industry_experience: '', notes: '' });
+                setCriteria({ position_name: '', department: '', min_experience_years: '', required_education: '', required_skills: '', preferred_skills: '', required_certifications: '', required_languages: '', industry_experience: '', notes: '', company: '' });
             }
             // 2+ templates: criteria state is unused (multi-template mode scans each
             // template directly), so no update needed.
@@ -181,7 +183,8 @@ export default function ResumeScanForm({ onScanComplete }) {
                         required_certifications: tmpl.required_certifications || '',
                         required_languages: tmpl.required_languages || '',
                         industry_experience: tmpl.industry_experience || '',
-                        notes: tmpl.notes || ''
+                        notes: tmpl.notes || '',
+                        company: tmpl.company || '' // Passing company for reliable grouping
                     }));
 
                     result = await scanSingleFile(files[i], criteriaList);
