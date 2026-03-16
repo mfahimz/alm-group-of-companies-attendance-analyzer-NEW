@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
     const [applying, setApplying] = useState(false);
     const [undoing, setUndoing] = useState(false);
     const [showRamadanShiftsView, setShowRamadanShiftsView] = useState(false);
+    const [applyProgress, setApplyProgress] = useState(null);
     const queryClient = useQueryClient();
 
     const { data: ramadanSchedules = [] } = useQuery({
@@ -24,7 +25,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true })
     });
 
-    const selectedOrOverlappingSchedule = React.useMemo(() => {
+    const selectedOrOverlappingSchedule = useMemo(() => {
         if (ramadanSchedules.length === 0) return null;
         if (selectedRamadanSchedule?.id) {
             const selected = ramadanSchedules.find(s => s.id === selectedRamadanSchedule.id);
@@ -40,7 +41,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         return overlapping || ramadanSchedules[0];
     }, [ramadanSchedules, selectedRamadanSchedule?.id, project.date_from, project.date_to]);
 
-    const ramadanOverlap = React.useMemo(() => {
+    const ramadanOverlap = useMemo(() => {
         if (!selectedOrOverlappingSchedule) return null;
         const projectStart = new Date(project.date_from);
         const projectEnd = new Date(project.date_to);
@@ -56,7 +57,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         };
     }, [selectedOrOverlappingSchedule, project.date_from, project.date_to]);
 
-    const ramadanShiftCount = React.useMemo(() => {
+    const ramadanShiftCount = useMemo(() => {
         if (!ramadanOverlap) return 0;
         return shifts.filter(s =>
             s.applicable_days?.includes('Ramadan') &&
@@ -67,14 +68,14 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
 
     const ramadanShiftsApplied = ramadanShiftCount > 0;
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (ramadanSchedules.length === 0) { setSelectedRamadanSchedule(null); return; }
         if (!selectedRamadanSchedule || !ramadanSchedules.some(s => s.id === selectedRamadanSchedule.id)) {
             setSelectedRamadanSchedule(selectedOrOverlappingSchedule || ramadanSchedules[0]);
         }
     }, [ramadanSchedules, selectedRamadanSchedule, selectedOrOverlappingSchedule]);
 
-    const parsedRamadanShifts = React.useMemo(() => {
+    const parsedRamadanShifts = useMemo(() => {
         if (!ramadanOverlap?.schedule) return { week1: {}, week2: {} };
         try {
             return {
@@ -89,13 +90,24 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
         const preview = [];
         const startDate = new Date(ramadanOverlap.from);
         const endDate = new Date(ramadanOverlap.to);
-        let currentWeekIndex = 0;
+        const ramadanStart = new Date(ramadanOverlap.schedule.ramadan_start_date);
+        
         for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
             const isSunday = dayOfWeek === 0;
-            preview.push({ date: dateStr, dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'long' }), isSunday, weekLabel: currentWeekIndex === 0 ? 'Week 1' : 'Week 2' });
-            if (isSunday) currentWeekIndex = (currentWeekIndex + 1) % 2;
+            
+            // Calculate how many Saturdays have passed since Ramadan start
+            const daysSinceRamadanStart = Math.floor((currentDate - ramadanStart) / (1000 * 60 * 60 * 24));
+            const saturdaysPassed = Math.floor((daysSinceRamadanStart + (7 - ramadanStart.getDay() + 6) % 7) / 7);
+            const currentWeekIndex = saturdaysPassed % 2;
+            
+            preview.push({ 
+                date: dateStr, 
+                dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'long' }), 
+                isSunday, 
+                weekLabel: currentWeekIndex === 0 ? 'Week 1' : 'Week 2' 
+            });
         }
         setRamadanPreviewData(preview);
         setShowRamadanPreview(true);
@@ -135,16 +147,48 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
     const handleApply = async () => {
         if (!ramadanOverlap || !selectedRamadanSchedule) return;
         setApplying(true);
+        setApplyProgress({ phase: 'Initializing...', current: 0, total: 100 });
+        
         try {
+            // FIX for ISSUE 3: We perform a fresh query here to confirm we are passing the 
+            // most recently saved ramadanScheduleId. This prevents issues if the selected 
+            // schedule ID is missing or derived from stale state and ensures we invoke 
+            // the backend with the correct overlapping schedule.
+            setApplyProgress({ phase: 'Fetching schedule...', current: 10, total: 100 });
+            const freshSchedules = await base44.entities.RamadanSchedule.filter({ 
+                company: project.company, 
+                active: true 
+            });
+            const projectStart = new Date(project.date_from);
+            const projectEnd = new Date(project.date_to);
+            const freshOverlapping = freshSchedules.find((schedule) => {
+                const ramadanStart = new Date(schedule.ramadan_start_date);
+                const ramadanEnd = new Date(schedule.ramadan_end_date);
+                return projectStart <= ramadanEnd && projectEnd >= ramadanStart;
+            });
+            const validScheduleId = selectedRamadanSchedule?.id || freshOverlapping?.id;
+
+            if (!validScheduleId) {
+                toast.error('Could not determine correct Ramadan schedule ID.');
+                setApplying(false);
+                setApplyProgress(null);
+                return;
+            }
+
+            setApplyProgress({ phase: 'Applying shifts...', current: 30, total: 100 });
             const result = await base44.functions.invoke('applyRamadanShifts', {
                 projectId: project.id,
-                ramadanScheduleId: selectedRamadanSchedule.id,
+                ramadanScheduleId: validScheduleId,
                 ramadanFrom: ramadanOverlap.from,
                 ramadanTo: ramadanOverlap.to
             });
+            
+            setApplyProgress({ phase: 'Finalizing...', current: 90, total: 100 });
             const d = result.data;
             if (d.success) {
-                queryClient.invalidateQueries(['shifts', project.id]);
+                setApplyProgress({ phase: 'Refreshing data...', current: 95, total: 100 });
+                await queryClient.invalidateQueries({ queryKey: ['shifts', project.id] });
+                setApplyProgress({ phase: 'Complete!', current: 100, total: 100 });
                 toast.success(`Applied ${d.shiftsCreated} Ramadan shifts for ${d.employeesProcessed} employees`);
                 setShowRamadanPreview(false);
             } else if (d.error) {
@@ -157,7 +201,10 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
             const msg = error?.response?.data?.error || error.message;
             toast.error(msg);
         } finally {
-            setApplying(false);
+            setTimeout(() => {
+                setApplying(false);
+                setApplyProgress(null);
+            }, 500);
         }
     };
 
@@ -211,6 +258,22 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         <p className="text-xs text-purple-600 mt-2">Sundays are excluded as weekly holidays.</p>
                     </div>
 
+                    {/* Progress Bar */}
+                    {applyProgress && (
+                        <div className="bg-white border border-purple-300 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-purple-900">{applyProgress.phase}</span>
+                                <span className="text-sm text-purple-700">{Math.round((applyProgress.current / applyProgress.total) * 100)}%</span>
+                            </div>
+                            <div className="w-full bg-purple-100 rounded-full h-2.5">
+                                <div 
+                                    className="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
+                                    style={{ width: `${(applyProgress.current / applyProgress.total) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Action Buttons */}
                     <div className="flex gap-3 flex-wrap">
                         <Button onClick={handlePreviewRamadan} variant="outline" disabled={!selectedRamadanSchedule || isBusy}>
@@ -229,10 +292,10 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
 
                         <Button
                             onClick={handleApply}
-                            disabled={!selectedRamadanSchedule || isBusy || ramadanShiftsApplied}
-                            className={ramadanShiftsApplied ? "bg-green-600 hover:bg-green-700" : "bg-purple-600 hover:bg-purple-700"}
+                            disabled={!selectedRamadanSchedule || isBusy}
+                            className="bg-purple-600 hover:bg-purple-700"
                         >
-                            {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : ramadanShiftsApplied ? <><Play className="w-4 h-4 mr-2" />Already Applied</> : <><Play className="w-4 h-4 mr-2" />Apply Ramadan Shifts</>}
+                            {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : <><Play className="w-4 h-4 mr-2" />{ramadanShiftsApplied ? 'Sync/Apply More Shifts' : 'Apply Ramadan Shifts'}</>}
                         </Button>
                     </div>
 
@@ -242,7 +305,7 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-green-800 font-medium">✓ Ramadan shifts active ({ramadanShiftCount} shifts)</p>
-                                    <p className="text-xs text-green-700 mt-1">To update from Ramadan Schedule: click "Undo" first, then "Apply" again with latest schedule.</p>
+                                    <p className="text-xs text-green-700 mt-1">Click "Sync/Apply More Shifts" to fill any missing records or continue if the operation was interrupted. Already-applied shifts will be skipped.</p>
                                 </div>
                                 {Object.keys(parsedRamadanShifts.week1).length > 0 && (
                                     <Button size="sm" variant="outline" onClick={() => setShowRamadanShiftsView(!showRamadanShiftsView)} className="text-purple-700 border-purple-300 hover:bg-purple-50">
@@ -266,15 +329,16 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                                         {Object.entries(parsedRamadanShifts[weekKey]).slice(0, 50).map(([attendanceId, shift]) => {
                                             const emp = employees.find(e => e.attendance_id === attendanceId);
                                             if (!emp) return null;
-                                            const activeShifts = shift.active_shifts || [];
+                                            const hasDay = shift.day_start && shift.day_end && shift.day_start !== '—';
+                                            const hasNight = shift.night_start && shift.night_end && shift.night_start !== '—';
                                             return (
                                                 <div key={attendanceId} className="text-xs text-slate-700 flex justify-between items-center py-1 border-b border-purple-100">
                                                     <span className="font-medium">{emp.name} ({attendanceId})</span>
                                                     <span className="text-purple-700">
-                                                        {activeShifts.includes('day') && shift.day_start && shift.day_end && `Day: ${shift.day_start}-${shift.day_end}`}
-                                                        {activeShifts.includes('day') && activeShifts.includes('night') && ' | '}
-                                                        {activeShifts.includes('night') && shift.night_start && shift.night_end && `Night: ${shift.night_start}-${shift.night_end}`}
-                                                        {activeShifts.length === 0 && '—'}
+                                                        {hasDay && `Day: ${shift.day_start}-${shift.day_end}`}
+                                                        {hasDay && hasNight && ' | '}
+                                                        {hasNight && `Night: ${shift.night_start}-${shift.night_end}`}
+                                                        {!hasDay && !hasNight && '—'}
                                                     </span>
                                                 </div>
                                             );
@@ -331,8 +395,8 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         </div>
                         <div className="flex gap-3 pt-4 border-t mt-4">
                             <Button variant="outline" onClick={() => setShowRamadanPreview(false)}>Close</Button>
-                            <Button onClick={handleApply} disabled={ramadanShiftsApplied || applying} className="bg-purple-600 hover:bg-purple-700">
-                                {applying ? 'Applying...' : ramadanShiftsApplied ? 'Already Applied' : 'Apply Ramadan Shifts'}
+                            <Button onClick={handleApply} disabled={applying} className="bg-purple-600 hover:bg-purple-700">
+                                {applying ? 'Applying...' : ramadanShiftsApplied ? 'Sync/Apply More Shifts' : 'Apply Ramadan Shifts'}
                             </Button>
                         </div>
                     </div>

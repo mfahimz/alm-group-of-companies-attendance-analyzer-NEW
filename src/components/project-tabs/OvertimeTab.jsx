@@ -5,10 +5,150 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Clock, Search, Save, Upload, Download, FileSpreadsheet, Users, DollarSign, Lock } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Search, Save, Upload, Download, FileSpreadsheet, Users, DollarSign, Lock, Trash2, X, Clock } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import SortableTableHead from '../ui/SortableTableHead';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
+
+
+/**
+ * Multi-Entry Cell Component
+ * Handles the display of total and the popover for multiple entries
+ */
+function EntryCell({ value, onSave, title, disabled }) {
+    const entries = Array.isArray(value) ? value : (value ? [{ amount: parseFloat(value), desc: 'Initial' }] : []);
+    const total = entries.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    
+    const [localEntries, setLocalEntries] = useState(entries);
+    const [isOpen, setIsOpen] = useState(false);
+
+    const handleAdd = () => {
+        setLocalEntries([...localEntries, { amount: 0, desc: '' }]);
+    };
+
+    const handleRemove = (index) => {
+        setLocalEntries(localEntries.filter((_, i) => i !== index));
+    };
+
+    const handleEntryChange = (index, field, val) => {
+        const newEntries = [...localEntries];
+        newEntries[index] = { ...newEntries[index], [field]: field === 'amount' ? (val === '' ? '' : parseFloat(val) || 0) : val };
+        setLocalEntries(newEntries);
+    };
+
+    const handleConfirm = () => {
+        onSave(localEntries);
+        setIsOpen(false);
+    };
+
+    const handleCancel = () => {
+        setLocalEntries(entries);
+        setIsOpen(false);
+    };
+
+    return (
+        <Popover open={isOpen} onOpenChange={(open) => {
+            if (open) setLocalEntries(entries);
+            setIsOpen(open);
+        }}>
+            <PopoverTrigger asChild>
+                <div 
+                    className={`h-9 min-w-[5rem] px-3 py-1 rounded-md border border-dashed flex items-center justify-center cursor-pointer transition-all
+                        ${total > 0 ? 'bg-white border-indigo-200 text-indigo-700 font-medium' : 'bg-slate-50 border-slate-300 text-slate-400 hover:bg-slate-100'}
+                        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-indigo-400 hover:shadow-sm'}
+                    `}
+                    onClick={(e) => {
+                        if (disabled) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                    }}
+                >
+                    {total > 0 ? (
+                        <span className="text-sm">{total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                    ) : (
+                        <Plus className="w-4 h-4" />
+                    )}
+                </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4 shadow-xl z-50" align="center">
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-indigo-600" />
+                            {title}
+                        </h4>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Multi-Entry</span>
+                    </div>
+                    
+                    <div className="max-h-[250px] overflow-y-auto space-y-3 pr-1">
+                        {localEntries.length === 0 ? (
+                            <p className="text-center py-4 text-xs text-slate-500 italic">No entries yet. Click "+" to add.</p>
+                        ) : (
+                            localEntries.map((entry, idx) => (
+                                <div key={idx} className="flex flex-col gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100 relative group">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1">
+                                            <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Amount</Label>
+                                            <Input 
+                                                type="number" 
+                                                value={entry.amount} 
+                                                onChange={(e) => handleEntryChange(idx, 'amount', e.target.value)}
+                                                className="h-8 text-xs font-semibold"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={() => handleRemove(idx)}
+                                            className="mt-5 h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                    <div>
+                                        <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Description</Label>
+                                        <Input 
+                                            value={entry.desc} 
+                                            onChange={(e) => handleEntryChange(idx, 'desc', e.target.value)}
+                                            className="h-8 text-xs"
+                                            placeholder="Reason..."
+                                        />
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleAdd}
+                        className="w-full border-dashed border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-300"
+                    >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Add Entry
+                    </Button>
+
+                    <div className="pt-2 border-t flex items-center justify-between gap-2">
+                        <div className="text-xs">
+                            <span className="text-slate-500">Total: </span>
+                            <span className="font-bold text-indigo-600">{localEntries.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+                            <Button size="sm" onClick={handleConfirm} className="bg-indigo-600 hover:bg-indigo-700">Save</Button>
+                        </div>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
 
 
 export default function OvertimeTab({ project }) {
@@ -22,7 +162,12 @@ export default function OvertimeTab({ project }) {
     const [editableAdjustments, setEditableAdjustments] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     const [isSavingAdjustments, setIsSavingAdjustments] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
+
+    // Preview States
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewData, setPreviewData] = useState([]);
 
     // ============================================
     // QUERIES
@@ -136,12 +281,12 @@ export default function OvertimeTab({ project }) {
                 // Adjustment fields from OvertimeData (editable anytime) or SalarySnapshot (after finalization)
                 snapshotId: snapshot?.id,
                 attendanceSource: snapshot?.attendance_source || null,
-                bonus: editableAdjustments[emp.attendance_id]?.bonus ?? otRecord?.bonus ?? snapshot?.bonus ?? 0,
-                incentive: editableAdjustments[emp.attendance_id]?.incentive ?? otRecord?.incentive ?? snapshot?.incentive ?? 0,
-                open_leave_salary: editableAdjustments[emp.attendance_id]?.open_leave_salary ?? otRecord?.open_leave_salary ?? snapshot?.open_leave_salary ?? 0,
-                variable_salary: editableAdjustments[emp.attendance_id]?.variable_salary ?? otRecord?.variable_salary ?? snapshot?.variable_salary ?? 0,
-                otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? otRecord?.otherDeduction ?? snapshot?.otherDeduction ?? 0,
-                advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? otRecord?.advanceSalaryDeduction ?? snapshot?.advanceSalaryDeduction ?? 0
+                bonus: editableAdjustments[emp.attendance_id]?.bonus ?? (Array.isArray(snapshot?.bonus) ? snapshot.bonus : (snapshot?.bonus ? [{amount: snapshot.bonus, desc: 'Imported'}] : (Array.isArray(otRecord?.bonus) ? otRecord.bonus : (otRecord?.bonus ? [{amount: otRecord.bonus, desc: 'Imported'}] : [])))),
+                incentive: editableAdjustments[emp.attendance_id]?.incentive ?? (Array.isArray(snapshot?.incentive) ? snapshot.incentive : (snapshot?.incentive ? [{amount: snapshot.incentive, desc: 'Imported'}] : (Array.isArray(otRecord?.incentive) ? otRecord.incentive : (otRecord?.incentive ? [{amount: otRecord.incentive, desc: 'Imported'}] : [])))),
+                open_leave_salary: editableAdjustments[emp.attendance_id]?.open_leave_salary ?? (Array.isArray(snapshot?.open_leave_salary) ? snapshot.open_leave_salary : (snapshot?.open_leave_salary ? [{amount: snapshot.open_leave_salary, desc: 'Imported'}] : (Array.isArray(otRecord?.open_leave_salary) ? otRecord.open_leave_salary : (otRecord?.open_leave_salary ? [{amount: otRecord.open_leave_salary, desc: 'Imported'}] : [])))),
+                variable_salary: editableAdjustments[emp.attendance_id]?.variable_salary ?? (Array.isArray(snapshot?.variable_salary) ? snapshot.variable_salary : (snapshot?.variable_salary ? [{amount: snapshot.variable_salary, desc: 'Imported'}] : (Array.isArray(otRecord?.variable_salary) ? otRecord.variable_salary : (otRecord?.variable_salary ? [{amount: otRecord.variable_salary, desc: 'Imported'}] : [])))),
+                otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? (Array.isArray(snapshot?.otherDeduction) ? snapshot.otherDeduction : (snapshot?.otherDeduction ? [{amount: snapshot.otherDeduction, desc: 'Imported'}] : (Array.isArray(otRecord?.otherDeduction) ? otRecord.otherDeduction : (otRecord?.otherDeduction ? [{amount: otRecord.otherDeduction, desc: 'Imported'}] : [])))),
+                advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? (Array.isArray(snapshot?.advanceSalaryDeduction) ? snapshot.advanceSalaryDeduction : (snapshot?.advanceSalaryDeduction ? [{amount: snapshot.advanceSalaryDeduction, desc: 'Imported'}] : (Array.isArray(otRecord?.advanceSalaryDeduction) ? otRecord.advanceSalaryDeduction : (otRecord?.advanceSalaryDeduction ? [{amount: otRecord.advanceSalaryDeduction, desc: 'Imported'}] : []))))
             };
         });
     }, [employees, overtimeRecords, editableData, editableAdjustments, salarySnapshots, project?.custom_employee_ids, isAlMaraghiMotors]);
@@ -183,7 +328,7 @@ export default function OvertimeTab({ project }) {
             ...prev,
             [attendanceId]: {
                 ...(prev[attendanceId] || {}),
-                [field]: value === '' ? 0 : parseFloat(value) || 0
+                [field]: value // accepts array or number now
             }
         }));
     };
@@ -196,33 +341,35 @@ export default function OvertimeTab({ project }) {
         return persistedOtRecord?.[field] ?? 0;
     };
 
-    const handleAdjustmentChange = (attendanceId, field, value) => {
-        const numValue = value === '' ? 0 : parseFloat(value) || 0;
-        
-        // Validation: bonus and incentive must be >= 0
-        if ((field === 'bonus' || field === 'incentive' || field === 'open_leave_salary' || field === 'variable_salary') && numValue < 0) {
-            const label = field === 'bonus'
-                ? 'Bonus'
-                : field === 'incentive'
-                    ? 'Incentive'
-                    : field === 'open_leave_salary'
-                        ? 'Open Leave Salary'
-                        : 'Variable Salary';
-            toast.error(`${label} cannot be negative`);
-            return;
-        }
-
+    const handleAdjustmentChange = (attendanceId, field, entries) => {
         setEditableAdjustments(prev => ({
             ...prev,
             [attendanceId]: {
                 ...(prev[attendanceId] || {}),
-                [field]: numValue
+                [field]: entries
             }
         }));
     };
 
     const getAdjustmentValue = (row, field) => {
         return editableAdjustments[row.attendance_id]?.[field] ?? row[field] ?? 0;
+    };
+
+    /**
+     * Flatten entries array to a single numeric sum for backend compatibility.
+     * The frontend uses arrays for multi-entry UI, but flattens them to a single sum for backend.
+     * Logs metadata for record-keeping until separate metadata entity is available.
+     */
+    const flattenToSum = (val, fieldName, empName) => {
+        if (Array.isArray(val)) {
+            val.forEach(entry => {
+                if (entry.desc) {
+                    console.log(`[Adjustment Metadata] Employee: ${empName}, Field: ${fieldName}, Amount: ${entry.amount}, Desc: ${entry.desc}`);
+                }
+            });
+            return val.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+        }
+        return parseFloat(val) || 0;
     };
 
     const handleSave = async () => {
@@ -249,16 +396,16 @@ export default function OvertimeTab({ project }) {
                     hrms_id: String(employee.hrms_id || ''),
                     name: employee.name,
                     department: employee.department || '',
-                    // Use edited value if present, else fall back to persisted record, else 0
-                    normalOtHours: edits.normalOtHours !== undefined ? edits.normalOtHours : (persistedOtRecord?.normalOtHours ?? 0),
-                    specialOtHours: edits.specialOtHours !== undefined ? edits.specialOtHours : (persistedOtRecord?.specialOtHours ?? 0),
-                    // Preserve existing adjustment values when saving OT
-                    bonus: persistedOtRecord?.bonus ?? employee.bonus ?? 0,
-                    incentive: persistedOtRecord?.incentive ?? employee.incentive ?? 0,
-                    open_leave_salary: persistedOtRecord?.open_leave_salary ?? employee.open_leave_salary ?? 0,
-                    variable_salary: persistedOtRecord?.variable_salary ?? employee.variable_salary ?? 0,
-                    otherDeduction: persistedOtRecord?.otherDeduction ?? employee.otherDeduction ?? 0,
-                    advanceSalaryDeduction: persistedOtRecord?.advanceSalaryDeduction ?? employee.advanceSalaryDeduction ?? 0
+                    // Flatten arrays to single numeric sums for backend compatibility
+                    normalOtHours: flattenToSum(edits.normalOtHours ?? persistedOtRecord?.normalOtHours ?? 0, 'Normal OT', employee.name),
+                    specialOtHours: flattenToSum(edits.specialOtHours ?? persistedOtRecord?.specialOtHours ?? 0, 'Special OT', employee.name),
+                    // Preserve and flatten existing adjustment values when saving OT
+                    bonus: flattenToSum(employee.bonus, 'Bonus', employee.name),
+                    incentive: flattenToSum(employee.incentive, 'Incentive', employee.name),
+                    open_leave_salary: flattenToSum(employee.open_leave_salary, 'Open Leave Salary', employee.name),
+                    variable_salary: flattenToSum(employee.variable_salary, 'Variable Salary', employee.name),
+                    otherDeduction: flattenToSum(employee.otherDeduction, 'Other Deduction', employee.name),
+                    advanceSalaryDeduction: flattenToSum(employee.advanceSalaryDeduction, 'Advance Salary Deduction', employee.name)
                 };
 
                 if (employee.otRecordId) {
@@ -289,7 +436,10 @@ export default function OvertimeTab({ project }) {
     };
 
     const handleExportTemplate = () => {
-        const templateData = filteredData.map(row => ({
+        // Sort by Employee Name (A-Z) by default for preview
+        const sortedData = [...filteredData].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        
+        const templateData = sortedData.map(row => ({
             'Attendance ID': row.attendance_id,
             'HRMS ID': row.hrms_id,
             'Name': row.name,
@@ -299,11 +449,22 @@ export default function OvertimeTab({ project }) {
             'Special OT Hours': row.specialOtHours || 0
         }));
 
-        const ws = XLSX.utils.json_to_sheet(templateData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
-        XLSX.writeFile(wb, `OT_Template_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
-        toast.success('Template downloaded');
+        setPreviewData(templateData);
+        setIsPreviewOpen(true);
+    };
+
+    const executeDownload = () => {
+        if (previewData.length === 0) return;
+        try {
+            const ws = XLSX.utils.json_to_sheet(previewData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
+            XLSX.writeFile(wb, `OT_Template_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast.success('Template downloaded');
+        } catch (error) {
+            console.error('[OvertimeTab] Download failed:', error);
+            toast.error('Failed to export template');
+        }
     };
 
     const handleImportOT = async (e) => {
@@ -365,12 +526,13 @@ export default function OvertimeTab({ project }) {
                 if (!employee) return;
 
                 const adjustmentData = {
-                    bonus: edits.bonus ?? employee.bonus ?? 0,
-                    incentive: edits.incentive ?? employee.incentive ?? 0,
-                    open_leave_salary: edits.open_leave_salary ?? employee.open_leave_salary ?? 0,
-                    variable_salary: edits.variable_salary ?? employee.variable_salary ?? 0,
-                    otherDeduction: edits.otherDeduction ?? employee.otherDeduction ?? 0,
-                    advanceSalaryDeduction: edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction ?? 0
+                    // Flatten arrays to single numeric sums for backend compatibility
+                    bonus: flattenToSum(edits.bonus ?? employee.bonus, 'Bonus', employee.name),
+                    incentive: flattenToSum(edits.incentive ?? employee.incentive, 'Incentive', employee.name),
+                    open_leave_salary: flattenToSum(edits.open_leave_salary ?? employee.open_leave_salary, 'Open Leave Salary', employee.name),
+                    variable_salary: flattenToSum(edits.variable_salary ?? employee.variable_salary, 'Variable Salary', employee.name),
+                    otherDeduction: flattenToSum(edits.otherDeduction ?? employee.otherDeduction, 'Other Deduction', employee.name),
+                    advanceSalaryDeduction: flattenToSum(edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction, 'Advance Salary Deduction', employee.name)
                 };
 
                 // Save to OvertimeData (always)
@@ -436,6 +598,136 @@ export default function OvertimeTab({ project }) {
         }
     };
 
+    // Sync Adjustments to Checklist logic
+    const handleSyncToChecklist = async () => {
+        if (!project?.id) return;
+        
+        setIsSyncing(true);
+        const flattenToSum = (val) => {
+            if (!val) return 0;
+            if (Array.isArray(val)) {
+                return val.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            }
+            return parseFloat(val) || 0;
+        };
+
+        try {
+            // 1. Fetch current checklist items once to check for existing tasks (Efficiency)
+            const existingTasks = await base44.entities.ChecklistItem.filter({ 
+                project_id: project.id,
+                is_auto_created: true
+            });
+
+            const operations = []; // To track all create/update calls
+
+            // ============================================
+            // 2. Overtime Task Logic (Single Task)
+            // ============================================
+            const otEmployees = overtimeData.filter(emp => {
+                const nOT = flattenToSum(emp.normalOtHours);
+                const sOT = flattenToSum(emp.specialOtHours);
+                return nOT > 0 || sOT > 0;
+            });
+
+            if (otEmployees.length > 0) {
+                const otTaskName = `Overtime Management - ${project.name}`;
+                const otDescription = otEmployees.map(e => e.name).join(', ');
+                const otFingerprint = `OT_MANAGEMENT_${project.id}`;
+                
+                const existingOTTask = existingTasks.find(t => t.fingerprint === otFingerprint);
+                const otPayload = {
+                    project_id: project.id,
+                    task_type: otTaskName,
+                    task_description: otDescription,
+                    status: 'pending',
+                    is_auto_created: true,
+                    linked_entity_id: 'salary_adjustments', // Link to Salary Adjustments
+                    fingerprint: otFingerprint,
+                    notes: `System-generated task for overtime monitoring.\nEmployees: ${otEmployees.length}`
+                };
+
+                if (existingOTTask) {
+                    await base44.entities.ChecklistItem.update(existingOTTask.id, otPayload);
+                } else {
+                    await base44.entities.ChecklistItem.create(otPayload);
+                }
+            }
+
+            // ============================================
+            // 3. Adjustment Task Logic (Categorized Tasks)
+            // ============================================
+            // Fixed set of columns to check as per UI/schema
+            const columns = [
+                { key: 'bonus', name: 'Bonus' },
+                { key: 'incentive', name: 'Incentive' },
+                { key: 'open_leave_salary', name: 'Open Leave Salary' },
+                { key: 'variable_salary', name: 'Variable Salary' },
+                { key: 'otherDeduction', name: 'Other Deduction' },
+                { key: 'advanceSalaryDeduction', name: 'Advance Salary Deduction' }
+            ];
+
+            for (const col of columns) {
+                const entries = [];
+                
+                overtimeData.forEach(emp => {
+                    const empEntries = emp[col.key];
+                    if (Array.isArray(empEntries) && empEntries.length > 0) {
+                        empEntries.forEach(entry => {
+                            if (parseFloat(entry.amount) > 0) {
+                                entries.push({
+                                    name: emp.name,
+                                    amount: entry.amount,
+                                    desc: entry.desc || 'No remarks'
+                                });
+                            }
+                        });
+                    } else if (parseFloat(emp[col.key]) > 0) {
+                        // Handle legacy numeric values if any
+                        entries.push({
+                            name: emp.name,
+                            amount: emp[col.key],
+                            desc: 'No remarks'
+                        });
+                    }
+                });
+
+                if (entries.length > 0) {
+                    const adjTaskName = col.name;
+                    const adjDescription = entries.map(e => 
+                        `${e.name} | ${parseFloat(e.amount).toFixed(2)} AED | ${e.desc}`
+                    ).join('\n');
+                    const adjFingerprint = `ADJ_${col.key}_${project.id}`;
+
+                    const existingAdjTask = existingTasks.find(t => t.fingerprint === adjFingerprint);
+                    const adjPayload = {
+                        project_id: project.id,
+                        task_type: adjTaskName,
+                        task_description: adjDescription,
+                        status: 'pending',
+                        is_auto_created: true,
+                        linked_entity_id: 'salary_adjustments',
+                        fingerprint: adjFingerprint,
+                        notes: `System-generated adjustment tasks for ${col.name}.\nTotal Entries: ${entries.length}`
+                    };
+
+                    if (existingAdjTask) {
+                        await base44.entities.ChecklistItem.update(existingAdjTask.id, adjPayload);
+                    } else {
+                        await base44.entities.ChecklistItem.create(adjPayload);
+                    }
+                }
+            }
+
+            toast.success('Checklist updated successfully with adjustments.');
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+        } catch (error) {
+            console.error('Sync Error:', error);
+            toast.error('Failed to sync to checklist: ' + error.message);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     // ============================================
     // RENDER
     // ============================================
@@ -464,6 +756,23 @@ export default function OvertimeTab({ project }) {
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <Button
+                            onClick={handleSyncToChecklist}
+                            disabled={isSyncing || isSaving}
+                            className="bg-indigo-600 hover:bg-indigo-700 shadow-md"
+                        >
+                            {isSyncing ? (
+                                <>
+                                    <Clock className="w-4 h-4 mr-2 animate-spin" />
+                                    Syncing...
+                                </>
+                            ) : (
+                                <>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Sync Adjustments to Checklist
+                                </>
+                            )}
+                        </Button>
                         <Button
                             variant="outline"
                             onClick={handleExportTemplate}
@@ -535,9 +844,9 @@ export default function OvertimeTab({ project }) {
                     <Table>
                         <TableHeader className="sticky top-0 bg-slate-50 z-10">
                             <TableRow>
-                                <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
-                                <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
-                                <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
+                                <SortableTableHead label="Att. ID" sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
+                                <SortableTableHead label="Name" sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
+                                <SortableTableHead label="Department" sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
                                 <TableHead className="bg-blue-50">Normal OT Hours</TableHead>
                                 <TableHead className="bg-cyan-50">Special OT Hours</TableHead>
                             </TableRow>
@@ -558,23 +867,19 @@ export default function OvertimeTab({ project }) {
                                         <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
                                         <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
                                         <TableCell className="bg-blue-50 p-1">
-                                            <Input
-                                                type="number"
-                                                step="0.5"
-                                                min="0"
+                                            <EntryCell 
+                                                title="Normal OT Hours"
                                                 value={getValue(row, 'normalOtHours')}
-                                                onChange={(e) => handleChange(row.attendance_id, 'normalOtHours', e.target.value)}
-                                                className="h-8 text-sm w-20"
+                                                onSave={(entries) => handleChange(row.attendance_id, 'normalOtHours', entries)}
+                                                disabled={false}
                                             />
                                         </TableCell>
                                         <TableCell className="bg-cyan-50 p-1">
-                                            <Input
-                                                type="number"
-                                                step="0.5"
-                                                min="0"
+                                            <EntryCell 
+                                                title="Special OT Hours"
                                                 value={getValue(row, 'specialOtHours')}
-                                                onChange={(e) => handleChange(row.attendance_id, 'specialOtHours', e.target.value)}
-                                                className="h-8 text-sm w-20"
+                                                onSave={(entries) => handleChange(row.attendance_id, 'specialOtHours', entries)}
+                                                disabled={false}
                                             />
                                         </TableCell>
                                     </TableRow>
@@ -649,9 +954,9 @@ export default function OvertimeTab({ project }) {
                         <Table>
                             <TableHeader className="sticky top-0 bg-slate-50 z-10">
                                 <TableRow>
-                                    <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
-                                    <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
-                                    <SortableTableHead sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
+                                    <SortableTableHead label="Att. ID" sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
+                                    <SortableTableHead label="Name" sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
+                                    <SortableTableHead label="Department" sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
                                     <TableHead className="bg-green-50 text-green-700">Bonus (+)</TableHead>
                                     <TableHead className="bg-green-50 text-green-700">Incentive (+)</TableHead>
                                     {isAlMaraghiMotors && <TableHead className="bg-green-50 text-green-700">Open Leave Salary (+)</TableHead>}
@@ -671,77 +976,61 @@ export default function OvertimeTab({ project }) {
                                 ) : filteredData.map(row => {
                                    const hasAdjustmentEdits = editableAdjustments[row.attendance_id];
                                    return (
-                                       <TableRow key={`adj-${row.attendance_id}`} className={hasAdjustmentEdits ? 'bg-amber-50' : ''}>
+                                        <TableRow key={`adj-${row.attendance_id}`} className={hasAdjustmentEdits ? 'bg-amber-50' : ''}>
                                            <TableCell className="font-medium">{row.attendance_id}</TableCell>
                                            <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
                                            <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
                                             <TableCell className="bg-green-50 p-1">
-                                               <Input
-                                                   type="number"
-                                                   step="0.01"
-                                                   min="0"
-                                                   value={getAdjustmentValue(row, 'bonus')}
-                                                   onChange={(e) => handleAdjustmentChange(row.attendance_id, 'bonus', e.target.value)}
-                                                   className="h-8 text-sm w-20"
-                                                   disabled={!canEditAdjustments}
-                                               />
+                                                <EntryCell 
+                                                    title="Bonus"
+                                                    value={getAdjustmentValue(row, 'bonus')}
+                                                    onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'bonus', entries)}
+                                                    disabled={!canEditAdjustments}
+                                                />
                                             </TableCell>
                                             <TableCell className="bg-green-50 p-1">
-                                               <Input
-                                                   type="number"
-                                                   step="0.01"
-                                                   min="0"
-                                                   value={getAdjustmentValue(row, 'incentive')}
-                                                   onChange={(e) => handleAdjustmentChange(row.attendance_id, 'incentive', e.target.value)}
-                                                   className="h-8 text-sm w-20"
-                                                   disabled={!canEditAdjustments}
-                                               />
+                                                <EntryCell 
+                                                    title="Incentive"
+                                                    value={getAdjustmentValue(row, 'incentive')}
+                                                    onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'incentive', entries)}
+                                                    disabled={!canEditAdjustments}
+                                                />
                                             </TableCell>
                                             {isAlMaraghiMotors && (
                                                 <TableCell className="bg-green-50 p-1">
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
+                                                    <EntryCell 
+                                                        title="Open Leave Salary"
                                                         value={getAdjustmentValue(row, 'open_leave_salary')}
-                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'open_leave_salary', e.target.value)}
-                                                        className="h-8 text-sm w-24"
+                                                        onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'open_leave_salary', entries)}
                                                         disabled={!canEditAdjustments}
                                                     />
                                                 </TableCell>
                                             )}
                                             {isAlMaraghiMotors && (
                                                 <TableCell className="bg-green-50 p-1">
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
+                                                    <EntryCell 
+                                                        title="Variable Salary"
                                                         value={getAdjustmentValue(row, 'variable_salary')}
-                                                        onChange={(e) => handleAdjustmentChange(row.attendance_id, 'variable_salary', e.target.value)}
-                                                        className="h-8 text-sm w-24"
+                                                        onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'variable_salary', entries)}
                                                         disabled={!canEditAdjustments}
                                                     />
                                                 </TableCell>
                                             )}
                                             <TableCell className="bg-red-50 p-1">
-                                               <Input
-                                                   type="number"
-                                                   step="0.01"
-                                                   value={getAdjustmentValue(row, 'otherDeduction')}
-                                                   onChange={(e) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', e.target.value)}
-                                                   className="h-8 text-sm w-20"
-                                                   disabled={!canEditAdjustments}
-                                               />
+                                                <EntryCell 
+                                                    title="Other Deduction"
+                                                    value={getAdjustmentValue(row, 'otherDeduction')}
+                                                    onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', entries)}
+                                                    disabled={!canEditAdjustments}
+                                                />
                                             </TableCell>
                                             <TableCell className="bg-red-50 p-1">
-                                               <Input
-                                                   type="number"
-                                                   step="0.01"
-                                                   value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
-                                                   onChange={(e) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', e.target.value)}
-                                                   className="h-8 text-sm w-20"
-                                                   disabled={!canEditAdjustments}
-                                               />
+                                                <EntryCell 
+                                                    title="Advance Salary Deduction"
+                                                    value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
+                                                    onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', entries)}
+                                                    disabled={!canEditAdjustments}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -754,6 +1043,16 @@ export default function OvertimeTab({ project }) {
                 </CardContent>
             </Card>
             </div>
+
+            {/* Excel Export Preview Dialog */}
+            <ExcelPreviewDialog
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                data={previewData}
+                headers={['Attendance ID', 'HRMS ID', 'Name', 'Department', 'Attendance Source', 'Normal OT Hours', 'Special OT Hours']}
+                fileName={`OT_Template_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`}
+                onConfirm={executeDownload}
+            />
         </>
     );
 }

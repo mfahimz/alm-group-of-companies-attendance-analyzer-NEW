@@ -75,26 +75,25 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
         const start = new Date(schedule.ramadan_start_date);
         const end = new Date(schedule.ramadan_end_date);
         
-        let weekIndex = 0; // Week 1 = 0, Week 2 = 1
-        
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dayOfWeek = d.getDay();
             const isSunday = dayOfWeek === 0;
             const isFriday = dayOfWeek === 5;
+            
+            // Calculate how many Saturdays have passed since Ramadan start
+            const daysSinceStart = Math.floor((d - start) / (1000 * 60 * 60 * 24));
+            const saturdaysPassed = Math.floor((daysSinceStart + (7 - start.getDay() + 6) % 7) / 7);
+            const weekNumber = saturdaysPassed % 2;
             
             days.push({
                 date: new Date(d),
                 dateStr: d.toISOString().split('T')[0],
                 day: d.getDate(),
                 month: d.getMonth(),
-                weekLabel: weekIndex === 0 ? 'W1' : 'W2',
+                weekLabel: weekNumber === 0 ? 'W1' : 'W2',
                 isSunday,
                 isFriday
             });
-            
-            if (isSunday) {
-                weekIndex = (weekIndex + 1) % 2;
-            }
         }
         
         return days;
@@ -102,22 +101,21 @@ export default function RamadanCalendarView({ schedule, employees, onClose }) {
 
     const formatShift = (shift, isFriday = false) => {
         if (!shift) return '—';
-        const activeShifts = shift.active_shifts || [];
         const parts = [];
         
         if (isAlMaraghiAutomotive && !isFriday) {
-            // Al Maraghi Automotive non-Friday: S1 and S2 both store times in day_start/day_end
-            if (activeShifts.includes('day') && shift.day_start && shift.day_end) {
-                parts.push(`S1: ${shift.day_start}-${shift.day_end}`);
-            } else if (activeShifts.includes('night') && shift.day_start && shift.day_end) {
-                parts.push(`S2: ${shift.day_start}-${shift.day_end}`);
+            // Al Maraghi Automotive non-Friday: S1 and S2 always stored in day_start/day_end
+            // We format it simply without guessing which shift definition it originally was
+            if (shift.day_start && shift.day_end && shift.day_start !== '—' && shift.day_end !== '—') {
+                parts.push(`${shift.day_start}-${shift.day_end}`);
             }
         } else {
             // Standard companies (and Al Maraghi Friday): day in day_start/day_end, night in night_start/night_end
-            if (activeShifts.includes('day') && shift.day_start && shift.day_end) {
+            // Purely read times directly from the shift fields, ignoring active_shifts
+            if (shift.day_start && shift.day_end && shift.day_start !== '—' && shift.day_end !== '—') {
                 parts.push(`D: ${shift.day_start}-${shift.day_end}`);
             }
-            if (activeShifts.includes('night') && shift.night_start && shift.night_end) {
+            if (shift.night_start && shift.night_end && shift.night_start !== '—' && shift.night_end !== '—') {
                 parts.push(`N: ${shift.night_start}-${shift.night_end}`);
             }
         }

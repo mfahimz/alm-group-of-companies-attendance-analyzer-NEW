@@ -18,6 +18,7 @@ import BulkEditShiftDialog from '../shifts/BulkEditShiftDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import TimePicker from '../ui/TimePicker';
 import RamadanShiftSection from './RamadanShiftSection';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 export default function ShiftTimingsTab({ project }) {
      const [file, setFile] = useState(null);
@@ -51,12 +52,7 @@ export default function ShiftTimingsTab({ project }) {
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showCopyDialog, setShowCopyDialog] = useState(false);
-    const [copySource, setCopySource] = useState({
-        type: 'block',
-        blockId: 'block1',
-        projectId: '',
-        projectBlockId: 'block1'
-    });
+    const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '', sourceProjectBlockId: 'block1' });
 
     const [formData, setFormData] = useState({
         attendance_id: '',
@@ -67,6 +63,15 @@ export default function ShiftTimingsTab({ project }) {
         is_single_shift: false,
         is_friday_shift: false,
         applicable_days: []
+    });
+
+    // Export Preview State
+    const [exportPreviewConfig, setExportPreviewConfig] = useState({
+        isOpen: false,
+        data: [],
+        headers: [],
+        fileName: '',
+        onConfirm: () => {}
     });
     const queryClient = useQueryClient();
 
@@ -136,6 +141,13 @@ export default function ShiftTimingsTab({ project }) {
         queryKey: ['projects'],
         queryFn: () => base44.entities.Project.list(),
         enabled: showCopyDialog
+    });
+
+    // Fetch shifts from selected source project for block selection
+    const { data: sourceProjectShifts = [] } = useQuery({
+        queryKey: ['sourceProjectShifts', copySource.projectId],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: copySource.projectId }),
+        enabled: showCopyDialog && copySource.type === 'project' && !!copySource.projectId
     });
 
     const { data: companySettings = [] } = useQuery({
@@ -501,38 +513,52 @@ export default function ShiftTimingsTab({ project }) {
             let sourceShifts = [];
             
             if (sourceType === 'block') {
-                // Copy from another block in the same project
-                sourceShifts = shifts.filter(s => s.shift_block === sourceBlockId);
-            } else if (sourceType === 'project') {
-                // Copy from another project
-                const [otherProjectShifts, otherProject] = await Promise.all([
-                    base44.entities.ShiftTiming.filter({ project_id: sourceProjectId }),
-                    base44.entities.Project.get(sourceProjectId)
-                ]);
-
-                const normalize = (v) => (v ? String(v).slice(0, 10) : '');
-                let savedRanges = null;
-                try {
-                    savedRanges = otherProject?.shift_block_ranges ? JSON.parse(otherProject.shift_block_ranges) : null;
-                } catch (e) {
-                    savedRanges = null;
-                }
-                const wantedRange = savedRanges?.[sourceProjectBlockId] || null;
-
-                sourceShifts = otherProjectShifts.filter(s => {
-                    if (s.shift_block) return s.shift_block === sourceProjectBlockId;
-                    // Legacy shifts without shift_block: best-effort map by effective range if available.
-                    if (wantedRange?.from && wantedRange?.to && s.effective_from && s.effective_to) {
-                        return normalize(s.effective_from) === normalize(wantedRange.from) &&
-                               normalize(s.effective_to) === normalize(wantedRange.to);
+                // Copy from another block in the same project (including legacy shifts)
+                const sourceBlockRange = blockDateRanges[sourceBlockId];
+                sourceShifts = shifts.filter(s => {
+                    if (s.shift_block === sourceBlockId) return true;
+                    
+                    // For legacy shifts without shift_block, check date ranges
+                    if (!s.shift_block && s.effective_from && s.effective_to && sourceBlockRange) {
+                        if (s.effective_from === sourceBlockRange.from && s.effective_to === sourceBlockRange.to) {
+                            return true;
+                        }
                     }
-                    // If no mapping info exists, treat legacy shifts as Block 1 only.
-                    return sourceProjectBlockId === 'block1';
+                    return false;
+                });
+            } else if (sourceType === 'project') {
+                // Copy from another project's specific block (including legacy shifts)
+                const otherProjectShifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProjectId });
+                
+                // Get source project to determine block ranges
+                const sourceProj = await base44.entities.Project.filter({ id: sourceProjectId });
+                let sourceBlockRanges = {};
+                try {
+                    sourceBlockRanges = sourceProj[0]?.shift_block_ranges ? JSON.parse(sourceProj[0].shift_block_ranges) : {};
+                } catch (e) {
+                    sourceBlockRanges = {};
+                }
+                
+                const sourceBlockRange = sourceBlockRanges[sourceProjectBlockId] || { 
+                    from: sourceProj[0]?.date_from, 
+                    to: sourceProj[0]?.date_to 
+                };
+                
+                sourceShifts = otherProjectShifts.filter(s => {
+                    if (s.shift_block === sourceProjectBlockId) return true;
+                    
+                    // For legacy shifts without shift_block, check date ranges
+                    if (!s.shift_block && s.effective_from && s.effective_to && sourceBlockRange) {
+                        if (s.effective_from === sourceBlockRange.from && s.effective_to === sourceBlockRange.to) {
+                            return true;
+                        }
+                    }
+                    return false;
                 });
             }
             
             if (sourceShifts.length === 0) {
-                throw new Error('No shifts found in source');
+                throw new Error('No shifts found in source block');
             }
             
             const targetRange = blockDateRanges[targetBlockId];
@@ -692,8 +718,6 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
         }
 
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-            
             const data = shifts.map(shift => {
                 const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                 return {
@@ -717,14 +741,30 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                 };
             });
 
-            const worksheet = XLSX.utils.json_to_sheet(data);
+            setExportPreviewConfig({
+                isOpen: true,
+                data: data,
+                headers: ['Attendance ID', 'Employee Name', 'Department', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Weekly Off', 'Shift Type', 'Applicable Days'],
+                fileName: `${project.name}_shift_timings.xlsx`,
+                onConfirm: executeExportDownload
+            });
+        } catch (error) {
+            toast.error('Failed to prepare export');
+            console.error(error);
+        }
+    };
+
+    const executeExportDownload = async () => {
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            const worksheet = XLSX.utils.json_to_sheet(exportPreviewConfig.data);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Shift Timings');
-            
-            XLSX.writeFile(workbook, `${project.name}_shift_timings.xlsx`);
-            toast.success('Shift timings exported to Excel');
+            XLSX.writeFile(workbook, exportPreviewConfig.fileName);
+            toast.success('Excel file downloaded');
+            setExportPreviewConfig(prev => ({ ...prev, isOpen: false }));
         } catch (error) {
-            toast.error('Failed to export');
+            toast.error('Download failed');
             console.error(error);
         }
     };
@@ -738,8 +778,6 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
         }
 
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-            
             const data = blockShifts.map(shift => {
                 const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                 return {
@@ -763,15 +801,27 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                 };
             });
 
-            const worksheet = XLSX.utils.json_to_sheet(data);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, blockId.replace('block', 'Block '));
-            
-            XLSX.writeFile(workbook, `${project.name}_${blockId}_shifts.xlsx`);
-            toast.success(`${blockId.replace('block', 'Block ')} shifts exported to Excel`);
+            setExportPreviewConfig({
+                isOpen: true,
+                data: data,
+                headers: ['Attendance ID', 'Employee Name', 'Department', 'AM Start', 'AM End', 'PM Start', 'PM End', 'Weekly Off', 'Shift Type', 'Applicable Days'],
+                fileName: `${project.name}_${blockId}_shifts.xlsx`,
+                onConfirm: async () => {
+                    try {
+                        const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+                        const worksheet = XLSX.utils.json_to_sheet(data);
+                        const workbook = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(workbook, worksheet, blockId.replace('block', 'Block '));
+                        XLSX.writeFile(workbook, `${project.name}_${blockId}_shifts.xlsx`);
+                        toast.success(`${blockId.replace('block', 'Block ')} shifts exported to Excel`);
+                        setExportPreviewConfig(prev => ({ ...prev, isOpen: false }));
+                    } catch (error) {
+                        toast.error('Download failed');
+                    }
+                }
+            });
         } catch (error) {
-            toast.error('Failed to export');
-            console.error(error);
+            toast.error('Failed to prepare export');
         }
     };
 
@@ -1789,12 +1839,12 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                         )}
 
                         {copySource.type === 'project' && (
-                            <div className="space-y-4">
+                            <>
                                 <div>
                                     <Label>Source Project</Label>
                                     <Select
                                         value={copySource.projectId || undefined}
-                                        onValueChange={(value) => setCopySource({ ...copySource, projectId: value, projectBlockId: 'block1' })}
+                                        onValueChange={(value) => setCopySource({ ...copySource, projectId: value, sourceProjectBlockId: 'block1' })}
                                     >
                                         <SelectTrigger className="mt-2">
                                             <SelectValue placeholder="Select project..." />
@@ -1804,39 +1854,64 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                                 .filter(p => p.id !== project.id && p.company === project.company)
                                                 .map(p => (
                                                     <SelectItem key={p.id} value={p.id}>
-                                                        {p.name} ({new Date(p.date_from).toLocaleDateString()})
+                                                        {p.name} ({new Date(p.date_from).toLocaleDateString('en-GB')} - {new Date(p.date_to).toLocaleDateString('en-GB')})
                                                     </SelectItem>
                                                 ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
 
-                                <div>
-                                    <Label>Source Block</Label>
-                                    <Select
-                                        value={copySource.projectBlockId || undefined}
-                                        onValueChange={(value) => setCopySource({ ...copySource, projectBlockId: value })}
-                                        disabled={!copySource.projectId}
-                                    >
-                                        <SelectTrigger className="mt-2">
-                                            <SelectValue placeholder="Select block..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Array.from(
-                                                { length: (allProjects.find(p => p.id === copySource.projectId)?.shift_blocks_count || 2) },
-                                                (_, i) => i + 1
-                                            ).map(num => {
-                                                const blockId = `block${num}`;
-                                                return (
-                                                    <SelectItem key={blockId} value={blockId}>
-                                                        Block {num}
-                                                    </SelectItem>
-                                                );
-                                            })}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
+                                {copySource.projectId && (
+                                    <div>
+                                        <Label>Source Block</Label>
+                                        <Select
+                                            value={copySource.sourceProjectBlockId || undefined}
+                                            onValueChange={(value) => setCopySource({ ...copySource, sourceProjectBlockId: value })}
+                                        >
+                                            <SelectTrigger className="mt-2">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {(() => {
+                                                    const sourceProj = allProjects.find(p => p.id === copySource.projectId);
+                                                    const sourceBlocksCount = sourceProj?.shift_blocks_count || 2;
+                                                    let sourceBlockRanges = {};
+                                                    
+                                                    try {
+                                                        sourceBlockRanges = sourceProj?.shift_block_ranges ? JSON.parse(sourceProj.shift_block_ranges) : {};
+                                                    } catch (e) {
+                                                        sourceBlockRanges = {};
+                                                    }
+
+                                                    return Array.from({ length: sourceBlocksCount }, (_, i) => i + 1).map(num => {
+                                                        const blockId = `block${num}`;
+                                                        const range = sourceBlockRanges[blockId] || { from: sourceProj?.date_from, to: sourceProj?.date_to };
+                                                        
+                                                        // Count shifts in this block (including legacy shifts without shift_block field)
+                                                        const count = sourceProjectShifts.filter(s => {
+                                                            if (s.shift_block === blockId) return true;
+                                                            
+                                                            // For legacy shifts without shift_block, check date ranges
+                                                            if (!s.shift_block && s.effective_from && s.effective_to && range) {
+                                                                if (s.effective_from === range.from && s.effective_to === range.to) {
+                                                                    return true;
+                                                                }
+                                                            }
+                                                            return false;
+                                                        }).length;
+                                                        
+                                                        return (
+                                                            <SelectItem key={blockId} value={blockId}>
+                                                                Block {num} ({count} shifts) - {range?.from ? new Date(range.from).toLocaleDateString('en-GB') : 'N/A'} to {range?.to ? new Date(range.to).toLocaleDateString('en-GB') : 'N/A'}
+                                                            </SelectItem>
+                                                        );
+                                                    });
+                                                })()}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                            </>
                         )}
 
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -1852,10 +1927,10 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                 sourceType: copySource.type,
                                 sourceBlockId: copySource.blockId,
                                 sourceProjectId: copySource.projectId,
-                                sourceProjectBlockId: copySource.projectBlockId,
+                                sourceProjectBlockId: copySource.sourceProjectBlockId,
                                 targetBlockId: copySource.targetBlockId
                             })}
-                            disabled={copyShiftsMutation.isPending || (copySource.type === 'project' && (!copySource.projectId || !copySource.projectBlockId))}
+                            disabled={copyShiftsMutation.isPending || (copySource.type === 'project' && !copySource.projectId)}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
                             {copyShiftsMutation.isPending ? 'Copying...' : 'Copy Shifts'}
@@ -1863,6 +1938,14 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                     </div>
                 </DialogContent>
             </Dialog>
+            <ExcelPreviewDialog
+                isOpen={exportPreviewConfig.isOpen}
+                onClose={() => setExportPreviewConfig(prev => ({ ...prev, isOpen: false }))}
+                data={exportPreviewConfig.data}
+                headers={exportPreviewConfig.headers}
+                fileName={exportPreviewConfig.fileName}
+                onConfirm={exportPreviewConfig.onConfirm}
+            />
         </div>
     );
 }

@@ -32,8 +32,8 @@ Deno.serve(async (req) => {
             { name: 'SalaryIncrements', description: 'Salary increment management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
             { name: 'HalfYearlyMinutesManagement', description: 'Half-yearly minutes allowance management', defaultRoles: 'admin,ceo' },
             { name: 'GraceMinutesManagement', description: 'Grace minutes management', defaultRoles: 'admin,ceo' },
-            { name: 'AnnualLeaveManagement', description: 'Annual leave calendar management', defaultRoles: 'admin,supervisor,ceo,hr_manager' },
-            { name: 'RamadanSchedules', description: 'Ramadan shift schedule management', defaultRoles: 'admin,ceo,hr_manager' },
+            { name: 'AnnualLeaveManagement', description: 'Annual leave calendar management', defaultRoles: 'admin,supervisor,user,ceo,hr_manager' },
+            { name: 'RamadanSchedules', description: 'Ramadan shift schedule management', defaultRoles: 'admin,user,ceo,hr_manager' },
 
             // Admin
             { name: 'CompanyManagement', description: 'Company settings and management', defaultRoles: 'admin,ceo,hr_manager' },
@@ -90,16 +90,33 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Step 2: Update descriptions ONLY (preserve allowed_roles)
+        // Step 2: Update descriptions and MERGE missing default roles
         for (const page of allPages) {
             const existing = existingMap.get(page.name);
-            if (existing && existing.description !== page.description) {
-                await base44.asServiceRole.entities.PagePermission.update(existing.id, {
-                    description: page.description
-                    // CRITICAL: Do NOT update allowed_roles here - preserve user's custom permissions
-                });
-                updated++;
-                updatedPageNames.push(page.name);
+            if (existing) {
+                const updates: any = {};
+                
+                if (existing.description !== page.description) {
+                    updates.description = page.description;
+                }
+
+                // MERGE LOGIC: If code has default roles that are missing in DB, add them.
+                // This ensures developers can "push" new access rules via code.
+                const dbRoles = existing.allowed_roles.split(',').map(r => r.trim()).filter(Boolean);
+                const codeRoles = (page.defaultRoles || 'admin').split(',').map(r => r.trim()).filter(Boolean);
+                
+                const missingRoles = codeRoles.filter(role => !dbRoles.includes(role));
+                
+                if (missingRoles.length > 0) {
+                    updates.allowed_roles = [...dbRoles, ...missingRoles].join(',');
+                    console.log(`[sync] Adding missing roles to ${page.name}: ${missingRoles.join(', ')}`);
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    await base44.asServiceRole.entities.PagePermission.update(existing.id, updates);
+                    updated++;
+                    updatedPageNames.push(page.name);
+                }
             }
         }
 

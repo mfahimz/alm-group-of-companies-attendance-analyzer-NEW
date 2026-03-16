@@ -135,26 +135,26 @@ Deno.serve(async (req) => {
         }
 
         // Helper: Parse time string to Date object
-        const parseTime = (timeStr, includeSeconds = false) => {
+        const parseTime = (timeStr: any) => {
             try {
                 if (!timeStr || timeStr === '—' || timeStr === '-') return null;
                 
-                if (includeSeconds) {
-                    let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-                    if (timeMatch) {
-                        let hours = parseInt(timeMatch[1]);
-                        const minutes = parseInt(timeMatch[2]);
-                        const seconds = parseInt(timeMatch[3]);
-                        const period = timeMatch[4].toUpperCase();
-                        if (period === 'PM' && hours !== 12) hours += 12;
-                        if (period === 'AM' && hours === 12) hours = 0;
-                        const date = new Date();
-                        date.setHours(hours, minutes, seconds, 0);
-                        return date;
-                    }
+                // Priority 1: Format with seconds
+                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = parseInt(timeMatch[3]);
+                    const period = timeMatch[4].toUpperCase();
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
                 }
                 
-                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+                // Priority 2: Standard AM/PM
+                timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                 if (timeMatch) {
                     let hours = parseInt(timeMatch[1]);
                     const minutes = parseInt(timeMatch[2]);
@@ -166,6 +166,7 @@ Deno.serve(async (req) => {
                     return date;
                 }
                 
+                // Priority 3: 24-hour with optional seconds
                 timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
                 if (timeMatch) {
                     const hours = parseInt(timeMatch[1]);
@@ -183,11 +184,11 @@ Deno.serve(async (req) => {
         };
 
         // Helper: Filter duplicate punches within 10 minutes
-        const filterMultiplePunches = (punchList, includeSeconds) => {
+        const filterMultiplePunches = (punchList: any[]) => {
             if (punchList.length <= 1) return punchList;
             const punchesWithTime = punchList.map(p => ({
                 ...p,
-                time: parseTime(p.timestamp_raw, includeSeconds)
+                time: parseTime(p.timestamp_raw)
             })).filter(p => p.time);
             if (punchesWithTime.length === 0) return punchList;
 
@@ -200,12 +201,12 @@ Deno.serve(async (req) => {
         };
 
         // Helper: Match punches to shift points
-        const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds) => {
+        const matchPunchesToShiftPoints = (dayPunches: any[], shift: any) => {
             if (!shift || dayPunches.length === 0) return [];
             
             const punchesWithTime = dayPunches.map(p => ({
                 ...p,
-                time: p.time || parseTime(p.timestamp_raw, includeSeconds)
+                time: p.time || parseTime(p.timestamp_raw)
             })).filter(p => p.time).sort((a, b) => a.time - b.time);
             
             if (punchesWithTime.length === 0) return [];
@@ -244,9 +245,8 @@ Deno.serve(async (req) => {
 
         // RECALCULATE attendance for custom date range
         // For Al Maraghi Motors: assumedDays are treated as fully present for salary
-        const recalculateEmployeeAttendance = (emp, dateFrom, dateTo, assumedDays = []) => {
+        const recalculateEmployeeAttendance = (emp: any, dateFrom: string, dateTo: string, assumedDays: any[] = []) => {
             const attendanceIdStr = String(emp.attendance_id);
-            const includeSeconds = project.company === 'Al Maraghi Automotive';
             
             const employeePunches = punches.filter(p => 
                 String(p.attendance_id) === attendanceIdStr &&
@@ -443,7 +443,7 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                const dayPunches = filterMultiplePunches(rawDayPunches, includeSeconds);
+                const dayPunches = filterMultiplePunches(rawDayPunches);
 
                 // Track allowed minutes
                 let allowedMinutesForDay = 0;
@@ -481,7 +481,7 @@ Deno.serve(async (req) => {
                     if (dateException.early_checkout_minutes > 0) earlyCheckoutMinutes += dateException.early_checkout_minutes;
                     if (dateException.other_minutes > 0) otherMinutes += dateException.other_minutes;
                 } else if (shift && dayPunches.length > 0 && !shouldSkipTimeCalc) {
-                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
                     
                     let dayLateMinutes = 0;
                     let dayEarlyMinutes = 0;
@@ -718,7 +718,7 @@ Deno.serve(async (req) => {
 
                 if (!shift) continue;
 
-                const dayPunches = filterMultiplePunches(rawDayPunches, includeSeconds);
+                const dayPunches = filterMultiplePunches(rawDayPunches);
 
                 let allowedMinutesForDay = 0;
                 if (dateException && dateException.type === 'ALLOWED_MINUTES' && 
@@ -744,7 +744,7 @@ Deno.serve(async (req) => {
                     if (dateException.early_checkout_minutes > 0) dayEarlyMinutes = dateException.early_checkout_minutes;
                     if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
                 } else if (dayPunches.length > 0) {
-                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
                     
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;

@@ -33,7 +33,10 @@ export default function RamadanSchedules() {
         queryFn: () => base44.auth.me()
     });
 
-    const { data: allSchedules = [] } = useQuery({
+    // FIX for ISSUE 1: Added refetch to the useQuery so we can manually trigger a fresh fetch
+    // when the user saves inside the RamadanShiftDesigner dialog. This ensures that opening
+    // the calendar right after saving will pass the freshest data prop.
+    const { data: allSchedules = [], refetch: refetchSchedules } = useQuery({
         queryKey: ['ramadanSchedules'],
         queryFn: () => base44.entities.RamadanSchedule.list('-year')
     });
@@ -353,13 +356,21 @@ export default function RamadanSchedules() {
                 <RamadanShiftDesigner
                     schedule={editingSchedule}
                     onClose={() => setEditingSchedule(null)}
+                    // FIX for ISSUE 1: We pass an onSave callback to trigger a fresh refetch 
+                    // in the parent component. This eliminates the stale data issue so that if 
+                    // the user opens the Calendar View next, it will receive the latest schedule.
+                    onSave={() => {
+                        queryClient.invalidateQueries({ queryKey: ['ramadanSchedules'] });
+                        refetchSchedules();
+                    }}
                 />
             )}
 
             {/* Calendar View Dialog */}
             {calendarViewSchedule && (
                 <RamadanCalendarView
-                    schedule={calendarViewSchedule}
+                    // ISSUE 1 FIX: Always pull the fresh schedule object from allSchedules so the calendar doesn't get a stale prop
+                    schedule={allSchedules.find(s => s.id === calendarViewSchedule.id) || calendarViewSchedule}
                     employees={employees.filter(emp => emp.attendance_id)}
                     onClose={() => setCalendarViewSchedule(null)}
                 />

@@ -1,9 +1,0 @@
----
-alwaysApply: true
----
-
-This app serves multiple companies. Every data fetch MUST:
-- Respect selectedCompany from useCompanyFilter() context
-- Filter by company when user role is not admin/supervisor/ceo/hr_manager
-- Never show one company's data to another company's users
-- Department heads are restricted to their own department only

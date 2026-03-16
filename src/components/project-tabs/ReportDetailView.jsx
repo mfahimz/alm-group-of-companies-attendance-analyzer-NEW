@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ import DailyBreakdownDialog from './DailyBreakdownDialog';
 import DeductibleCell from './DeductibleCell';
 import ReportTableRow from './ReportTableRow';
 import * as XLSX from 'xlsx';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -27,6 +29,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [editingDay, setEditingDay] = useState(null);
     const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
     const [sort, setSort] = useState({ key: 'deductible_minutes', direction: 'desc' });
+    
+    // Preview state for Excel export
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewData, setPreviewData] = useState([]);
+    const [previewHeaders, setPreviewHeaders] = useState([]);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -61,7 +68,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         queryFn: async () => {
             // Primary: fetch by report_run_id
             const results = await base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000);
-            
+
             // Fallback for closed projects: if no results found by report_run_id,
             // try fetching by project_id (covers cases where finalized results stored under a different run id)
             if (results.length === 0 && project?.id && (project.status === 'closed' || reportRun.is_final)) {
@@ -72,7 +79,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (matchingRun.length > 0) return matchingRun;
                 if (byProject.length > 0) return byProject;
             }
-            
+
             return results;
         },
         staleTime: 5 * 60 * 1000,
@@ -80,6 +87,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
+    });
+
+    const { data: allReportRuns = [] } = useQuery({
+        queryKey: ['reportRuns', project.id],
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
+        enabled: !!project?.id
     });
 
     const { data: allEmployees = [] } = useQuery({
@@ -122,17 +135,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (!isDepartmentHead || !deptHeadVerification?.verified) {
             return allEmployees;
         }
-        
-        const managedIds = deptHeadVerification.assignment.managed_employee_ids 
+
+        const managedIds = deptHeadVerification.assignment.managed_employee_ids
             ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
             : [];
-        
+
         if (managedIds.length === 0) return [];
-        
+
         // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
         // CRITICAL: Exclude department head from the list
-        return allEmployees.filter(emp => 
-            managedIds.includes(String(emp.id)) && 
+        return allEmployees.filter(emp =>
+            managedIds.includes(String(emp.id)) &&
             String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
         );
     }, [allEmployees, isDepartmentHead, deptHeadVerification]);
@@ -141,7 +154,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (!isDepartmentHead || !deptHeadVerification?.verified) {
             return allResults;
         }
-        
+
         // For finalized/closed projects, prioritize results that have deductible_minutes stored
         // (i.e. results that belong to the actual finalized report run)
         const isFinalized = reportRun.is_final || project.status === 'closed';
@@ -154,7 +167,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
         // Filter results to only show department head's subordinates
         const departmentAttendanceIds = employees.map(emp => String(emp.attendance_id));
-        return sourceResults.filter(result => 
+        return sourceResults.filter(result =>
             departmentAttendanceIds.includes(String(result.attendance_id))
         );
     }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, project]);
@@ -207,80 +220,74 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     }, [reportRun]);
 
+    // Midnight buffer: 2 hours (120 minutes) for Ramadan night shifts crossover
+    const MIDNIGHT_BUFFER_MINUTES = 120;
+
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
         if (/AM|PM/i.test(timeStr)) return timeStr;
-        
+
         const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
         if (!match) return '—';
-        
+
         let hours = parseInt(match[1]);
         const minutes = match[2];
-        
+
         const period = hours >= 12 ? 'PM' : 'AM';
         if (hours > 12) hours -= 12;
         if (hours === 0) hours = 12;
-        
+
         return `${hours}:${minutes} ${period}`;
     };
 
-    const parseTime = (timeStr, includeSeconds = false) => {
+    const parseTime = (timeStr) => {
         try {
-            if (!timeStr || timeStr === '—') return null;
+            if (!timeStr || timeStr === '—' || timeStr === '-') return null;
 
-            // For Al Maraghi Automotive: Match with seconds (HH:MM:SS AM/PM)
-            if (includeSeconds) {
-                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-                if (timeMatch) {
-                    let hours = parseInt(timeMatch[1]);
-                    const minutes = parseInt(timeMatch[2]);
-                    const seconds = parseInt(timeMatch[3]);
-                    const period = timeMatch[4].toUpperCase();
-
-                    if (period === 'PM' && hours !== 12) hours += 12;
-                    if (period === 'AM' && hours === 12) hours = 0;
-
-                    const date = new Date();
-                    date.setHours(hours, minutes, seconds, 0);
-                    return date;
-                }
-            }
-
-            // Standard format with AM/PM
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            // Priority 1: Format with seconds
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
-                const period = timeMatch[3].toUpperCase();
-
+                const seconds = parseInt(timeMatch[3]);
+                const period = timeMatch[4].toUpperCase();
                 if (period === 'PM' && hours !== 12) hours += 12;
                 if (period === 'AM' && hours === 12) hours = 0;
-
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-
-            // Handle timestamp_raw format: "1/16/2026 8:37" or "1/16/2026 14:28" (24-hour without AM/PM)
-            // Extract time part from date/time string
-            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-            if (dateTimeMatch) {
-                const hours = parseInt(dateTimeMatch[1]);
-                const minutes = parseInt(dateTimeMatch[2]);
-                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
-
                 const date = new Date();
                 date.setHours(hours, minutes, seconds, 0);
                 return date;
             }
 
-            // Pure 24-hour format: "8:37" or "14:28" or "8:37:00"
+            // Priority 2: Standard AM/PM
+            timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = timeMatch[3].toUpperCase();
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            }
+
+            // Priority 3: 24-hour with optional seconds
             timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
                 const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
+                const date = new Date();
+                date.setHours(hours, minutes, seconds, 0);
+                return date;
+            }
 
+            // Handle timestamp_raw format: "1/16/2026 8:37"
+            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (dateTimeMatch) {
+                const hours = parseInt(dateTimeMatch[1]);
+                const minutes = parseInt(dateTimeMatch[2]);
+                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
                 const date = new Date();
                 date.setHours(hours, minutes, seconds, 0);
                 return date;
@@ -292,52 +299,77 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     };
 
-    const matchPunchesToShiftPoints = (dayPunches, shift) => {
+    const isWithinMidnightBuffer = (timestampRaw) => {
+        const parsed = parseTime(timestampRaw);
+        if (!parsed) return false;
+        const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
+        return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
+    };
+
+    const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr = null) => {
         if (!shift || dayPunches.length === 0) return [];
-        
+
         // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive';
-        
-        const punchesWithTime = dayPunches.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw, includeSeconds)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
-        
+        const includeSeconds = project.company === 'Al Maraghi Automotive' || project.company === 'Al Maraghi Motors';
+
+        const punchesWithTime = dayPunches.map(p => {
+            const time = parseTime(p.timestamp_raw);
+            if (!time) return null;
+
+            // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
+            // add 24 hours to its time so it matches correctly against PM_END
+            const isNextDayPunch = nextDateStr && p.punch_date === nextDateStr;
+            const adjustedTime = isNextDayPunch ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+
+            return {
+                ...p,
+                time: adjustedTime,
+                _isNextDayPunch: isNextDayPunch
+            };
+        }).filter(p => p).sort((a, b) => a.time - b.time);
+
         if (punchesWithTime.length === 0) return [];
-        
+
+        // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
+        const pmEndTime = parseTime(shift.pm_end);
+        let adjustedPmEnd = pmEndTime;
+        if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+            adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+        }
+
         const shiftPoints = [
             { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
             { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
             { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
-            { type: 'PM_END', time: parseTime(shift.pm_end), label: shift.pm_end }
+            { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
-        
+
         const matches = [];
         const usedShiftPoints = new Set();
-        
+
         for (const punch of punchesWithTime) {
             let closestMatch = null;
             let minDistance = Infinity;
             let isExtendedMatch = false;
             let isFarExtendedMatch = false;
-            
+
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
-                
+
                 const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                
+
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
                     closestMatch = shiftPoint;
                 }
             }
-            
+
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
+
                     const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
+
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
@@ -345,13 +377,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     }
                 }
             }
-            
+
             if (!closestMatch) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
+
                     const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
+
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
@@ -359,7 +391,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     }
                 }
             }
-            
+
             if (closestMatch) {
                 matches.push({
                     punch,
@@ -381,20 +413,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 });
             }
         }
-        
+
         return matches;
     };
 
-    const detectPartialDay = (dayPunches, shift) => {
+
+    const detectPartialDay = (dayPunches, shift, nextDateStr = null) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-        const incSec = project.company === 'Al Maraghi Automotive';
-        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw, incSec) })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time).sort((a, b) => a.time - b.time);
         if (pts.length < 2) return { isPartial: false, reason: null };
         const amStart = parseTime(shift.am_start), amEnd = parseTime(shift.am_end), pmStart = parseTime(shift.pm_start);
         let pmEnd = parseTime(shift.pm_end);
         if (!amStart || !pmEnd) return { isPartial: false, reason: null };
         if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
-        const mid = amEnd && pmStart && String(shift.am_end||'').trim() !== '' && String(shift.pm_start||'').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
+        const mid = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
         const single = shift.is_single_shift === true || !mid;
         const expected = single ? (pmEnd - amStart) / 60000 : ((amEnd ? (amEnd - amStart) / 60000 : 0) + (pmStart ? (pmEnd - pmStart) / 60000 : 0));
         const actual = (pts[pts.length - 1].time - pts[0].time) / 60000;
@@ -405,12 +437,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const filterMultiplePunches = (punchList, shift) => {
         if (punchList.length <= 1) return punchList;
 
-        // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive';
-
         const punchesWithTime = punchList.map(p => ({
             ...p,
-            time: parseTime(p.timestamp_raw, includeSeconds)
+            time: parseTime(p.timestamp_raw)
         })).filter(p => p.time);
 
         if (punchesWithTime.length === 0) return punchList;
@@ -432,7 +461,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         // CRITICAL FIX: For finalized reports, return stored values WITHOUT recalculation
         // Finalized reports must be immutable - no punch/shift/exception recalculation
         const isFinalized = reportRun.is_final || project.status === 'closed';
-        
+
         if (isFinalized) {
             // Return stored values AS-IS from finalized AnalysisResult
             return {
@@ -447,31 +476,40 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annualLeaveCount: result.annual_leave_count || 0
             };
         }
-        
+
         // NON-FINALIZED ONLY: Recalculate from live punch data
         const attendanceIdStr = String(result.attendance_id);
-        const employeePunches = punches.filter(p => 
+
+        const dayBeforeStart = new Date(dateFrom);
+        dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+        const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
+
+        const dayAfterEnd = new Date(dateTo);
+        dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+        const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
+
+        const employeePunches = punches.filter(p =>
             String(p.attendance_id) === attendanceIdStr &&
-            p.punch_date >= dateFrom && 
-            p.punch_date <= dateTo
+            p.punch_date >= dayBeforeStartStr &&
+            p.punch_date <= dayAfterEndStr
         );
         const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-        const employeeExceptions = exceptions.filter(e => 
+        const employeeExceptions = exceptions.filter(e =>
             (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
             e.use_in_analysis !== false &&
             e.is_custom_type !== true
         );
 
         const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-        
+
         // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive';
+        const includeSeconds = project.company === 'Al Maraghi Automotive' || project.company === 'Al Maraghi Motors';
 
         let dayOverrides = {};
         if (result.day_overrides) {
             try {
                 dayOverrides = JSON.parse(result.day_overrides);
-            } catch (e) {}
+            } catch (e) { }
         }
 
         let totalLateMinutes = 0;
@@ -495,16 +533,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         // Calculate annual leave as CALENDAR DAYS (not working days) - same as salary calculation
         const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
         const annualLeaveDatesProcessed = new Set();
-        
+
         for (const alEx of annualLeaveExceptions) {
             try {
                 const exFrom = new Date(alEx.date_from);
                 const exTo = new Date(alEx.date_to);
-                
+
                 // Clamp to report date range
                 const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
                 const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
-                
+
                 if (rangeStart <= rangeEnd) {
                     // Count each calendar day individually
                     for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
@@ -518,41 +556,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
         annualLeaveCount = annualLeaveDatesProcessed.size;
 
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const currentDate = new Date(d);
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayOfWeek = currentDate.getDay();
-
-            let weeklyOffDay = null;
-            if (project.weekly_off_override && project.weekly_off_override !== 'None') {
-                weeklyOffDay = dayNameToNumber[project.weekly_off_override];
-            } else if (employee?.weekly_off) {
-                weeklyOffDay = dayNameToNumber[employee.weekly_off];
-            }
-            
-            if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                continue;
-            }
-
-            workingDays++;
-
-            const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
-                .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
-                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
-                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
-                });
-
-            // Find all matching exceptions and get the latest one by created_date (calculateEmployeeTotals)
-            const matchingExceptionsCalc = employeeExceptions.filter(ex => {
-                const exFrom = new Date(ex.date_from);
-                const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo;
-            });
-
-            const dateException = matchingExceptionsCalc && matchingExceptionsCalc.length > 0
-                ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
-                : null;
+            const currentDayName = dayNames[dayOfWeek];
 
             const isShiftEffective = (s) => {
                 if (!s.effective_from || !s.effective_to) return true;
@@ -567,71 +577,109 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return currentDateOnly >= fromDateOnly && currentDateOnly <= toDateOnly;
             };
 
-            // Get current day name
-            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            const currentDayName = dayNames[dayOfWeek];
+            let weeklyOffDay = null;
+            if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+            } else if (employee?.weekly_off) {
+                weeklyOffDay = dayNameToNumber[employee.weekly_off];
+            }
+
+            if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                continue;
+            }
+
+            workingDays++;
+
+            const toDateStr = (date) => date.toISOString().split('T')[0];
+            const nextDateObj = new Date(currentDate);
+            nextDateObj.setDate(nextDateObj.getDate() + 1);
+            const nextDateStr = toDateStr(nextDateObj);
+
+            const prevDateObj = new Date(currentDate);
+            prevDateObj.setDate(prevDateObj.getDate() - 1);
+            const prevDateStr = toDateStr(prevDateObj);
+
+            // Check if previous day's shift ended near midnight
+            let prevShiftEndsNearMidnight = false;
+            {
+                const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
+                const prevGeneralShifts = employeeShifts.filter(s => !s.date);
+                const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
+                for (const ps of prevShiftCandidates) {
+                    const pEndTime = parseTime(ps.pm_end);
+                    if (pEndTime) {
+                        const h = pEndTime.getHours();
+                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
+                    }
+                }
+            }
+
+            let rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+
+            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
+            if (prevShiftEndsNearMidnight) {
+                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
+            }
+
+            const matchingExceptionsCalc = employeeExceptions.filter(ex => {
+                const exFrom = new Date(ex.date_from);
+                const exTo = new Date(ex.date_to);
+                return currentDate >= exFrom && currentDate <= exTo;
+            });
+
+            const dateException = matchingExceptionsCalc && matchingExceptionsCalc.length > 0
+                ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                : null;
 
             let shift = null;
             shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
-            
+
             if (!shift) {
-                // Try to find a general shift that applies to this day by checking applicable_days
                 const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
-                
                 for (const s of applicableShifts) {
-                    // Check if shift has applicable_days specified
                     if (s.applicable_days) {
                         const appDays = s.applicable_days;
-                        
-                        // Try JSON array first
                         try {
                             const applicableDaysArray = JSON.parse(appDays);
                             if (Array.isArray(applicableDaysArray) && applicableDaysArray.length > 0) {
                                 if (applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
-                                    shift = s;
-                                    break;
+                                    shift = s; break;
                                 }
-                                continue; // Move to next shift if JSON parsed but day not found
+                                continue;
                             }
-                        } catch (e) {
-                            // Not JSON, try string matching
-                        }
-                        
-                        // Handle string format like "Monday to Thursday and Saturday" or "Friday"
+                        } catch (e) { }
+
                         const appDaysLower = appDays.toLowerCase();
                         const dayLower = currentDayName.toLowerCase();
-                        
-                        // Direct match (e.g., "Friday")
                         if (appDaysLower.includes(dayLower)) {
-                            shift = s;
-                            break;
+                            shift = s; break;
                         }
-                        
-                        // Handle range patterns like "Monday to Thursday"
+
                         const rangeMatch = appDaysLower.match(/(\w+)\s+to\s+(\w+)/);
                         if (rangeMatch) {
                             const dayOrder = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
                             const startIdx = dayOrder.indexOf(rangeMatch[1]);
                             const endIdx = dayOrder.indexOf(rangeMatch[2]);
                             const currentIdx = dayOrder.indexOf(dayLower);
-                            
+
                             if (startIdx !== -1 && endIdx !== -1 && currentIdx !== -1) {
                                 if (currentIdx >= startIdx && currentIdx <= endIdx) {
-                                    shift = s;
-                                    break;
+                                    shift = s; break;
                                 }
                             }
                         }
                     }
                 }
-                
-                // If no applicable_days match found, fall back to is_friday_shift logic
+
                 if (!shift) {
                     if (dayOfWeek === 5) {
                         shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
-                        if (!shift) {
-                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
-                        }
+                        if (!shift) shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                     } else {
                         shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                     }
@@ -640,237 +688,161 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
                 const isFriday = dayOfWeek === 5;
-                const shouldApplyOverride = dateException.include_friday || !isFriday;
-                
-                if (shouldApplyOverride) {
+                if (dateException.include_friday || !isFriday) {
                     shift = {
-                        am_start: dateException.new_am_start,
-                        am_end: dateException.new_am_end,
-                        pm_start: dateException.new_pm_start,
-                        pm_end: dateException.new_pm_end
+                        am_start: dateException.new_am_start, am_end: dateException.new_am_end,
+                        pm_start: dateException.new_pm_start, pm_end: dateException.new_pm_end
                     };
                 }
             }
 
             const dayOverride = dayOverrides[dateStr];
-
-            // Apply shift override BEFORE any calculations
             if (dayOverride?.shiftOverride) {
                 shift = {
-                    am_start: dayOverride.shiftOverride.am_start,
-                    am_end: dayOverride.shiftOverride.am_end,
-                    pm_start: dayOverride.shiftOverride.pm_start,
-                    pm_end: dayOverride.shiftOverride.pm_end
+                    am_start: dayOverride.shiftOverride.am_start, am_end: dayOverride.shiftOverride.am_end,
+                    pm_start: dayOverride.shiftOverride.pm_start, pm_end: dayOverride.shiftOverride.pm_end
                 };
             }
 
+            let shiftEndsNearMidnight = false;
+            if (shift) {
+                const pmEndTime = parseTime(shift.pm_end);
+                if (pmEndTime) {
+                    const h = pmEndTime.getHours();
+                    if (h === 23 || h === 0) shiftEndsNearMidnight = true;
+                }
+            }
+
+            if (shiftEndsNearMidnight) {
+                const nextDayPunches = employeePunches
+                    .filter(p => p.punch_date === nextDateStr)
+                    .filter(p => isWithinMidnightBuffer(p.timestamp_raw));
+                const seenIds = new Set(rawDayPunches.map(p => p.id));
+                const uniqueNextDayPunches = nextDayPunches.filter(p => !seenIds.has(p.id));
+                if (uniqueNextDayPunches.length > 0) {
+                    rawDayPunches = [...rawDayPunches, ...uniqueNextDayPunches];
+                    rawDayPunches.sort((a, b) => {
+                        const timeA = parseTime(a.timestamp_raw);
+                        const timeB = parseTime(b.timestamp_raw);
+                        const aTime = (timeA?.getTime() || 0) + (a.punch_date === nextDateStr ? 86400000 : 0);
+                        const bTime = (timeB?.getTime() || 0) + (b.punch_date === nextDateStr ? 86400000 : 0);
+                        return aTime - bTime;
+                    });
+                }
+            }
+
             const dayPunches = filterMultiplePunches(rawDayPunches, shift);
-            const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
-                                   shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
-                                   shift.am_end !== '—' && shift.pm_start !== '—' &&
-                                   shift.am_end !== '-' && shift.pm_start !== '-';
+            const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+                shift.am_end !== '—' && shift.pm_start !== '—' &&
+                shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(dayPunches, shift);
+            let punchMatchesTotals = [];
+            if (shift && dayPunches.length > 0) {
+                punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift, nextDateStr);
+            }
 
-            // Track allowed minutes from ALLOWED_MINUTES exception
+            const partialDayResult = detectPartialDay(dayPunches, shift, nextDateStr);
+
+            // TRACK ATTENDANCE STATUS
+            if (dayOverride) {
+                if (dayOverride.type === 'MANUAL_PRESENT') presentDays++;
+                else if (dayOverride.type === 'MANUAL_ABSENT') fullAbsenceCount++;
+                else if (dayOverride.type === 'MANUAL_HALF') { presentDays++; halfAbsenceCount++; }
+                else if (dayOverride.type === 'OFF') workingDays--;
+                else if (dayOverride.type === 'SICK_LEAVE') sickLeaveCount++;
+            } else if (dateException) {
+                if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') workingDays--;
+                else if (dateException.type === 'MANUAL_PRESENT') presentDays++;
+                else if (dateException.type === 'MANUAL_ABSENT') fullAbsenceCount++;
+                else if (dateException.type === 'MANUAL_HALF') { presentDays++; halfAbsenceCount++; }
+                else if (dateException.type === 'SICK_LEAVE') sickLeaveCount++;
+                else if (dateException.type === 'ANNUAL_LEAVE') {
+                    if (dayPunches.length === 0) workingDays--;
+                    else presentDays++;
+                } else if (dayPunches.length > 0) presentDays++;
+                else fullAbsenceCount++;
+            } else if (dayPunches.length > 0) {
+                presentDays++;
+                if (partialDayResult.isPartial) halfAbsenceCount++;
+            } else {
+                fullAbsenceCount++;
+            }
+
+            const shouldSkipTimeCalc = dateException && [
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+            ].includes(dateException.type) || (dayOverride?.type === 'SICK_LEAVE');
+
             let allowedMinutesForDay = 0;
             if (dateException && dateException.type === 'ALLOWED_MINUTES') {
                 allowedMinutesForDay = dateException.allowed_minutes || 0;
             }
 
-            // Initialize time tracking variables
             let currentOtherMinutes = 0;
             let exceptionLateMinutes = 0;
             let exceptionEarlyMinutes = 0;
 
-            // Capture exception minutes for this specific date
             if (dateException && !dayOverride) {
-                if (dateException.type !== 'OFF' && 
-                    dateException.type !== 'PUBLIC_HOLIDAY' && 
-                    dateException.type !== 'MANUAL_ABSENT' && 
-                    dateException.type !== 'SICK_LEAVE') {
-                    if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        exceptionLateMinutes = dateException.late_minutes;
-                    }
-                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        exceptionEarlyMinutes = dateException.early_checkout_minutes;
-                    }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
-                        currentOtherMinutes = dateException.other_minutes;
-                    }
+                if (!shouldSkipTimeCalc) {
+                    if (dateException.late_minutes && dateException.late_minutes > 0) exceptionLateMinutes = dateException.late_minutes;
+                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) exceptionEarlyMinutes = dateException.early_checkout_minutes;
+                    if (dateException.other_minutes && dateException.other_minutes > 0) currentOtherMinutes = dateException.other_minutes;
                 }
             }
 
-            // Handle day override status changes
-            if (dayOverride) {
-                if (dayOverride.type === 'MANUAL_PRESENT') {
-                    presentDays++;
-                } else if (dayOverride.type === 'MANUAL_ABSENT') {
-                    fullAbsenceCount++;
-                } else if (dayOverride.type === 'MANUAL_HALF') {
-                    presentDays++;
-                    halfAbsenceCount++;
-                } else if (dayOverride.type === 'OFF') {
-                    workingDays--;
-                } else if (dayOverride.type === 'SICK_LEAVE') {
-                    // Sick leave from day override: counts as working day, no LOP, no time calculations
-                    sickLeaveCount++;
-                }
+            let dayLateMinutes = 0;
+            let dayEarlyMinutes = 0;
 
-                // If there's a manual override (no shift change), use those values directly and skip calculation
-                if (!dayOverride.shiftOverride && dayOverride.lateMinutes !== undefined) {
-                    // SICK_LEAVE override: skip all time calculations
-                    if (dayOverride.type === 'SICK_LEAVE') {
-                        continue;
-                    }
-                    totalLateMinutes += dayOverride.lateMinutes;
-                    if (dayOverride.earlyCheckoutMinutes !== undefined) {
-                        totalEarlyCheckout += dayOverride.earlyCheckoutMinutes;
-                    }
-                    if (dayOverride.otherMinutes !== undefined) {
-                        totalOtherMinutes += dayOverride.otherMinutes;
-                    }
-                    continue;
-                }
-                // SICK_LEAVE override without manual minutes: still skip time calculations
-                if (dayOverride.type === 'SICK_LEAVE') {
-                    continue;
-                }
-            }
-
-            let punchMatchesTotals = [];
-            if (shift && dayPunches.length > 0) {
-                punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift);
-            }
-
-            const shouldSkipTimeCalc = dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
-            ].includes(dateException.type);
-
-            // Count based on actual attendance (if no override handled it)
-            if (!dayOverride) {
-                if (dateException) {
-                    if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') {
-                        workingDays--;
-                    } else if (dateException.type === 'MANUAL_PRESENT') {
-                        presentDays++;
-                    } else if (dateException.type === 'MANUAL_ABSENT') {
-                        fullAbsenceCount++;
-                    } else if (dateException.type === 'MANUAL_HALF') {
-                        presentDays++;
-                        halfAbsenceCount++;
-                    } else if (dateException.type === 'SICK_LEAVE') {
-                        // Sick leave counts as WORKING DAY (no deduction from working_days)
-                        // Day is tracked separately as sick_leave_count
-                        // No LOP deduction, no late/early calculation for this day
-                        sickLeaveCount++;
-                    } else if (dateException.type === 'ANNUAL_LEAVE') {
-                        // Annual leave - already counted as calendar days upfront
-                        // Skip this day for attendance counting
-                        if (dayPunches.length === 0) {
-                            workingDays--;
-                            // Don't increment annualLeaveCount here - already counted upfront
-                        } else {
-                            presentDays++;
-                        }
-                    } else if (dayPunches.length > 0) {
-                        presentDays++;
-                    } else {
-                        fullAbsenceCount++;
-                    }
-                } else if (dayPunches.length > 0) {
-                    const partialDayResult = detectPartialDay(dayPunches, shift);
-                    if (partialDayResult.isPartial) {
-                        presentDays++;
-                        halfAbsenceCount++;
-                    } else {
-                        presentDays++;
-                    }
-                } else {
-                    fullAbsenceCount++;
-                }
-            }
-            
-            // Check if exception has manual time values - if so, skip punch calculation for this day
-            const hasManualExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
-
-            // Apply manual time adjustments from exception fields (exclusive - don't recalculate from punches)
-            if (hasManualExceptionMinutes) {
-                if (dateException.type !== 'OFF' && 
-                    dateException.type !== 'PUBLIC_HOLIDAY' && 
-                    dateException.type !== 'MANUAL_ABSENT' && 
-                    dateException.type !== 'SICK_LEAVE') {
-                    // Manual late/early exceptions should mark day as present
-                    if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && dayPunches.length === 0) {
-                        presentDays++;
-                    }
-
-                    // Apply ALL manual time fields from exception (already stored in variables)
-                    if (exceptionLateMinutes > 0) {
-                        totalLateMinutes += Math.abs(exceptionLateMinutes);
-                    }
-                    if (exceptionEarlyMinutes > 0) {
-                        totalEarlyCheckout += Math.abs(exceptionEarlyMinutes);
-                    }
-                    if (currentOtherMinutes > 0) {
-                        totalOtherMinutes += Math.abs(currentOtherMinutes);
-                    }
-                }
-            }
-            
-            // Calculate times from punches ONLY if no manual exception minutes exist
-            if (shift && punchMatchesTotals.length > 0 && !partialDayResult.isPartial && !shouldSkipTimeCalc && !hasManualExceptionMinutes) {
-                let dayLateMinutes = 0;
-                let dayEarlyMinutes = 0;
-                
+            // 1. Calculation phase: punches (regardless of partial day status - match backend)
+            if (shift && punchMatchesTotals.length > 0 && !shouldSkipTimeCalc) {
                 for (const match of punchMatchesTotals) {
                     if (!match.matchedTo) continue;
-                    
                     const punchTime = match.punch.time;
                     const shiftTime = match.shiftTime;
-                    
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                        if (punchTime > shiftTime) {
-                            const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
-                            dayLateMinutes += minutes;
-                        }
+                        if (punchTime > shiftTime) dayLateMinutes += Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                     }
-                    
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                        if (punchTime < shiftTime) {
-                            const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
-                            dayEarlyMinutes += minutes;
-                        }
+                        if (punchTime < shiftTime) dayEarlyMinutes += Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                     }
                 }
-                
-                // Apply allowed minutes - subtract from late/early
-                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
-                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                    // Proportionally reduce late and early
-                    if (totalDayMinutes > 0) {
-                        const lateRatio = dayLateMinutes / totalDayMinutes;
-                        const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                        dayLateMinutes = Math.round(remaining * lateRatio);
-                        dayEarlyMinutes = Math.round(remaining * earlyRatio);
-                    }
-                }
-                
-                totalLateMinutes += dayLateMinutes;
-                totalEarlyCheckout += dayEarlyMinutes;
             }
+
+            // 2. Override phases
+            if (dateException && !shouldSkipTimeCalc) {
+                if (exceptionLateMinutes > 0) dayLateMinutes = Math.abs(exceptionLateMinutes);
+                if (exceptionEarlyMinutes > 0) dayEarlyMinutes = Math.abs(exceptionEarlyMinutes);
+                if (currentOtherMinutes > 0) totalOtherMinutes += Math.abs(currentOtherMinutes);
+            }
+            if (dayOverride && !shouldSkipTimeCalc) {
+                if (dayOverride.lateMinutes !== undefined) dayLateMinutes = dayOverride.lateMinutes;
+                if (dayOverride.earlyCheckoutMinutes !== undefined) dayEarlyMinutes = dayOverride.earlyCheckoutMinutes;
+                if (dayOverride.otherMinutes !== undefined) totalOtherMinutes += dayOverride.otherMinutes;
+            }
+
+            // 3. Deduction Reduction
+            const totalDayMinutesNet = dayLateMinutes + dayEarlyMinutes;
+            if (allowedMinutesForDay > 0 && totalDayMinutesNet > 0) {
+                const remaining = Math.max(0, totalDayMinutesNet - allowedMinutesForDay);
+                const lateRatio = dayLateMinutes / totalDayMinutesNet;
+                const earlyRatio = dayEarlyMinutes / totalDayMinutesNet;
+                dayLateMinutes = Math.round(remaining * lateRatio);
+                dayEarlyMinutes = Math.round(remaining * earlyRatio);
+            }
+
+            totalLateMinutes += dayLateMinutes;
+            totalEarlyCheckout += dayEarlyMinutes;
         }
 
-        return { 
-            totalLateMinutes: Math.max(0, totalLateMinutes), 
-            totalEarlyCheckout: Math.max(0, totalEarlyCheckout), 
+        return {
+            totalLateMinutes: Math.max(0, totalLateMinutes),
+            totalEarlyCheckout: Math.max(0, totalEarlyCheckout),
             totalOtherMinutes: Math.max(0, totalOtherMinutes),
-            workingDays: Math.max(0, workingDays), 
-            presentDays: Math.max(0, presentDays), 
-            fullAbsenceCount: Math.max(0, fullAbsenceCount), 
-            halfAbsenceCount: Math.max(0, halfAbsenceCount), 
+            workingDays: Math.max(0, workingDays),
+            presentDays: Math.max(0, presentDays),
+            fullAbsenceCount: Math.max(0, fullAbsenceCount),
+            halfAbsenceCount: Math.max(0, halfAbsenceCount),
             sickLeaveCount: Math.max(0, sickLeaveCount),
             annualLeaveCount: Math.max(0, annualLeaveCount)
         };
@@ -895,7 +867,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // so the summary table matches the daily breakdown the user sees.
     const baseEnrichedResults = React.useMemo(() => {
         const isFinalized = reportRun.is_final || project.status === 'closed';
-        
+
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
@@ -909,7 +881,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             if (isFinalized) {
                 // FINALIZED: Use stored values AS-IS — never recalculate
                 const storedDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? null;
-                
+
                 // If stored deductible is null/missing but we have late+early data, compute it
                 // This handles the case where results were fetched from wrong report run via fallback
                 const lateMin = result.late_minutes || 0;
@@ -917,9 +889,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const graceMin = result.grace_minutes ?? 15;
                 const approvedMin = result.approved_minutes || 0;
                 const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
-                
-                const effectiveDeductible = storedDeductible !== null 
-                    ? storedDeductible 
+
+                const effectiveDeductible = storedDeductible !== null
+                    ? storedDeductible
                     : computedDeductible;
 
                 return {
@@ -945,14 +917,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }
 
             // NON-FINALIZED: Recalculate from live punch data + day_overrides
-            const { 
-                totalLateMinutes, 
-                totalEarlyCheckout, 
+            const {
+                totalLateMinutes,
+                totalEarlyCheckout,
                 totalOtherMinutes,
-                workingDays, 
-                presentDays, 
-                fullAbsenceCount, 
-                halfAbsenceCount, 
+                workingDays,
+                presentDays,
+                fullAbsenceCount,
+                halfAbsenceCount,
                 sickLeaveCount,
                 annualLeaveCount
             } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
@@ -988,9 +960,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             .filter(result => {
                 const matchesSearch = String(result.attendance_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                     result.name.toLowerCase().includes(searchTerm.toLowerCase());
-                
+
                 if (!matchesSearch) return false;
-                
+
                 // Risk-based filtering
                 if (riskFilter === 'high-risk') {
                     const total = (result.late_minutes || 0) + (result.early_checkout_minutes || 0);
@@ -1003,31 +975,31 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 } else if (riskFilter === 'unverified') {
                     return !result.isVerified;
                 }
-                
+
                 return true;
             })
             .sort((a, b) => {
                 // Always push "no punches" employees to the end
                 if (a.has_no_punches && !b.has_no_punches) return 1;
                 if (!a.has_no_punches && b.has_no_punches) return -1;
-                
+
                 let aVal = a[sort.key];
                 let bVal = b[sort.key];
-                
+
                 // For deductible sorting, use effective deductible if available
                 if (sort.key === 'deductible_minutes') {
                     aVal = a.effective_deductible_minutes ?? a.deductible_minutes ?? 0;
                     bVal = b.effective_deductible_minutes ?? b.deductible_minutes ?? 0;
                 }
-                
+
                 // Handle null/undefined values - push them to the end
                 if (aVal == null && bVal == null) return 0;
                 if (aVal == null) return 1;
                 if (bVal == null) return -1;
-                
+
                 if (typeof aVal === 'string') aVal = aVal.toLowerCase();
                 if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-                
+
                 if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
                 if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
                 return 0;
@@ -1053,24 +1025,24 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // Debounce verification updates to prevent rate limiting
     const debounceTimeoutRef = React.useRef(null);
     const pendingVerifiedRef = React.useRef(null);
-    
+
     const toggleVerification = (attendanceId) => {
         const attendanceIdStr = String(attendanceId);
-        const newVerified = verifiedEmployees.includes(attendanceIdStr) 
+        const newVerified = verifiedEmployees.includes(attendanceIdStr)
             ? verifiedEmployees.filter(id => id !== attendanceIdStr)
             : [...verifiedEmployees, attendanceIdStr];
-        
+
         // Update local state immediately for instant UI feedback
         setVerifiedEmployees(newVerified);
-        
+
         // Store pending changes
         pendingVerifiedRef.current = newVerified;
-        
+
         // Clear existing timeout
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
         }
-        
+
         // Debounce the API call by 1.5 seconds to batch multiple clicks
         debounceTimeoutRef.current = setTimeout(() => {
             if (pendingVerifiedRef.current) {
@@ -1100,7 +1072,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return r.full_absence_count === 0 && total === 0;
             })
             .map(r => String(r.attendance_id));
-        
+
         const newVerified = [...new Set([...verifiedEmployees, ...cleanEmployees])];
         setVerifiedEmployees(newVerified);
         updateVerificationMutation.mutate(newVerified);
@@ -1132,7 +1104,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const finalizeReportMutation = useMutation({
         mutationFn: async () => {
             console.log('[ReportDetailView] Starting finalization...');
-            
+
             // Show progress dialog
             setFinalizationProgress({
                 open: true,
@@ -1150,17 +1122,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             console.log('[ReportDetailView] Step 0: Writing UI values to AnalysisResult...');
             const currentEnriched = baseEnrichedResults;
             let updatedCount = 0;
-            
+
             for (const row of currentEnriched) {
                 // Build update payload with the EXACT values shown in the UI table
                 const updates = {};
                 let needsUpdate = false;
-                
+
                 // Compare UI values with stored AnalysisResult values
                 // Find the raw result to compare against
                 const rawResult = results.find(r => r.id === row.id);
                 if (!rawResult) continue;
-                
+
                 const fieldsToSync = [
                     { uiKey: 'working_days', dbKey: 'working_days' },
                     { uiKey: 'present_days', dbKey: 'present_days' },
@@ -1174,7 +1146,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     { uiKey: 'deductible_minutes', dbKey: 'deductible_minutes' },
                     { uiKey: 'grace_minutes', dbKey: 'grace_minutes' },
                 ];
-                
+
                 for (const f of fieldsToSync) {
                     const uiVal = row[f.uiKey] ?? 0;
                     const dbVal = rawResult[f.dbKey] ?? 0;
@@ -1183,7 +1155,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         needsUpdate = true;
                     }
                 }
-                
+
                 if (needsUpdate) {
                     console.log(`[ReportDetailView] Syncing UI→DB for ${row.attendance_id}:`, updates);
                     await base44.entities.AnalysisResult.update(row.id, updates);
@@ -1206,20 +1178,50 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 throw new Error(markResult.data?.error || 'Finalization failed');
             }
 
-            // STEP 2: Create all salary snapshots in a single invoke.
-            // Backend handles chunked persistence internally to avoid API limits.
-            setFinalizationProgress(prev => ({
-                ...prev,
-                currentEmployee: 'Creating salary snapshots for all employees...',
-                status: 'Generating snapshots. This may take some time for large reports...'
-            }));
+            // STEP 2: Create all salary snapshots using batch mode
+            const BATCH_SIZE = 10;
+            let batchStart = 0;
+            let hasMore = true;
+            let totalEmployees = 0;
 
-            const snapshotResult = await base44.functions.invoke('createSalarySnapshots', {
-                project_id: project.id,
-                report_run_id: reportRun.id
-            });
+            while (hasMore) {
+                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
+                    project_id: project.id,
+                    report_run_id: reportRun.id,
+                    batch_mode: true,
+                    batch_start: batchStart,
+                    batch_size: BATCH_SIZE
+                });
 
-            console.log('[ReportDetailView] Snapshot creation result:', snapshotResult.data);
+                if (batchResult.data?.batch_mode) {
+                    totalEmployees = batchResult.data.total_employees;
+                    const currentPos = batchResult.data.current_position;
+                    const currentBatch = batchResult.data.current_batch || [];
+                    hasMore = batchResult.data.has_more;
+
+                    const percentage = totalEmployees > 0 ? Math.round(currentPos / totalEmployees * 100) : 0;
+
+                    setFinalizationProgress(prev => ({
+                        open: true,
+                        current: currentPos,
+                        total: totalEmployees,
+                        currentEmployee: currentBatch.length > 0
+                            ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
+                            : 'Processing...',
+                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
+                    }));
+
+                    batchStart = currentPos;
+
+                    if (hasMore) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } else {
+                    // Fallback if backend doesn't support batch_mode (unlikely)
+                    hasMore = false;
+                }
+            }
+
             console.log('[ReportDetailView] All snapshots created successfully');
             return markResult.data;
         },
@@ -1245,19 +1247,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         },
         onError: async (error) => {
             console.error('[ReportDetailView] Finalization error:', error);
-            
+
             setFinalizationProgress({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
 
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id], refetchType: 'all' }),
                 queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' })
             ]);
-            
+
             const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
             const actionRequired = error?.response?.data?.action_required;
-            
+
             console.error('[ReportDetailView] Error details:', { errorMsg, actionRequired });
-            
+
             if (actionRequired) {
                 toast.error(`${errorMsg}\n\nAction required: ${actionRequired}`, {
                     duration: 10000
@@ -1273,33 +1275,68 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
+            setSaveProgress({ current: 0, total: 100, status: 'Validating date range...' });
+
+            // BUSINESS LOGIC: Date-Range Protection & Conflict Prevention
+            const newFrom = new Date(reportRun.date_from);
+            const newTo = new Date(reportRun.date_to);
+            const projectFrom = new Date(project.date_from);
+            const projectTo = new Date(project.date_to);
+
+            // Exception: If the report covers the entire project range, bypass the blocking rule
+            const isFullProjectRange = 
+                newFrom.toLocaleDateString() === projectFrom.toLocaleDateString() && 
+                newTo.toLocaleDateString() === projectTo.toLocaleDateString();
+
+            if (!isFullProjectRange) {
+                // Blocking Rule: Check for overlaps with already saved reports
+                const overlappingReport = allReportRuns.find(run => {
+                    // Only check reports marked as saved, and exclude the current report
+                    if (!run.is_saved || run.id === reportRun.id) return false;
+                    
+                    const savedFrom = new Date(run.date_from);
+                    const savedTo = new Date(run.date_to);
+                    
+                    // Standard overlap formula: (StartA <= EndB) and (EndA >= StartB)
+                    return (newFrom <= savedTo) && (newTo >= savedFrom);
+                });
+
+                if (overlappingReport) {
+                    const rangeText = `${new Date(overlappingReport.date_from).toLocaleDateString()} - ${new Date(overlappingReport.date_to).toLocaleDateString()}`;
+                    const errorMsg = `Overlap Detected: A saved report already exists for part of this period (${rangeText}). Save blocked to prevent data conflicts.`;
+                    throw new Error(errorMsg);
+                }
+            }
+
             setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
-            
-            // Set this as the last saved report
-            await base44.entities.Project.update(project.id, {
-                last_saved_report_id: reportRun.id
-            });
-            
+
+            // Set this as a saved report (persists regardless of newer reports)
+            // Also maintain last_saved_report_id on project for legacy support
+            await Promise.all([
+                base44.entities.ReportRun.update(reportRun.id, { is_saved: true }),
+                base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id })
+            ]);
+
             // Delete existing report-generated exceptions for this report to prevent duplicates
-            const existingReportExceptions = exceptions.filter(e => 
+            const existingReportExceptions = exceptions.filter(e =>
                 e.created_from_report && e.report_run_id === reportRun.id
             );
-            
+
             if (existingReportExceptions.length > 0) {
                 setSaveProgress({ current: 0, total: 100, status: 'Removing old exceptions...' });
                 for (const ex of existingReportExceptions) {
                     await base44.entities.Exception.delete(ex.id);
                 }
             }
-            
+
             const exceptionsToCreate = [];
-            
+
             // Determine if current user made any edits that need approval
             const isCurrentUserRegular = userRole === 'user' && !isSupervisor;
-            
+
             for (const result of results) {
                 if (!result.day_overrides) continue;
-                
+
                 let dayOverrides = {};
                 try {
                     dayOverrides = JSON.parse(result.day_overrides);
@@ -1316,10 +1353,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     // Group by type, minutes, and shift override to create separate exceptions
                     const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
                     if (!datesByType[key]) {
-                        datesByType[key] = { 
-                            dates: [], 
-                            data: override, 
-                            attendance_id: result.attendance_id 
+                        datesByType[key] = {
+                            dates: [],
+                            data: override,
+                            attendance_id: result.attendance_id
                         };
                     }
                     datesByType[key].dates.push(dateStr);
@@ -1327,12 +1364,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                 for (const group of Object.values(datesByType)) {
                     const sortedDates = group.dates.sort();
-                    
+
                     // CRITICAL FIX: Time-based exceptions (late/early/other min) must be per-date,
                     // not spanning ranges — otherwise minutes apply to every day in the range.
                     const hasTimeMins = (group.data.lateMinutes > 0) || (group.data.earlyCheckoutMinutes > 0) || (group.data.otherMinutes > 0);
                     const ranges = [];
-                    
+
                     if (hasTimeMins) {
                         sortedDates.forEach(d => ranges.push({ start: d, end: d }));
                     } else {
@@ -1367,7 +1404,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             detailsParts.push(group.data.details);
                         }
 
-                        const detailsText = detailsParts.length > 0 
+                        const detailsText = detailsParts.length > 0
                             ? `Report edit: ${detailsParts.join(' | ')}`
                             : 'Report edit: Manual adjustment from report';
 
@@ -1422,7 +1459,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const batchSize = 10;
                 const totalBatches = Math.ceil(exceptionsToCreate.length / batchSize);
                 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-                
+
                 // Retry helper with backoff
                 const retryWithBackoff = async (fn, maxRetries = 3) => {
                     for (let i = 0; i < maxRetries; i++) {
@@ -1439,17 +1476,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         }
                     }
                 };
-                
+
                 for (let i = 0; i < exceptionsToCreate.length; i += batchSize) {
                     const batch = exceptionsToCreate.slice(i, i + batchSize);
                     const batchNumber = Math.floor(i / batchSize) + 1;
-                    
-                    setSaveProgress({ 
-                        current: batchNumber, 
-                        total: totalBatches, 
-                        status: `Saving exceptions ${batchNumber}/${totalBatches}...` 
+
+                    setSaveProgress({
+                        current: batchNumber,
+                        total: totalBatches,
+                        status: `Saving exceptions ${batchNumber}/${totalBatches}...`
                     });
-                    
+
                     try {
                         await retryWithBackoff(() => base44.entities.Exception.bulkCreate(batch));
                         await delay(1500); // Delay between batches
@@ -1474,9 +1511,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['reportRun', reportRun.id]);
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
-            
+
             // Note: Approval links functionality removed - department heads now use pre-approval system
-            
+
             setIsSaving(false);
             setSaveProgress(null);
         },
@@ -1499,83 +1536,94 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 toast.error('No data to export');
                 return;
             }
-        
-        const includeRamadanGiftInExport = showRamadanGiftColumn;
 
-        // Build headers matching the visible table columns - using Hours instead of Minutes
-        const headers = [
-            'Attendance ID',
-            'Name',
-            'Has Punches',
-            'Working Days',
-            'Present Days',
-            'Annual Leave',
-            'Sick Leave',
-            'LOP Days',
-            'Half Days',
-            'Late (Hours)',
-            'Early Checkout (Hours)',
-            ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
-            'Other (Hours)',
-            'Grace (Hours)',
-            ...(includeRamadanGiftInExport ? ['Ramadan Gift (min)'] : []),
-            'Deductible (Hours)',
-            'Notes'
-        ];
+            const includeRamadanGiftInExport = showRamadanGiftColumn;
 
-        const rows = filteredResults.map(r => {
-            // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
-            // For non-finalized reports, use the recalculated values from enrichedResults
-            const deductible = (r.effective_deductible_minutes ?? r.deductible_minutes) || 0;
-            const late = r.late_minutes || 0;
-            const early = r.early_checkout_minutes || 0;
-            const grace = r.grace_minutes ?? 15;
-
-            const baseRow = [
-                r.attendance_id,
-                r.name,
-                r.has_no_punches ? 'No' : 'Yes',
-                Math.max(0, r.working_days || 0),
-                Math.max(0, (r.manual_present_days ?? r.present_days) || 0),
-                Math.max(0, r.manual_annual_leave_count ?? r.annual_leave_count ?? 0),
-                Math.max(0, r.manual_sick_leave_count ?? r.sick_leave_count ?? 0),
-                Math.max(0, (r.manual_full_absence_count ?? r.full_absence_count) || 0),
-                Math.max(0, r.half_absence_count || 0),
-                minutesToHours(Math.max(0, late)),
-                minutesToHours(Math.max(0, early))
+            // Build headers matching the visible table columns - using Hours instead of Minutes
+            const headers = [
+                'Attendance ID',
+                'Name',
+                'Has Punches',
+                'Working Days',
+                'Present Days',
+                'Annual Leave',
+                'Sick Leave',
+                'LOP Days',
+                'Half Days',
+                'Late (Hours)',
+                'Early Checkout (Hours)',
+                ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
+                'Other (Hours)',
+                'Grace (Hours)',
+                ...(includeRamadanGiftInExport ? ['Ramadan Gift (min)'] : []),
+                'Deductible (Hours)',
+                'Notes'
             ];
 
-            // Add approved minutes only if company allows it
-            if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
-                baseRow.push(minutesToHours(Math.max(0, r.approved_minutes || 0)));
-            }
+            const rows = filteredResults.map(r => {
+                // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
+                // For non-finalized reports, use the recalculated values from enrichedResults
+                const deductible = (r.effective_deductible_minutes ?? r.deductible_minutes) || 0;
+                const late = r.late_minutes || 0;
+                const early = r.early_checkout_minutes || 0;
+                const grace = r.grace_minutes ?? 15;
 
-            baseRow.push(
-                minutesToHours(Math.max(0, r.other_minutes || 0)),
-                minutesToHours(Math.max(0, grace))
-            );
+                const baseRow = [
+                    r.attendance_id,
+                    r.name,
+                    r.has_no_punches ? 'No' : 'Yes',
+                    Math.max(0, r.working_days || 0),
+                    Math.max(0, (r.manual_present_days ?? r.present_days) || 0),
+                    Math.max(0, r.manual_annual_leave_count ?? r.annual_leave_count ?? 0),
+                    Math.max(0, r.manual_sick_leave_count ?? r.sick_leave_count ?? 0),
+                    Math.max(0, (r.manual_full_absence_count ?? r.full_absence_count) || 0),
+                    Math.max(0, r.half_absence_count || 0),
+                    minutesToHours(Math.max(0, late)),
+                    minutesToHours(Math.max(0, early))
+                ];
 
-            if (includeRamadanGiftInExport) {
-                baseRow.push(Math.max(0, r.ramadan_gift_minutes || 0));
-            }
+                // Add approved minutes only if company allows it
+                if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
+                    baseRow.push(minutesToHours(Math.max(0, r.approved_minutes || 0)));
+                }
 
-            baseRow.push(
-                minutesToHours(Math.max(0, deductible)),
-                r.notes || ''
-            );
+                baseRow.push(
+                    minutesToHours(Math.max(0, r.other_minutes || 0)),
+                    minutesToHours(Math.max(0, grace))
+                );
 
-            return baseRow;
-        });
+                if (includeRamadanGiftInExport) {
+                    baseRow.push(Math.max(0, r.ramadan_gift_minutes || 0));
+                }
 
-        const data = [headers, ...rows];
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
+                baseRow.push(
+                    minutesToHours(Math.max(0, deductible)),
+                    r.notes || ''
+                );
+
+                return baseRow;
+            });
+
+            setPreviewHeaders(headers);
+            setPreviewData(rows);
+            setIsPreviewOpen(true);
+        } catch (error) {
+            console.error('[ReportDetailView] Export preparation failed:', error);
+            toast.error('Failed to prepare export data');
+        }
+    };
+
+    const executeExcelDownload = () => {
+        try {
+            const data = [previewHeaders, ...previewData];
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
             XLSX.writeFile(wb, `attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`);
             toast.success('Attendance report exported');
         } catch (error) {
-            console.error('[ReportDetailView] Export failed:', error);
-            toast.error('Failed to export attendance report. Please try again.');
+            console.error('[ReportDetailView] Download failed:', error);
+            toast.error('Failed to download attendance report');
         }
     };
 
@@ -1626,7 +1674,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
 
         if (oldValue !== newValue) {
-            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(()=>{});
+            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(() => { });
         }
 
         toast.success('Ramadan gift saved');
@@ -1651,12 +1699,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 </p>
                             </div>
                         </div>
-                        <div className="w-full bg-green-200 rounded-full h-2">
-                            <div 
-                                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${saveProgress.total > 0 ? (saveProgress.current / saveProgress.total) * 100 : 0}%` }}
-                            />
-                        </div>
+                        <Progress value={saveProgress.total > 0 ? (saveProgress.current / saveProgress.total) * 100 : 0} className="w-full bg-green-200" />
                     </CardContent>
                 </Card>
             )}
@@ -1684,63 +1727,63 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             )}
                         </div>
                         <div className="flex gap-2">
-                           <Button
-                               onClick={exportToExcel}
-                               variant="outline"
-                           >
-                               <Download className="w-4 h-4 mr-2" />
-                               Export
-                           </Button>
-                           {project.status !== 'closed' && (
-                               <>
-                                   <Button
-                                       onClick={() => setShowSaveConfirmation(true)}
-                                       disabled={isSaving}
-                                       className="bg-green-600 hover:bg-green-700"
-                                   >
-                                       <Save className="w-4 h-4 mr-2" />
-                                       {isSaving ? 'Saving...' : 'Save Report'}
-                                   </Button>
-                                   {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
-                                       <Button
-                                           onClick={() => finalizeReportMutation.mutate()}
-                                           disabled={finalizeReportMutation.isPending}
-                                           className="bg-purple-600 hover:bg-purple-700"
-                                           title="Finalize report without generating approval links"
-                                       >
-                                           {finalizeReportMutation.isPending ? (
-                                               <>
-                                                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                   Finalizing...
-                                               </>
-                                           ) : (
-                                               <>
-                                                   <CheckCircle className="w-4 h-4 mr-2" />
-                                                   Finalize Report
-                                               </>
-                                           )}
-                                       </Button>
-                                   )}
-                                   {isAdmin && reportRun.is_final && (
-                                       <Button
-                                           onClick={() => unfinalizeReportMutation.mutate()}
-                                           disabled={unfinalizeReportMutation.isPending}
-                                           variant="outline"
-                                           className="border-red-300 text-red-600 hover:bg-red-50"
-                                           title="Un-finalize report (admin only)"
-                                       >
-                                           {unfinalizeReportMutation.isPending ? (
-                                               <>
-                                                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                   Un-finalizing...
-                                               </>
-                                           ) : (
-                                               <>Un-finalize Report</>
-                                           )}
-                                       </Button>
-                                   )}
-                               </>
-                           )}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Export
+                            </Button>
+                            {project.status !== 'closed' && (
+                                <>
+                                    <Button
+                                        onClick={() => setShowSaveConfirmation(true)}
+                                        disabled={isSaving}
+                                        className="bg-green-600 hover:bg-green-700"
+                                    >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {isSaving ? 'Saving...' : 'Save Report'}
+                                    </Button>
+                                    {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
+                                        <Button
+                                            onClick={() => finalizeReportMutation.mutate()}
+                                            disabled={finalizeReportMutation.isPending}
+                                            className="bg-purple-600 hover:bg-purple-700"
+                                            title="Finalize report without generating approval links"
+                                        >
+                                            {finalizeReportMutation.isPending ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Finalizing...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                                    Finalize Report
+                                                </>
+                                            )}
+                                        </Button>
+                                    )}
+                                    {isAdmin && reportRun.is_final && (
+                                        <Button
+                                            onClick={() => unfinalizeReportMutation.mutate()}
+                                            disabled={unfinalizeReportMutation.isPending}
+                                            variant="outline"
+                                            className="border-red-300 text-red-600 hover:bg-red-50"
+                                            title="Un-finalize report (admin only)"
+                                        >
+                                            {unfinalizeReportMutation.isPending ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Un-finalizing...
+                                                </>
+                                            ) : (
+                                                <>Un-finalize Report</>
+                                            )}
+                                        </Button>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
                 </CardContent>
@@ -1845,19 +1888,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <tbody className="[&_tr:last-child]:border-0">
                                 {filteredResults.map((result) => (
                                     <ReportTableRow
-                                    key={result.id}
-                                    result={result}
-                                    isAdmin={isAdmin}
-                                    isSupervisor={isSupervisor}
-                                    isDepartmentHead={isDepartmentHead}
-                                    project={project}
-                                    reportRun={reportRun}
-                                    showRamadanGiftColumn={showRamadanGiftColumn}
-                                    onToggleVerification={toggleVerification}
-                                    onEditGrace={setEditingGraceMinutes}
-                                    onShowBreakdown={showDailyBreakdown}
-                                    onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
-                                    onSaveRamadanGift={saveRamadanGift}
+                                        key={result.id}
+                                        result={result}
+                                        isAdmin={isAdmin}
+                                        isSupervisor={isSupervisor}
+                                        isDepartmentHead={isDepartmentHead}
+                                        project={project}
+                                        reportRun={reportRun}
+                                        showRamadanGiftColumn={showRamadanGiftColumn}
+                                        onToggleVerification={toggleVerification}
+                                        onEditGrace={setEditingGraceMinutes}
+                                        onShowBreakdown={showDailyBreakdown}
+                                        onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
+                                        onSaveRamadanGift={saveRamadanGift}
                                     />
                                 ))}
                             </tbody>
@@ -1899,7 +1942,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 isUser={isUser}
                 isSupervisor={isSupervisor}
             />
-
+            <ExcelPreviewDialog
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                data={previewData}
+                headers={previewHeaders}
+                fileName={`attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`}
+                onConfirm={executeExcelDownload}
+            />
         </div>
     );
 }

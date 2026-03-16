@@ -70,6 +70,7 @@ Primary bootstrap sequence:
 
 1. `src/main.jsx` renders `<App />`.
 2. `src/App.jsx` wraps the app with:
+   - `AuthProvider`
    - `QueryClientProvider`
    - `BrowserRouter`
 3. `AuthenticatedApp` blocks rendering until public settings and auth state are resolved.
@@ -101,11 +102,11 @@ Navigation metadata is defined in `src/components/config/pagesConfig.jsx`:
 
 ## 4.3 Authentication and Session Initialization
 
-Authentication is handled natively by the Base44 platform and SDK:
+`src/lib/AuthContext.jsx` provides app-level auth lifecycle:
 
-- Base44 manages the user session and token lifecycle.
-- The app reads auth-related runtime parameters (e.g. token, app id) and lets the SDK validate the session.
-- App code responds to high-level states such as:
+- Fetches app public settings first (to determine auth constraints)
+- Validates user session if token exists
+- Emits explicit app states:
   - loading
   - auth required
   - user not registered
@@ -314,7 +315,7 @@ When inconsistencies appear (mismatch, missing snapshots, invalid IDs):
 - Frontend bootstrap: `src/main.jsx`, `src/App.jsx`
 - Router registration: `src/pages.config.js`
 - App shell: `src/Layout.jsx`
-- Auth params: `src/lib/app-params.js`
+- Auth: `src/lib/AuthContext.jsx`, `src/lib/app-params.js`
 - Permissions: `src/components/config/pagesConfig.jsx`, `src/components/hooks/usePermissions.jsx`
 - Data safety helper: `src/components/utils/dataAccessHelpers.jsx`
 - Core backend analysis: `functions/runAnalysis.ts`

@@ -55,6 +55,60 @@ Deno.serve(async (req) => {
         const details = [];
 
         // ============================================================
+        // PRE-CHECK: Duplicate IDs in Employee Entity for this Company
+        // ============================================================
+        const projectId = reportRun.project_id || (analysisResults.length > 0 ? analysisResults[0].project_id : null);
+        if (projectId) {
+            const project = await base44.asServiceRole.entities.Project.get(projectId);
+            if (project && project.company) {
+                const allEmployees = await base44.asServiceRole.entities.Employee.filter({ company: project.company }, null, 5000);
+                
+                const hrmsIds = {};
+                const attIds = {};
+                
+                allEmployees.forEach(emp => {
+                    if (emp.hrms_id) {
+                        if (!hrmsIds[emp.hrms_id]) hrmsIds[emp.hrms_id] = [];
+                        hrmsIds[emp.hrms_id].push({ name: emp.name, id: emp.id });
+                    }
+                    if (emp.attendance_id) {
+                        if (!attIds[emp.attendance_id]) attIds[emp.attendance_id] = [];
+                        attIds[emp.attendance_id].push({ name: emp.name, id: emp.id });
+                    }
+                });
+
+                const duplicateHrms = Object.entries(hrmsIds).filter(([, employees]) => employees.length > 1);
+                const duplicateAtt = Object.entries(attIds).filter(([, employees]) => employees.length > 1);
+
+                if (duplicateHrms.length > 0) {
+                    issues.push({
+                        type: 'DUPLICATE_COMPANY_HRMS_IDS',
+                        severity: 'CRITICAL',
+                        count: duplicateHrms.length,
+                        message: `${duplicateHrms.length} HRMS IDs are duplicated within company ${project.company}`,
+                        details: duplicateHrms.map(([id, employees]) => ({
+                            hrms_id: id,
+                            employees
+                        }))
+                    });
+                }
+
+                if (duplicateAtt.length > 0) {
+                    issues.push({
+                        type: 'DUPLICATE_COMPANY_ATTENDANCE_IDS',
+                        severity: 'CRITICAL',
+                        count: duplicateAtt.length,
+                        message: `${duplicateAtt.length} Attendance IDs are duplicated within company ${project.company}`,
+                        details: duplicateAtt.map(([id, employees]) => ({
+                            attendance_id: id,
+                            employees
+                        }))
+                    });
+                }
+            }
+        }
+
+        // ============================================================
         // CHECK 1: Duplicate AnalysisResult rows
         // ============================================================
         const analysisGrouped = {};

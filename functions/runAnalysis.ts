@@ -4,7 +4,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * Backend function to run attendance analysis for a project
  * This contains the complete analysis logic moved from frontend
  */
-Deno.serve(async (req) => {
+// @ts-ignore: Deno
+Deno.serve(async (req: Request) => {
     try {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
@@ -13,12 +14,20 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { project_id, date_from, date_to, report_name, _existing_report_run_id } = await req.json();
+        const {
+            project_id,
+            date_from,
+            date_to,
+            report_name,
+            _existing_report_run_id,
+            _chunk_offset,
+            _chunk_size
+        } = await req.json();
 
         if (!project_id || !date_from || !date_to) {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
         }
-        
+
         // BUG FIX #1: Support updating existing reports after shift/exception changes
         let reportRun;
         if (_existing_report_run_id) {
@@ -48,14 +57,14 @@ Deno.serve(async (req) => {
 
         // Resolve company_id for stable company identification
         const AL_MARAGHI_MOTORS_COMPANY_ID = 2;
-        let isAlMaraghiMotors = false;
+        let isAlMaraghiMotors = project.company === 'Al Maraghi Motors' || project.company === 'Al Maraghi Auto Repairs';
         try {
             const companyRecords = await base44.asServiceRole.entities.Company.filter({ name: project.company }, null, 5);
             if (companyRecords.length > 0 && companyRecords[0].company_id === AL_MARAGHI_MOTORS_COMPANY_ID) {
                 isAlMaraghiMotors = true;
             }
         } catch (e) {
-            console.warn('[runAnalysis] Could not resolve company_id, carried grace will not apply');
+            console.warn('[runAnalysis] Could not resolve company_id, name-based check used');
         }
 
         // Fetch all required data
@@ -68,33 +77,33 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.ProjectEmployee.filter({ project_id }),
             base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true })
         ]);
-        
+
         console.log('[runAnalysis] All employees fetched:', allEmployees.length);
 
         // Parse Ramadan schedules for shift lookup - only include schedules that overlap with project date range
         const projectStart = new Date(date_from);
         const projectEnd = new Date(date_to);
-        let ramadanShiftsLookup = {};
-        
+        let ramadanShiftsLookup: any = {};
+
         for (const schedule of ramadanSchedules) {
             try {
                 const ramadanStart = new Date(schedule.ramadan_start_date);
                 const ramadanEnd = new Date(schedule.ramadan_end_date);
-                
+
                 // Check if Ramadan period overlaps with project date range
                 const hasOverlap = ramadanStart <= projectEnd && ramadanEnd >= projectStart;
-                
+
                 if (hasOverlap) {
                     const week1Data = schedule.week1_shifts ? JSON.parse(schedule.week1_shifts) : {};
                     const week2Data = schedule.week2_shifts ? JSON.parse(schedule.week2_shifts) : {};
-                    
+
                     ramadanShiftsLookup[schedule.id] = {
                         start: ramadanStart,
                         end: ramadanEnd,
                         week1: week1Data,
                         week2: week2Data
                     };
-                    
+
                     console.log(`[runAnalysis] Ramadan schedule ${schedule.id} overlaps with project (${ramadanStart.toISOString().split('T')[0]} to ${ramadanEnd.toISOString().split('T')[0]})`);
                 }
             } catch (e) {
@@ -118,51 +127,51 @@ Deno.serve(async (req) => {
 
         // Filter employees based on custom selection or department
         let filteredEmployees = allEmployees;
-        
+
         if (project.custom_employee_ids && project.custom_employee_ids.trim() !== '') {
             // Parse custom employee IDs (HRMS IDs) - keep as strings
             const customHrmsIds = project.custom_employee_ids
                 .split(',')
                 .map(id => id.trim())
                 .filter(id => id && id !== 'NULL');
-            
+
             console.log('[runAnalysis] Custom HRMS IDs:', customHrmsIds.length);
-            
+
             // Filter employees by HRMS ID - string comparison
-            filteredEmployees = allEmployees.filter(e => 
+            filteredEmployees = allEmployees.filter((e: any) =>
                 customHrmsIds.includes(String(e.hrms_id))
             );
         }
-        
+
         // Get attendance IDs of filtered employees - keep as strings
         // CRITICAL BUG FIX #4: Filter out employees without attendance_id UNLESS they have has_attendance_tracking=false (salary-only)
         const activeEmployeeAttendanceIds = filteredEmployees
-            .filter(e => e.attendance_id && e.attendance_id !== null && e.attendance_id !== undefined)
-            .filter(e => String(e.attendance_id).trim() !== '')
-            .map(e => String(e.attendance_id));
-        
+            .filter((e: any) => e.attendance_id && e.attendance_id !== null && e.attendance_id !== undefined)
+            .filter((e: any) => String(e.attendance_id).trim() !== '')
+            .map((e: any) => String(e.attendance_id));
+
         // CRITICAL: Include ALL active employees, not just those with punches
         // Employees may have exceptions (annual leave, sick leave, LOP) even without any punches
         // This ensures they appear in attendance reports for proper tracking
         const uniqueEmployeeIds = [...activeEmployeeAttendanceIds];
-        
+
         // Add project-specific employee overrides (for unmatched attendance IDs)
         // CRITICAL: Filter out project employees without attendance_id
         const projectEmployeeIds = projectEmployees
-            .filter(pe => pe.attendance_id && pe.attendance_id !== null && pe.attendance_id !== undefined)
-            .filter(pe => String(pe.attendance_id).trim() !== '')
-            .map(pe => String(pe.attendance_id));
+            .filter((pe: any) => pe.attendance_id && pe.attendance_id !== null && pe.attendance_id !== undefined)
+            .filter((pe: any) => String(pe.attendance_id).trim() !== '')
+            .map((pe: any) => String(pe.attendance_id));
         for (const peId of projectEmployeeIds) {
             if (!uniqueEmployeeIds.includes(peId)) {
                 uniqueEmployeeIds.push(peId);
             }
         }
-        
+
         console.log('[runAnalysis] Total punches:', punches.length);
         console.log('[runAnalysis] Filtered employees:', filteredEmployees.length);
         console.log('[runAnalysis] Project employee overrides:', projectEmployees.length);
         console.log('[runAnalysis] Employees to analyze (all active + overrides):', uniqueEmployeeIds.length);
-        
+
         // Combine master employees with project-specific overrides for lookups
         // CRITICAL: Only include project employees with valid attendance_id
         const employees = [
@@ -201,70 +210,88 @@ Deno.serve(async (req) => {
         }
 
         // Helper functions (moved from frontend)
-        const parseTime = (timeStr, includeSeconds = false) => {
+        const parseTime = (timeStr: any) => {
             try {
                 if (!timeStr || timeStr === '—') return null;
-                
-                if (includeSeconds) {
-                    let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-                    if (timeMatch) {
-                        let hours = parseInt(timeMatch[1]);
-                        const minutes = parseInt(timeMatch[2]);
-                        const seconds = parseInt(timeMatch[3]);
-                        const period = timeMatch[4].toUpperCase();
-                        
-                        if (period === 'PM' && hours !== 12) hours += 12;
-                        if (period === 'AM' && hours === 12) hours = 0;
-                        
-                        const date = new Date();
-                        date.setHours(hours, minutes, seconds, 0);
-                        return date;
-                    }
+
+                // Priority 1: Format with seconds (e.g., "12:00:00 AM")
+                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = parseInt(timeMatch[3]);
+                    const period = timeMatch[4].toUpperCase();
+
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
                 }
-                
-                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+
+                // Priority 2: Standard AM/PM (e.g., "12:00 AM")
+                timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                 if (timeMatch) {
                     let hours = parseInt(timeMatch[1]);
                     const minutes = parseInt(timeMatch[2]);
                     const period = timeMatch[3].toUpperCase();
-                    
+
                     if (period === 'PM' && hours !== 12) hours += 12;
                     if (period === 'AM' && hours === 12) hours = 0;
-                    
+
                     const date = new Date();
                     date.setHours(hours, minutes, 0, 0);
                     return date;
                 }
-                
+
+                // Priority 3: 24-hour format with optional seconds (e.g., "14:28" or "14:28:05")
                 timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
                 if (timeMatch) {
                     const hours = parseInt(timeMatch[1]);
                     const minutes = parseInt(timeMatch[2]);
                     const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
-                    
+
                     const date = new Date();
                     date.setHours(hours, minutes, seconds, 0);
                     return date;
                 }
-                
+
                 return null;
             } catch {
                 return null;
             }
         };
 
-        const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds = false, nextDateStr = null) => {
+        // Helper to get YYYY-MM-DD in local time
+        const toDateStr = (date: any) => {
+            const d = new Date(date);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        /**
+         * MATCH PUNCHES TO SHIFT POINTS
+         * Matches daily punch timestamps to specific shift start/end points (AM_START, PM_END, etc.)
+         *
+         * BUSINESS LOGIC:
+         * 1. Uses multi-phase matching with increasing time windows (60min, 120min, 180min, 240min, 300min).
+         * 2. This allows matching even extremely late arrivals or early departures up to 5 hours from target.
+         * 3. MIDNIGHT CROSSOVER: Specifically handles punches from the next day that belong to a night shift.
+         * 4. PRECISION: Must pass 'includeSeconds' to parseTime() because shift times often include seconds
+         *    (e.g., "12:00:00 AM") which fail standard "HH:MM" regex parsing.
+         */
+        const matchPunchesToShiftPoints = (dayPunches: any[], shift: any, includeSeconds = false, nextDateStr: string | null = null) => {
             if (!shift || dayPunches.length === 0) return [];
-            
-            const punchesWithTime = dayPunches.map(p => {
-                const time = parseTime(p.timestamp_raw, includeSeconds);
+
+            const punchesWithTime = dayPunches.map((p: any) => {
+                const time = parseTime(p.timestamp_raw);
                 if (!time) return null;
-                
+
                 // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
                 // add 24 hours to its time so it sorts and matches correctly against PM_END
                 const isNextDayPunch = nextDateStr && p.punch_date === nextDateStr;
                 const adjustedTime = isNextDayPunch ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
-                
+
                 return {
                     ...p,
                     time: adjustedTime,
@@ -272,49 +299,49 @@ Deno.serve(async (req) => {
                     _isNextDayPunch: isNextDayPunch
                 };
             }).filter(p => p).sort((a, b) => a.time - b.time);
-            
+
             if (punchesWithTime.length === 0) return [];
-            
+
             // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
             const pmEndTime = parseTime(shift.pm_end);
             let adjustedPmEnd = pmEndTime;
             if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
                 adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
             }
-            
+
             const shiftPoints = [
                 { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
                 { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
                 { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
                 { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
             ].filter(sp => sp.time);
-            
+
             const matches = [];
             const usedShiftPoints = new Set();
-            
+
             for (const punch of punchesWithTime) {
                 let closestMatch = null;
                 let minDistance = Infinity;
                 let isExtendedMatch = false;
                 let isFarExtendedMatch = false;
-                
+
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                    
+
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
+
                     if (distance <= 60 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
                     }
                 }
-                
+
                 if (!closestMatch) {
                     for (const shiftPoint of shiftPoints) {
                         if (usedShiftPoints.has(shiftPoint.type)) continue;
-                        
+
                         const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                        
+
                         if (distance <= 120 && distance < minDistance) {
                             minDistance = distance;
                             closestMatch = shiftPoint;
@@ -322,13 +349,13 @@ Deno.serve(async (req) => {
                         }
                     }
                 }
-                
+
                 if (!closestMatch) {
                     for (const shiftPoint of shiftPoints) {
                         if (usedShiftPoints.has(shiftPoint.type)) continue;
-                        
+
                         const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-                        
+
                         if (distance <= 180 && distance < minDistance) {
                             minDistance = distance;
                             closestMatch = shiftPoint;
@@ -336,7 +363,7 @@ Deno.serve(async (req) => {
                         }
                     }
                 }
-                
+
                 if (closestMatch) {
                     matches.push({
                         punch,
@@ -358,49 +385,59 @@ Deno.serve(async (req) => {
                     });
                 }
             }
-            
+
             return matches;
         };
 
-        const detectPartialDay = (dayPunches, shift, includeSeconds = false, nextDateStr = null) => {
+        /**
+         * DETECT PARTIAL DAY
+         * Identifies if an employee worked significantly less than their expected shift hours.
+         *
+         * BUSINESS LOGIC:
+         * 1. Calculates expected duration based on actual shift blocks (AM + PM).
+         * 2. For split shifts (Ramadan), it ignores the break between AM_END and PM_START.
+         * 3. If actual worked time is < 50% of expected, it's flagged as a partial day.
+         * 4. PRECISION: Shift times must be parsed with 'includeSeconds' to avoid "null" shift points.
+         */
+        const detectPartialDay = (dayPunches: any[], shift: any, nextDateStr: string | null = null) => {
             if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-            
+
             const punchesWithTime = dayPunches.map(p => {
-                const time = parseTime(p.timestamp_raw, includeSeconds);
+                const time = parseTime(p.timestamp_raw);
                 if (!time) return null;
                 // MIDNIGHT FIX: Adjust time for next-day crossover punches
                 const isNextDay = nextDateStr && p.punch_date === nextDateStr;
                 const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
                 return { ...p, time: adjustedTime };
             }).filter(p => p).sort((a, b) => a.time - b.time);
-            
+
             if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
-            
+
             const firstPunch = punchesWithTime[0].time;
             const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
-            
+
             const amStart = parseTime(shift.am_start);
             const amEnd = parseTime(shift.am_end);
             const pmStart = parseTime(shift.pm_start);
             let pmEnd = parseTime(shift.pm_end);
-            
+
             if (!amStart || !pmEnd) return { isPartial: false, reason: null };
-            
+
             // MIDNIGHT FIX: If shift ends at midnight, adjust to 24:00
             if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) {
                 pmEnd = new Date(pmEnd.getTime() + 24 * 60 * 60 * 1000);
             }
-            
+
             // CRITICAL FIX: For split/two-shift schedules (e.g., Ramadan day+night),
             // calculate expected working time as sum of ACTUAL shift blocks, NOT span from first to last.
             // Otherwise a long break between shifts (e.g., 12PM-8PM gap) inflates expected time
             // and causes false partial-day detection.
-            const hasMiddleTimes = amEnd && pmStart && 
-                                   String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' &&
-                                   shift.am_end !== '—' && shift.pm_start !== '—' &&
-                                   shift.am_end !== '-' && shift.pm_start !== '-';
+            const hasMiddleTimes = amEnd && pmStart &&
+                String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' &&
+                shift.am_end !== '—' && shift.pm_start !== '—' &&
+                shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift.is_single_shift === true || !hasMiddleTimes;
-            
+
             let expectedMinutes;
             if (isSingleShift) {
                 // Single shift: expected = pm_end - am_start (full span)
@@ -412,24 +449,25 @@ Deno.serve(async (req) => {
                 const pmBlock = pmStart ? (pmEnd - pmStart) / (1000 * 60) : 0;
                 expectedMinutes = amBlock + pmBlock;
             }
-            
+
             const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
-            
+
             if (expectedMinutes > 0 && actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
-                return { 
-                    isPartial: true, 
-                    reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)` 
+                return {
+                    isPartial: true,
+                    reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)`
                 };
             }
-            
+
             return { isPartial: false, reason: null };
         };
 
         // MIDNIGHT BUFFER: Helper to check if a punch timestamp falls within the midnight buffer window
-        // (i.e., between 12:00 AM and 1:00 AM = 60 minutes after midnight)
-        const MIDNIGHT_BUFFER_MINUTES = 60;
-        const isWithinMidnightBuffer = (timestampRaw, includeSecondsFlag) => {
-            const parsed = parseTime(timestampRaw, includeSecondsFlag);
+        // (i.e., between 12:00 AM and 02:00 AM = 120 minutes after midnight)
+        // This is specifically extended to 2 hours for Ramadan night shifts crossover support.
+        const MIDNIGHT_BUFFER_MINUTES = 120;
+        const isWithinMidnightBuffer = (timestampRaw) => {
+            const parsed = parseTime(timestampRaw);
             if (!parsed) return false;
             const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
             return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
@@ -440,7 +478,7 @@ Deno.serve(async (req) => {
 
             const punchesWithTime = punchList.map(p => ({
                 ...p,
-                time: parseTime(p.timestamp_raw, includeSeconds)
+                time: parseTime(p.timestamp_raw)
             })).filter(p => p.time);
 
             if (punchesWithTime.length === 0) return punchList;
@@ -466,47 +504,47 @@ Deno.serve(async (req) => {
         // Analyze employee function
         const analyzeEmployee = async (attendance_id) => {
             const attendanceIdStr = String(attendance_id);
-            
+
             // MIDNIGHT SHIFT FIX: Include punches from the day AFTER the project end date
             // because shifts ending at/near midnight (e.g., 12:00 AM) will have punch-outs
             // recorded on the next calendar day (e.g., 12:05 AM, 12:15 AM, 12:20 AM)
             const dayAfterEnd = new Date(date_to);
             dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
-            const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
-            
+            const dayAfterEndStr = toDateStr(dayAfterEnd);
+
             // MIDNIGHT FIX: Include punches from 1 day BEFORE and 1 day AFTER the range
             // - Day before: needed to check if previous day's shift ended near midnight
             //   (those punches from 12:00-1:30 AM on the first day belong to the previous day)
             // - Day after: needed to grab midnight crossover punch-outs from the last day
             const dayBeforeStart = new Date(date_from);
             dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
-            const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
-            
-            const employeePunches = punches.filter(p => 
-                String(p.attendance_id) === attendanceIdStr && 
-                p.punch_date >= dayBeforeStartStr && 
+            const dayBeforeStartStr = toDateStr(dayBeforeStart);
+
+            const employeePunches = punches.filter(p =>
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= dayBeforeStartStr &&
                 p.punch_date <= dayAfterEndStr
             );
-            
+
             // Separate the core-range punches (used for main iteration) and overflow punches
             const nextDayPunches = employeePunches.filter(p =>
                 p.punch_date === dayAfterEndStr
             );
-            
+
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
             const employeeExceptions = exceptions.filter(e => {
                 try {
                     return (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
-                           e.use_in_analysis !== false &&
-                           e.is_custom_type !== true;
+                        e.use_in_analysis !== false &&
+                        e.is_custom_type !== true;
                 } catch {
                     return false;
                 }
             });
-            
+
             const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-            const includeSeconds = project.company === 'Al Maraghi Automotive';
-            
+            const includeSeconds = true; // Unified: always support high-precision parsing
+
             console.log(`[runAnalysis] Employee ${attendanceIdStr}: carried_grace_minutes = ${employee?.carried_grace_minutes || 0}`);
 
             let workingDays = 0;
@@ -550,14 +588,14 @@ Deno.serve(async (req) => {
                     } else if (employee?.weekly_off) {
                         weeklyOffDay = dayNameToNumber[employee.weekly_off];
                     }
-                    
+
                     // Check if this day is also marked as a weekly off. If so, don't count as working day.
                     if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                         continue;
                     }
 
                     // Additionally, ensure no public holidays mark this day off
-                    const dateStr = currentDate.toISOString().split('T')[0];
+                    const dateStr = toDateStr(currentDate);
                     const matchingExceptions = employeeExceptions.filter(ex => {
                         try {
                             const exFrom = new Date(ex.date_from);
@@ -569,7 +607,7 @@ Deno.serve(async (req) => {
                             return false;
                         }
                     });
-                    const hasPublicHoliday = matchingExceptions.some(ex => 
+                    const hasPublicHoliday = matchingExceptions.some(ex =>
                         ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                     );
 
@@ -602,26 +640,26 @@ Deno.serve(async (req) => {
                     _otherMinutesDetails: null
                 };
             }
-            
+
             // Calculate annual leave as CALENDAR DAYS (not working days)
             // This is done upfront, counting all days including weekends/holidays
             let annualLeaveCount = 0;
             const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
             const annualLeaveDatesProcessed = new Set(); // Track dates already counted
-            
+
             for (const alEx of annualLeaveExceptions) {
                 try {
                     const exFrom = new Date(alEx.date_from);
                     const exTo = new Date(alEx.date_to);
-                    
+
                     // Clamp to report date range
                     const rangeStart = exFrom < startDate ? startDate : exFrom;
                     const rangeEnd = exTo > endDate ? endDate : exTo;
-                    
+
                     if (rangeStart <= rangeEnd) {
                         // Count each calendar day in the range
                         for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
-                            const dateStr = d.toISOString().split('T')[0];
+                            const dateStr = toDateStr(d);
                             if (!annualLeaveDatesProcessed.has(dateStr)) {
                                 annualLeaveDatesProcessed.add(dateStr);
                                 annualLeaveCount++;
@@ -633,15 +671,15 @@ Deno.serve(async (req) => {
                     console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${alEx.id}, date_from: ${alEx.date_from}, date_to: ${alEx.date_to}, Error: ${dateError.message}`);
                 }
             }
-            
+
             const dayNameToNumber = {
                 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
                 'Thursday': 4, 'Friday': 5, 'Saturday': 6
             };
-            
+
             for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
                 const currentDate = new Date(d);
-                const dateStr = currentDate.toISOString().split('T')[0];
+                const dateStr = toDateStr(currentDate);
                 // CRITICAL: Use UTC day of week to avoid timezone issues
                 // new Date(dateStr) creates a date at UTC midnight, so we must use getUTCDay()
                 // Otherwise, server timezone can shift the day and cause incorrect weekly off detection
@@ -653,14 +691,14 @@ Deno.serve(async (req) => {
                 } else if (employee?.weekly_off) {
                     weeklyOffDay = dayNameToNumber[employee.weekly_off];
                 }
-                
+
                 // Check if this is employee's weekly off day - BEFORE any other processing
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                     // Track weekly off day in dateStatusMap for LOP-adjacent check
                     dateStatusMap[dateStr] = 'WEEKLY_OFF';
                     continue;
                 }
-                
+
                 // Get ALL matching exceptions for this date first (to check DAY_SWAP and PUBLIC_HOLIDAY)
                 let matchingExceptions = [];
                 try {
@@ -678,12 +716,12 @@ Deno.serve(async (req) => {
                 } catch {
                     matchingExceptions = [];
                 }
-                
+
                 // Check for PUBLIC_HOLIDAY - day is NOT a working day (check BEFORE assumed_present_daily)
-                const hasPublicHoliday = matchingExceptions.some(ex => 
+                const hasPublicHoliday = matchingExceptions.some(ex =>
                     ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                 );
-                
+
                 if (hasPublicHoliday) {
                     // Check for MANUAL_ABSENT even on public holiday
                     const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
@@ -695,7 +733,7 @@ Deno.serve(async (req) => {
                     }
                     continue; // Skip this day - it's a holiday
                 }
-                
+
                 // CRITICAL FIX: ASSUMED_PRESENT_DAILY logic
                 // Employees flagged as "assumed present" are automatically marked present every working day
                 // This applies AFTER checking weekly off and public holidays
@@ -705,18 +743,18 @@ Deno.serve(async (req) => {
                     // Skip ALL punch processing, late/early calculations, exceptions for this day
                     continue;
                 }
-                
+
                 // DAY_SWAP exception: Override weekly off for specific dates
                 const daySwapException = matchingExceptions.find(ex => ex.type === 'DAY_SWAP');
                 if (daySwapException) {
                     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                     const currentDayName = dayNames[dayOfWeek];
-                    
+
                     // If current day matches new_weekly_off, treat it as weekly off
                     if (daySwapException.new_weekly_off === currentDayName) {
                         continue; // Skip this day - it's the new weekly off
                     }
-                    
+
                     // If current day matches working_day_override, treat it as working day (ignore standard weekly off)
                     if (daySwapException.working_day_override === currentDayName) {
                         weeklyOffDay = null; // Override the weekly off - make this day a working day
@@ -797,80 +835,82 @@ Deno.serve(async (req) => {
                     }
                     // If employee worked, continue normal analysis
                 }
+                // SHIFT SELECTION PRIORITY LOGIC (TASK 2 CONSOLIDATION)
+                // The system must resolve which shift applies to a given employee on a given date.
+                // We strictly prioritize project-specific ShiftTiming records applied manually
+                // or via 'Apply Ramadan Shifts' button as the primary source of truth.
+                // ================================================================
 
-                // Check for date-specific Ramadan ShiftTiming records FIRST
-                // applyRamadanShifts creates separate ShiftTiming records for day and night shifts
-                // We need to merge them into a single shift object for proper punch matching
-                let ramadanShift = null;
+                let shift = null;
                 const dateSpecificShifts = employeeShifts.filter(s => s.date === dateStr && isShiftEffective(s));
-                const ramadanDateShifts = dateSpecificShifts.filter(s => 
-                    s.applicable_days && s.applicable_days.includes('Ramadan')
-                );
-                
-                if (ramadanDateShifts.length > 0) {
-                    if (ramadanDateShifts.length === 1) {
-                        // Single Ramadan shift record — could be:
-                        // 1. "Combined Shift" (is_single_shift=false, has 4 time points)
-                        // 2. "Day Shift" only (is_single_shift=true, has 2 time points)
-                        // 3. "Night Shift" only (is_single_shift=true, has 2 time points)
-                        ramadanShift = ramadanDateShifts[0];
-                        console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: Single record "${ramadanShift.applicable_days}", is_single_shift=${ramadanShift.is_single_shift}, times: ${ramadanShift.am_start}/${ramadanShift.am_end}/${ramadanShift.pm_start}/${ramadanShift.pm_end}`);
+
+                if (dateSpecificShifts.length > 0) {
+                    // PRIORITY 1: Use project-applied date-specific records
+                    if (dateSpecificShifts.length === 1) {
+                        shift = dateSpecificShifts[0];
+                        console.log(`[runAnalysis] PROJECT SHIFT: Found specific record for ${attendanceIdStr} on ${dateStr}: "${shift.applicable_days}"`);
                     } else {
-                        // Multiple Ramadan shifts on same day — merge day + night into 4-point shift
-                        // This handles LEGACY data where day and night were stored as separate records
-                        const dayShift = ramadanDateShifts.find(s => 
-                            s.applicable_days?.includes('Day') || s.applicable_days?.includes('S1')
+                        // MERGE LOGIC: If multiple records exist (e.g. legacy Ramadan day+night), merge them
+                        const ramadanDateShifts = dateSpecificShifts.filter(s =>
+                            String(s.applicable_days || '').includes('Ramadan')
                         );
-                        const nightShift = ramadanDateShifts.find(s => 
-                            s.applicable_days?.includes('Night') || s.applicable_days?.includes('S2')
-                        );
-                        
-                        if (dayShift && nightShift) {
-                            ramadanShift = {
-                                am_start: dayShift.am_start,
-                                am_end: dayShift.pm_end,    // Day shift end (stored in pm_end for single shifts)
-                                pm_start: nightShift.am_start, // Night shift start (stored in am_start for single shifts)
-                                pm_end: nightShift.pm_end,   // Night shift end
-                                is_single_shift: false,
-                                is_friday_shift: dayShift.is_friday_shift,
-                                _ramadan: true,
-                                _merged: true
-                            };
-                            console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: MERGED day+night (legacy), is_single_shift=false, times: ${ramadanShift.am_start}/${ramadanShift.am_end}/${ramadanShift.pm_start}/${ramadanShift.pm_end}`);
-                        } else {
-                            // Only one type found among multiple records — use the first one
-                            ramadanShift = ramadanDateShifts[0];
-                            console.log(`[runAnalysis] RAMADAN: Employee ${attendanceIdStr}, Date ${dateStr}: Multiple records but only one type found, using first: "${ramadanShift.applicable_days}"`);
+
+                        if (ramadanDateShifts.length >= 2) {
+                            const dayShift = ramadanDateShifts.find(s =>
+                                s.applicable_days?.includes('Day') || s.applicable_days?.includes('S1')
+                            );
+                            const nightShift = ramadanDateShifts.find(s =>
+                                s.applicable_days?.includes('Night') || s.applicable_days?.includes('S2')
+                            );
+
+                            if (dayShift && nightShift) {
+                                shift = {
+                                    am_start: dayShift.am_start,
+                                    am_end: dayShift.pm_end,
+                                    pm_start: nightShift.am_start,
+                                    pm_end: nightShift.pm_end,
+                                    is_single_shift: false,
+                                    applicable_days: 'Ramadan Merged Shift',
+                                    _ramadan: true,
+                                    _merged: true
+                                };
+                                console.log(`[runAnalysis] PROJECT SHIFT: Merged day+night records for ${attendanceIdStr} on ${dateStr}`);
+                            }
+                        }
+
+                        if (!shift) {
+                            // Default to the most recent record if no mergeable Ramadan pair found
+                            shift = dateSpecificShifts.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+                            console.log(`[runAnalysis] PROJECT SHIFT: Multiple records found for ${attendanceIdStr} on ${dateStr}, using most recent: "${shift.applicable_days}"`);
                         }
                     }
-                }
-                
-                // Fallback: Build from raw Ramadan schedule JSON if no ShiftTiming records exist
-                if (!ramadanShift) {
+                } else {
+                    // FALLBACK: Only if NO project-specific records exist, look for external logic/patterns
+
+                    // Fallback 1: Build from raw Ramadan schedule JSON
                     for (const scheduleId in ramadanShiftsLookup) {
                         const ramadanData = ramadanShiftsLookup[scheduleId];
                         if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
                             const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
-                            let weekNumber = 1;
-                            
-                            for (let i = 0; i <= daysSinceStart; i++) {
+                            let saturdaysPassed = 0;
+
+                            for (let i = 0; i < daysSinceStart; i++) {
                                 const checkDate = new Date(ramadanData.start);
                                 checkDate.setDate(checkDate.getDate() + i);
                                 const checkDayOfWeek = checkDate.getUTCDay();
-                                
-                                if (checkDayOfWeek === 0 && i > 0) {
-                                    weekNumber = weekNumber === 1 ? 2 : 1;
-                                }
+                                if (checkDayOfWeek === 6) saturdaysPassed++;
                             }
-                            
+
+                            const weekNumber = (saturdaysPassed % 2) === 0 ? 1 : 2;
                             const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
                             const employeeShiftData = weekData[attendanceIdStr];
-                            
-                            if (employeeShiftData && employeeShiftData.active_shifts && employeeShiftData.active_shifts.length > 0) {
-                                const activeShifts = employeeShiftData.active_shifts;
-                                
-                                if (activeShifts.includes('day') && activeShifts.includes('night')) {
-                                    ramadanShift = {
+
+                            if (employeeShiftData) {
+                                const hasDay = employeeShiftData.day_start && employeeShiftData.day_end && employeeShiftData.day_start !== '—' && employeeShiftData.day_end !== '—';
+                                const hasNight = employeeShiftData.night_start && employeeShiftData.night_end && employeeShiftData.night_start !== '—' && employeeShiftData.night_end !== '—';
+
+                                if (hasDay && hasNight) {
+                                    shift = {
                                         am_start: employeeShiftData.day_start || '',
                                         am_end: employeeShiftData.day_end || '',
                                         pm_start: employeeShiftData.night_start || '',
@@ -878,8 +918,8 @@ Deno.serve(async (req) => {
                                         is_single_shift: false,
                                         _ramadan: true
                                     };
-                                } else if (activeShifts.includes('day')) {
-                                    ramadanShift = {
+                                } else if (hasDay) {
+                                    shift = {
                                         am_start: employeeShiftData.day_start || '',
                                         am_end: '—',
                                         pm_start: '—',
@@ -887,8 +927,8 @@ Deno.serve(async (req) => {
                                         is_single_shift: true,
                                         _ramadan: true
                                     };
-                                } else if (activeShifts.includes('night')) {
-                                    ramadanShift = {
+                                } else if (hasNight) {
+                                    shift = {
                                         am_start: employeeShiftData.night_start || '',
                                         am_end: '—',
                                         pm_start: '—',
@@ -903,15 +943,19 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Use Ramadan shift, or fall back to non-Ramadan date-specific shift
-                const nonRamadanDateShift = dateSpecificShifts.find(s => 
-                    !s.applicable_days || !s.applicable_days.includes('Ramadan')
-                );
-                let shift = ramadanShift || nonRamadanDateShift;
+                if (!shift) {
+                    // Fallback 2: Build from regular shifts (non-Ramadan)
+                    const nonRamadanDateShift = dateSpecificShifts.find(s =>
+                        !s.applicable_days || !s.applicable_days.includes('Ramadan')
+                    );
+                    shift = nonRamadanDateShift;
+                }
 
                 if (!shift) {
                     const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
-                    
+
+                    // PRIORITY 3: A shift that explicitly matches the specific day of the week 
+                    // (e.g., applicable_days includes "Monday")
                     for (const s of applicableShifts) {
                         if (s.applicable_days) {
                             try {
@@ -927,8 +971,10 @@ Deno.serve(async (req) => {
                             }
                         }
                     }
-                    
+
                     if (!shift) {
+                        // PRIORITY 4: The general company shift logic
+                        // If it's a Friday, we check for a general Friday shift, otherwise we grab the first general shift
                         if (dayOfWeek === 5) {
                             shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
                             if (!shift) {
@@ -939,7 +985,7 @@ Deno.serve(async (req) => {
                         }
                     }
                 }
-                
+
                 // CRITICAL FIX: Log missing shift will happen after filteredPunches is computed below
 
                 if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
@@ -980,21 +1026,21 @@ Deno.serve(async (req) => {
                     (dateException && dateException.type === 'OFF');
                 
                 // ================================================================
-                // MIDNIGHT SHIFT FIX: Collect punches for this date
-                // If shift ends at or near midnight (12:00 AM / 00:00), 
-                // also include early-morning punches from the NEXT day
-                // that are actually the punch-out for THIS day's shift.
+                // MIDNIGHT SHIFT HANDLING (TASK 3 AUDIT)
+                // If a shift ends at or near midnight (12:00 AM / 00:00), 
+                // the system must correctly include early-morning punches from the NEXT chronological day
+                // (e.g. 00:15 AM punch) because they belong to THIS date's shift.
                 // ================================================================
                 const nextDateObj = new Date(currentDate);
                 nextDateObj.setDate(nextDateObj.getDate() + 1);
-                const nextDateStr = nextDateObj.toISOString().split('T')[0];
-                
+                const nextDateStr = toDateStr(nextDateObj);
+
                 // Check previous day's shift to see if IT ended near midnight
                 // If so, exclude early-morning punches that belong to the previous day
                 const prevDateObj = new Date(currentDate);
                 prevDateObj.setDate(prevDateObj.getDate() - 1);
-                const prevDateStr = prevDateObj.toISOString().split('T')[0];
-                
+                const prevDateStr = toDateStr(prevDateObj);
+
                 let prevShiftEndsNearMidnight = false;
                 {
                     // Check if previous day had a shift ending near midnight
@@ -1014,19 +1060,19 @@ Deno.serve(async (req) => {
                         if (pEndTime) {
                             const pEndHour = pEndTime.getHours();
                             const pEndMin = pEndTime.getMinutes();
-                            // Shift ends near midnight: 11 PM (hour 23) or exactly 12:00 AM (hour 0, minute 0)
-                            if (pEndHour === 23 || (pEndHour === 0 && pEndMin === 0)) {
+                            // Shift ends near midnight: 11 PM (hour 23) or any time in 12 AM hour (hour 0)
+                            if (pEndHour === 23 || pEndHour === 0) {
                                 prevShiftEndsNearMidnight = true;
                                 break;
                             }
                         }
                     }
                 }
-                
+
                 if (prevShiftEndsNearMidnight) {
                     console.log(`[runAnalysis] MIDNIGHT DETECT: Employee ${attendanceIdStr}, Date ${dateStr}: Previous day (${prevDateStr}) shift ends near midnight → will exclude early AM punches`);
                 }
-                
+
                 // Determine if this shift ends near midnight
                 // For single shifts: end time is in pm_end (am_start → pm_end)
                 // For combined shifts: end time is in pm_end (night shift end)
@@ -1037,28 +1083,28 @@ Deno.serve(async (req) => {
                     if (pmEndTime) {
                         const endHour = pmEndTime.getHours();
                         const endMinute = pmEndTime.getMinutes();
-                        // Shift ends near midnight if pm_end is 11:00 PM - 11:59 PM or exactly 12:00 AM (0:00)
-                        if (endHour === 23 || (endHour === 0 && endMinute === 0)) {
+                        // Shift ends near midnight if pm_end is in 11 PM hour (23) or 12 AM hour (0)
+                        if (endHour === 23 || endHour === 0) {
                             shiftEndsNearMidnight = true;
                         }
                     }
                 }
-                
+
                 // Get punches for this date
                 let dayPunches = employeePunches
                     .filter(p => p.punch_date === dateStr);
-                
+
                 // MIDNIGHT FIX: If PREVIOUS day's shift ended near midnight,
-                // exclude early-morning punches (12:00 AM - 1:00 AM) from THIS day's punches
+                // exclude early-morning punches (12:00 AM - 02:00 AM) from THIS day's punches
                 // because those belong to the previous day's shift as punch-outs
                 if (prevShiftEndsNearMidnight) {
                     const beforeFilter = dayPunches.length;
-                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
+                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
                     if (dayPunches.length < beforeFilter) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Excluded ${beforeFilter - dayPunches.length} early AM punch(es) that belong to prev day ${prevDateStr}`);
                     }
                 }
-                
+
                 // If shift ends near midnight, also grab early-morning punches from next day
                 // These are punch-outs that crossed midnight (e.g., 12:05 AM, 12:15 AM, 12:30 AM)
                 if (shiftEndsNearMidnight) {
@@ -1067,35 +1113,35 @@ Deno.serve(async (req) => {
                         ...employeePunches.filter(p => p.punch_date === nextDateStr),
                         ...nextDayPunches.filter(p => p.punch_date === nextDateStr)
                     ];
-                    
+
                     // Deduplicate by punch id
                     const seenIds = new Set(dayPunches.map(p => p.id));
                     const uniqueNextDayPunches = nextDayAllPunches.filter(p => !seenIds.has(p.id));
-                    
-                    // Include next-day punches that are within 60 minutes of midnight
-                    // (i.e., punches between 12:00 AM and 1:00 AM)
-                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw, includeSeconds));
-                    
+
+                    // Include next-day punches that are within 120 minutes of midnight
+                    // (i.e., punches between 12:00 AM and 02:00 AM)
+                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw));
+
                     if (midnightCrossoverPunches.length > 0) {
                         console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Found ${midnightCrossoverPunches.length} crossover punch(es) from next day ${nextDateStr}`);
                         dayPunches = [...dayPunches, ...midnightCrossoverPunches];
                     }
                 }
-                
+
                 dayPunches = dayPunches.sort((a, b) => {
-                        const timeA = parseTime(a.timestamp_raw, includeSeconds);
-                        const timeB = parseTime(b.timestamp_raw, includeSeconds);
-                        // For midnight crossover, punches from next day (hour 0) should sort AFTER today's punches
-                        // We adjust by adding 24h offset if the punch is from the next day
-                        const aIsNextDay = a.punch_date === nextDateStr;
-                        const bIsNextDay = b.punch_date === nextDateStr;
-                        const aTime = (timeA?.getTime() || 0) + (aIsNextDay ? 24 * 60 * 60 * 1000 : 0);
-                        const bTime = (timeB?.getTime() || 0) + (bIsNextDay ? 24 * 60 * 60 * 1000 : 0);
-                        return aTime - bTime;
-                    });
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
+                    // For midnight crossover, punches from next day (hour 0) should sort AFTER today's punches
+                    // We adjust by adding 24h offset if the punch is from the next day
+                    const aIsNextDay = a.punch_date === nextDateStr;
+                    const bIsNextDay = b.punch_date === nextDateStr;
+                    const aTime = (timeA?.getTime() || 0) + (aIsNextDay ? 24 * 60 * 60 * 1000 : 0);
+                    const bTime = (timeB?.getTime() || 0) + (bIsNextDay ? 24 * 60 * 60 * 1000 : 0);
+                    return aTime - bTime;
+                });
 
                 let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
-                
+
                 // Log missing shift AFTER filteredPunches is computed
                 if (!shift && filteredPunches.length > 0 && !dateException) {
                     console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
@@ -1127,7 +1173,7 @@ Deno.serve(async (req) => {
                         console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + ${skipType} → adding fake punch`);
                     }
                 }
-                
+
                 let punchMatches = [];
                 let hasUnmatchedPunch = false;
                 // Allow punch matching even when skip is applied (we'll zero out specific minutes after)
@@ -1137,23 +1183,23 @@ Deno.serve(async (req) => {
                     punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
                     hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 }
-                
+
                 // SINGLE SHIFT DETECTION: Check both the flag AND the actual time fields
                 // A shift is single if:
                 //   1. is_single_shift flag is true, OR
                 //   2. The middle time fields (am_end, pm_start) are empty/dash (only 2 time points exist)
-                const hasMiddleTimes = shift?.am_end && shift?.pm_start && 
-                                       String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
-                                       shift.am_end !== '—' && shift.pm_start !== '—' &&
-                                       shift.am_end !== '-' && shift.pm_start !== '-' &&
-                                       shift.am_end !== 'null' && shift.pm_start !== 'null';
+                const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                    String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
+                    shift.am_end !== '—' && shift.pm_start !== '—' &&
+                    shift.am_end !== '-' && shift.pm_start !== '-' &&
+                    shift.am_end !== 'null' && shift.pm_start !== 'null';
                 const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
 
                 // Skip partial day detection if SKIP_PUNCH is applied
                 // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches
-                const partialDayResult = hasSkipPunchApplied 
-                    ? { isPartial: false, reason: '' } 
-                    : detectPartialDay(filteredPunches, shift, includeSeconds, nextDateStr);
+                const partialDayResult = hasSkipPunchApplied
+                    ? { isPartial: false, reason: '' }
+                    : detectPartialDay(filteredPunches, shift, nextDateStr);
 
                 if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
                     if (filteredPunches.length === 0) {
@@ -1206,9 +1252,9 @@ Deno.serve(async (req) => {
                 //    totalApprovedMinutes is the SUM of per-day reductions, tracked for DISPLAY only.
                 let approvedMinutesForDay = 0;
                 try {
-                    if (rules.approved_minutes_enabled && 
-                        dateException && 
-                        dateException.type === 'ALLOWED_MINUTES' && 
+                    if (rules.approved_minutes_enabled &&
+                        dateException &&
+                        dateException.type === 'ALLOWED_MINUTES' &&
                         dateException.approval_status === 'approved_dept_head' &&
                         filteredPunches.length > 0) {  // FIX: only apply if employee was present
                         approvedMinutesForDay = dateException.allowed_minutes || 0;
@@ -1218,13 +1264,13 @@ Deno.serve(async (req) => {
                 }
 
                 const hasManualTimeException = dateException && (
-                    dateException.type === 'MANUAL_LATE' || 
+                    dateException.type === 'MANUAL_LATE' ||
                     dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
                     (dateException.late_minutes && dateException.late_minutes > 0) ||
                     (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) ||
                     (dateException.other_minutes && dateException.other_minutes > 0)
                 );
-                
+
                 const shouldSkipTimeCalculation = dateException && [
                     'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
                 ].includes(dateException.type);
@@ -1251,17 +1297,17 @@ Deno.serve(async (req) => {
                     
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
-                        
+
                         const punchTime = match.punch.time;
                         const shiftTime = match.shiftTime;
-                        
+
                         if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                             if (punchTime > shiftTime) {
                                 const minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
                                 dayLateMinutes += minutes;
                             }
                         }
-                        
+
                         if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                             if (punchTime < shiftTime) {
                                 const minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
@@ -1302,8 +1348,8 @@ Deno.serve(async (req) => {
                     if (approvedMinutesForDay > 0) {
                         const dayTotal = dayLateMinutes + dayEarlyMinutes;
                         const reduction = Math.min(approvedMinutesForDay, dayTotal);
-                        const lateRatio = dayTotal > 0 ? dayLateMinutes / dayTotal : 0;
-                        const earlyRatio = dayTotal > 0 ? dayEarlyMinutes / dayTotal : 0;
+                        const lateRatio = dayLateMinutes / dayTotal;
+                        const earlyRatio = dayEarlyMinutes / dayTotal;
                         dayLateMinutes = Math.max(0, dayLateMinutes - Math.round(reduction * lateRatio));
                         dayEarlyMinutes = Math.max(0, dayEarlyMinutes - Math.round(reduction * earlyRatio));
                         totalApprovedMinutes += reduction; // track actual reduction for display
@@ -1318,8 +1364,13 @@ Deno.serve(async (req) => {
                     console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 real punches, skip applied → no time calc needed`);
                 }
 
+                // 4. Accumulation phase: Add to the final employee totals
+                lateMinutes += dayLateMinutes;
+                earlyCheckoutMinutes += dayEarlyMinutes;
+                otherMinutes += dayOtherMinutes;
+
                 const expectedPunches = isSingleShift ? 2 : 4;
-                
+
                 const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
                 const hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
                 if (hasUnmatchedPunch) {
@@ -1340,7 +1391,7 @@ Deno.serve(async (req) => {
                 if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
                     abnormal_dates_set.add(dateStr);
                 }
-                
+
                 // Check for extreme lateness - ONLY on matched start punches (not all punches)
                 if (shift && punchMatches.length > 0) {
                     for (const match of punchMatches) {
@@ -1385,21 +1436,21 @@ Deno.serve(async (req) => {
 
                 for (const woDateStr of weeklyOffDates) {
                     const woDate = new Date(woDateStr);
-                    
+
                     const prevDate = new Date(woDate);
                     prevDate.setDate(prevDate.getDate() - 1);
-                    const prevDateStr = prevDate.toISOString().split('T')[0];
-                    
+                    const prevDateStr = toDateStr(prevDate);
+
                     const nextDate = new Date(woDate);
                     nextDate.setDate(nextDate.getDate() + 1);
-                    const nextDateStr = nextDate.toISOString().split('T')[0];
-                    
+                    const nextDateStr = toDateStr(nextDate);
+
                     const prevStatus = dateStatusMap[prevDateStr];
                     const nextStatus = dateStatusMap[nextDateStr];
-                    
+
                     const prevIsLOP = prevStatus === 'LOP';
                     const nextIsLOP = nextStatus === 'LOP';
-                    
+
                     if (prevIsLOP || nextIsLOP) {
                         // Weekly off adjacent to LOP → count weekly off as LOP too
                         lopAdjacentWeeklyOffCount++;
@@ -1413,13 +1464,13 @@ Deno.serve(async (req) => {
             const criticalDatesFormatted = critical_abnormal_dates_set.size > 0
                 ? [...critical_abnormal_dates_set].sort().map(d => new Date(d).toLocaleDateString()).join(', ')
                 : '';
-            const autoResolutionNotes = auto_resolutions.length > 0 
+            const autoResolutionNotes = auto_resolutions.length > 0
                 ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
                 : '';
-            
+
             const dept = employee?.department || 'Admin';
             const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
-            
+
             // Fetch carried_grace_minutes from Employee entity for Al Maraghi Motors ONLY (by stable company_id)
             let carriedGrace = 0;
             if (project.use_carried_grace_minutes === true && isAlMaraghiMotors) {
@@ -1432,7 +1483,7 @@ Deno.serve(async (req) => {
                     console.log(`[runAnalysis] [Al Maraghi Motors] Employee ${attendanceIdStr}: No carried grace found or value is 0, using defaultGraceMinutes only`);
                 }
             }
-            
+
             // ============================================================================
             // CRITICAL: DEDUCTIBLE_MINUTES CALCULATION (IMMUTABLE FOR SALARY)
             // ============================================================================
@@ -1458,13 +1509,16 @@ Deno.serve(async (req) => {
             //   Where late_minutes and early_checkout_minutes are the RAW values stored here.
             //   No other fields (approved, other, deductible, ramadan_gift) are involved.
             // ============================================================================
-            const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
+            // Al Maraghi Rule: Grace carry-forward is 15 minutes per working day.
+            // Annual Leave days with zero punches are excluded from workingDays (see line 832).
+            const effectiveBaseGrace = isAlMaraghiMotors ? (baseGrace * workingDays) : baseGrace;
+            const totalGraceMinutes = Math.max(0, effectiveBaseGrace) + Math.max(0, carriedGrace);
             // lateMinutes and earlyCheckoutMinutes are ALREADY net of per-day approved reductions.
             // Do NOT subtract totalApprovedMinutes again — that would be double-dipping.
             const rawLateEarly = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);
             const deductibleMinutes = Math.max(0, rawLateEarly - totalGraceMinutes);
-            
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
+
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, WorkingDays=${workingDays}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
 
             // Build set of LOP-adjacent weekly off dates for storage
             const lopAdjacentWeeklyOffDates = Object.entries(dateStatusMap)
@@ -1522,15 +1576,22 @@ Deno.serve(async (req) => {
         const allResults = [];
         const processedAttendanceIds = new Set();
         const otherMinutesExceptionsToCreate = []; // Track other minutes exceptions to create
-        const ANALYSIS_BATCH_SIZE = 15; // BUG FIX #5: Increased from 5 to 15 for better performance
-        const ANALYSIS_BATCH_DELAY = 500; // 500ms delay between analysis batches
-        
+        const ANALYSIS_BATCH_SIZE = 100; // CRITICAL FIX: Process 100 employees at once to avoid timeout
+        const ANALYSIS_BATCH_DELAY = 0; // No delays for maximum speed
+
         // Convert to array for batch processing
         const employeeIdsArray = [...uniqueEmployeeIds];
-        
-        for (let i = 0; i < employeeIdsArray.length; i += ANALYSIS_BATCH_SIZE) {
-            const batchIds = employeeIdsArray.slice(i, i + ANALYSIS_BATCH_SIZE);
-            
+
+        // CHUNK PROCESSING: If chunk params provided, only process that subset
+        const startIdx = _chunk_offset !== undefined ? _chunk_offset : 0;
+        const endIdx = _chunk_size !== undefined ? Math.min(startIdx + _chunk_size, employeeIdsArray.length) : employeeIdsArray.length;
+        const employeesToProcess = employeeIdsArray.slice(startIdx, endIdx);
+
+        console.log(`[runAnalysis] Processing chunk: employees ${startIdx}-${endIdx} of ${employeeIdsArray.length}`);
+
+        for (let i = 0; i < employeesToProcess.length; i += ANALYSIS_BATCH_SIZE) {
+            const batchIds = employeesToProcess.slice(i, i + ANALYSIS_BATCH_SIZE);
+
             // Process batch of employees
             for (const attendance_id of batchIds) {
                 const idStr = String(attendance_id);
@@ -1538,7 +1599,7 @@ Deno.serve(async (req) => {
                     console.warn('[runAnalysis] Skipping duplicate attendance_id:', attendance_id);
                     continue;
                 }
-                
+
                 processedAttendanceIds.add(idStr);
                 const result = await analyzeEmployee(attendance_id);
                 const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
@@ -1549,41 +1610,53 @@ Deno.serve(async (req) => {
                     ramadan_gift_minutes: preservedRamadanGiftMinutes,
                     ...result
                 });
-                
+
                 // Track other minutes for exception creation
                 if (result._otherMinutesDetails) {
                     otherMinutesExceptionsToCreate.push(result._otherMinutesDetails);
                 }
             }
-            
+
             // Log progress
-            console.log(`[runAnalysis] Processed batch ${Math.floor(i / ANALYSIS_BATCH_SIZE) + 1}/${Math.ceil(employeeIdsArray.length / ANALYSIS_BATCH_SIZE)} (${Math.min(i + ANALYSIS_BATCH_SIZE, employeeIdsArray.length)}/${employeeIdsArray.length} employees)`);
-            
+            console.log(`[runAnalysis] Processed batch ${Math.floor(i / ANALYSIS_BATCH_SIZE) + 1}/${Math.ceil(employeesToProcess.length / ANALYSIS_BATCH_SIZE)} (${Math.min(i + ANALYSIS_BATCH_SIZE, employeesToProcess.length)}/${employeesToProcess.length} employees in this chunk)`);
+
             // Add delay between analysis batches to reduce database load
-            if (i + ANALYSIS_BATCH_SIZE < employeeIdsArray.length) {
+            if (i + ANALYSIS_BATCH_SIZE < employeesToProcess.length) {
                 await new Promise(resolve => setTimeout(resolve, ANALYSIS_BATCH_DELAY));
             }
         }
-        
+
         console.log('[runAnalysis] Processed employees:', allResults.length);
         console.log('[runAnalysis] Unique attendance IDs processed:', processedAttendanceIds.size);
 
-        // Replace existing AnalysisResult rows for this report run so reruns are deterministic
-        // while preserving ramadan_gift_minutes values copied above.
-        if (existingResultsForReport.length > 0) {
+        // CHUNK MODE: Only delete results for employees in THIS chunk
+        if (_chunk_offset !== undefined && allResults.length > 0) {
+            const attendanceIdsToDelete = allResults.map(r => r.attendance_id);
+            for (const aid of attendanceIdsToDelete) {
+                const existing = await base44.asServiceRole.entities.AnalysisResult.filter({
+                    project_id,
+                    report_run_id: reportRun.id,
+                    attendance_id: aid
+                });
+                if (existing.length > 0) {
+                    await base44.asServiceRole.entities.AnalysisResult.delete(existing[0].id);
+                }
+            }
+        } else if (existingResultsForReport.length > 0 && _chunk_offset === undefined) {
+            // Full run - delete all existing
             await base44.asServiceRole.entities.AnalysisResult.deleteMany({
                 project_id,
                 report_run_id: reportRun.id
             });
         }
 
-        // Save results in smaller batches with longer delays
-        const SAVE_BATCH_SIZE = 10; // Save 10 results at a time (reduced from 50)
-        const SAVE_BATCH_DELAY = 300; // 300ms delay between save batches
-        
+        // Save results in larger batches with minimal delays
+        const SAVE_BATCH_SIZE = 100; // CRITICAL FIX: Save 100 results at once to avoid timeout
+        const SAVE_BATCH_DELAY = 0; // No delays for maximum speed
+
         for (let i = 0; i < allResults.length; i += SAVE_BATCH_SIZE) {
             const batch = allResults.slice(i, i + SAVE_BATCH_SIZE);
-            
+
             // Retry logic for save operations
             let retries = 3;
             while (retries > 0) {
@@ -1597,9 +1670,9 @@ Deno.serve(async (req) => {
                     await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
                 }
             }
-            
+
             console.log(`[runAnalysis] Saved batch ${Math.floor(i / SAVE_BATCH_SIZE) + 1}/${Math.ceil(allResults.length / SAVE_BATCH_SIZE)}`);
-            
+
             // Add delay between save batches
             if (i + SAVE_BATCH_SIZE < allResults.length) {
                 await new Promise(resolve => setTimeout(resolve, SAVE_BATCH_DELAY));
@@ -1611,16 +1684,16 @@ Deno.serve(async (req) => {
         // Each date with other minutes gets its own exception with the correct minutes for that day.
         if (otherMinutesExceptionsToCreate.length > 0) {
             console.log(`[runAnalysis] Creating MANUAL_OTHER_MINUTES exceptions (per-date) for ${otherMinutesExceptionsToCreate.length} employees`);
-            
+
             for (const detail of otherMinutesExceptionsToCreate) {
                 try {
                     const breakdown = detail.breakdown || {};
                     const dates = Object.keys(breakdown);
-                    
+
                     for (const dateStr of dates) {
                         const minutesForDate = breakdown[dateStr];
                         if (!minutesForDate || minutesForDate <= 0) continue;
-                        
+
                         await base44.asServiceRole.entities.Exception.create({
                             project_id,
                             attendance_id: detail.attendance_id,
@@ -1641,25 +1714,31 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Update project status
-        await base44.asServiceRole.entities.Project.update(project_id, {
-            last_saved_report_id: reportRun.id,
-            status: 'analyzed'
-        });
+        // Update project status (only if this is NOT a chunk or it's the final chunk)
+        const isFinalChunk = _chunk_offset === undefined || (startIdx + allResults.length >= uniqueEmployeeIds.length);
+        if (isFinalChunk) {
+            await base44.asServiceRole.entities.Project.update(project_id, {
+                last_saved_report_id: reportRun.id,
+                status: 'analyzed'
+            });
+        }
 
         return Response.json({
             success: true,
             report_run_id: reportRun.id,
             processed_count: allResults.length,
             total_count: uniqueEmployeeIds.length,
+            chunk_start: startIdx,
+            chunk_end: endIdx,
+            is_complete: isFinalChunk,
             other_minutes_exceptions_created: otherMinutesExceptionsToCreate.length,
-            message: `Analysis complete for ${allResults.length} employees`
+            message: `Analysis complete for ${allResults.length} employees (${startIdx}-${endIdx} of ${uniqueEmployeeIds.length})`
         });
 
     } catch (error) {
         console.error('Run analysis error:', error);
-        return Response.json({ 
-            error: error.message 
+        return Response.json({
+            error: error.message
         }, { status: 500 });
     }
 });

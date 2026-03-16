@@ -154,108 +154,121 @@ Deno.serve(async (req) => {
         }
 
         const body = await req.json();
-        const { fileBase64, fileName, fileType, criteria } = body;
+        const { fileBase64, fileName, fileType, criteria, mode = 'full', existingData = null, existingFileUrl = null } = body;
 
-        if (!fileBase64 || !fileName) {
-            return Response.json({ error: 'File data is required' }, { status: 400 });
-        }
-
-        // File type validation
-        const ext = ('.' + fileName.split('.').pop()).toLowerCase();
-        const mimeOk = ALLOWED_MIME_TYPES.includes(fileType);
-        const extOk = ALLOWED_EXTENSIONS.includes(ext);
-        if (!mimeOk && !extOk) {
-            return Response.json({ error: 'Invalid file type. Only PDF and DOCX resumes are accepted.' }, { status: 400 });
-        }
-
-        if (!criteria || !criteria.position_name) {
-            return Response.json({ error: 'Position criteria is required' }, { status: 400 });
-        }
-
-        // Convert base64 to binary
-        const binaryStr = atob(fileBase64);
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) {
-            bytes[i] = binaryStr.charCodeAt(i);
-        }
-        const mimeType = fileType || 'application/octet-stream';
-        const fileObj = new File([bytes], fileName, { type: mimeType });
-
-        // Step 1: Upload file
-        const uploadResult = await base44.integrations.Core.UploadFile({ file: fileObj });
-        const fileUrl = uploadResult.file_url;
-
-        // Step 2: Extract structured data from resume
-        const extractionSchema = {
-            type: "object",
-            properties: {
-                full_name: { type: "string" },
-                email: { type: "string" },
-                phone: { type: "string" },
-                total_years_experience: { type: "number", description: "Total years across all jobs" },
-                relevant_years_experience: {
-                    type: "number",
-                    description: `Years of experience in roles directly similar to "${criteria.position_name}" in the ${criteria.department || 'relevant'} field. Count only roles where the job title, responsibilities, or industry closely match this position. Do NOT count unrelated roles.`
-                },
-                current_or_last_position: { type: "string" },
-                current_or_last_company: { type: "string" },
-                skills: { type: "array", items: { type: "string" } },
-                education: {
-                    type: "array",
-                    items: {
-                        type: "object",
-                        properties: {
-                            degree: { type: "string" },
-                            field: { type: "string", description: "Field of study, e.g. Mechanical Engineering, Computer Science" },
-                            institution: { type: "string" },
-                            year: { type: "string" }
-                        }
-                    }
-                },
-                experience: {
-                    type: "array",
-                    items: {
-                        type: "object",
-                        properties: {
-                            company: { type: "string" },
-                            role: { type: "string" },
-                            duration: { type: "string" },
-                            responsibilities: { type: "string" }
-                        }
-                    }
-                },
-                certifications: { type: "array", items: { type: "string" } },
-                languages: { type: "array", items: { type: "string" } }
+        // Validation for different modes
+        if (mode === 'full' || mode === 'extraction_only') {
+            if (!fileBase64 || !fileName) {
+                return Response.json({ error: 'File data is required for this mode' }, { status: 400 });
             }
-        };
+        }
+        
+        if (mode === 'evaluation_only' && !existingData) {
+            return Response.json({ error: 'Extracted data is required for re-evaluation' }, { status: 400 });
+        }
 
-        let extractedData = null;
-        try {
+        const criteriaList = Array.isArray(criteria) ? criteria : (criteria ? [criteria] : []);
+        if (mode !== 'extraction_only' && criteriaList.length === 0) {
+            return Response.json({ error: 'Position criteria is required for evaluation' }, { status: 400 });
+        }
+
+        // File type validation (if file is provided)
+        if (fileBase64 && fileName) {
+            const ext = ('.' + fileName.split('.').pop()).toLowerCase();
+            const mimeOk = ALLOWED_MIME_TYPES.includes(fileType);
+            const extOk = ALLOWED_EXTENSIONS.includes(ext);
+            if (!mimeOk && !extOk) {
+                return Response.json({ error: 'Invalid file type. Only PDF and DOCX resumes are accepted.' }, { status: 400 });
+            }
+        }
+
+        // Helper: Extract structured data from uploaded file
+        async function extractResumeData(fileUrl: string, positionName: string) {
+            const extractionSchema = {
+                type: "object",
+                properties: {
+                    full_name: { type: "string" },
+                    email: { type: "string" },
+                    phone: { type: "string" },
+                    total_years_experience: { type: "number", description: "Total years across all jobs" },
+                    relevant_years_experience: {
+                        type: "number",
+                        description: `Years of experience in roles directly similar to "${positionName}" in the field. Count only roles where the job title, responsibilities, or industry closely match this position. Do NOT count unrelated roles.`
+                    },
+                    current_or_last_position: { type: "string" },
+                    current_or_last_company: { type: "string" },
+                    skills: { type: "array", items: { type: "string" } },
+                    education: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                degree: { type: "string" },
+                                field: { type: "string", description: "Field of study, e.g. Mechanical Engineering, Computer Science" },
+                                institution: { type: "string" },
+                                year: { type: "string" }
+                            }
+                        }
+                    },
+                    experience: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                company: { type: "string" },
+                                role: { type: "string" },
+                                duration: { type: "string" },
+                                responsibilities: { type: "string" }
+                            }
+                        }
+                    },
+                    certifications: { type: "array", items: { type: "string" } },
+                    languages: { type: "array", items: { type: "string" } },
+                    nationality: { type: "string", description: "The candidate's nationality, e.g., Syrian, Egyptian, Indian, etc." },
+                    current_location: { type: "string", description: "The candidate's current city and country of residence." },
+                    gender: { type: "string", description: "The candidate's gender (Male/Female)." }
+                }
+            };
+
             const extractionResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
                 file_url: fileUrl,
                 json_schema: extractionSchema
             });
-            if (extractionResult.status === 'success') {
-                extractedData = extractionResult.output;
+
+            if (extractionResult.status !== 'success') {
+                throw new Error('Extraction failed: ' + (extractionResult.error || 'Unknown error'));
             }
-        } catch (extractErr) {
-            console.error('Extraction failed:', extractErr.message);
+            return extractionResult.output;
         }
 
-        // Step 3: Code-based comparison
-        const codeComparison = buildCodeComparison(extractedData || {}, criteria);
+        // Helper: Evaluate extracted data against position criteria
+        async function evaluateCandidate(extractedData: any, criteria: any) {
+            const codeComparison = buildCodeComparison(extractedData, criteria);
+            const criteriaText = buildCriteriaText(criteria);
+            const resumeDataStr = JSON.stringify(extractedData, null, 2);
 
-        // Step 4: AI Evaluation
-        const criteriaText = buildCriteriaText(criteria);
-        const resumeDataStr = extractedData
-            ? JSON.stringify(extractedData, null, 2)
-            : `File uploaded but could not be parsed. File: ${fileName}`;
+            // Mandatory Rule Checking Logic
+            const mandatoryRules = criteria.mandatory_rules || [];
+            const failedMandatory = [];
+            
+            if (mandatoryRules.length > 0) {
+                // Check min experience if mandatory
+                if (mandatoryRules.includes('min_experience_years') && criteria.min_experience_years) {
+                    const candExp = extractedData.relevant_years_experience ?? extractedData.total_years_experience ?? 0;
+                    if (candExp < parseFloat(criteria.min_experience_years)) {
+                        failedMandatory.push(`Required ${criteria.min_experience_years}+ years experience (Candidate has ${candExp}y)`);
+                    }
+                }
+                // Other mandatory checks (keywords in skills, education, etc.) can be added here
+                // For now, we'll let the AI also flag mandatory failures in its summary if we mention them in the prompt
+            }
 
-        const prompt = `You are an expert HR recruiter and ATS evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
+            const prompt = `You are an expert HR recruiter and ATS evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
 
-You are evaluating this candidate specifically for the role of: ${criteria.position_name}. All scoring, skill matching, and recommendations must be made relative to the requirements of this position only.
+You are evaluating this candidate specifically for the role of: ${criteria.position_name}.
+All scoring, skill matching, and recommendations must be made relative to the requirements of this position only.
 
-Evaluate the following resume against the structured screening criteria for this role.
+${failedMandatory.length > 0 ? `CRITICAL: The candidate FAILED the following mandatory requirements:\n- ${failedMandatory.join('\n- ')}\nAdjust score and recommendation accordingly.` : ''}
 
 SCREENING CRITERIA:
 ${criteriaText}
@@ -268,89 +281,148 @@ CODE-BASED REQUIREMENTS MATCH SUMMARY:
 - Required skills matched: ${codeComparison.candidate_skills_matched?.join(', ') || 'none'}
 - Certifications found: ${codeComparison.candidate_certifications?.join(', ') || 'none'}
 - Languages present: ${(extractedData?.languages || []).join(', ') || 'none'}
-- Missing languages: ${codeComparison.missing_languages?.join(', ') || 'none'}
-
-Provide a thorough, objective evaluation. Consider UAE work environment and automotive industry context.
-Be specific and cite actual data from the resume.
 
 Output a JSON with these exact fields:
 - score: number 0-100 overall suitability
 - recommendation: exactly one of ["Highly Recommended", "Recommended", "Consider", "Not Recommended"]
-- summary: 2-3 sentences explaining overall assessment
-- matched_skills: array of strings - specific criteria the candidate meets
-- missing_skills: array of strings - important requirements the candidate lacks
-- strengths: array of 3 specific strings from the resume data
-- concerns: array of strings - specific red flags (empty array if none)
-- experience_years: number - years in roles RELEVANT to "${criteria.position_name}" only, not total career years`;
+- summary: 2-3 sentences explaining overall assessment. If they failed a mandatory rule, state it clearly.
+- matched_skills: array of strings
+- missing_skills: array of strings
+- strengths: array of 3 specific strings
+- concerns: array of strings. If they failed mandatory rules, list them here.
+- experience_years: number (relevant to the role)`;
 
-        const aiResponse = await base44.integrations.Core.InvokeLLM({
-            prompt,
-            response_json_schema: {
-                type: "object",
-                properties: {
-                    score: { type: "number" },
-                    recommendation: { type: "string" },
-                    summary: { type: "string" },
-                    matched_skills: { type: "array", items: { type: "string" } },
-                    missing_skills: { type: "array", items: { type: "string" } },
-                    strengths: { type: "array", items: { type: "string" } },
-                    concerns: { type: "array", items: { type: "string" } },
-                    experience_years: { type: "number" }
+            const aiResponse = await base44.integrations.Core.InvokeLLM({
+                prompt,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        score: { type: "number" },
+                        recommendation: { type: "string" },
+                        summary: { type: "string" },
+                        matched_skills: { type: "array", items: { type: "string" } },
+                        missing_skills: { type: "array", items: { type: "string" } },
+                        strengths: { type: "array", items: { type: "string" } },
+                        concerns: { type: "array", items: { type: "string" } },
+                        experience_years: { type: "number" }
+                    }
                 }
+            });
+
+            // If mandatory rules failed, ensure the recommendation is at most 'Not Recommended' or similar
+            if (failedMandatory.length > 0 && (aiResponse.recommendation === 'Highly Recommended' || aiResponse.recommendation === 'Recommended')) {
+                aiResponse.recommendation = 'Not Recommended';
+                aiResponse.score = Math.min(aiResponse.score, 30);
             }
-        });
 
-        // Properly distinguish score=0 from missing score
-        const aiScore = aiResponse?.score != null ? aiResponse.score : 0;
+            return {
+                aiResponse,
+                codeComparison,
+                criteriaText,
+                failedMandatory
+            };
+        }
 
-        // Step 5: Save result — consistent JSON array storage for all list fields
+        let fileUrl = existingFileUrl;
+        let extractedData = existingData;
+
+        // Step 1: Upload (if needed)
+        let fileObj: File | null = null;
+        if (!fileUrl && fileBase64) {
+            const binaryStr = atob(fileBase64);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) { bytes[i] = binaryStr.charCodeAt(i); }
+            const mimeType = fileType || 'application/octet-stream';
+            fileObj = new File([bytes], fileName, { type: mimeType });
+            
+            const uploadResult = await base44.integrations.Core.UploadFile({ file: fileObj });
+            fileUrl = uploadResult.file_url;
+        }
+
+        // Step 2: Extract (if needed)
+        if (!extractedData && fileUrl && (mode === 'full' || mode === 'extraction_only')) {
+            const contextPosition = criteriaList[0]?.position_name || 'Generic Role';
+            extractedData = await extractResumeData(fileUrl, contextPosition);
+        }
+
+        if (mode === 'extraction_only') {
+            return Response.json({ success: true, extractedData, fileUrl });
+        }
+
+        // Step 3: Evaluate
+        const evaluations = [];
+        for (const crit of criteriaList) {
+            const evalResult = await evaluateCandidate(extractedData, crit);
+            evaluations.push({
+                criteria: crit,
+                ...evalResult,
+                aiScore: evalResult.aiResponse.score
+            });
+        }
+
+        // Find the best evaluation
+        const best = evaluations.reduce((prev, current) => (current.aiScore > prev.aiScore ? current : prev), evaluations[0]);
+
+        // Step 4: Save to history
         const scanRecord = await base44.entities.ResumeScanResult.create({
             applicant_name: extractedData?.full_name || 'Unknown',
             applicant_email: extractedData?.email || '',
             applicant_phone: extractedData?.phone || '',
-            position_applied: criteria.position_name || '',
-            department: criteria.department || '',
+            position_applied: best.criteria.position_name || '',
+            department: best.criteria.department || '',
             file_url: fileUrl,
-            file_name: fileName,
+            file_name: fileName || 'uploaded_resume',
             extracted_data: JSON.stringify(extractedData),
-            code_comparison: JSON.stringify(codeComparison),
-            criteria_used: criteriaText,
-            criteria_data: JSON.stringify(criteria), // structured criteria for audit/re-run
-            ai_score: aiScore,
-            ai_recommendation: aiResponse?.recommendation || 'Consider',
-            ai_summary: aiResponse?.summary || '',
-            matched_skills: JSON.stringify(aiResponse?.matched_skills || []),
-            missing_skills: JSON.stringify(aiResponse?.missing_skills || []),
-            strengths: JSON.stringify(aiResponse?.strengths || []),
-            concerns: JSON.stringify(aiResponse?.concerns || []),
-            years_experience: aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
+            code_comparison: JSON.stringify(best.codeComparison),
+            criteria_used: best.criteriaText,
+            criteria_data: JSON.stringify(best.criteria),
+            ai_score: best.aiScore,
+            ai_recommendation: best.aiResponse?.recommendation || 'Consider',
+            ai_summary: best.aiResponse?.summary || '',
+            matched_skills: JSON.stringify(best.aiResponse?.matched_skills || []),
+            missing_skills: JSON.stringify(best.aiResponse?.missing_skills || []),
+            strengths: JSON.stringify(best.aiResponse?.strengths || []),
+            concerns: JSON.stringify(best.aiResponse?.concerns || []),
+            years_experience: best.aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
             scanned_by: user.email,
             status: 'completed',
-            // evaluated_template_name records which template (position) was used in this
-            // specific scan call. The frontend uses this in multi-template mode to map
-            // each independent scan result back to the template that produced it.
-            evaluated_template_name: criteria.position_name || ''
+            evaluation_status: best.failedMandatory.length > 0 ? 'Rejected' : 'Pending',
+            nationality: extractedData?.nationality || 'Not Specified',
+            location: extractedData?.current_location || 'Not Specified',
+            gender: extractedData?.gender || 'Not Specified',
+            evaluated_template_name: best.criteria.position_name || ''
         });
 
         return Response.json({
             success: true,
             scanId: scanRecord.id,
             result: {
-                score: aiScore,
-                recommendation: aiResponse?.recommendation || 'Consider',
-                summary: aiResponse?.summary || '',
-                matched_skills: aiResponse?.matched_skills || [],
-                missing_skills: aiResponse?.missing_skills || [],
-                strengths: aiResponse?.strengths || [],
-                concerns: aiResponse?.concerns || [],
-                experience_years: aiResponse?.experience_years ?? 0,
-                applicant_name: extractedData?.full_name || 'Unknown',
-                applicant_email: extractedData?.email || '',
+                score: best.aiScore,
+                recommendation: best.aiResponse?.recommendation,
+                summary: best.aiResponse?.summary,
+                matched_skills: best.aiResponse?.matched_skills,
+                missing_skills: best.aiResponse?.missing_skills,
+                strengths: best.aiResponse?.strengths,
+                concerns: [
+                    ...(best.aiResponse?.concerns || []),
+                    ...best.failedMandatory
+                ],
+                years_experience: scanRecord.years_experience,
+                applicant_name: scanRecord.applicant_name,
+                applicant_email: scanRecord.applicant_email,
+                nationality: scanRecord.nationality,
+                location: scanRecord.location,
+                gender: scanRecord.gender,
                 file_url: fileUrl,
                 file_name: fileName,
                 extracted_data: JSON.stringify(extractedData),
-                code_comparison: codeComparison,
-                evaluated_template_name: criteria.position_name || ''
+                code_comparison: best.codeComparison,
+                matched_template_name: best.criteria.position_name,
+                failed_mandatory: best.failedMandatory,
+                template_scores: criteriaList.length > 1 ? evaluations.map(e => ({
+                    template_name: e.criteria.position_name,
+                    score: e.aiScore
+                })) : undefined
             }
         });
 

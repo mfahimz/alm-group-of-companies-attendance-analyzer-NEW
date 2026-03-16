@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     try {
         console.log('[createSalarySnapshots] Function invoked');
         const base44 = createClientFromRequest(req);
-        
+
         // Allow service role calls (from markFinalReport)
         let user = null;
         try {
@@ -51,8 +51,8 @@ Deno.serve(async (req) => {
         console.log('[createSalarySnapshots] Params:', { project_id, report_run_id });
 
         if (!project_id || !report_run_id) {
-            return Response.json({ 
-                error: 'project_id and report_run_id are required' 
+            return Response.json({
+                error: 'project_id and report_run_id are required'
             }, { status: 400 });
         }
 
@@ -63,19 +63,19 @@ Deno.serve(async (req) => {
         }
 
         const project = projects[0];
-        
+
         // ============================================================
         // USE PROJECT-LEVEL DEFAULTS (Settings entity removed)
         // ============================================================
         const settings = null;
-        
+
         // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
         let divisor = settings?.salary_divisor || project.salary_calculation_days || 30;
         if (!divisor || divisor <= 0) {
             console.warn('[createSalarySnapshots] Invalid salary_divisor from settings, using default 30');
             divisor = 30;
         }
-        
+
         // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
         let otDivisor = settings?.ot_divisor || project.ot_calculation_days || divisor;
         if (!otDivisor || otDivisor <= 0) {
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
             otDivisor = divisor;
         }
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
-        
+
         // OT Rates from settings
         let otNormalRate = settings?.ot_normal_rate || 1.25;
         let otSpecialRate = settings?.ot_special_rate || 1.5;
@@ -95,17 +95,17 @@ Deno.serve(async (req) => {
             console.warn('[createSalarySnapshots] Invalid ot_special_rate, using default 1.5');
             otSpecialRate = 1.5;
         }
-        
+
         // WPS Cap settings
         const wpsCapEnabledGlobal = settings?.wps_cap_enabled ?? (isAlMaraghi ? true : false);
         const wpsCapAmountGlobal = settings?.wps_cap_amount ?? 4900;
         const balanceRoundingRule = settings?.balance_rounding_rule || 'EXACT';
-        
+
         // Formula settings
         const leavePayFormula = settings?.leave_pay_formula || 'TOTAL_SALARY';
         const salaryLeaveFormula = settings?.salary_leave_formula || 'BASIC_PLUS_ALLOWANCES';
         const assumedPresentLastDays = settings?.assumed_present_last_days ?? (isAlMaraghi ? 2 : 0);
-        
+
         console.log('[createSalarySnapshots] ============================================');
         console.log('[createSalarySnapshots] CALCULATION SETTINGS (from Project):');
         console.log('[createSalarySnapshots]   Salary Divisor:', divisor);
@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
 
             console.log(`[createSalarySnapshots] ✅ BATCH CONTINUE MODE: existing snapshots repaired; continuing with remaining employees`);
         }
-        
+
         console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: proceeding with snapshot creation flow`);
         console.log(`[createSalarySnapshots] Request mode: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}, batch_size: ${batch_size}`);
 
@@ -284,12 +284,12 @@ Deno.serve(async (req) => {
         // Exception: If employee has ANNUAL_LEAVE on those days, honor the leave.
         // ============================================================
         let assumedPresentDays = [];
-        
+
         if (isAlMaraghi) {
             const projectDateTo = new Date(project.date_to);
             const salaryMonthStart = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth(), 1);
             const salaryMonthEnd = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth() + 1, 0);
-            
+
             salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
             salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
 
@@ -338,12 +338,12 @@ Deno.serve(async (req) => {
         const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts, allOvertimeData] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
-            base44.asServiceRole.entities.AnalysisResult.filter({ 
+            base44.asServiceRole.entities.AnalysisResult.filter({
                 project_id: project_id,
                 report_run_id: report_run_id
             }, null, 5000),
             base44.asServiceRole.entities.Exception.filter({ project_id: project_id }, null, 5000),
-            isAlMaraghi 
+            isAlMaraghi
                 ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true }, null, 5000)
                 : Promise.resolve([]),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000),
@@ -369,26 +369,26 @@ Deno.serve(async (req) => {
         }
 
         // Helper: Parse time string to Date object
-        const parseTime = (timeStr, includeSeconds = false) => {
+        const parseTime = (timeStr) => {
             try {
                 if (!timeStr || timeStr === '—' || timeStr === '-') return null;
-                
-                if (includeSeconds) {
-                    let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-                    if (timeMatch) {
-                        let hours = parseInt(timeMatch[1]);
-                        const minutes = parseInt(timeMatch[2]);
-                        const seconds = parseInt(timeMatch[3]);
-                        const period = timeMatch[4].toUpperCase();
-                        if (period === 'PM' && hours !== 12) hours += 12;
-                        if (period === 'AM' && hours === 12) hours = 0;
-                        const date = new Date();
-                        date.setHours(hours, minutes, seconds, 0);
-                        return date;
-                    }
+
+                // Priority 1: Format with seconds
+                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = parseInt(timeMatch[3]);
+                    const period = timeMatch[4].toUpperCase();
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
                 }
-                
-                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+
+                // Priority 2: Standard AM/PM
+                timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                 if (timeMatch) {
                     let hours = parseInt(timeMatch[1]);
                     const minutes = parseInt(timeMatch[2]);
@@ -399,7 +399,8 @@ Deno.serve(async (req) => {
                     date.setHours(hours, minutes, 0, 0);
                     return date;
                 }
-                
+
+                // Priority 3: 24-hour with optional seconds
                 timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
                 if (timeMatch) {
                     const hours = parseInt(timeMatch[1]);
@@ -409,7 +410,7 @@ Deno.serve(async (req) => {
                     date.setHours(hours, minutes, seconds, 0);
                     return date;
                 }
-                
+
                 return null;
             } catch {
                 return null;
@@ -417,11 +418,11 @@ Deno.serve(async (req) => {
         };
 
         // Helper: Filter duplicate punches within 10 minutes
-        const filterMultiplePunches = (punchList, includeSeconds) => {
+        const filterMultiplePunches = (punchList) => {
             if (punchList.length <= 1) return punchList;
             const punchesWithTime = punchList.map(p => ({
                 ...p,
-                time: parseTime(p.timestamp_raw, includeSeconds)
+                time: parseTime(p.timestamp_raw)
             })).filter(p => p.time);
             if (punchesWithTime.length === 0) return punchList;
 
@@ -434,30 +435,37 @@ Deno.serve(async (req) => {
         };
 
         // Helper: Match punches to shift points
-        const matchPunchesToShiftPoints = (dayPunches, shift, includeSeconds) => {
+        const matchPunchesToShiftPoints = (dayPunches, shift) => {
             if (!shift || dayPunches.length === 0) return [];
-            
+
             const punchesWithTime = dayPunches.map(p => ({
                 ...p,
-                time: p.time || parseTime(p.timestamp_raw, includeSeconds)
+                time: p.time || parseTime(p.timestamp_raw)
             })).filter(p => p.time).sort((a, b) => a.time - b.time);
-            
+
             if (punchesWithTime.length === 0) return [];
-            
+
+            // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
+            const pmEndTime = parseTime(shift.pm_end);
+            let adjustedPmEnd = pmEndTime;
+            if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+                adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+            }
+
             const shiftPoints = [
                 { type: 'AM_START', time: parseTime(shift.am_start) },
                 { type: 'AM_END', time: parseTime(shift.am_end) },
                 { type: 'PM_START', time: parseTime(shift.pm_start) },
-                { type: 'PM_END', time: parseTime(shift.pm_end) }
+                { type: 'PM_END', time: adjustedPmEnd }
             ].filter(sp => sp.time);
-            
+
             const matches = [];
             const usedShiftPoints = new Set();
-            
+
             for (const punch of punchesWithTime) {
                 let closestMatch = null;
                 let minDistance = Infinity;
-                
+
                 // Phase 1: Normal match (±60 min)
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
@@ -467,7 +475,7 @@ Deno.serve(async (req) => {
                         closestMatch = shiftPoint;
                     }
                 }
-                
+
                 // Phase 2: Extended match (±120 min)
                 if (!closestMatch) {
                     for (const shiftPoint of shiftPoints) {
@@ -479,7 +487,7 @@ Deno.serve(async (req) => {
                         }
                     }
                 }
-                
+
                 // Phase 3: Far extended match (±180 min)
                 if (!closestMatch) {
                     for (const shiftPoint of shiftPoints) {
@@ -491,13 +499,13 @@ Deno.serve(async (req) => {
                         }
                     }
                 }
-                
+
                 if (closestMatch) {
                     matches.push({ punch, matchedTo: closestMatch.type, shiftTime: closestMatch.time });
                     usedShiftPoints.add(closestMatch.type);
                 }
             }
-            
+
             return matches;
         };
 
@@ -559,15 +567,15 @@ Deno.serve(async (req) => {
 
         const recalculateEmployeeAttendance = (emp, dateFrom, dateTo, assumedDays = []) => {
             const attendanceIdStr = String(emp.attendance_id);
-            const includeSeconds = project.company === 'Al Maraghi Automotive';
-            
-            const employeePunches = punches.filter(p => 
+            const includeSeconds = true; // Unified
+
+            const employeePunches = punches.filter(p =>
                 String(p.attendance_id) === attendanceIdStr &&
-                p.punch_date >= dateFrom && 
+                p.punch_date >= dateFrom &&
                 p.punch_date <= dateTo
             );
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-            const employeeExceptions = allExceptions.filter(e => 
+            const employeeExceptions = allExceptions.filter(e =>
                 (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
                 e.use_in_analysis !== false &&
                 e.is_custom_type !== true
@@ -605,7 +613,7 @@ Deno.serve(async (req) => {
                 } else if (emp.weekly_off) {
                     weeklyOffDay = dayNameToNumber[emp.weekly_off];
                 }
-                
+
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                     continue;
                 }
@@ -617,19 +625,19 @@ Deno.serve(async (req) => {
                 // CRITICAL FIX: Check if assumed day is employee's weekly off - if so, don't mark present
                 // ============================================================
                 const isAssumedPresentDay = assumedDays.includes(dateStr);
-                
+
                 if (isAssumedPresentDay) {
                     // Check if this assumed day is the employee's weekly off
                     // Each employee has their own weekly_off field
                     const assumedDayOfWeek = currentDate.getUTCDay();
                     const employeeWeeklyOff = emp.weekly_off ? dayNameToNumber[emp.weekly_off] : null;
-                    
+
                     // If assumed day is employee's weekly off, skip it (don't mark as present)
                     if (employeeWeeklyOff !== null && assumedDayOfWeek === employeeWeeklyOff) {
                         console.log(`[createSalarySnapshots] ${emp.name}: Skipping assumed present day ${dateStr} - it's their weekly off (${emp.weekly_off})`);
                         continue; // Don't mark as present, it's their weekly off
                     }
-                    
+
                     // Check if employee has annual leave on this assumed day
                     const hasAnnualLeaveOnAssumedDay = employeeExceptions.some(ex => {
                         if (ex.type !== 'ANNUAL_LEAVE') return false;
@@ -640,7 +648,7 @@ Deno.serve(async (req) => {
                             return false;
                         }
                     });
-                    
+
                     if (!hasAnnualLeaveOnAssumedDay) {
                         // Assumed present: count as working day, present day, NO deductions
                         workingDays++;
@@ -662,13 +670,13 @@ Deno.serve(async (req) => {
                 });
 
                 // Check for PUBLIC_HOLIDAY - day is NOT a working day
-                const hasPublicHoliday = matchingExceptions.some(ex => 
+                const hasPublicHoliday = matchingExceptions.some(ex =>
                     ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                 );
-                
+
                 // Check for MANUAL_ABSENT on the same date (even if it's a public holiday)
                 const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
-                
+
                 if (hasPublicHoliday) {
                     // PUBLIC_HOLIDAY: Day is NOT a working day
                     // BUT if there's also a MANUAL_ABSENT, count LOP without adding to working days
@@ -743,13 +751,13 @@ Deno.serve(async (req) => {
                                     shift = s;
                                     break;
                                 }
-                            } catch {}
+                            } catch { }
                         }
                     }
                     if (!shift) {
                         if (dayOfWeek === 5) {
                             shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s)) ||
-                                    employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                                employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                         } else {
                             shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                         }
@@ -769,11 +777,11 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                const dayPunches = filterMultiplePunches(rawDayPunches, includeSeconds);
+                const dayPunches = filterMultiplePunches(rawDayPunches);
 
                 // Track allowed minutes
                 let allowedMinutesForDay = 0;
-                if (dateException && dateException.type === 'ALLOWED_MINUTES' && 
+                if (dateException && dateException.type === 'ALLOWED_MINUTES' &&
                     dateException.approval_status === 'approved_dept_head') {
                     allowedMinutesForDay = dateException.allowed_minutes || 0;
                     approvedMinutes += allowedMinutesForDay;
@@ -781,7 +789,7 @@ Deno.serve(async (req) => {
 
                 // Check for manual time exception
                 const hasManualTimeException = dateException && (
-                    dateException.type === 'MANUAL_LATE' || 
+                    dateException.type === 'MANUAL_LATE' ||
                     dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
                     (dateException.late_minutes > 0) ||
                     (dateException.early_checkout_minutes > 0) ||
@@ -801,23 +809,18 @@ Deno.serve(async (req) => {
                     presentDays++;
                 }
 
-                // Calculate time issues
-                if (hasManualTimeException && !shouldSkipTimeCalc) {
-                    if (dateException.late_minutes > 0) lateMinutes += dateException.late_minutes;
-                    if (dateException.early_checkout_minutes > 0) earlyCheckoutMinutes += dateException.early_checkout_minutes;
-                    if (dateException.other_minutes > 0) otherMinutes += dateException.other_minutes;
-                } else if (shift && dayPunches.length > 0 && !shouldSkipTimeCalc) {
-                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
-                    
-                    let dayLateMinutes = 0;
-                    let dayEarlyMinutes = 0;
-                    
-                    // BUG FIX #2: Use Math.abs on RESULT of time difference, not individual components
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+
+                // 1. Calculation phase: Compute from punches if valid shift exists
+                if (shift && dayPunches.length > 0 && !shouldSkipTimeCalc) {
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
+
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         const punchTime = match.punch.time;
                         const shiftTime = match.shiftTime;
-                        
+
                         if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
                             dayLateMinutes += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
                         }
@@ -825,25 +828,33 @@ Deno.serve(async (req) => {
                             dayEarlyMinutes += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
                         }
                     }
-                    
-                    // Apply allowed minutes offset
-                    if (allowedMinutesForDay > 0) {
-                        const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                        const excessMinutes = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                        if (totalDayMinutes > 0 && excessMinutes > 0) {
-                            const lateRatio = dayLateMinutes / totalDayMinutes;
-                            const earlyRatio = dayEarlyMinutes / totalDayMinutes;
-                            dayLateMinutes = Math.round(excessMinutes * lateRatio);
-                            dayEarlyMinutes = Math.round(excessMinutes * earlyRatio);
-                        } else {
-                            dayLateMinutes = 0;
-                            dayEarlyMinutes = 0;
-                        }
-                    }
-                    
-                    lateMinutes += dayLateMinutes;
-                    earlyCheckoutMinutes += dayEarlyMinutes;
                 }
+
+                // 2. Override phase: Specific manual adjustments (if provided)
+                if (dateException && !shouldSkipTimeCalc) {
+                    if (dateException.late_minutes > 0) {
+                        dayLateMinutes = dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes > 0) {
+                        dayEarlyMinutes = dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes > 0) {
+                        otherMinutes += dateException.other_minutes;
+                    }
+                }
+
+                // 3. Deduction Reduction phase: Apply allowed minutes
+                const rawTotalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                if (allowedMinutesForDay > 0 && rawTotalDayMinutes > 0) {
+                    const remaining = Math.max(0, rawTotalDayMinutes - allowedMinutesForDay);
+                    const lateRatio = dayLateMinutes / rawTotalDayMinutes;
+                    const earlyRatio = dayEarlyMinutes / rawTotalDayMinutes;
+                    dayLateMinutes = Math.round(remaining * lateRatio);
+                    dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                }
+
+                lateMinutes += dayLateMinutes;
+                earlyCheckoutMinutes += dayEarlyMinutes;
             }
 
             // Get grace minutes
@@ -855,15 +866,15 @@ Deno.serve(async (req) => {
             // Calculate annual leave as CALENDAR DAYS (not working days)
             const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
             const annualLeaveDatesProcessed = new Set();
-            
+
             for (const alEx of annualLeaveExceptions) {
                 try {
                     const exFrom = new Date(alEx.date_from);
                     const exTo = new Date(alEx.date_to);
-                    
+
                     const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
                     const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
-                    
+
                     if (rangeStart <= rangeEnd) {
                         for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
                             const dateStr = d.toISOString().split('T')[0];
@@ -912,19 +923,19 @@ Deno.serve(async (req) => {
 
             const attendanceIdStr = String(emp.attendance_id);
             const includeSeconds = false; // Al Maraghi doesn't use seconds
-            
+
             // ============================================================
             // PROJECT-SPECIFIC OVERRIDE: "January – Al Maraghi Motors"
             // Override previous month date range for this specific project
             // ============================================================
             // Check for both regular hyphen and en-dash variants of the project name
-            const isJanuaryAlMaraghiProject = project.name === 'January - Al Maraghi Motors' || 
-                                               project.name === 'January – Al Maraghi Motors';
-            
+            const isJanuaryAlMaraghiProject = project.name === 'January - Al Maraghi Motors' ||
+                project.name === 'January – Al Maraghi Motors';
+
             let effectivePrevMonthFrom = extraPrevMonthFrom;
             let effectivePrevMonthTo = extraPrevMonthTo;
             let effectiveLopOnlyDate = extraPrevMonthTo; // Default: last day of prev month range
-            
+
             if (isJanuaryAlMaraghiProject) {
                 // For "January – Al Maraghi Motors" ONLY:
                 // - Previous month hours: 29/12/2025 → 31/12/2025
@@ -932,17 +943,17 @@ Deno.serve(async (req) => {
                 effectivePrevMonthFrom = '2025-12-29';
                 effectivePrevMonthTo = '2025-12-31';
                 effectiveLopOnlyDate = '2025-12-31';
-                
+
                 console.log(`[createSalarySnapshots] PROJECT OVERRIDE: "January – Al Maraghi Motors" - Using prev month range 29-31 Dec, LOP only on 31 Dec`);
             }
-            
-            const employeePunches = punches.filter(p => 
+
+            const employeePunches = punches.filter(p =>
                 String(p.attendance_id) === attendanceIdStr &&
-                p.punch_date >= effectivePrevMonthFrom && 
+                p.punch_date >= effectivePrevMonthFrom &&
                 p.punch_date <= effectivePrevMonthTo
             );
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-            const employeeExceptions = allExceptions.filter(e => 
+            const employeeExceptions = allExceptions.filter(e =>
                 (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
                 e.use_in_analysis !== false &&
                 e.is_custom_type !== true
@@ -958,7 +969,7 @@ Deno.serve(async (req) => {
             let totalEarlyMinutes = 0;
             let totalOtherMinutes = 0;
             let totalApprovedMinutes = 0;
-            
+
             // LOP: Only check the specific LOP day (last day of prev month range)
             let extraLopDays = 0;
             const lastDayOfPrevMonth = effectiveLopOnlyDate; // e.g., "2025-12-31"
@@ -979,7 +990,7 @@ Deno.serve(async (req) => {
                 } else if (emp.weekly_off) {
                     weeklyOffDay = dayNameToNumber[emp.weekly_off];
                 }
-                
+
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                     continue;
                 }
@@ -992,7 +1003,7 @@ Deno.serve(async (req) => {
                     } catch { return false; }
                 });
 
-                const hasPublicHoliday = matchingExceptions.some(ex => 
+                const hasPublicHoliday = matchingExceptions.some(ex =>
                     ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                 );
                 if (hasPublicHoliday) continue;
@@ -1017,7 +1028,7 @@ Deno.serve(async (req) => {
 
                 // Get punches for this day
                 const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
-                
+
                 // NO PUNCHES: Only count as LOP if it's the last day of prev month
                 if (rawDayPunches.length === 0) {
                     if (isLastDayOfPrevMonth) {
@@ -1048,13 +1059,13 @@ Deno.serve(async (req) => {
                                     shift = s;
                                     break;
                                 }
-                            } catch {}
+                            } catch { }
                         }
                     }
                     if (!shift) {
                         if (dayOfWeek === 5) {
                             shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s)) ||
-                                    employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                                employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                         } else {
                             shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
                         }
@@ -1075,18 +1086,18 @@ Deno.serve(async (req) => {
 
                 if (!shift) continue;
 
-                const dayPunches = filterMultiplePunches(rawDayPunches, includeSeconds);
+                const dayPunches = filterMultiplePunches(rawDayPunches);
 
                 // Track allowed/approved minutes for this day
                 let allowedMinutesForDay = 0;
-                if (dateException && dateException.type === 'ALLOWED_MINUTES' && 
+                if (dateException && dateException.type === 'ALLOWED_MINUTES' &&
                     dateException.approval_status === 'approved_dept_head') {
                     allowedMinutesForDay = dateException.allowed_minutes || 0;
                     totalApprovedMinutes += allowedMinutesForDay;
                 }
 
                 const hasManualTimeException = dateException && (
-                    dateException.type === 'MANUAL_LATE' || 
+                    dateException.type === 'MANUAL_LATE' ||
                     dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
                     (dateException.late_minutes > 0) ||
                     (dateException.early_checkout_minutes > 0) ||
@@ -1102,13 +1113,15 @@ Deno.serve(async (req) => {
                     if (dateException.early_checkout_minutes > 0) dayEarlyMinutes = dateException.early_checkout_minutes;
                     if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
                 } else if (dayPunches.length > 0) {
-                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift, includeSeconds);
-                    
+                    // SYNC: Pass nextDateStr (calculated from currentDate below) if needed
+                    // For now, simple match is used in recalculatePreviousMonthIssues
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
+
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
                         const punchTime = match.punch.time;
                         const shiftTime = match.shiftTime;
-                        
+
                         if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
                             dayLateMinutes += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
                         }
@@ -1127,7 +1140,7 @@ Deno.serve(async (req) => {
             // Calculate deductible minutes for the ENTIRE prev month range
             // Grace is applied ONCE for the whole range (not per day)
             // Formula: max(0, totalLate + totalEarly + totalOther - grace - approved)
-            const totalExtraDeductibleMinutes = Math.max(0, 
+            const totalExtraDeductibleMinutes = Math.max(0,
                 totalLateMinutes + totalEarlyMinutes + totalOtherMinutes - graceMinutes - totalApprovedMinutes
             );
 
@@ -1159,7 +1172,7 @@ Deno.serve(async (req) => {
         const snapshots = [];
         let analyzedCount = 0;
         let noAttendanceCount = 0;
-        
+
         // ============================================================
         // COMPANY-SPECIFIC CONFIGURATION: Include All Employees in Salary
         // ============================================================
@@ -1167,50 +1180,50 @@ Deno.serve(async (req) => {
         const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({
             company: project.company
         }, null, 1);
-        
-        const includeAllEmployeesInSalary = companySettings.length > 0 
+
+        const includeAllEmployeesInSalary = companySettings.length > 0
             ? (companySettings[0].include_all_employees_in_salary || false)
             : false;
-        
+
         // Al Maraghi Motors & Naser Mohsin: Hardcoded to include all employees (until migrated to settings)
-        const isAlMaraghiOrNaser = project.company === 'Al Maraghi Motors' || 
-                                    project.company === 'Naser Mohsin Auto Parts';
-        
+        const isAlMaraghiOrNaser = project.company === 'Al Maraghi Motors' ||
+            project.company === 'Naser Mohsin Auto Parts';
+
         const shouldIncludeAllEmployees = isAlMaraghiOrNaser || includeAllEmployeesInSalary;
-        
+
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] COMPANY SALARY MODE: ${project.company}`);
         console.log(`[createSalarySnapshots]   Include All Employees in Salary: ${shouldIncludeAllEmployees ? 'YES (including non-attendance)' : 'NO (attendance_id required)'}`);
         console.log(`[createSalarySnapshots]   Config Source: ${isAlMaraghiOrNaser ? 'HARDCODED' : companySettings.length > 0 ? 'CompanySettings' : 'DEFAULT (false)'}`);
         console.log(`[createSalarySnapshots] ============================================`);
-        
+
         // Filter employees to project's custom_employee_ids if specified
         let eligibleEmployees;
-        
+
         if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
             const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
-            
+
             if (shouldIncludeAllEmployees) {
                 // Al Maraghi / Include All Mode: ALL employees in custom list, regardless of attendance_id
                 eligibleEmployees = employees.filter(emp => {
-                    return customIds.includes(String(emp.hrms_id)) || 
-                           (emp.attendance_id && customIds.includes(String(emp.attendance_id)));
+                    return customIds.includes(String(emp.hrms_id)) ||
+                        (emp.attendance_id && customIds.includes(String(emp.attendance_id)));
                 });
                 console.log(`[createSalarySnapshots] [INCLUDE ALL MODE] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids (including non-attendance)`);
             } else {
                 // Standard Mode: ONLY employees with valid attendance_id
                 eligibleEmployees = employees.filter(emp => {
-                    const hasValidAttendanceId = emp.attendance_id && 
-                                                  emp.attendance_id !== null && 
-                                                  emp.attendance_id !== undefined &&
-                                                  String(emp.attendance_id).trim() !== '';
-                    
+                    const hasValidAttendanceId = emp.attendance_id &&
+                        emp.attendance_id !== null &&
+                        emp.attendance_id !== undefined &&
+                        String(emp.attendance_id).trim() !== '';
+
                     if (!hasValidAttendanceId) {
                         return false;
                     }
-                    
-                    return customIds.includes(String(emp.hrms_id)) || 
-                           customIds.includes(String(emp.attendance_id));
+
+                    return customIds.includes(String(emp.hrms_id)) ||
+                        customIds.includes(String(emp.attendance_id));
                 });
                 console.log(`[createSalarySnapshots] [STANDARD MODE] Filtered to ${eligibleEmployees.length} employees with attendance_id from custom_employee_ids`);
             }
@@ -1221,38 +1234,38 @@ Deno.serve(async (req) => {
                 console.log(`[createSalarySnapshots] [INCLUDE ALL MODE] Including ALL ${eligibleEmployees.length} active employees`);
             } else {
                 eligibleEmployees = employees.filter(emp => {
-                    const hasValidAttendanceId = emp.attendance_id && 
-                                                  emp.attendance_id !== null && 
-                                                  emp.attendance_id !== undefined &&
-                                                  String(emp.attendance_id).trim() !== '';
+                    const hasValidAttendanceId = emp.attendance_id &&
+                        emp.attendance_id !== null &&
+                        emp.attendance_id !== undefined &&
+                        String(emp.attendance_id).trim() !== '';
                     return hasValidAttendanceId;
                 });
                 console.log(`[createSalarySnapshots] [STANDARD MODE] Filtered to ${eligibleEmployees.length} employees with attendance_id`);
             }
         }
-        
+
         // Calculate statistics for logging transparency
         const withAttendanceId = eligibleEmployees.filter(e => e.attendance_id && String(e.attendance_id).trim() !== '').length;
         const withoutAttendanceId = eligibleEmployees.length - withAttendanceId;
-        
+
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] ✅ TOTAL ELIGIBLE EMPLOYEES: ${eligibleEmployees.length}`);
         console.log(`[createSalarySnapshots]    - With attendance_id: ${withAttendanceId}`);
         console.log(`[createSalarySnapshots]    - Without attendance_id: ${withoutAttendanceId}`);
         console.log(`[createSalarySnapshots] ELIGIBLE EMPLOYEE IDs: [${eligibleEmployees.map(e => e.attendance_id || e.hrms_id).slice(0, 20).join(', ')}${eligibleEmployees.length > 20 ? '...' : ''}]`);
         console.log(`[createSalarySnapshots] ============================================`);
-        
+
         // BATCH MODE: Process only a subset of employees
-        const employeesToProcess = batch_mode 
+        const employeesToProcess = batch_mode
             ? eligibleEmployees.slice(batch_start, batch_start + batch_size)
             : eligibleEmployees;
-        
+
         console.log(`[createSalarySnapshots] 📦 THIS BATCH: ${employeesToProcess.length} employees (indices ${batch_start} to ${batch_start + employeesToProcess.length - 1})`);
         console.log(`[createSalarySnapshots] THIS BATCH IDs: [${employeesToProcess.map(e => e.attendance_id || e.hrms_id).join(', ')}]`);
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] 🔄 ENTERING FOR LOOP - Processing ${employeesToProcess.length} employees`);
         console.log(`[createSalarySnapshots] ============================================`);
-        
+
         let loopIterationCount = 0;
         let skippedCount = 0;
         for (const emp of employeesToProcess) {
@@ -1266,11 +1279,11 @@ Deno.serve(async (req) => {
             }
 
             // Find matching salary record (REQUIRED for salary snapshot)
-            const baseSalary = salaries.find(s => 
-                String(s.employee_id) === String(emp.hrms_id) || 
+            const baseSalary = salaries.find(s =>
+                String(s.employee_id) === String(emp.hrms_id) ||
                 String(s.attendance_id) === String(emp.attendance_id)
             );
-            
+
             // Skip if no salary record - employee is not eligible for salary
             if (!baseSalary) {
                 console.log(`[createSalarySnapshots] ⚠️ SKIP: ${emp.name} (${emp.attendance_id || emp.hrms_id}) - no salary record found`);
@@ -1278,10 +1291,10 @@ Deno.serve(async (req) => {
                 skippedCount++;
                 continue;
             }
-            
+
             console.log(`[createSalarySnapshots] ✅ Salary record found for ${emp.name}`);
             console.log(`[createSalarySnapshots] 💰 Salary Data: basic_salary=${baseSalary.basic_salary}, allowances=${baseSalary.allowances}, allowances_with_bonus=${baseSalary.allowances_with_bonus}, total_salary=${baseSalary.total_salary}`);
-            
+
             // ============================================================
             // AL MARAGHI MOTORS: SALARY INCREMENT RESOLUTION
             // For current month salary: use increment effective for salary month
@@ -1289,14 +1302,14 @@ Deno.serve(async (req) => {
             // ============================================================
             let currentMonthSalary = { ...baseSalary };
             let prevMonthSalary = { ...baseSalary };
-            
+
             if (isAlMaraghi && salaryIncrements.length > 0) {
                 // Get increments for this employee
-                const empIncrements = salaryIncrements.filter(inc => 
+                const empIncrements = salaryIncrements.filter(inc =>
                     String(inc.employee_id) === String(emp.hrms_id) ||
                     String(inc.attendance_id) === String(emp.attendance_id)
                 );
-                
+
                 if (empIncrements.length > 0) {
                     // Current month salary (use salary month start for resolution)
                     const currentMonthStr = salaryMonthStartStr; // e.g., "2026-01-01"
@@ -1311,7 +1324,7 @@ Deno.serve(async (req) => {
                             }
                         })
                         .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
-                    
+
                     if (applicableCurrentIncrements.length > 0) {
                         const currentInc = applicableCurrentIncrements[0];
                         currentMonthSalary = {
@@ -1323,13 +1336,13 @@ Deno.serve(async (req) => {
                         };
                         console.log(`[createSalarySnapshots] ${emp.name}: Using increment effective ${currentInc.effective_month} for current month salary`);
                     }
-                    
+
                     // Previous month salary (for OT and prev month deductions)
                     // Previous month is the month BEFORE the salary month
                     if (hasExtraPrevMonthRange && extraPrevMonthFrom) {
                         const prevMonthDate = new Date(extraPrevMonthFrom);
                         const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
-                        
+
                         // BUG FIX #8: Proper date parsing with error handling
                         const applicablePrevIncrements = empIncrements
                             .filter(inc => {
@@ -1341,7 +1354,7 @@ Deno.serve(async (req) => {
                                 }
                             })
                             .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
-                        
+
                         if (applicablePrevIncrements.length > 0) {
                             const prevInc = applicablePrevIncrements[0];
                             prevMonthSalary = {
@@ -1356,20 +1369,20 @@ Deno.serve(async (req) => {
                     }
                 }
             }
-            
+
             // Use resolved salaries (currentMonthSalary for current month, prevMonthSalary for previous month)
             const salary = currentMonthSalary;
 
             // Check if employee has analysis result
             // SALARY-ONLY FIX: For employees without attendance_id, they won't have AnalysisResult
-            const analysisResult = emp.attendance_id 
+            const analysisResult = emp.attendance_id
                 ? analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id))
                 : null;
             const hasAnalysisResult = !!analysisResult;
-            
+
             let calculated;
             let attendanceSource;
-            
+
             // PERMANENT LOCK: For finalized reports, use AnalysisResult values AS-IS (1:1 copy)
             // CRITICAL: Check manual override fields FIRST, fallback to regular fields
             // Manual overrides are set when user edits report before finalization
@@ -1421,21 +1434,21 @@ Deno.serve(async (req) => {
             // ============================================================
             // COMPONENT 1: Basic Salary (base pay)
             const basicSalary = salary?.basic_salary || 0;
-            
+
             // COMPONENT 2: Allowances WITHOUT bonus (used for salary leave amount)
             // CRITICAL: This is "allowances" field, NOT "allowances_with_bonus"
             const allowancesAmount = Number(salary?.allowances) || 0;
-            
+
             // COMPONENT 3: Allowances WITH bonus (stored for display/reference)
             const allowancesWithBonus = Number(salary?.allowances_with_bonus) || 0;
-            
+
             // Total Salary = Component 1 + Component 2 + Component 3
             const totalSalaryAmount = salary?.total_salary || 0;
             const workingHours = salary?.working_hours || baseSalary?.working_hours || 9;
-            
+
             // Previous month salary values (for OT and prev month deductions)
             const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalaryAmount;
-            
+
             // BUG FIX #9: Only calculate extraPrevMonthData if Al Maraghi AND extra range exists
             let extraPrevMonthData = {
                 extraDeductibleMinutes: 0,
@@ -1454,23 +1467,23 @@ Deno.serve(async (req) => {
             const salaryLeaveDaysOverride = calculateSalaryLeaveDaysOverride(emp, project.date_from, project.date_to);
             // annualLeaveDaysForSalary: the annual leave count used for salary calculations
             const annualLeaveDaysForSalary = calculated.annualLeaveCount;
-            
+
             let salaryLeaveDays = salaryLeaveDaysOverride > 0
                 ? salaryLeaveDaysOverride
                 : annualLeaveDaysForSalary;
 
             // Calculate derived salary values - ALL rounded to 2 decimal places
             const leaveDays = calculated.annualLeaveCount + calculated.fullAbsenceCount;
-            
+
             // Leave Pay Formula (configurable)
-            const leavePayBase = leavePayFormula === 'BASIC_PLUS_ALLOWANCES' 
+            const leavePayBase = leavePayFormula === 'BASIC_PLUS_ALLOWANCES'
                 ? (basicSalary + allowancesAmount)
                 : totalSalaryAmount;
             const rawLeavePay = leaveDays > 0 ? (leavePayBase / divisor) * leaveDays : 0;
             const leavePay = Math.round(rawLeavePay);
-            
+
             // Salary Leave Amount Formula (configurable)
-            const salaryLeaveBase = salaryLeaveFormula === 'BASIC_PLUS_ALLOWANCES' 
+            const salaryLeaveBase = salaryLeaveFormula === 'BASIC_PLUS_ALLOWANCES'
                 ? (basicSalary + allowancesAmount)
                 : totalSalaryAmount;
             const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryLeaveBase / divisor) * salaryLeaveDays : 0;
@@ -1479,7 +1492,7 @@ Deno.serve(async (req) => {
             const salaryLeaveAmount = is9HourEmployee
                 ? Math.ceil(rawSalaryLeaveAmount / 5) * 5
                 : Math.round(rawSalaryLeaveAmount);
-            
+
             console.log(`[createSalarySnapshots] 💡 SALARY LEAVE CALCULATION for ${emp.name}:`);
             console.log(`[createSalarySnapshots]    Formula: ${salaryLeaveFormula}`);
             console.log(`[createSalarySnapshots]    basicSalary = ${basicSalary}`);
@@ -1490,7 +1503,7 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots]    salaryLeaveDays = ${salaryLeaveDays}`);
             console.log(`[createSalarySnapshots]    salaryLeaveDaysOverride = ${salaryLeaveDaysOverride}`);
             console.log(`[createSalarySnapshots]    salaryLeaveAmount = ${salaryLeaveAmount}`);
-            
+
             const netDeduction = Math.round(Math.max(0, leavePay - salaryLeaveAmount) * 100) / 100;
 
             // Use finalized attendance fields from AnalysisResult AS-IS.
@@ -1503,13 +1516,13 @@ Deno.serve(async (req) => {
             // while snapshot fields remain separate for UI/audit fidelity.
             const payrollDeductibleMinutes = finalizedDeductibleMinutes + finalizedOtherMinutes;
             const deductibleHours = Math.round((payrollDeductibleMinutes / 60) * 100) / 100;
-            
+
             // Current month hourly rate uses salary divisor (2 decimals)
             const hourlyRate = Math.round((totalSalaryAmount / divisor / workingHours) * 100) / 100;
-            
+
             // Current month deductible hours pay - conventional rounding (0.5+ rounds up)
             const currentMonthDeductibleHoursPay = Math.round(hourlyRate * deductibleHours);
-            
+
             // ============================================================
             // DISABLED: Previous month deduction logic
             // Previous month deductions have been removed from Al Maraghi Motors
@@ -1520,10 +1533,10 @@ Deno.serve(async (req) => {
             const extraPrevMonthLopDays = 0;
             const extraPrevMonthLopPay = 0;
             const extraPrevMonthDeductibleHoursPay = 0;
-            
+
             // Total deductible hours pay = current month only (no prev month)
             const totalDeductibleHoursPay = currentMonthDeductibleHoursPay;
-            
+
             // Final total calculation (NO previous month deductions)
             // Current month: netDeduction (leave) + currentMonthDeductibleHoursPay (time)
             // ALWAYS round to 2 decimals, then apply whole number rounding for balance
@@ -1571,14 +1584,14 @@ Deno.serve(async (req) => {
 
             // CRITICAL: Fetch OvertimeData to populate OT and adjustment fields
             // OvertimeData is entered BEFORE finalization in the Overtime tab
-            const otRecord = allOvertimeData.find(ot => 
+            const otRecord = allOvertimeData.find(ot =>
                 (emp.attendance_id && String(ot.attendance_id) === String(emp.attendance_id)) ||
                 String(ot.hrms_id) === String(emp.hrms_id)
             );
-            
+
             // OT calculations using previous month salary (for historical accuracy)
             const otHourlyRate = prevMonthTotalSalary / otDivisor / workingHours;
-            
+
             const normalOtHours = otRecord?.normalOtHours || 0;
             const specialOtHours = otRecord?.specialOtHours || 0;
             const normalOtSalary = Math.round(otHourlyRate * otNormalRate * normalOtHours);
@@ -1623,16 +1636,16 @@ Deno.serve(async (req) => {
 
             // Recalculate final total with grouped additions/deductions
             const totalWithAdjustments = Math.round((totalSalaryAmount + netAdditions - netDeductions) * 100) / 100;
-            
+
             // Recalculate WPS split with adjusted total
             let finalWpsAmount = totalWithAdjustments;
             let finalBalanceAmount = 0;
             let finalWpsCapApplied = false;
-            
+
             // Use global WPS settings (from SalaryCalculationSettings or employee-specific override)
             const effectiveWpsCapEnabled = wpsCapEnabled !== undefined ? wpsCapEnabled : wpsCapEnabledGlobal;
             const effectiveWpsCapAmount = wpsCapAmount !== undefined ? wpsCapAmount : wpsCapAmountGlobal;
-            
+
             if (effectiveWpsCapEnabled) {
                 if (totalWithAdjustments <= 0) {
                     finalWpsAmount = 0;
@@ -1641,13 +1654,13 @@ Deno.serve(async (req) => {
                 } else {
                     const cap = effectiveWpsCapAmount;
                     const rawExcess = Math.max(0, totalWithAdjustments - cap);
-                    
+
                     if (balanceRoundingRule === 'NEAREST_100') {
                         finalBalanceAmount = Math.round((Math.floor(rawExcess / 100) * 100) * 100) / 100;
                     } else {
                         finalBalanceAmount = Math.round(rawExcess * 100) / 100;
                     }
-                    
+
                     finalWpsAmount = Math.round((totalWithAdjustments - finalBalanceAmount) * 100) / 100;
                     finalWpsCapApplied = rawExcess > 0;
                 }
@@ -1655,9 +1668,9 @@ Deno.serve(async (req) => {
                 finalWpsAmount = 0;
                 finalBalanceAmount = 0;
             }
-            
+
             console.log(`[createSalarySnapshots] 💾 Creating snapshot for ${emp.name} - Total: ${totalWithAdjustments}, WPS: ${finalWpsAmount}, Balance: ${finalBalanceAmount}, OT: ${totalOtSalary}`);
-            
+
             // SALARY-ONLY FIX: Store attendance_id as null if employee doesn't have one
             snapshots.push({
                 project_id: String(project_id),
@@ -1693,12 +1706,12 @@ Deno.serve(async (req) => {
                 salary_month_start: salaryMonthStartStr,
                 salary_month_end: salaryMonthEndStr,
                 salary_leave_days: salaryLeaveDays,
-                 leaveDays: leaveDays,
-                 leavePay: leavePay,
-                 salaryLeaveAmount: salaryLeaveAmount,
-                 deductibleHours: deductibleHours,
-                 deductibleHoursPay: totalDeductibleHoursPay,
-                 netDeduction: netDeduction,
+                leaveDays: leaveDays,
+                leavePay: leavePay,
+                salaryLeaveAmount: salaryLeaveAmount,
+                deductibleHours: deductibleHours,
+                deductibleHoursPay: totalDeductibleHoursPay,
+                netDeduction: netDeduction,
                 // OT & Adjustment Fields (populated from OvertimeData)
                 normalOtHours: normalOtHours,
                 normalOtSalary: normalOtSalary,
@@ -1721,12 +1734,12 @@ Deno.serve(async (req) => {
                 snapshot_created_at: new Date().toISOString(),
                 attendance_source: attendanceSource
             });
-            
+
             existingSnapshotKeys.add(employeeKey);
             console.log(`[createSalarySnapshots] ✅ Snapshot added to array (${snapshots.length} total so far)`);
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE`);
         }
-        
+
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] 🏁 FOR LOOP EXITED`);
         console.log(`[createSalarySnapshots]    Total iterations completed: ${loopIterationCount}`);
@@ -1741,7 +1754,7 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots] Snapshots created in this batch: ${snapshots.length}`);
             console.log(`[createSalarySnapshots] Batch start index: ${batch_start}`);
             console.log(`[createSalarySnapshots] Total eligible employees: ${eligibleEmployees.length}`);
-            
+
             if (snapshots.length > 0) {
                 console.log(`[createSalarySnapshots] 💾 Calling bulkCreate for ${snapshots.length} snapshots...`);
                 await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
@@ -1749,10 +1762,10 @@ Deno.serve(async (req) => {
             } else {
                 console.log(`[createSalarySnapshots] ⚠️ WARNING: No snapshots to create in this batch`);
             }
-            
+
             const currentPosition = batch_start + employeesToProcess.length;
             const hasMore = currentPosition < eligibleEmployees.length;
-            
+
             console.log(`[createSalarySnapshots] ============================================`);
             console.log(`[createSalarySnapshots] 📊 BATCH COMPLETE SUMMARY:`);
             console.log(`[createSalarySnapshots]    Current position: ${currentPosition}`);
@@ -1761,7 +1774,7 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots]    Remaining: ${eligibleEmployees.length - currentPosition} employees`);
             console.log(`[createSalarySnapshots] ============================================`);
             console.log(`[createSalarySnapshots] 📤 RETURNING BATCH RESPONSE`);
-            
+
             return Response.json({
                 success: true,
                 batch_mode: true,
@@ -1773,12 +1786,12 @@ Deno.serve(async (req) => {
                 current_batch: snapshots.map(s => ({ attendance_id: s.attendance_id, name: s.name }))
             });
         }
-        
+
         // STANDARD MODE: Bulk create all snapshots at once
         console.log(`[createSalarySnapshots] ============================================`);
         console.log(`[createSalarySnapshots] 🚨 STANDARD MODE - RETURN PATH #2`);
         console.log(`[createSalarySnapshots] ============================================`);
-        
+
         if (snapshots.length > 0) {
             console.log(`[createSalarySnapshots] 💾 STANDARD MODE: Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
 
@@ -1811,7 +1824,7 @@ Deno.serve(async (req) => {
         }
 
         console.log(`[createSalarySnapshots] 📤 RETURNING STANDARD MODE SUCCESS RESPONSE`);
-        
+
         return Response.json({
             success: true,
             snapshots_created: snapshots.length,
@@ -1827,8 +1840,8 @@ Deno.serve(async (req) => {
         console.error('[createSalarySnapshots] 🚨 ERROR RETURN PATH #3');
         console.error('[createSalarySnapshots] Error message:', error.message);
         console.error('[createSalarySnapshots] Error stack:', error.stack);
-        return Response.json({ 
-            error: error.message 
+        return Response.json({
+            error: error.message
         }, { status: 500 });
     }
 });

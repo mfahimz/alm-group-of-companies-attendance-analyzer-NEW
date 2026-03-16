@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Upload, Download, Save, Copy, Sparkles, ArrowLeftRight } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function RamadanShiftDesigner({ schedule, onClose }) {
+export default function RamadanShiftDesigner({ schedule, onClose, onSave }) {
     const [week1Shifts, setWeek1Shifts] = useState(() => {
         try {
             return schedule.week1_shifts ? JSON.parse(schedule.week1_shifts) : {};
@@ -144,7 +144,10 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             await base44.entities.RamadanSchedule.update(schedule.id, data);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['ramadanSchedules']);
+            // FIX for ISSUE 1: Use object syntax for invalidateQueries to ensure compatibility 
+            // and call the parent's onSave to explicitly trigger a refetch of the stale schedules data
+            queryClient.invalidateQueries({ queryKey: ['ramadanSchedules'] });
+            if (onSave) onSave();
             toast.success('Ramadan schedule saved. Use "Sync from Ramadan Schedule" in each project to apply changes.');
         }
     });
@@ -174,7 +177,10 @@ export default function RamadanShiftDesigner({ schedule, onClose }) {
             const oldWeek2 = { ...week2Shifts };
             setWeek1Shifts(oldWeek2);
             setWeek2Shifts(oldWeek1);
-            queryClient.invalidateQueries(['ramadanSchedules']);
+            
+            // FIX for ISSUE 1: Refresh cache explicitly through parent so stale data won't persist
+            queryClient.invalidateQueries({ queryKey: ['ramadanSchedules'] });
+            if (onSave) onSave();
             toast.success('Week 1 and Week 2 shifts swapped successfully. Remember to re-apply Ramadan shifts in affected projects.');
         },
         onError: (err) => {

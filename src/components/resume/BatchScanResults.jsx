@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, ChevronRight, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ChevronRight, ArrowLeft, Globe, UserCheck, UserX, MapPin, Filter, Users, Briefcase } from 'lucide-react';
 import ResumeScanResultView from './ResumeScanResult';
 import { Button } from '@/components/ui/button';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 const REC_CONFIG = {
     'Highly Recommended': { color: 'bg-green-100 text-green-800 border-green-200', dot: 'bg-green-500' },
@@ -26,6 +28,25 @@ export default function BatchScanResults({ results, onNewScan }) {
     const [selectedIndex, setSelectedIndex] = useState(null);
     // Tracks which card indices have their per-template score breakdown open.
     const [expandedScores, setExpandedScores] = useState(new Set());
+    const [filters, setFilters] = useState({
+        nationality: '',
+        location: '',
+        minExperience: '',
+        gender: ''
+    });
+    const [localStatuses, setLocalStatuses] = useState({}); // { scanId: 'Selected' | 'Rejected' }
+    const queryClient = useQueryClient();
+
+    const updateStatusMutation = useMutation({
+        mutationFn: async ({ id, status }) => {
+            await base44.entities.ResumeScanResult.update(id, { evaluation_status: status });
+            return { id, status };
+        },
+        onSuccess: (data) => {
+            setLocalStatuses(prev => ({ ...prev, [data.id]: data.status }));
+            queryClient.invalidateQueries({ queryKey: ['resumeScans'] });
+        }
+    });
 
     if (selectedIndex !== null) {
         return (
@@ -42,23 +63,127 @@ export default function BatchScanResults({ results, onNewScan }) {
         );
     }
 
-    const sorted = [...results].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const filteredResults = [...results].filter(r => {
+        const nationality = (r.nationality || '').toLowerCase();
+        const location = (r.location || '').toLowerCase();
+        const gender = (r.gender || '').toLowerCase();
+        const experience = r.years_experience || 0;
+
+        if (filters.nationality && !nationality.includes(filters.nationality.toLowerCase())) return false;
+        if (filters.location && !location.includes(filters.location.toLowerCase())) return false;
+        if (filters.gender && filters.gender !== 'All' && gender !== filters.gender.toLowerCase()) return false;
+        if (filters.minExperience && experience < parseInt(filters.minExperience)) return false;
+
+        return true;
+    });
+
+    const sorted = filteredResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+    
+    // Unique nationalities for dropdown
+    const uniqueNationalities = Array.from(new Set(results.map(r => r.nationality).filter(Boolean))).sort();
 
     return (
         <div className="space-y-4">
+            {/* Filter Bar */}
+            <div className="bg-[#F9FAFB] border border-[#E2E6EC] rounded-xl px-4 py-3 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2 text-[#4B5563]">
+                    <Filter className="w-4 h-4" />
+                    <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 flex-1">
+                    <div className="relative min-w-[120px]">
+                        <Globe className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <select
+                            value={filters.nationality}
+                            onChange={(e) => setFilters(f => ({ ...f, nationality: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-[11px] bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36] appearance-none"
+                        >
+                            <option value="">Nationality (All)</option>
+                            {uniqueNationalities.map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="relative min-w-[120px]">
+                        <MapPin className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <input
+                            type="text"
+                            placeholder="Location..."
+                            value={filters.location}
+                            onChange={(e) => setFilters(f => ({ ...f, location: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-[11px] bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36]"
+                        />
+                    </div>
+
+                    <div className="relative min-w-[100px]">
+                        <Briefcase className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <input
+                            type="number"
+                            placeholder="Min Exp"
+                            value={filters.minExperience}
+                            onChange={(e) => setFilters(f => ({ ...f, minExperience: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-[11px] bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36]"
+                        />
+                    </div>
+
+                    <div className="relative min-w-[100px]">
+                        <Users className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                        <select
+                            value={filters.gender}
+                            onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
+                            className="w-full pl-8 pr-3 py-1.5 text-[11px] bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36] appearance-none"
+                        >
+                            <option value="All">Gender (All)</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={() => setFilters({ nationality: '', location: '', minExperience: '', gender: 'All' })}
+                        className="text-[11px] text-[#6B7280] hover:text-[#1F2937] px-1 transition-colors"
+                    >
+                        Reset
+                    </button>
+                </div>
+            </div>
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-sm font-semibold text-[#1F2937]">Batch Scan Complete — {results.length} Resume{results.length > 1 ? 's' : ''}</h3>
-                    <p className="text-xs text-[#6B7280] mt-0.5">Click any candidate to view the full AI report</p>
+                    <h3 className="text-sm font-semibold text-[#1F2937]">Batch Scan Summary — {sorted.length} shown</h3>
+                    <p className="text-xs text-[#6B7280] mt-0.5">Evaluation status updates are saved instantly</p>
                 </div>
                 <div className="flex gap-2 text-xs text-[#6B7280]">
                     <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
-                        {results.filter(r => r.recommendation === 'Highly Recommended' || r.recommendation === 'Recommended').length} Recommended
+                        {sorted.filter(r => r.recommendation === 'Highly Recommended' || r.recommendation === 'Recommended').length} Recommended
                     </span>
                     <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
-                        {results.filter(r => r.recommendation === 'Not Recommended').length} Not Recommended
+                        {sorted.filter(r => r.recommendation === 'Not Recommended').length} Not Recommended
                     </span>
+                    {sorted.some(r => r.evaluation_status === 'Rejected') && (
+                        <span className="px-2 py-1 bg-red-600 text-white rounded-full font-bold animate-pulse">
+                            {sorted.filter(r => r.evaluation_status === 'Rejected').length} Knock-outs
+                        </span>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => sorted.forEach(r => r.id && updateStatusMutation.mutate({ id: r.id, status: 'Selected' }))}
+                        className="text-xs text-indigo-600 hover:bg-indigo-50"
+                    >
+                        Bulk Select All
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => sorted.forEach(r => r.id && updateStatusMutation.mutate({ id: r.id, status: 'Rejected' }))}
+                        className="text-xs text-red-600 hover:bg-red-50"
+                    >
+                        Bulk Reject All
+                    </Button>
                 </div>
             </div>
 
@@ -91,9 +216,16 @@ export default function BatchScanResults({ results, onNewScan }) {
                                             ? result.applicant_name
                                             : result.file_name || 'Unknown Candidate'}
                                     </p>
-                                    {result.applicant_email && (
-                                        <p className="text-xs text-[#9CA3AF] truncate">{result.applicant_email}</p>
-                                    )}
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        {result.applicant_email && (
+                                            <p className="text-xs text-[#9CA3AF] truncate">{result.applicant_email}</p>
+                                        )}
+                                        {/* Display candidate nationality prominently as required by business logic */}
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-semibold">
+                                            <Globe className="w-3 h-3 text-amber-700" />
+                                            Nat: {result.nationality || 'Not Specified'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {/* Score Bar */}
@@ -102,14 +234,65 @@ export default function BatchScanResults({ results, onNewScan }) {
                                 </div>
 
                                 {/* Recommendation Badge */}
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium border hidden md:inline ${rec.color}`}>
-                                    {result.recommendation}
-                                </span>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border hidden md:inline ${rec.color}`}>
+                                        {result.recommendation}
+                                    </span>
+                                    {result.evaluation_status === 'Rejected' && (
+                                        <span className="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold uppercase tracking-tight hidden md:inline animate-pulse">
+                                            Knock-out Failed
+                                        </span>
+                                    )}
+                                </div>
 
                                 {/* Mobile score */}
                                 <span className="text-sm font-bold text-[#1F2937] sm:hidden">{result.score}</span>
 
                                 <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#0F1E36] flex-shrink-0 transition-colors" />
+                            </div>
+
+                            {/* Manual Evaluation Controls */}
+                            <div className="mt-3 flex items-center justify-between pt-3 border-t border-[#F4F6F9]">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (result.id) updateStatusMutation.mutate({ id: result.id, status: 'Selected' });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tight flex items-center gap-1.5 transition-all border ${
+                                            (localStatuses[result.id] || result.evaluation_status) === 'Selected'
+                                                ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                                                : 'bg-white border-[#E2E6EC] text-[#6B7280] hover:border-green-500 hover:text-green-600'
+                                        }`}
+                                    >
+                                        <UserCheck className="w-3.5 h-3.5" />
+                                        {(localStatuses[result.id] || result.evaluation_status) === 'Selected' ? 'Selected' : 'Select'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (result.id) updateStatusMutation.mutate({ id: result.id, status: 'Rejected' });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tight flex items-center gap-1.5 transition-all border ${
+                                            (localStatuses[result.id] || result.evaluation_status) === 'Rejected'
+                                                ? 'bg-red-600 border-red-600 text-white shadow-sm'
+                                                : 'bg-white border-[#E2E6EC] text-[#6B7280] hover:border-red-500 hover:text-red-600'
+                                        }`}
+                                    >
+                                        <UserX className="w-3.5 h-3.5" />
+                                        {(localStatuses[result.id] || result.evaluation_status) === 'Rejected' ? 'Rejected' : 'Reject'}
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-[#9CA3AF] font-medium italic">
+                                        Exp: {result.years_experience ?? 0}y
+                                    </span>
+                                    <span className="text-[10px] text-[#9CA3AF] font-medium italic truncate max-w-[120px]">
+                                        Loc: {result.location || 'Not Specified'}
+                                    </span>
+                                </div>
                             </div>
 
                             {/* Mobile recommendation */}

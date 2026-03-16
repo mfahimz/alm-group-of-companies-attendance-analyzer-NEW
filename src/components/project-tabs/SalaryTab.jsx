@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import { Label } from '@/components/ui/label';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 
 export default function SalaryTab({ project }) {
@@ -28,6 +29,11 @@ export default function SalaryTab({ project }) {
     const [newReportName, setNewReportName] = useState('');
     const [newReportDateFrom, setNewReportDateFrom] = useState('');
     const [newReportDateTo, setNewReportDateTo] = useState('');
+
+    // Preview States
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewData, setPreviewData] = useState([]);
+    const [currentReport, setCurrentReport] = useState(null);
 
 
 
@@ -285,11 +291,14 @@ export default function SalaryTab({ project }) {
         }
     };
 
-    // Export salary report to Excel
+    // Export salary report to Excel (Preview logic)
     const handleExportToExcel = (report) => {
         try {
             const data = JSON.parse(report.snapshot_data);
-            const exportData = data.map(row => ({
+            // Sort by Employee Name (A-Z) by default for preview
+            const sortedData = [...data].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            
+            const exportData = sortedData.map(row => ({
                 'Attendance ID': row.attendance_id || 'SALARY-ONLY',
                 'Name': row.name,
                 'Department': row.department || '-',
@@ -333,12 +342,26 @@ export default function SalaryTab({ project }) {
                 'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
             }));
 
-            const ws = XLSX.utils.json_to_sheet(exportData);
+            setPreviewData(exportData);
+            setCurrentReport(report);
+            setIsPreviewOpen(true);
+        } catch (error) {
+            console.error('[SalaryTab] Preview failed:', error);
+            toast.error('Failed to prepare report preview');
+        }
+    };
+
+    // Actual Excel generation after confirmation
+    const executeDownload = () => {
+        if (!currentReport || previewData.length === 0) return;
+        try {
+            const ws = XLSX.utils.json_to_sheet(previewData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
-            XLSX.writeFile(wb, `${report.report_name}_${report.date_from}_to_${report.date_to}.xlsx`);
+            XLSX.writeFile(wb, `${currentReport.report_name}_${currentReport.date_from}_to_${currentReport.date_to}.xlsx`);
             toast.success('Excel file downloaded');
         } catch (error) {
+            console.error('[SalaryTab] Download failed:', error);
             toast.error('Failed to export report');
         }
     };
@@ -381,6 +404,20 @@ export default function SalaryTab({ project }) {
             </Card>
         );
     }
+
+    // Dynamic headers based on company
+    const salaryExportHeaders = [
+        'Attendance ID', 'Name', 'Department', 'Attendance Source', 'Working Hours/Day',
+        'Basic Salary', 'Total Salary', 'Working Days', 'Present Days', 'LOP Days',
+        'Annual Leave Days', 'Sick Leave Days', 'Leave Days', 'Leave Pay', 'Salary Leave Days',
+        'Salary Leave Amount', 'Net Deduction', 'Deductible Hours', 'Deductible Hours Pay',
+        'Extra Deductible Hrs (Prev Month)', 'Extra LOP Days (Prev Month)', 'Extra LOP Pay (Prev Month)',
+        'Extra Deductible Pay (Prev Month)', 'Normal OT Hours', 'Normal OT Salary',
+        'Special OT Hours', 'Special OT Salary', 'Total OT Salary', 'Other Deduction',
+        'Bonus', 'Incentive',
+        ...(isAlMaraghi ? ['Open Leave Salary', 'Variable Salary'] : []),
+        'Advance Salary Deduction', 'Total', 'WPS Pay', 'Balance', 'WPS Cap Applied', 'WPS Cap Amount'
+    ];
 
     return (
         <div className="space-y-6">
@@ -483,7 +520,7 @@ export default function SalaryTab({ project }) {
                                                     <div className="flex justify-end gap-1">
                                                         <Link to={createPageUrl('SalaryReportDetail') + `?reportId=${report.id}`}>
                                                             <Button size="sm" variant="ghost" title="View Report">
-                                                                <Eye className="w-4 h-4 text-indigo-600" />
+                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
                                                         </Link>
                                                         <Button
@@ -592,6 +629,16 @@ export default function SalaryTab({ project }) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Excel Export Preview Dialog */}
+            <ExcelPreviewDialog
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                data={previewData}
+                headers={salaryExportHeaders}
+                fileName={currentReport ? `${currentReport.report_name}_${currentReport.date_from}_to_${currentReport.date_to}.xlsx` : 'Salary_Report.xlsx'}
+                onConfirm={executeDownload}
+            />
         </div>
     );
 }

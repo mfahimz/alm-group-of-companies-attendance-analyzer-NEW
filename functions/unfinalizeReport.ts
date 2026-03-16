@@ -57,6 +57,17 @@ Deno.serve(async (req) => {
             finalized_date: null
         });
 
+        // --- NEW: Cleanup Checklist Tasks for LOP and Other Minutes ---
+        try {
+            await base44.asServiceRole.functions.invoke('createReportChecklistTasks', {
+                reportRunId: report_run_id,
+                action: 'delete'
+            });
+            console.log('[unfinalizeReport] Auto-checklist cleanup triggered successfully');
+        } catch (checklistError) {
+            console.warn('[unfinalizeReport] Failed to trigger auto-checklist cleanup:', checklistError.message);
+        }
+
         console.log(`[unfinalizeReport] Report ${report_run_id} un-finalized successfully`);
 
         return Response.json({

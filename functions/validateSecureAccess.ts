@@ -128,6 +128,26 @@ Deno.serve(async (req) => {
                 departmentScoped: false
             },
             
+            // Ramadan Schedules
+            'RamadanSchedule': {
+                create: ['admin', 'ceo', 'hr_manager'],
+                read: ['admin', 'supervisor', 'ceo', 'user', 'hr_manager'],
+                update: ['admin', 'ceo', 'hr_manager'],
+                delete: ['admin'],
+                companyScoped: true,
+                departmentScoped: false
+            },
+
+            // Annual Leaves
+            'AnnualLeave': {
+                create: ['admin', 'supervisor', 'ceo', 'hr_manager'],
+                read: ['admin', 'supervisor', 'ceo', 'user', 'department_head', 'hr_manager'],
+                update: ['admin', 'supervisor', 'ceo', 'hr_manager'],
+                delete: ['admin'],
+                companyScoped: true,
+                departmentScoped: false
+            },
+
             // User entity - special rules
             'User': {
                 create: ['admin', 'ceo'],

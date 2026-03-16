@@ -1,61 +1,62 @@
 {
     "name": "DeveloperChangeLog",
-    "description": "Source of truth for tracking all development activity in this application. Every feature, bug fix, configuration change, data fix, and rollback is recorded here. This entity is managed exclusively through the Developer Module's Change Management section and provides a permanent, auditable history of what was changed, when, by whom, and why.",
+    "description": "Source of truth for tracking all development activity. Supports categorization, priority management, and technical implementation notes.",
     "fields": {
         "title": {
             "type": "string",
             "required": true,
-            "description": "Short descriptive title of the change."
+            "description": "Short descriptive title of the change request."
         },
-        "change_type": {
+        "description": {
             "type": "string",
             "required": true,
-            "enum": ["Feature", "Bug Fix", "Configuration", "Data Fix", "Rollback"],
-            "description": "Category of the change."
+            "description": "Detailed business or functional description of the change."
+        },
+        "category": {
+            "type": "string",
+            "required": true,
+            "enum": ["Logic", "UI", "Architecture"],
+            "description": "Functional domain of the change."
+        },
+        "priority": {
+            "type": "string",
+            "required": true,
+            "enum": ["Low", "Medium", "High", "Critical"],
+            "description": "Importance and urgency level."
         },
         "status": {
             "type": "string",
             "required": true,
-            "default": "Planned",
-            "enum": ["Planned", "In Progress", "Completed", "Rolled Back"],
-            "description": "Current status of the change."
+            "default": "Pending",
+            "enum": ["Pending", "In Progress", "Frozen", "Completed"],
+            "description": "Current lifecycle state of the work."
         },
-        "description": {
+        "technical_notes": {
             "type": "string",
             "required": false,
-            "description": "Detailed description of the change, its purpose, and expected impact."
-        },
-        "affected_areas": {
-            "type": "string",
-            "required": false,
-            "description": "Areas of the application affected by this change (e.g. 'Payroll, Employee Sync, Reports')."
+            "description": "Implementation prompts, code pointers, and technical constraints."
         },
         "implemented_by": {
             "type": "string",
             "required": false,
-            "description": "Name or email of the person who implemented the change."
+            "description": "Name or email of the developer."
         },
         "implemented_date": {
             "type": "string",
             "format": "date",
             "required": false,
-            "description": "Date when the change was implemented."
-        },
-        "notes": {
-            "type": "string",
-            "required": false,
-            "description": "Additional notes, observations, or follow-up items related to this change."
+            "description": "Completion date."
         },
         "created_by": {
             "type": "string",
             "required": false,
-            "description": "Email of the user who created this entry. Auto-set on save."
+            "description": "System user who logged the request."
         },
         "created_at": {
             "type": "string",
             "format": "date-time",
             "required": false,
-            "description": "Timestamp when this entry was created. Auto-set on save."
+            "description": "Creation timestamp."
         }
     }
 }

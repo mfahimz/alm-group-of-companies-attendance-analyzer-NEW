@@ -7,9 +7,10 @@ import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient } from '@tanstack/react-query';
 
 /**
- * Midnight buffer: punches between 12:00 AM and 1:00 AM (60 min after midnight)
+ * Midnight buffer: punches between 12:00 AM and 02:00 AM (120 min after midnight).
+ * Extended to 2 hours for Ramadan night shifts crossover support.
  */
-const MIDNIGHT_BUFFER_MINUTES = 60;
+const MIDNIGHT_BUFFER_MINUTES = 120;
 
 export default function DailyBreakdownDialog({
     open,
@@ -30,7 +31,7 @@ export default function DailyBreakdownDialog({
 }) {
     const [editingDay, setEditingDay] = useState(null);
     const queryClient = useQueryClient();
-    const includeSeconds = project.company === 'Al Maraghi Automotive';
+    const includeSeconds = true; // Unified
     const isFinalized = reportRun.is_final || project.status === 'closed';
 
     const isWithinMidnightBuffer = (timestampRaw) => {
@@ -81,7 +82,7 @@ export default function DailyBreakdownDialog({
         }
 
         const attendanceIdStr = String(currentResult.attendance_id);
-        
+
         // MIDNIGHT FIX: Fetch punches including day before and day after for crossover
         const dayBeforeStart = new Date(startDate);
         dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
@@ -89,13 +90,13 @@ export default function DailyBreakdownDialog({
         const dayAfterEnd = new Date(endDate);
         dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
         const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
-        
+
         const allEmployeePunchesExtended = punches.filter(p =>
             String(p.attendance_id) === attendanceIdStr &&
             p.punch_date >= dayBeforeStartStr &&
             p.punch_date <= dayAfterEndStr
         );
-        
+
         const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
         const employeeExceptions = exceptions.filter(e =>
             (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
@@ -113,15 +114,15 @@ export default function DailyBreakdownDialog({
             if (!s.effective_from || !s.effective_to) return true;
             const from = new Date(s.effective_from);
             const to = new Date(s.effective_to);
-            const cd = new Date(new Date().setHours(0,0,0,0)); // placeholder, overridden below
+            const cd = new Date(new Date().setHours(0, 0, 0, 0)); // placeholder, overridden below
             return true; // simplified - actual check done inline
         };
 
         const checkShiftEffective = (s, currentDate) => {
             if (!s.effective_from || !s.effective_to) return true;
-            const from = new Date(s.effective_from); from.setHours(0,0,0,0);
-            const to = new Date(s.effective_to); to.setHours(0,0,0,0);
-            const cd = new Date(currentDate); cd.setHours(0,0,0,0);
+            const from = new Date(s.effective_from); from.setHours(0, 0, 0, 0);
+            const to = new Date(s.effective_to); to.setHours(0, 0, 0, 0);
+            const cd = new Date(currentDate); cd.setHours(0, 0, 0, 0);
             return cd >= from && cd <= to;
         };
 
@@ -197,8 +198,8 @@ export default function DailyBreakdownDialog({
                 for (const ps of prevShiftCandidates) {
                     const pEndTime = parseTime(ps.pm_end, includeSeconds);
                     if (pEndTime) {
-                        const h = pEndTime.getHours(), m = pEndTime.getMinutes();
-                        if (h === 23 || (h === 0 && m === 0)) { prevShiftEndsNearMidnight = true; break; }
+                        const h = pEndTime.getHours();
+                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
                     }
                 }
             }
@@ -274,10 +275,10 @@ export default function DailyBreakdownDialog({
             // Check if THIS shift ends near midnight → grab next-day crossover punches
             let shiftEndsNearMidnight = false;
             if (shift) {
-                const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+                const pmEndTime = parseTime(shift.pm_end);
                 if (pmEndTime) {
-                    const h = pmEndTime.getHours(), m = pmEndTime.getMinutes();
-                    if (h === 23 || (h === 0 && m === 0)) shiftEndsNearMidnight = true;
+                    const h = pmEndTime.getHours();
+                    if (h === 23 || h === 0) shiftEndsNearMidnight = true;
                 }
             }
 
@@ -360,12 +361,11 @@ export default function DailyBreakdownDialog({
             // This is a display-only breakdown — edit actions are already gated by project.status !== 'closed'.
             // For closed/finalized projects, we still compute per-day late/early from punches so that
             // department heads and admins can see *which day* the minutes came from, not just the stored total.
-            const shouldSkipPunchCalc = shouldSkipTimeCalc || hasExceptionMinutes;
+            let dayLateMinutes = 0;
+            let dayEarlyMinutes = 0;
 
-            if (shift && punchMatches.length > 0 && !shouldSkipPunchCalc) {
-                let dayLateMinutes = 0;
-                let dayEarlyMinutes = 0;
-
+            // 1. Calculation phase: Compute from punches if valid shift exists
+            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
                 for (const match of punchMatches) {
                     if (!match.matchedTo) continue;
                     const punchTime = match.punch.time;
@@ -375,9 +375,6 @@ export default function DailyBreakdownDialog({
                         if (punchTime > shiftTime) {
                             const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                             dayLateMinutes += minutes;
-                            const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
-                            if (lateInfo) lateInfo += ' | ';
-                            lateInfo += `${label}: ${minutes} min late`;
                         }
                     }
 
@@ -385,28 +382,50 @@ export default function DailyBreakdownDialog({
                         if (punchTime < shiftTime) {
                             const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                             dayEarlyMinutes += minutes;
-                            if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
-                                earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
-                            } else {
-                                earlyCheckoutInfo = `${minutes} min`;
-                            }
                         }
                     }
                 }
+            }
 
-                const totalDayMinutes = dayLateMinutes + dayEarlyMinutes;
-                if (allowedMinutesForDay > 0 && totalDayMinutes > 0) {
-                    const remaining = Math.max(0, totalDayMinutes - allowedMinutesForDay);
-                    const lateRatio = totalDayMinutes > 0 ? dayLateMinutes / totalDayMinutes : 0;
-                    const earlyRatio = totalDayMinutes > 0 ? dayEarlyMinutes / totalDayMinutes : 0;
-                    const adjustedLate = Math.round(remaining * lateRatio);
-                    const adjustedEarly = Math.round(remaining * earlyRatio);
-                    lateMinutesTotal = adjustedLate;
-                    lateInfo = adjustedLate > 0 ? `${adjustedLate} min (after ${allowedMinutesForDay} allowed)` : '-';
-                    earlyCheckoutInfo = adjustedEarly > 0 ? `${adjustedEarly} min (after ${allowedMinutesForDay} allowed)` : '-';
-                } else {
-                    lateMinutesTotal = dayLateMinutes;
+            // 2. Override phase: Specific manual adjustments (if present and > 0)
+            let isLateOverridden = false;
+            let isEarlyOverridden = false;
+            
+            if (dateException && !shouldSkipTimeCalc) {
+                if (exceptionLateMinutes > 0) {
+                    dayLateMinutes = exceptionLateMinutes;
+                    isLateOverridden = true;
                 }
+                if (exceptionEarlyMinutes > 0) {
+                    dayEarlyMinutes = exceptionEarlyMinutes;
+                    isEarlyOverridden = true;
+                }
+            }
+
+            // 3. Deduction Reduction phase: Apply allowed minutes
+            const rawDayMinutes = dayLateMinutes + dayEarlyMinutes;
+            if (allowedMinutesForDay > 0 && rawDayMinutes > 0) {
+                const remaining = Math.max(0, rawDayMinutes - allowedMinutesForDay);
+                const lateRatio = dayLateMinutes / rawDayMinutes;
+                const earlyRatio = dayEarlyMinutes / rawDayMinutes;
+                dayLateMinutes = Math.round(remaining * lateRatio);
+                dayEarlyMinutes = Math.round(remaining * earlyRatio);
+            }
+
+            // 4. Formatting phase: Build info strings for UI display
+            lateMinutesTotal = dayLateMinutes;
+            if (dayLateMinutes > 0) {
+                const source = isLateOverridden ? '(from exception)' : (allowedMinutesForDay > 0 ? `(after ${allowedMinutesForDay} allowed)` : '');
+                lateInfo = `${dayLateMinutes} min ${source}`.trim();
+            } else {
+                lateInfo = '-';
+            }
+
+            if (dayEarlyMinutes > 0) {
+                const source = isEarlyOverridden ? '(from exception)' : (allowedMinutesForDay > 0 ? `(after ${allowedMinutesForDay} allowed)` : '');
+                earlyCheckoutInfo = `${dayEarlyMinutes} min ${source}`.trim();
+            } else {
+                earlyCheckoutInfo = '-';
             }
 
             // Determine status
@@ -463,32 +482,36 @@ export default function DailyBreakdownDialog({
                         punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
                         hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                         lateInfo = ''; lateMinutesTotal = 0; earlyCheckoutInfo = '';
-                        if (!shouldSkipPunchCalc) {
-                            for (const match of punchMatches) {
-                                if (!match.matchedTo) continue;
-                                const punchTime = match.punch.time;
-                                const shiftTime = match.shiftTime;
-                                if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                                    if (punchTime > shiftTime) {
-                                        const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
-                                        lateMinutesTotal += minutes;
-                                        const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
-                                        if (lateInfo) lateInfo += ' | ';
-                                        lateInfo += `${label}: ${minutes} min late`;
-                                    }
+                        
+                        let overLate = 0;
+                        let overEarly = 0;
+
+                        for (const match of punchMatches) {
+                            if (!match.matchedTo) continue;
+                            const punchTime = match.punch.time;
+                            const shiftTime = match.shiftTime;
+                            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                                if (punchTime > shiftTime) {
+                                    const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                                    overLate += minutes;
+                                    const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
+                                    if (lateInfo) lateInfo += ' | ';
+                                    lateInfo += `${label}: ${minutes} min late`;
                                 }
-                                if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                                    if (punchTime < shiftTime) {
-                                        const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
-                                        if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
-                                            earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
-                                        } else {
-                                            earlyCheckoutInfo = `${minutes} min`;
-                                        }
+                            }
+                            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                                if (punchTime < shiftTime) {
+                                    const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                                    overEarly += minutes;
+                                    if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
+                                        earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
+                                    } else {
+                                        earlyCheckoutInfo = `${minutes} min`;
                                     }
                                 }
                             }
                         }
+                        lateMinutesTotal = overLate;
                     }
                 }
                 if (dayOverride.type === 'MANUAL_PRESENT') status = 'Present (Edited)';
@@ -563,7 +586,7 @@ export default function DailyBreakdownDialog({
         if (!shift || dayPunches.length === 0) return [];
 
         const punchesWithTime = dayPunches.map(p => {
-            const time = parseTime(p.timestamp_raw, includeSeconds);
+            const time = parseTime(p.timestamp_raw);
             if (!time) return null;
             // If punch is from next day (midnight crossover), add 24h
             const isNextDay = nextDateStr && p.punch_date === nextDateStr;
@@ -574,16 +597,16 @@ export default function DailyBreakdownDialog({
         if (punchesWithTime.length === 0) return [];
 
         // Adjust PM_END if it's midnight (00:00)
-        const pmEndTime = parseTime(shift.pm_end, includeSeconds);
+        const pmEndTime = parseTime(shift.pm_end);
         let adjustedPmEnd = pmEndTime;
         if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
             adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
         }
 
         const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start, includeSeconds), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end, includeSeconds), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start, includeSeconds), label: shift.pm_start },
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
             { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
 
@@ -596,7 +619,7 @@ export default function DailyBreakdownDialog({
             let isExtendedMatch = false;
             let isFarExtendedMatch = false;
 
-            // Try 60 min window
+            // Try 120 min window (Extended for Ramadan shifts)
             for (const sp of shiftPoints) {
                 if (usedShiftPoints.has(sp.type)) continue;
                 const distance = Math.abs(punch.time - sp.time) / (1000 * 60);

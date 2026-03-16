@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
 import { Plus, Trash2, Search, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
@@ -19,6 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import TablePagination from '../ui/TablePagination';
 import TimePicker from '../ui/TimePicker';
 import { formatInUAE } from '@/components/ui/timezone';
+import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 // Predefined checklist tasks
 const PREDEFINED_TASKS = [
@@ -42,6 +43,8 @@ function ChecklistSection({ project, checklistItems = [] }) {
     const queryClient = useQueryClient();
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [newTask, setNewTask] = useState({
         task_type: '',
         task_description: '',
@@ -49,6 +52,10 @@ function ChecklistSection({ project, checklistItems = [] }) {
         notes: ''
     });
     const [isCustomType, setIsCustomType] = useState(false);
+
+    // Preview state for Checklist
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewData, setPreviewData] = useState([]);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -117,6 +124,22 @@ function ChecklistSection({ project, checklistItems = [] }) {
         }
     });
 
+    // Bulk delete selected checklist tasks
+    const bulkDeleteTasksMutation = useMutation({
+        mutationFn: async (ids) => {
+            await Promise.all([...ids].map(id => base44.entities.ChecklistItem.delete(id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['checklistItems', project.id]);
+            toast.success(`${selectedIds.size} task(s) deleted`);
+            setSelectedIds(new Set());
+            setShowBulkDeleteConfirm(false);
+        },
+        onError: (error) => {
+            toast.error('Bulk delete failed: ' + error.message);
+        }
+    });
+
     const handleToggleStatus = (task) => {
         const newStatus = task.status === 'completed' ? 'pending' : 'completed';
         const updates = {
@@ -149,6 +172,26 @@ function ChecklistSection({ project, checklistItems = [] }) {
         deleteTaskMutation.mutate(task.id);
     };
 
+    // Selection helpers
+    const allSelected = checklistItems.length > 0 && selectedIds.size === checklistItems.length;
+    const someSelected = selectedIds.size > 0 && selectedIds.size < checklistItems.length;
+
+    const handleSelectAll = (checked) => {
+        if (checked) {
+            setSelectedIds(new Set(checklistItems.map(t => t.id)));
+        } else {
+            setSelectedIds(new Set());
+        }
+    };
+
+    const handleSelectRow = (id, checked) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (checked) next.add(id); else next.delete(id);
+            return next;
+        });
+    };
+
     const taskTypeStats = PREDEFINED_TASKS.reduce((acc, predefinedTask) => {
         acc[predefinedTask.task_type] = { total: 0, completed: 0 };
         return acc;
@@ -165,34 +208,43 @@ function ChecklistSection({ project, checklistItems = [] }) {
     });
 
     const handleExportChecklist = async () => {
-        if (checklistItems.length === 0) {
-            toast.error('No checklist items to export');
-            return;
-        }
+        // Checklist items are already sorted via props
+        const exportData = checklistItems.map(task => ({
+            'Task Type': task.task_type, // Moved to first for merging logic
+            'ID': task.id?.substring(0, 8),
+            'Description': task.task_description,
+            'Status': task.status,
+            'Completed By': task.completed_by || '—',
+            'Completed Date': task.completed_date ? new Date(task.completed_date).toLocaleString() : '—',
+            'Notes': task.notes || ''
+        }));
 
+        setPreviewData(exportData);
+        setIsPreviewOpen(true);
+    };
+
+    const executeChecklistDownload = async () => {
+        if (previewData.length === 0) return;
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-            
-            const exportData = checklistItems.map(task => ({
-                'Task Type': task.task_type,
-                'Description': task.task_description,
-                'Status': task.status === 'completed' ? 'Completed' : task.status === 'in_progress' ? 'In Progress' : 'Pending',
-                'Completed By': task.completed_by || '—',
-                'Completed Date': task.completed_date ? formatInUAE(new Date(task.completed_date), 'dd/MM/yyyy HH:mm') : '—',
-                'Notes': task.notes || '—',
-                'Is Predefined': task.is_predefined ? 'Yes' : 'No'
-            }));
-            
-            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            // Use xlsx for export
+            const XLSX = await import('xlsx');
+            const worksheet = XLSX.utils.json_to_sheet(previewData);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Checklist');
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Checklist");
             
-            const filename = `checklist_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`;
-            XLSX.writeFile(workbook, filename);
-            
-            toast.success(`Exported ${exportData.length} checklist items`);
+            // Apply Dynamic Merging and Formatting
+            formatMergedWorksheet(worksheet, previewData, XLSX);
+
+            const wscols = [
+                { wch: 20 }, { wch: 10 }, { wch: 60 }, { wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 40 }
+            ];
+            worksheet['!cols'] = wscols;
+
+            XLSX.writeFile(workbook, `Checklist_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast.success('Checklist exported to Excel');
         } catch (error) {
-            toast.error('Failed to export: ' + error.message);
+            console.error('[Checklist] Export failed:', error);
+            toast.error('Export failed: ' + error.message);
         }
     };
 
@@ -200,8 +252,26 @@ function ChecklistSection({ project, checklistItems = [] }) {
         <Card className="border-0 shadow-sm bg-green-50/30">
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle>Checklist</CardTitle>
+                    <div className="flex items-center gap-3">
+                        <CardTitle>Checklist</CardTitle>
+                        {selectedIds.size > 0 && (
+                            <span className="text-xs font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                                {selectedIds.size} selected
+                            </span>
+                        )}
+                    </div>
                     <div className="flex gap-2">
+                        {selectedIds.size > 0 && (
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setShowBulkDeleteConfirm(true)}
+                                disabled={bulkDeleteTasksMutation.isPending}
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Selected ({selectedIds.size})
+                            </Button>
+                        )}
                         {checklistItems.length > 0 && (
                             <Button
                                 onClick={handleExportChecklist}
@@ -283,6 +353,14 @@ function ChecklistSection({ project, checklistItems = [] }) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-10 px-4">
+                                        <Checkbox
+                                            checked={someSelected ? 'indeterminate' : allSelected}
+                                            onCheckedChange={handleSelectAll}
+                                            aria-label="Select all tasks"
+                                            className="cursor-pointer"
+                                        />
+                                    </TableHead>
                                     <TableHead>Task Type</TableHead>
                                     <TableHead>Description</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -290,7 +368,21 @@ function ChecklistSection({ project, checklistItems = [] }) {
                             </TableHeader>
                             <TableBody>
                                 {checklistItems.map((task) => (
-                                    <TableRow key={task.id} className={task.status === 'completed' ? 'bg-green-50' : ''}>
+                                    <TableRow
+                                        key={task.id}
+                                        className={[
+                                            task.status === 'completed' ? 'bg-green-50' : '',
+                                            selectedIds.has(task.id) ? 'ring-1 ring-inset ring-green-400 bg-green-50/60' : ''
+                                        ].join(' ')}
+                                    >
+                                        <TableCell className="px-4">
+                                            <Checkbox
+                                                checked={!!selectedIds.has(task.id)}
+                                                onCheckedChange={(checked) => handleSelectRow(task.id, !!checked)}
+                                                aria-label={`Select task ${task.id}`}
+                                                className="cursor-pointer"
+                                            />
+                                        </TableCell>
                                         <TableCell className="font-medium">{task.task_type}</TableCell>
                                         <TableCell className={task.status === 'completed' ? 'line-through text-slate-500' : ''}>
                                             {task.task_description}
@@ -323,6 +415,31 @@ function ChecklistSection({ project, checklistItems = [] }) {
                     </div>
                 )}
             </CardContent>
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Delete {selectedIds.size} task(s)?</DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone. The selected checklist tasks will be permanently removed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => bulkDeleteTasksMutation.mutate(selectedIds)}
+                            disabled={bulkDeleteTasksMutation.isPending}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {bulkDeleteTasksMutation.isPending ? 'Deleting...' : 'Yes, Delete All'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Add Task Dialog */}
             <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -475,9 +592,64 @@ function ChecklistSection({ project, checklistItems = [] }) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ExcelPreviewDialog
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                data={previewData}
+                headers={['Task Type', 'ID', 'Description', 'Status', 'Completed By', 'Completed Date', 'Notes']}
+                fileName={`Checklist_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`}
+                onConfirm={executeChecklistDownload}
+                simulateMergeColumns={['Task Type']}
+            />
         </Card>
     );
 }
+
+/**
+ * Executive Formatting Engine for Excel
+ * Groups consecutive identical values in the first column and applies styling.
+ */
+const formatMergedWorksheet = (worksheet, data, XLSX) => {
+    if (!worksheet || !worksheet['!ref'] || !data || data.length === 0) return;
+
+    const merges = [];
+    const firstColKey = Object.keys(data[0])[0];
+    
+    let groupStart = 1; // Start from Row 1 (skipping header at Row 0)
+
+    for (let i = 0; i < data.length; i++) {
+        const currentValue = String(data[i][firstColKey] || '').trim();
+        const nextValue = i < data.length - 1 ? String(data[i + 1][firstColKey] || '').trim() : null;
+
+        // Apply alignment and wrapText to the first column cells regardless of merging
+        const cellRef = { r: i + 1, c: 0 };
+        const cellAddress = XLSX && XLSX.utils 
+            ? XLSX.utils.encode_cell(cellRef) 
+            : `A${i + 2}`;
+        
+        if (worksheet[cellAddress]) {
+            worksheet[cellAddress].s = {
+                alignment: { vertical: "center", horizontal: "center", wrapText: true }
+            };
+        }
+
+        if (currentValue === nextValue && currentValue !== '') {
+            // Group continues
+        } else {
+            // Group ends
+            if (i + 1 > groupStart) {
+                merges.push({
+                    s: { r: groupStart, c: 0 },
+                    e: { r: i + 1, c: 0 }
+                });
+            }
+            groupStart = i + 2;
+        }
+    }
+
+    worksheet['!merges'] = merges;
+};
 
 // Map user-friendly names to system type codes
 const TYPE_MAP = {
@@ -556,6 +728,16 @@ export default function ExceptionsTab({ project }) {
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [importPreview, setImportPreview] = useState(null);
     const [showImportPreview, setShowImportPreview] = useState(false);
+
+    // Export Preview States
+    const [previewConfig, setPreviewConfig] = useState({
+        isOpen: false,
+        data: [],
+        headers: [],
+        fileName: '',
+        onConfirm: null
+    });
+
     const queryClient = useQueryClient();
 
     const { data: allExceptions = [] } = useQuery({
@@ -601,13 +783,33 @@ export default function ExceptionsTab({ project }) {
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
-
-    const { data: checklistItems = [] } = useQuery({
+     const { data: checklistItems = [], isLoading: checklistLoading } = useQuery({
         queryKey: ['checklistItems', project.id],
         queryFn: () => base44.entities.ChecklistItem.filter({ project_id: project.id }, 'created_date'),
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false
     });
+
+    // Hierarchical Sorting Logic for Checklist Items: Type Name (A-Z) -> Description/Name
+    const sortedChecklistItems = React.useMemo(() => {
+        if (!checklistItems) return [];
+        return [...checklistItems].sort((a, b) => {
+            const typeA = (a.task_type || '').toLowerCase();
+            const typeB = (b.task_type || '').toLowerCase();
+            
+            if (typeA < typeB) return -1;
+            if (typeA > typeB) return 1;
+            
+            // Secondary Sort: Description/Name
+            const descA = (a.task_description || '').toLowerCase();
+            const descB = (b.task_description || '').toLowerCase();
+            
+            if (descA < descB) return -1;
+            if (descA > descB) return 1;
+            
+            return 0;
+        });
+    }, [checklistItems]);
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user';
@@ -920,39 +1122,53 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
     };
 
     const handleExport = async () => {
+        const employeeMap = employees.reduce((acc, emp) => {
+            acc[String(emp.attendance_id)] = emp.name;
+            return acc;
+        }, {});
+
+        const exportData = sortedExceptions.map(ex => {
+            const empName = ex.attendance_id === 'ALL' ? 'All Employees' : (employeeMap[String(ex.attendance_id)] || '—');
+            return {
+                'Employee ID': ex.attendance_id,
+                'Employee Name': empName,
+                'Type': ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' '),
+                'From': ex.date_from ? new Date(ex.date_from).toLocaleDateString() : '—',
+                'To': ex.date_to ? new Date(ex.date_to).toLocaleDateString() : '—',
+                'Details': ex.details || '-',
+                'From Report': ex.created_from_report ? 'Yes' : 'No',
+                'Created By': ex.created_by || 'System',
+                'Created Date': ex.created_date ? new Date(ex.created_date).toLocaleString() : '—'
+            };
+        });
+
+        setPreviewConfig({
+            isOpen: true,
+            data: exportData,
+            headers: ['Employee ID', 'Employee Name', 'Type', 'From', 'To', 'Details', 'From Report', 'Created By', 'Created Date'],
+            fileName: `Exceptions_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`,
+            onConfirm: executeExportDownload
+        });
+    };
+
+    const executeExportDownload = async () => {
+        if (previewConfig.data.length === 0) return;
         try {
             const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-            
-            const exportData = sortedExceptions.map(ex => {
-                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
-                return {
-                    'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
-                    'Employee Name': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
-                    'Department': ex.attendance_id === 'ALL' ? '—' : (employee?.department || '—'),
-                    'Type': ex.is_custom_type ? ex.custom_type_name || 'Custom' : ex.type.replace(/_/g, ' '),
-                    'From Date': ex.is_custom_type && (!ex.date_from || ex.date_from === project.date_from) ? '—' : new Date(ex.date_from).toLocaleDateString(),
-                    'To Date': ex.is_custom_type && (!ex.date_to || ex.date_to === project.date_to) ? '—' : new Date(ex.date_to).toLocaleDateString(),
-                    'Details': ex.details || '',
-                    'Use in Analysis': ex.use_in_analysis !== false ? 'Yes' : 'No',
-                    'From Report': ex.created_from_report ? 'Yes' : 'No',
-                    'Created Date': new Date(ex.created_date).toLocaleDateString(),
-                    'Created By': ex.created_by || ''
-                };
-            });
-            
-            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const worksheet = XLSX.utils.json_to_sheet(previewConfig.data);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Exceptions');
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Exceptions");
             
-            const filename = hasActiveFilters 
-                ? `exceptions_filtered_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`
-                : `exceptions_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`;
-            
-            XLSX.writeFile(workbook, filename);
-            
-            toast.success(`Exported ${exportData.length} exceptions${hasActiveFilters ? ' (filtered)' : ''}`);
+            const wscols = [
+                { wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 12 }, { wch: 20 }, { wch: 20 }
+            ];
+            worksheet['!cols'] = wscols;
+
+            XLSX.writeFile(workbook, previewConfig.fileName);
+            toast.success('Exceptions exported to Excel');
         } catch (error) {
-            toast.error('Failed to export: ' + error.message);
+            console.error('[Exceptions] Export failed:', error);
+            toast.error('Export failed: ' + error.message);
         }
     };
 
@@ -1273,30 +1489,25 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const needsSkipPunch = formData.type === 'SKIP_PUNCH';
     const needsDaySwap = formData.type === 'DAY_SWAP';
     const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
-
-    // Group and flatten exceptions by type and custom name (invisible grouping)
+    // Hierarchical Sorting Logic for Exceptions: Type Name (A-Z) -> Employee Name
     const sortedExceptions = React.useMemo(() => {
-        const groups = {};
-        
-        filteredExceptions.forEach(ex => {
-            let groupKey;
-            if (ex.is_custom_type) {
-                // For custom types, group by custom_type_name (case-insensitive)
-                const customName = (ex.custom_type_name || 'Custom').toLowerCase();
-                groupKey = `CUSTOM_${customName}`;
-            } else {
-                groupKey = ex.type;
-            }
+        return [...filteredExceptions].sort((a, b) => {
+            const typeA = (a.is_custom_type ? (a.custom_type_name || 'Custom') : a.type.replace(/_/g, ' ')).toLowerCase();
+            const typeB = (b.is_custom_type ? (b.custom_type_name || 'Custom') : b.type.replace(/_/g, ' ')).toLowerCase();
             
-            if (!groups[groupKey]) {
-                groups[groupKey] = [];
-            }
-            groups[groupKey].push(ex);
+            if (typeA < typeB) return -1;
+            if (typeA > typeB) return 1;
+            
+            // Secondary Sort: Employee Name
+            const nameA = (employees.find(e => String(e.attendance_id) === String(a.attendance_id) && e.company === project.company)?.name || '').toLowerCase();
+            const nameB = (employees.find(e => String(e.attendance_id) === String(b.attendance_id) && e.company === project.company)?.name || '').toLowerCase();
+            
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            
+            return 0;
         });
-        
-        // Flatten groups into a single sorted array
-        return Object.values(groups).flat();
-    }, [filteredExceptions]);
+    }, [filteredExceptions, employees, project.company]);
 
     const paginatedExceptions = sortedExceptions.slice(
         (currentPage - 1) * rowsPerPage,
@@ -1304,53 +1515,101 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     );
 
     const handleGroupExport = async () => {
+        // Step 3: Annual Leave Source Filter
+        // Filter out "Annual Leave" from exceptions if it already exists in checklist or just by rule.
+        // Result: Only "Annual Leave" from Checklist remains.
+        
+        const filteredExceptionsForExport = sortedExceptions.filter(ex => {
+            const typeName = (ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' ')).toLowerCase().trim();
+            return typeName !== 'annual leave';
+        });
+
+        // Combine both sources for intermingled hierarchical sorting
+        const combinedData = [
+            ...filteredExceptionsForExport.map(ex => {
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id) && e.company === project.company);
+                const typeName = ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' ');
+                const empName = ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—');
+                
+                return {
+                    type: typeName, // Moved to first for merging
+                    category: 'Attendance Exception',
+                    id: ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
+                    employeeTask: empName,
+                    details: ex.details || '-',
+                    context: `${typeName}${ex.created_from_report ? ' (From Report)' : ''}`,
+                    sortType: typeName.toLowerCase(),
+                    sortName: empName.toLowerCase()
+                };
+            }),
+            ...sortedChecklistItems.map(task => {
+                const taskType = task.task_type || 'General';
+                const taskDesc = task.task_description || '—';
+                
+                return {
+                    type: taskType, // Moved to first for merging
+                    category: 'Checklist Task',
+                    id: taskType,
+                    employeeTask: taskDesc,
+                    details: task.notes || '-',
+                    context: `${task.is_predefined ? 'Predefined' : 'Project Task'}${task.completed_by ? ` (By: ${task.completed_by})` : ''}`,
+                    sortType: taskType.toLowerCase(),
+                    sortName: taskDesc.toLowerCase()
+                };
+            })
+        ];
+
+        // Apply consistent alphabetical sort: Type Name -> Employee/Task Name
+        combinedData.sort((a, b) => {
+            if (a.sortType < b.sortType) return -1;
+            if (a.sortType > b.sortType) return 1;
+            if (a.sortName < b.sortName) return -1;
+            if (a.sortName > b.sortName) return 1;
+            return 0;
+        });
+
+        const exportRows = combinedData.map(item => ({
+            'Type': item.type,
+            'Category': item.category,
+            'Employee / Task': item.employeeTask,
+            'Details': item.details,
+            'Additional Context': item.context
+        }));
+
+        setPreviewConfig({
+            isOpen: true,
+            data: exportRows,
+            headers: ['Type', 'Category', 'Employee / Task', 'Details', 'Additional Context'],
+            fileName: `Unified_Export_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`,
+            onConfirm: executeGroupExportDownload,
+            simulateMergeColumns: ['Type']
+        });
+    };
+
+    const executeGroupExportDownload = async () => {
+        if (previewConfig.data.length === 0) return;
         try {
-            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            // Use xlsx for export
+            const XLSX = await import('xlsx');
+            
+            // Create worksheet from JSON
+            const worksheet = XLSX.utils.json_to_sheet(previewConfig.data);
             const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Unified Export");
             
-            // Export Exceptions Sheet
-            if (sortedExceptions.length > 0) {
-                const exceptionsData = sortedExceptions.map(ex => {
-                    const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
-                    return {
-                        'Attendance ID': ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
-                        'Employee Name': ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—'),
-                        'Department': ex.attendance_id === 'ALL' ? '—' : (employee?.department || '—'),
-                        'Type': ex.is_custom_type ? ex.custom_type_name || 'Custom' : ex.type.replace(/_/g, ' '),
-                        'From Date': ex.is_custom_type && (!ex.date_from || ex.date_from === project.date_from) ? '—' : new Date(ex.date_from).toLocaleDateString(),
-                        'To Date': ex.is_custom_type && (!ex.date_to || ex.date_to === project.date_to) ? '—' : new Date(ex.date_to).toLocaleDateString(),
-                        'Details': ex.details || '',
-                        'Use in Analysis': ex.use_in_analysis !== false ? 'Yes' : 'No',
-                        'From Report': ex.created_from_report ? 'Yes' : 'No'
-                    };
-                });
-                
-                const exceptionsSheet = XLSX.utils.json_to_sheet(exceptionsData);
-                XLSX.utils.book_append_sheet(workbook, exceptionsSheet, 'Exceptions');
-            }
+            // Apply Dynamic Merging and Formatting
+            formatMergedWorksheet(worksheet, previewConfig.data, XLSX);
             
-            // Export Checklist Sheet
-            if (checklistItems.length > 0) {
-                const checklistData = checklistItems.map(task => ({
-                    'Task Type': task.task_type,
-                    'Description': task.task_description,
-                    'Status': task.status === 'completed' ? 'Completed' : task.status === 'in_progress' ? 'In Progress' : 'Pending',
-                    'Completed By': task.completed_by || '—',
-                    'Completed Date': task.completed_date ? formatInUAE(new Date(task.completed_date), 'dd/MM/yyyy HH:mm') : '—',
-                    'Notes': task.notes || '—',
-                    'Is Predefined': task.is_predefined ? 'Yes' : 'No'
-                }));
-                
-                const checklistSheet = XLSX.utils.json_to_sheet(checklistData);
-                XLSX.utils.book_append_sheet(workbook, checklistSheet, 'Checklist');
-            }
-            
-            const filename = `${project.name}_exceptions_checklist_${new Date().toISOString().split('T')[0]}.xlsx`;
-            XLSX.writeFile(workbook, filename);
-            
-            toast.success(`Exported exceptions and checklist data`);
+            const wscols = [
+                { wch: 25 }, { wch: 25 }, { wch: 60 }, { wch: 40 }, { wch: 40 }
+            ];
+            worksheet['!cols'] = wscols;
+
+            XLSX.writeFile(workbook, previewConfig.fileName);
+            toast.success('Unified export downloaded with dynamic grouping');
         } catch (error) {
-            toast.error('Failed to export: ' + error.message);
+            console.error('[Unified] Export failed:', error);
+            toast.error('Export failed: ' + error.message);
         }
     };
 
@@ -1362,7 +1621,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="font-medium text-slate-900">Export All Data</p>
-                            <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in one file</p>
+                            <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in a single consolidated sheet</p>
                         </div>
                         <Button
                             onClick={handleGroupExport}
@@ -1370,7 +1629,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             className="bg-gradient-to-r from-indigo-600 to-green-600 hover:from-indigo-700 hover:to-green-700"
                         >
                             <Download className="w-4 h-4 mr-2" />
-                            Export All
+                            Export Unified
                         </Button>
                     </div>
                 </CardContent>
@@ -2247,7 +2506,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             </Card>
 
             {/* Payroll Checklist Section */}
-            <ChecklistSection project={project} checklistItems={checklistItems} />
+            <ChecklistSection project={project} checklistItems={sortedChecklistItems} />
 
             {/* Report-Generated Exceptions */}
             {reportExceptions.length > 0 && (
@@ -2633,6 +2892,16 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     )}
                 </DialogContent>
             </Dialog>
+
+            <ExcelPreviewDialog
+                isOpen={previewConfig.isOpen}
+                onClose={() => setPreviewConfig(prev => ({ ...prev, isOpen: false }))}
+                data={previewConfig.data}
+                headers={previewConfig.headers}
+                fileName={previewConfig.fileName}
+                onConfirm={previewConfig.onConfirm}
+                simulateMergeColumns={previewConfig.simulateMergeColumns}
+            />
         </div>
     );
 }

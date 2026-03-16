@@ -214,6 +214,32 @@ Deno.serve(async (req) => {
             }
         }
 
+        // =====================================================================
+        // FALLBACK FOR DELETE EVENTS (GHOST TASK PREVENTION)
+        // =====================================================================
+        // If this is a delete event and the payload didn't tell us which 
+        // projects were affected, we search the ChecklistItem entity for any 
+        // auto-created tasks linked to this leave record. This ensures 
+        // "ghost tasks" are cleaned up even if the automation payload is 
+        // incomplete.
+        // =====================================================================
+        if (eventType === 'delete' && affectedProjectIds.size === 0) {
+            try {
+                console.log(`[onAnnualLeaveChange] No projects in delete payload for ${leaveId}, searching ChecklistItem for ghost tasks...`);
+                // Use a high limit to ensure we find all linked tasks across all projects
+                const orphans = await base44.asServiceRole.entities.ChecklistItem.filter({
+                    linked_annual_leave_id: String(leaveId),
+                    is_auto_created: true
+                }, { limit: 1000 });
+
+                for (const task of orphans) {
+                    if (task.project_id) affectedProjectIds.add(String(task.project_id));
+                }
+            } catch (searchError: any) {
+                console.error(`[onAnnualLeaveChange] Error searching for orphan checklist items for leave ${leaveId}:`, searchError.message);
+            }
+        }
+
         if (affectedProjectIds.size === 0) {
             return Response.json({
                 success: true,

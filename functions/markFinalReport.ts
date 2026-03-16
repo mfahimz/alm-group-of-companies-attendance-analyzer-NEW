@@ -33,11 +33,43 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        // Unmark all existing final reports for this project
+        // Fetch all report runs for this project once to use in validation and loop
         const allReports = await base44.asServiceRole.entities.ReportRun.filter({
             project_id: project_id
         }, null, 5000);
 
+        // BUSINESS LOGIC: Date-Range Protection & Conflict Prevention
+        const targetReport = allReports.find(r => r.id === report_run_id);
+        if (targetReport) {
+            const newFrom = new Date(targetReport.date_from);
+            const newTo = new Date(targetReport.date_to);
+            const projectFrom = new Date(projects[0].date_from);
+            const projectTo = new Date(projects[0].date_to);
+
+            // Exception: If the report covers the entire project range, bypass the blocking rule
+            const isFullProjectRange = 
+                newFrom.toISOString().split('T')[0] === projectFrom.toISOString().split('T')[0] && 
+                newTo.toISOString().split('T')[0] === projectTo.toISOString().split('T')[0];
+
+            if (!isFullProjectRange) {
+                const overlappingReport = allReports.find(run => {
+                    if (!run.is_saved || run.id === report_run_id) return false;
+                    const savedFrom = new Date(run.date_from);
+                    const savedTo = new Date(run.date_to);
+                    return (newFrom <= savedTo) && (newTo >= savedFrom);
+                });
+
+                if (overlappingReport) {
+                    const rangeText = `${new Date(overlappingReport.date_from).toLocaleDateString()} - ${new Date(overlappingReport.date_to).toLocaleDateString()}`;
+                    return Response.json({ 
+                        success: false, 
+                        error: `Validation Failed: This report overlaps with an already saved report (${rangeText}). Conflict prevention blocks this operation.`
+                    }, { status: 400 });
+                }
+            }
+        }
+
+        // Unmark all existing final reports for this project
         for (const report of allReports) {
             if (report.is_final) {
                 await base44.asServiceRole.entities.ReportRun.update(report.id, {
@@ -50,6 +82,7 @@ Deno.serve(async (req) => {
         const nowUAE = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString();
         await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
             is_final: true,
+            is_saved: true, // A finalized report is also a saved report
             finalized_by: user.email,
             finalized_date: nowUAE,
             recalculation_version: 0

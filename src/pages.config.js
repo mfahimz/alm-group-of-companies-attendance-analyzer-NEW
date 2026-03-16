@@ -48,6 +48,7 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import AIPayrollInsights from './pages/AIPayrollInsights';
+import AgentsDocumentation from './pages/AgentsDocumentation';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import AppDocumentation from './pages/AppDocumentation';
 import AuditLogs from './pages/AuditLogs';
@@ -59,8 +60,6 @@ import CompanySelection from './pages/CompanySelection';
 import Dashboard from './pages/Dashboard';
 import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
-import DeveloperModule from './pages/DeveloperModule';
-import DevelopmentLog from './pages/DevelopmentLog';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
 import FeatureRequests from './pages/FeatureRequests';
@@ -80,14 +79,16 @@ import Salaries from './pages/Salaries';
 import SalaryIncrements from './pages/SalaryIncrements';
 import SalaryReportDetail from './pages/SalaryReportDetail';
 import TechnicalDocumentation from './pages/TechnicalDocumentation';
-import TestDataViewer from './pages/TestDataViewer';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
+import SoftwareDoc from './pages/SoftwareDoc';
+import DeveloperPortal from './pages/developer/DeveloperPortal';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AIPayrollInsights": AIPayrollInsights,
+    "AgentsDocumentation": AgentsDocumentation,
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "AppDocumentation": AppDocumentation,
     "AuditLogs": AuditLogs,
@@ -99,8 +100,6 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "DepartmentHeadDashboard": DepartmentHeadDashboard,
     "DepartmentHeadSettings": DepartmentHeadSettings,
-    "DeveloperModule": DeveloperModule,
-    "DevelopmentLog": DevelopmentLog,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
     "FeatureRequests": FeatureRequests,
@@ -120,9 +119,10 @@ export const PAGES = {
     "SalaryIncrements": SalaryIncrements,
     "SalaryReportDetail": SalaryReportDetail,
     "TechnicalDocumentation": TechnicalDocumentation,
-    "TestDataViewer": TestDataViewer,
     "UserProfile": UserProfile,
     "Users": Users,
+    "SoftwareDoc": SoftwareDoc,
+    "DeveloperPortal": DeveloperPortal,
 }
 
 export const pagesConfig = {

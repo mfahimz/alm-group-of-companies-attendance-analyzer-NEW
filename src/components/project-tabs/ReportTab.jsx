@@ -100,17 +100,153 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         refetchOnMount: false
     });
 
+    const { data: employees = [] } = useQuery({
+        queryKey: ['employees', project.company],
+        queryFn: () => base44.entities.Employee.filter({ company: project.company }),
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
+    });
+
     const uniqueEmployeeIds = [...new Set(punches.map(p => p.attendance_id))];
 
     // Analysis functions
     const performDataQualityCheck = () => {
         const issues = [];
         
+        // 1. Basic configuration checks
         if (punches.length > 0 && shifts.length === 0) {
             issues.push({
                 type: 'error',
                 title: 'No shift timings configured',
                 details: 'Add shift timings in the Shifts tab before running analysis'
+            });
+        }
+
+        if (!rules) {
+            issues.push({
+                type: 'error',
+                title: 'Attendance rules not configured',
+                details: 'Configure rules in Settings > Rules for this company'
+            });
+        }
+
+        // 2. Duplicate ID checks
+        const hrmsIds = {};
+        const attIds = {};
+        employees.forEach(emp => {
+            if (emp.hrms_id) {
+                if (!hrmsIds[emp.hrms_id]) hrmsIds[emp.hrms_id] = [];
+                hrmsIds[emp.hrms_id].push(emp.name);
+            }
+            if (emp.attendance_id) {
+                if (!attIds[emp.attendance_id]) attIds[emp.attendance_id] = [];
+                attIds[emp.attendance_id].push(emp.name);
+            }
+        });
+
+        const duplicateHrms = Object.entries(hrmsIds).filter(([, names]) => names.length > 1);
+        if (duplicateHrms.length > 0) {
+            issues.push({
+                type: 'error',
+                title: 'Duplicate HRMS IDs found',
+                details: duplicateHrms.map(([id, names]) => `ID ${id} used by: ${names.join(', ')}`).join(' | ')
+            });
+        }
+
+        const duplicateAtt = Object.entries(attIds).filter(([, names]) => names.length > 1);
+        if (duplicateAtt.length > 0) {
+            issues.push({
+                type: 'error',
+                title: 'Duplicate Attendance IDs found',
+                details: duplicateAtt.map(([id, names]) => `ID ${id} used by: ${names.join(', ')}`).join(' | ')
+            });
+        }
+
+        // 3. 'Missing Shift' Detection (Orphan Punches)
+        const missingShifts = [];
+        const dayNameToNumber = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        
+        // Group punches by employee and date
+        const punchesByEmpDate = {};
+        punches.forEach(p => {
+            if (p.punch_date >= dateFrom && p.punch_date <= dateTo) {
+                const key = `${p.attendance_id}_${p.punch_date}`;
+                punchesByEmpDate[key] = (punchesByEmpDate[key] || 0) + 1;
+            }
+        });
+
+        uniqueEmployeeIds.forEach(attId => {
+            const attIdStr = String(attId);
+            const employee = employees.find(e => String(e.attendance_id) === attIdStr);
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attIdStr);
+            
+            // Determine weekly off
+            let weeklyOffDay = null;
+            if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+            } else if (employee?.weekly_off) {
+                weeklyOffDay = dayNameToNumber[employee.weekly_off];
+            }
+
+            // Loop through selected range
+            for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
+                const currentDate = new Date(d);
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const dayOfWeek = currentDate.getDay();
+                
+                const punchCount = punchesByEmpDate[`${attIdStr}_${dateStr}`] || 0;
+                
+                // PERFORMANCE SAFETY: Skip if totalPunches === 0
+                if (punchCount > 0) {
+                    const isWeeklyHoliday = (weeklyOffDay !== null && dayOfWeek === weeklyOffDay);
+                    
+                    if (!isWeeklyHoliday) {
+                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        const currentDayName = dayNames[dayOfWeek];
+                        
+                        const hasShift = employeeShifts.some(s => {
+                            if (s.date === dateStr) return true;
+                            if (!s.date && s.applicable_days) {
+                                try {
+                                    const days = JSON.parse(s.applicable_days);
+                                    if (Array.isArray(days) && days.some(day => day.toLowerCase() === currentDayName.toLowerCase())) return true;
+                                } catch(e) {}
+                            }
+                            if (!s.date && !s.applicable_days) {
+                                if (dayOfWeek === 5 && s.is_friday_shift) return true;
+                                if (dayOfWeek !== 5 && !s.is_friday_shift) return true;
+                                if (dayOfWeek === 5 && !employeeShifts.some(ss => ss.is_friday_shift)) return true;
+                            }
+                            return false;
+                        });
+                        
+                        if (!hasShift) {
+                            missingShifts.push({
+                                name: employee?.name || `ID: ${attIdStr}`,
+                                date: dateStr
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        if (missingShifts.length > 0) {
+            const uniqueAffected = [...new Set(missingShifts.map(ms => ms.name))].length;
+            issues.push({
+                type: 'warning',
+                title: 'Missing Shift Settings Detected',
+                details: `Warning: ${uniqueAffected} employees have punches on days with no scheduled shifts. Calculations for these days may be inaccurate.`,
+                affectedList: missingShifts
             });
         }
         
@@ -152,39 +288,101 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         }
 
         setIsAnalyzing(true);
-        setAnalysisProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Starting analysis on server...' });
+        setAnalysisProgress({ 
+            current: 0, 
+            total: 100, 
+            status: 'Preparing analysis...',
+            step: 'Initializing',
+            subStatus: 'Loading employee data and configurations'
+        });
 
         try {
+            // Step 1: Preparing
+            setAnalysisProgress({ 
+                current: 10, 
+                total: 100, 
+                status: 'Preparing analysis...',
+                step: 'Loading Data',
+                subStatus: 'Fetching employee records and shift schedules'
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Step 2: Processing attendance
+            setAnalysisProgress({ 
+                current: 25, 
+                total: 100, 
+                status: 'Analyzing attendance records...',
+                step: 'Processing Attendance',
+                subStatus: `Checking ${uniqueEmployeeIds.length} employees across ${Math.ceil((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))} days`
+            });
+
+            const batchSize = 10;
+            let offset = 0;
+            let isComplete = false;
+            let reportRunId = null;
+            let totalProcessed = 0;
+
+            while (!isComplete) {
+                const response = await base44.functions.invoke('runAnalysis', {
+                    project_id: project.id,
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
+                    _existing_report_run_id: reportRunId,
+                    _chunk_offset: offset,
+                    _chunk_size: batchSize
+                });
+
+                if (response.data.success) {
+                    reportRunId = response.data.report_run_id;
+                    isComplete = response.data.is_complete;
+                    offset += batchSize;
+                    totalProcessed += response.data.processed_count;
+
+                    const percentage = Math.round(25 + Math.min(offset / uniqueEmployeeIds.length, 1) * 50);
+
+                    // Step 3: Processing results iteration
+                    setAnalysisProgress({ 
+                        current: percentage, 
+                        total: 100, 
+                        status: 'Calculating attendance summary...',
+                        step: 'Finalizing Results',
+                        subStatus: `Analyzed ${Math.min(offset, uniqueEmployeeIds.length)} of ${uniqueEmployeeIds.length} employees`
+                    });
+
+                    if (!isComplete) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } else {
+                    throw new Error(response.data.error || 'Analysis chunk failed');
+                }
+            }
+
+            // Step 4: Complete
+            setAnalysisProgress({ 
+                current: 100, 
+                total: 100, 
+                status: 'Analysis complete!',
+                step: 'Done',
+                subStatus: `Successfully analyzed ${totalProcessed} employees`
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            queryClient.invalidateQueries(['results', project.id]);
+            queryClient.invalidateQueries(['reportRuns', project.id]);
+            queryClient.invalidateQueries(['project', project.id]);
+            queryClient.invalidateQueries(['projects']);
+            toast.success(`✅ Analysis complete`);
+        } catch (error) {
             setAnalysisProgress({ 
                 current: 0, 
-                total: uniqueEmployeeIds.length, 
-                status: 'Processing on server...',
-                subStatus: 'Analysis is running in the background. This may take a few minutes.'
+                total: 100, 
+                status: 'Analysis failed',
+                step: 'Error',
+                subStatus: error.message
             });
-
-            const response = await base44.functions.invoke('runAnalysis', {
-                project_id: project.id,
-                date_from: dateFrom,
-                date_to: dateTo,
-                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`
-            });
-
-            if (response.data.success) {
-                queryClient.invalidateQueries(['results', project.id]);
-                queryClient.invalidateQueries(['reportRuns', project.id]);
-                queryClient.invalidateQueries(['project', project.id]);
-                queryClient.invalidateQueries(['projects']);
-                toast.success(response.data.message);
-                setAnalysisProgress({ 
-                    current: response.data.processed_count, 
-                    total: response.data.total_count, 
-                    status: 'Complete!',
-                    subStatus: 'Report generated successfully'
-                });
-            } else {
-                throw new Error(response.data.error || 'Analysis failed');
-            }
-        } catch (error) {
             toast.error('Analysis failed: ' + error.message);
             console.error(error);
         } finally {
@@ -379,7 +577,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             }
 
             // STEP 3: Create salary snapshots in batches with real progress
-            const BATCH_SIZE = 20;
+            const BATCH_SIZE = 10;
             let batchStart = 0;
             let hasMore = true;
             let totalEmployees = 0;
@@ -436,8 +634,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     batchStart = currentPos;
 
                     if (hasMore) {
-                        console.log(`[ReportTab] ⏳ Waiting 100ms before next batch...`);
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        console.log(`[ReportTab] ⏳ Waiting 300ms before next batch...`);
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     } else {
                         console.log(`[ReportTab] ✅ ALL BATCHES COMPLETE - Exiting loop`);
                     }
@@ -703,25 +901,23 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             </div>
 
                             {analysisProgress && (
-                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-                                        <div className="flex-1">
-                                            <p className="font-medium text-indigo-900">{analysisProgress.status}</p>
+                                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-5">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <Loader2 className="w-6 h-6 text-indigo-600 animate-spin flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1 space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-semibold text-indigo-900 text-lg">{analysisProgress.step}</p>
+                                                <span className="text-sm font-medium text-indigo-700">
+                                                    {analysisProgress.current}%
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-indigo-800 font-medium">{analysisProgress.status}</p>
                                             {analysisProgress.subStatus && (
-                                                <p className="text-sm text-indigo-700 mt-0.5">{analysisProgress.subStatus}</p>
+                                                <p className="text-xs text-indigo-600 mt-1">{analysisProgress.subStatus}</p>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="w-full bg-indigo-200 rounded-full h-2">
-                                        <div 
-                                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                            style={{ width: `${analysisProgress.total > 0 ? (analysisProgress.current / analysisProgress.total) * 100 : 0}%` }}
-                                        />
-                                    </div>
-                                    <p className="text-sm text-indigo-700 mt-2">
-                                        {analysisProgress.current} / {analysisProgress.total} employees processed
-                                    </p>
+                                    <Progress value={analysisProgress.current} className="h-2" />
                                 </div>
                             )}
                         </div>
@@ -800,6 +996,25 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                             }`}>
                                                 {issue.details}
                                             </p>
+                                            
+                                            {issue.affectedList && (
+                                                <div className="mt-3 bg-white/50 rounded-md p-2 border border-amber-200/50 max-h-40 overflow-y-auto">
+                                                    <p className="text-xs font-semibold text-amber-800 mb-1">Affected Employees & Dates:</p>
+                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                        {issue.affectedList.slice(0, 50).map((item, i) => (
+                                                            <div key={i} className="text-[10px] text-amber-700 flex justify-between">
+                                                                <span className="truncate mr-2 font-medium">{item.name}</span>
+                                                                <span className="shrink-0 opacity-70">{item.date}</span>
+                                                            </div>
+                                                        ))}
+                                                        {issue.affectedList.length > 50 && (
+                                                            <div className="text-[10px] text-amber-600 italic col-span-2 mt-1">
+                                                                + {issue.affectedList.length - 50} more records...
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -887,7 +1102,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             <div className="flex items-start gap-2 text-xs text-amber-800">
                                 <div className="animate-spin h-3 w-3 border-2 border-amber-300 border-t-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
                                 <div>
-                                    <strong>Creating salary snapshots...</strong> This takes ~2-3 seconds per 20 employees.
+                                    <strong>Creating salary snapshots...</strong> This takes ~3 seconds per 10 employees.
                                     <br />
                                     <span className="text-amber-700">⚠️ Do NOT navigate away or close this dialog until complete!</span>
                                 </div>
@@ -994,13 +1209,19 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
+                                                        {/* 
+                                                          BUSINESS LOGIC: Status-based Labeling
+                                                          - 'Final' badge: Strictly based on 'is_final' field (marked for salary)
+                                                          - 'Saved' badge: Strictly based on 'is_saved' field (edits persisted)
+                                                          These labels persist based on DB state, not latest-report defaults.
+                                                        */}
                                                         {run.is_final && (
                                                             <Badge className="bg-green-100 text-green-700 border-green-300">
                                                                 <Star className="w-3 h-3 mr-1 fill-green-700" />
                                                                 Final
                                                             </Badge>
                                                         )}
-                                                        {project.last_saved_report_id === run.id && (
+                                                        {run.is_saved && (
                                                             <Badge className="bg-blue-100 text-blue-700 border-blue-300">
                                                                 <Save className="w-3 h-3 mr-1" />
                                                                 Saved

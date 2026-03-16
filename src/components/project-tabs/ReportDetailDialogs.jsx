@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { Progress } from "@/components/ui/progress";
 
 export function GraceMinutesDialog({ editingGraceMinutes, onClose, onSave, isPending }) {
     return (
@@ -86,16 +87,11 @@ export function FinalizationProgressDialog({ progress }) {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <div className="flex justify-between text-sm text-slate-600">
+                        <div className="flex justify-between text-sm text-slate-600 mb-2">
                             <span>Progress</span>
                             <span className="font-medium">{progress.current} / {progress.total}</span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div
-                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
-                            />
-                        </div>
+                        <Progress value={progress.total > 0 ? (progress.current / progress.total) * 100 : 0} />
                     </div>
                     <div className="space-y-1">
                         <div className="text-sm font-medium text-slate-700">{progress.status}</div>

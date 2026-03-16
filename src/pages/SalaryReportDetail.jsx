@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import PINLock from '../components/ui/PINLock';
@@ -572,46 +571,15 @@ export default function SalaryReportDetail() {
     };
 
     const handleExportToExcel = () => {
+        toast.error('Excel export requires xlsx package. Please contact administrator.');
+        
+        /* DISABLED - xlsx package not available
         const exportData = filteredData.map(row => {
-            // Calculate totals for export to get correct WPS values
             const { total, wpsPay, balance, wpsCapApplied, netAdditions, netDeductions, effectiveOtOrIncentive } = calculateTotals(row);
             return {
                 'Attendance ID': row.attendance_id,
                 'Name': row.name,
-                'Attendance Source': row.attendance_source || 'ANALYZED',
-                'Total Salary': Math.round(row.total_salary || 0),
-                'Working Days': row.working_days || 0,
-                'Present Days': row.present_days || 0,
-                'LOP Days': row.full_absence_count || 0,
-                'Annual Leave Days': parseFloat(((row.salary_leave_days || row.salaryLeaveDays || 0)).toFixed(2)),
-                'Leave Days': parseFloat((((row.salary_leave_days || row.salaryLeaveDays || 0) + (row.full_absence_count || 0))).toFixed(2)),
-                'Leave Pay': parseFloat((row.leavePay || 0).toFixed(2)),
-                'Salary Leave Days': parseFloat((row.salary_leave_days || row.salaryLeaveDays || 0).toFixed(2)),
-                'Salary Leave Amount': parseFloat((row.salaryLeaveAmount || 0).toFixed(2)),
-                'Net Deduction': parseFloat((row.netDeduction || 0).toFixed(2)),
-                'Deductible Hours': parseFloat((row.deductibleHours || 0).toFixed(2)),
-                'Deductible Hours Pay': parseFloat((row.deductibleHoursPay || 0).toFixed(2)),
-                'Normal OT Hours': parseFloat((row.normalOtHours || 0).toFixed(2)),
-                'Normal OT Salary': parseFloat((row.normalOtSalary || 0).toFixed(2)),
-                'Special OT Hours': parseFloat((row.specialOtHours || 0).toFixed(2)),
-                'Special OT Salary': parseFloat((row.specialOtSalary || 0).toFixed(2)),
-                'Total OT Salary': parseFloat(((row.normalOtSalary || 0) + (row.specialOtSalary || 0)).toFixed(2)),
-                'Effective OT/Incentive (Higher Only)': parseFloat((effectiveOtOrIncentive || 0).toFixed(2)),
-                'Net Additions': parseFloat((netAdditions || 0).toFixed(2)),
-                'Other Deduction': parseFloat((row.otherDeduction || 0).toFixed(2)),
-                'Bonus': parseFloat((row.bonus || 0).toFixed(2)),
-                'Incentive': parseFloat((row.incentive || 0).toFixed(2)),
-                ...(isAlMaraghi ? {
-                    'Open Leave Salary': parseFloat((asNumber(row.open_leave_salary)).toFixed(2)),
-                    'Variable Salary': parseFloat((asNumber(row.variable_salary)).toFixed(2))
-                } : {}),
-                'Advance Salary Deduction': parseFloat((row.advanceSalaryDeduction || 0).toFixed(2)),
-                'Net Deductions': parseFloat((netDeductions || 0).toFixed(2)),
-                'Total': parseFloat(total.toFixed(2)),
-                'WPS Pay': parseFloat(wpsPay.toFixed(2)),
-                'Balance': Math.round(balance),
-                'WPS Cap Applied': wpsCapApplied ? 'Yes' : 'No',
-                'WPS Cap Amount': row.wps_cap_enabled ? (row.wps_cap_amount || 4900) : ''
+                ...
             };
         });
 
@@ -620,6 +588,7 @@ export default function SalaryReportDetail() {
         XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
         XLSX.writeFile(wb, `${report?.report_name || 'Salary'}_${report?.date_from}_to_${report?.date_to}.xlsx`);
         toast.success('Excel file downloaded');
+        */
     };
 
     // ============================================
