@@ -320,6 +320,22 @@ export default function DailyBreakdownDialog({
                 shift = { ...shift, ...override.shiftOverride };
             }
 
+            // Detect SKIP_PUNCH exception for this date
+            const matchingExcsForDate = empExceptions.filter(ex => {
+                try {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return currentDate >= exFrom && currentDate <= exTo;
+                } catch { return false; }
+            });
+            const skipPunchEx = matchingExcsForDate.find(ex => ex.type === 'SKIP_PUNCH');
+            const dayException = matchingExcsForDate.find(ex => ex.type !== 'SKIP_PUNCH') || null;
+            const isOnLeave = dayException && (dayException.type === 'SICK_LEAVE' || dayException.type === 'ANNUAL_LEAVE');
+            const skipPunchType = skipPunchEx?.punch_to_skip || null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | null
+            const hasActiveSkip = !!(skipPunchEx && !isOnLeave);
+            const isAmSkip = hasActiveSkip && (skipPunchType === 'AM_PUNCH_IN' || !skipPunchType);
+            const isPmSkip = hasActiveSkip && (skipPunchType === 'PM_PUNCH_OUT' || !skipPunchType);
+
             let dayPunches = empPunches.filter(p => p.punch_date === dateStr);
             const shiftEndsMidnight = shift && (parseTime(shift.pm_end)?.getHours() === 0 || parseTime(shift.pm_end)?.getHours() === 23);
             
@@ -341,8 +357,25 @@ export default function DailyBreakdownDialog({
                 }
             });
 
+            // SKIP_PUNCH zeroing: mirror the backend logic exactly
+            if (isAmSkip) lateMins = 0;
+            if (isPmSkip) earlyMins = 0;
+
             if (override?.lateMinutes !== undefined) lateMins = override.lateMinutes;
             if (override?.earlyCheckoutMinutes !== undefined) earlyMins = override.earlyCheckoutMinutes;
+
+            // Determine daily status
+            let dayStatus;
+            if (override?.type) {
+                dayStatus = override.type;
+            } else if (hasActiveSkip && dayPunches.length === 0) {
+                // 0-punch + active skip = Present (Skip Punch), NOT Absent
+                dayStatus = 'Present (Skip Punch)';
+            } else if (dayPunches.length > 0) {
+                dayStatus = detectPartialDay(dedupedPunches, shift).isPartial ? 'Half Day' : 'Present';
+            } else {
+                dayStatus = 'Absent';
+            }
 
             breakdown.push({
                 date: formatDate(dateStr),
@@ -350,14 +383,16 @@ export default function DailyBreakdownDialog({
                 punches: dayPunches.length,
                 punchMatches,
                 shift: shift ? `${shift.am_start} - ${shift.pm_end}` : 'No Shift',
-                status: override?.type || (dayPunches.length > 0 ? (detectPartialDay(dedupedPunches, shift).isPartial ? 'Half Day' : 'Present') : 'Absent'),
+                status: dayStatus,
                 lateMinutesTotal: lateMins,
-                earlyCheckoutInfo: earlyMins > 0 ? `${earlyMins} min` : '-',
+                earlyCheckoutInfo: earlyMins > 0 ? `${earlyMins}` : '0',
                 otherMinutes: override?.otherMinutes || 0,
                 abnormal: override?.isAbnormal || punchMatches.some(m => !m.matchedTo),
                 shiftObject: shift,
                 hasOverride: !!override,
-                isManual: !!override?.is_manual_minutes
+                isManual: !!override?.is_manual_minutes,
+                isSkipPunch: hasActiveSkip,
+                skipPunchType
             });
         }
         return breakdown;
@@ -479,7 +514,12 @@ export default function DailyBreakdownDialog({
                                     <TableCell>
                                         <div className="flex flex-col gap-1">
                                             <span className="text-xs">{day.status}</span>
-                                            {day.isManual && (
+                                            {day.isSkipPunch && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-medium bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                                    ⏭ Skip Punch
+                                                </span>
+                                            )}
+                                            {day.isManual && !day.isSkipPunch && (
                                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-medium bg-blue-100 text-blue-800">
                                                     Edited
                                                 </span>
@@ -492,7 +532,7 @@ export default function DailyBreakdownDialog({
                                                 type="number"
                                                 defaultValue={day.lateMinutesTotal}
                                                 onBlur={(e) => handleMinutesChange(day, 'lateMinutes', e.target.value)}
-                                                className={`w-full h-7 px-1 text-[10px] border rounded focus:ring-1 focus:ring-blue-500 outline-none ${day.isManual ? 'text-blue-600 font-medium' : ''}`}
+                                                className={`w-full h-7 px-1 text-[10px] border rounded focus:ring-1 focus:ring-blue-500 outline-none ${day.isManual ? 'text-blue-600 font-medium' : ''} ${day.isSkipPunch && day.lateMinutesTotal === 0 ? 'bg-cyan-50' : ''}`}
                                             />
                                             <span className="text-[8px] text-muted-foreground ml-1">min</span>
                                         </div>
@@ -503,7 +543,7 @@ export default function DailyBreakdownDialog({
                                                 type="number"
                                                 defaultValue={parseInt(day.earlyCheckoutInfo) || 0}
                                                 onBlur={(e) => handleMinutesChange(day, 'earlyCheckoutMinutes', e.target.value)}
-                                                className={`w-full h-7 px-1 text-[10px] border rounded focus:ring-1 focus:ring-blue-500 outline-none ${day.isManual ? 'text-blue-600 font-medium' : ''}`}
+                                                className={`w-full h-7 px-1 text-[10px] border rounded focus:ring-1 focus:ring-blue-500 outline-none ${day.isManual ? 'text-blue-600 font-medium' : ''} ${day.isSkipPunch && parseInt(day.earlyCheckoutInfo) === 0 ? 'bg-cyan-50' : ''}`}
                                             />
                                             <span className="text-[8px] text-muted-foreground ml-1">min</span>
                                         </div>

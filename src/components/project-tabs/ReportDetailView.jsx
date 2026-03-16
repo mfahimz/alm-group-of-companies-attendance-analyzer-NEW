@@ -574,8 +574,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return currentDate.getTime() >= exFrom.getTime() && currentDate.getTime() <= exTo.getTime();
             });
 
-            const dateException = matchingExceptionsCalc && matchingExceptionsCalc.length > 0
-                ? matchingExceptionsCalc.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+            // Separate SKIP_PUNCH from the primary exception
+            // SKIP_PUNCH runs alongside other exceptions without overriding them
+            const skipPunchExCalc = matchingExceptionsCalc.find(ex => ex.type === 'SKIP_PUNCH') || null;
+            const nonSkipExceptions = matchingExceptionsCalc.filter(ex => ex.type !== 'SKIP_PUNCH');
+
+            const dateException = nonSkipExceptions.length > 0
+                ? nonSkipExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
                 : null;
 
             let shift = null;
@@ -687,6 +692,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             const partialDayResult = detectPartialDay(dayPunches, shift, nextDateStr);
 
+            // SKIP_PUNCH flags (mirrors backend logic exactly)
+            const isOnLeaveCalc = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
+            const skipPunchTypeCalc = skipPunchExCalc?.punch_to_skip || null;
+            const hasActiveSkipCalc = !!(skipPunchExCalc && !isOnLeaveCalc);
+            const isAmSkipCalc = hasActiveSkipCalc && (skipPunchTypeCalc === 'AM_PUNCH_IN' || !skipPunchTypeCalc);
+            const isPmSkipCalc = hasActiveSkipCalc && (skipPunchTypeCalc === 'PM_PUNCH_OUT' || !skipPunchTypeCalc);
+
             // TRACK ATTENDANCE STATUS
             if (dayOverride) {
                 if (dayOverride.type === 'MANUAL_PRESENT') presentDays++;
@@ -708,6 +720,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             } else if (dayPunches.length > 0) {
                 presentDays++;
                 if (partialDayResult.isPartial) halfAbsenceCount++;
+            } else if (hasActiveSkipCalc) {
+                // 0 punches + active SKIP_PUNCH = Present (Skip Punch), NOT LOP
+                presentDays++;
             } else {
                 fullAbsenceCount++;
             }
@@ -767,7 +782,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (dayOverride.otherMinutes !== undefined) totalOtherMinutes += dayOverride.otherMinutes;
             }
 
-            // 3. Deduction Reduction
+            // 3. SKIP_PUNCH zeroing: mirror backend — zero out the relevant bucket after all calculations
+            // AM skip forgives late arrival; PM skip forgives early departure.
+            if (isAmSkipCalc) dayLateMinutes = 0;
+            if (isPmSkipCalc) dayEarlyMinutes = 0;
+
+            // 4. Deduction Reduction (ALLOWED_MINUTES)
             const totalDayMinutesNet = dayLateMinutes + dayEarlyMinutes;
             if (allowedMinutesForDay > 0 && totalDayMinutesNet > 0) {
                 const remaining = Math.max(0, totalDayMinutesNet - allowedMinutesForDay);
