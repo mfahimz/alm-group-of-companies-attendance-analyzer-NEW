@@ -17,8 +17,14 @@ import {
     XCircle,
     MoreHorizontal,
     FileText,
-    Loader2
+    Loader2,
+    Building2,
+    ChevronDown,
+    ChevronRight,
+    ExternalLink,
+    ArrowLeft
 } from 'lucide-react';
+import ResumeScanResultView from './ResumeScanResult';
 import { toast } from 'sonner';
 import { 
     DropdownMenu, 
@@ -38,6 +44,8 @@ export default function TalentPool() {
     const qc = useQueryClient();
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
+    const [selectedCandidate, setSelectedCandidate] = useState(null);
+    const [expandedRoles, setExpandedRoles] = useState(new Set());
     const [reMatchingJob, setReMatchingJob] = useState(null);
     const [showReMatchList, setShowReMatchList] = useState(false);
 
@@ -152,6 +160,72 @@ export default function TalentPool() {
     };
 
     const nationalities = useMemo(() => ['All', ...new Set(candidates.map(c => c.nationality).filter(Boolean))], [candidates]);
+
+    // Grouping Logic
+    const groupedData = useMemo(() => {
+        const companies = {
+            'Al Maraghi Motors': { keyword: 'Motors', roles: [] },
+            'Naser Mohsin Auto Parts': { keyword: 'Parts', roles: [] }
+        };
+
+        const rolesList = jobTemplates.map(t => ({
+            name: t.position_name,
+            company: t.position_name?.includes('Motors') ? 'Al Maraghi Motors' : t.position_name?.includes('Parts') ? 'Naser Mohsin Auto Parts' : null
+        })).filter(r => r.company);
+
+        Object.keys(companies).forEach(companyName => {
+            const companyKeyword = companies[companyName].keyword;
+            const companyRoles = rolesList.filter(r => r.company === companyName);
+            
+            companies[companyName].roles = companyRoles.map(role => ({
+                name: role.name,
+                candidates: filteredCandidates.filter(c => 
+                    c.matched_template_name === role.name && 
+                    c.matched_template_name.includes(companyKeyword)
+                )
+            }));
+        });
+
+        return companies;
+    }, [filteredCandidates, jobTemplates]);
+
+    const toggleRole = (roleName) => {
+        setExpandedRoles(prev => {
+            const next = new Set(prev);
+            if (next.has(roleName)) next.delete(roleName);
+            else next.add(roleName);
+            return next;
+        });
+    };
+
+    if (selectedCandidate) {
+        // Prepare result object for View component
+        const result = {
+            ...selectedCandidate,
+            score: selectedCandidate.ai_score || 0,
+            recommendation: selectedCandidate.ai_recommendation,
+            summary: selectedCandidate.ai_summary,
+            ai_strengths: selectedCandidate.ai_strengths,
+            ai_concerns: selectedCandidate.ai_concerns,
+            matched_skills: selectedCandidate.matched_skills,
+            missing_skills: selectedCandidate.missing_skills,
+            experience_years: selectedCandidate.years_experience || 0,
+        };
+
+        return (
+            <div className="space-y-4">
+                <Button 
+                    variant="ghost" 
+                    onClick={() => setSelectedCandidate(null)}
+                    className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Talent Pool
+                </Button>
+                <ResumeScanResultView result={result} onNewScan={() => setSelectedCandidate(null)} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -283,160 +357,131 @@ export default function TalentPool() {
                 </div>
             </div>
 
-            {/* Candidates Table */}
-            <div className="bg-white border border-[#E2E6EC] rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-[#F8FAFC]/80 backdrop-blur-sm border-b border-[#E2E6EC]">
-                        <tr>
-                            <th className="px-5 py-4 w-10">
-                                <Checkbox 
-                                    checked={selectedIds.length > 0 && selectedIds.length === filteredCandidates.length}
-                                    onCheckedChange={handleSelectAll}
-                                />
-                            </th>
-                            <th className="px-5 py-4 text-xs font-bold text-[#4B5563] uppercase tracking-wider">Applicant</th>
-                            <th className="px-5 py-4 text-xs font-bold text-[#4B5563] uppercase tracking-wider">Attributes</th>
-                            <th className="px-5 py-4 text-xs font-bold text-[#4B5563] uppercase tracking-wider">Evaluation History</th>
-                            <th className="px-5 py-4 text-xs font-bold text-[#4B5563] uppercase tracking-wider text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E2E6EC]">
-                        {isLoading ? (
-                            <tr>
-                                <td colSpan="5" className="py-20 text-center">
-                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
-                                    <p className="text-sm text-slate-500">Loading talent pool...</p>
-                                </td>
-                            </tr>
-                        ) : filteredCandidates.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="py-20 text-center">
-                                    <div className="bg-slate-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                                        <Search className="w-8 h-8 text-slate-300" />
-                                    </div>
-                                    <p className="text-sm text-slate-500">No candidates found matching your search</p>
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredCandidates.map(c => {
-                                const isSelected = selectedIds.includes(c.id);
+            {/* Candidates Grouped View */}
+            <div className="space-y-8">
+                {isLoading ? (
+                    <div className="py-20 text-center bg-white border border-[#E2E6EC] rounded-xl">
+                        <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
+                        <p className="text-sm text-slate-500">Loading talent pool...</p>
+                    </div>
+                ) : Object.keys(groupedData).map(companyName => (
+                    <div key={companyName} className="space-y-4">
+                        <div className="flex items-center gap-3 pb-2 border-b border-[#E2E6EC]">
+                            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                                <Building2 className="w-4 h-4 text-slate-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-[#1F2937]">{companyName}</h3>
+                            <span className="text-xs font-medium text-slate-400">
+                                {groupedData[companyName].roles.reduce((acc, r) => acc + r.candidates.length, 0)} total candidates
+                            </span>
+                        </div>
+
+                        <div className="space-y-2">
+                            {groupedData[companyName].roles.map(role => {
+                                const isExpanded = expandedRoles.has(`${companyName}-${role.name}`);
                                 return (
-                                    <tr key={c.id} className={`hover:bg-[#F9FAFB] transition-colors ${isSelected ? 'bg-indigo-50/30' : ''}`}>
-                                        <td className="px-5 py-4">
-                                            <Checkbox 
-                                                checked={isSelected}
-                                                onCheckedChange={(checked) => handleSelectOne(c.id, checked)}
-                                            />
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div>
-                                                <p className="font-semibold text-slate-900">{c.applicant_name}</p>
-                                                <p className="text-xs text-slate-500">{c.applicant_email}</p>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span className="text-[10px] b-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">
-                                                        {c.position_applied}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="space-y-1.5">
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                                                    <span className="text-slate-600">{c.location}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                                    <span className="text-slate-600 font-medium">{c.years_experience}y Exp</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <User className="w-3.5 h-3.5 text-slate-400" />
-                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${c.gender === 'Female' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                        {c.gender} • {c.nationality}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="flex flex-col gap-1.5">
+                                    <div key={role.name} className="border border-[#E2E6EC] rounded-xl overflow-hidden bg-white shadow-sm">
+                                        {/* Role Header */}
+                                        <div 
+                                            onClick={() => toggleRole(`${companyName}-${role.name}`)}
+                                            className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                                        c.ai_score >= 70 ? 'bg-green-100 text-green-700' : 
-                                                        c.ai_score >= 40 ? 'bg-yellow-100 text-yellow-700' : 
-                                                        'bg-red-100 text-red-700'
-                                                    }`}>
-                                                        {c.ai_score}
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-semibold text-slate-800">{c.ai_recommendation}</span>
-                                                        <span className="text-[10px] text-slate-400">Last scanned for {new Date(c.created_date).toLocaleDateString()}</span>
-                                                    </div>
+                                                    <Briefcase className="w-4 h-4 text-indigo-500" />
+                                                    <span className="font-semibold text-slate-900">{role.name}</span>
                                                 </div>
-                                                {c.evaluation_status && (
-                                                    <div className={`text-[10px] w-fit px-2 py-0.5 rounded-full font-bold uppercase ${
-                                                        c.evaluation_status === 'Selected' ? 'bg-indigo-600 text-white' :
-                                                        c.evaluation_status === 'Rejected' ? 'bg-red-500 text-white' :
-                                                        'bg-slate-100 text-slate-500'
-                                                    }`}>
-                                                        {c.evaluation_status}
+                                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-bold">
+                                                    {role.candidates.length}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Bulk selection for role if needed could go here, but kept it simple helper */}
+                                            {role.candidates.length > 0 && (
+                                                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                    <Checkbox 
+                                                        checked={role.candidates.every(c => selectedIds.includes(c.id))}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setSelectedIds(prev => [...new Set([...prev, ...role.candidates.map(c => c.id)])]);
+                                                            } else {
+                                                                const idsToRemove = new Set(role.candidates.map(c => c.id));
+                                                                setSelectedIds(prev => prev.filter(id => !idsToRemove.has(id)));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-[10px] text-slate-400 font-medium">Select All</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Role Candidates List */}
+                                        {isExpanded && (
+                                            <div className="px-5 pb-4 space-y-3">
+                                                {role.candidates.length === 0 ? (
+                                                    <div className="py-6 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                                        <p className="text-xs text-slate-500 italic">no candidates yet for this role</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        {role.candidates.map(c => {
+                                                            const isSelected = selectedIds.includes(c.id);
+                                                            return (
+                                                                <div 
+                                                                    key={c.id} 
+                                                                    className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${isSelected ? 'border-indigo-500 bg-indigo-50/30' : 'border-[#E2E6EC] bg-white hover:border-slate-300'}`}
+                                                                >
+                                                                    <Checkbox 
+                                                                        checked={isSelected}
+                                                                        onCheckedChange={(checked) => handleSelectOne(c.id, checked)}
+                                                                    />
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                                                            <h4 className="font-bold text-slate-900 truncate">{c.applicant_name}</h4>
+                                                                            <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                                                c.ai_score >= 70 ? 'bg-green-100 text-green-700' : 
+                                                                                c.ai_score >= 40 ? 'bg-yellow-100 text-yellow-700' : 
+                                                                                'bg-red-100 text-red-700'
+                                                                            }`}>
+                                                                                {c.ai_score}%
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                                            <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                                                                                <MapPin className="w-3 h-3" />
+                                                                                {c.location || 'Unknown'}
+                                                                            </div>
+                                                                            <div className={`text-[10px] font-bold uppercase tracking-tight ${
+                                                                                c.ai_recommendation === 'Highly Recommended' ? 'text-green-600' :
+                                                                                c.ai_recommendation === 'Recommended' ? 'text-blue-600' :
+                                                                                c.ai_recommendation === 'Consider' ? 'text-amber-600' : 'text-red-500'
+                                                                            }`}>
+                                                                                {c.ai_recommendation}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="sm" 
+                                                                        onClick={() => setSelectedCandidate(c)}
+                                                                        className="h-8 px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 shrink-0"
+                                                                    >
+                                                                        <ExternalLink className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
                                             </div>
-                                        </td>
-                                        <td className="px-5 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                                                            <RefreshCcw className="w-3.5 h-3.5" />
-                                                            Re-Match
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-56 max-h-[300px] overflow-y-auto">
-                                                        <div className="px-2 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider border-b mb-1">
-                                                            Select Target Template
-                                                        </div>
-                                                        {jobTemplates.map(jt => (
-                                                            <DropdownMenuItem 
-                                                                key={jt.id} 
-                                                                onClick={() => reMatchMutation.mutate({ candidate: c, template: jt })}
-                                                                className="text-xs py-2"
-                                                            >
-                                                                {jt.position_name}
-                                                            </DropdownMenuItem>
-                                                        ))}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                            <MoreHorizontal className="w-4 h-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => window.open(c.file_url)}>
-                                                            <FileText className="w-3.5 h-3.5 mr-2" />
-                                                            View Original Resume
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleSelectOne(c.id, true)} className="text-indigo-600">
-                                                            <CheckCircle2 className="w-3.5 h-3.5 mr-2" />
-                                                            Shortlist
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ ids: [c.id], status: 'Rejected' })} className="text-red-600">
-                                                            <XCircle className="w-3.5 h-3.5 mr-2" />
-                                                            Reject
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                        )}
+                                    </div>
                                 );
-                            })
-                        )}
-                    </tbody>
-                </table>
+                            })}
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

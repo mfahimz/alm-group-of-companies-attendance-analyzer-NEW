@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { ScanLine, History, Plus, Settings, User } from 'lucide-react';
 import ResumeScanForm from '../components/resume/ResumeScanForm';
 import BatchScanResults from '../components/resume/BatchScanResults';
+import ResumeDashboard from '../components/resume/ResumeDashboard';
 import ScanHistoryTable from '../components/resume/ScanHistoryTable';
 import JobTemplateManager from '../components/resume/JobTemplateManager';
 import TalentPool from '../components/resume/TalentPool';
+import CompanyRoleManager from '../components/resume/CompanyRoleManager';
 import { base44 } from '@/api/base44Client';
+import { ShieldCheck } from 'lucide-react';
 
 export default function ResumeScanner() {
     const [isAdmin, setIsAdmin] = useState(false);
@@ -14,6 +17,7 @@ export default function ResumeScanner() {
         base44.auth.me().then(u => setIsAdmin(u?.role === 'admin')).catch(() => {});
     }, []);
     const [activeTab, setActiveTab] = useState('scan');
+    const [showScanForm, setShowScanForm] = useState(false);
     const [scanResults, setScanResults] = useState(null); // array of results
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
@@ -25,6 +29,7 @@ export default function ResumeScanner() {
 
     const handleNewScan = () => {
         setScanResults(null);
+        setShowScanForm(true);
         setActiveTab('scan');
     };
 
@@ -34,6 +39,8 @@ export default function ResumeScanner() {
         { key: 'history', label: 'Scan History', icon: History },
         { key: 'templates', label: 'Position Templates', icon: Settings },
     ];
+
+    const allTabs = isAdmin ? [...tabs, { key: 'admin', label: 'Admin', icon: ShieldCheck }] : tabs;
 
     return (
         <div className="min-h-screen bg-[#F4F6F9]">
@@ -53,10 +60,16 @@ export default function ResumeScanner() {
             {/* Mini Nav Tabs */}
             <div className="bg-white border-b border-[#E2E6EC] px-6">
                 <div className="max-w-[1600px] mx-auto flex gap-0">
-                    {tabs.map(({ key, label, icon: Icon }) => (
+                    {allTabs.map(({ key, label, icon: Icon }) => (
                         <button
                             key={key}
-                            onClick={() => { setActiveTab(key); if (key === 'scan') setScanResults(null); }}
+                            onClick={() => { 
+                                setActiveTab(key); 
+                                if (key === 'scan') {
+                                    setScanResults(null); 
+                                    setShowScanForm(false);
+                                }
+                            }}
                             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                                 activeTab === key
                                     ? 'border-[#0F1E36] text-[#0F1E36]'
@@ -76,8 +89,10 @@ export default function ResumeScanner() {
                     <div className="bg-white rounded-xl border border-[#E2E6EC] shadow-sm p-6">
                         {scanResults ? (
                             <BatchScanResults results={scanResults} onNewScan={handleNewScan} />
-                        ) : (
+                        ) : showScanForm ? (
                             <ResumeScanForm onScanComplete={handleScanComplete} />
+                        ) : (
+                            <ResumeDashboard onNewScan={() => setShowScanForm(true)} />
                         )}
                     </div>
                 )}
@@ -101,6 +116,12 @@ export default function ResumeScanner() {
                 {activeTab === 'templates' && (
                     <div className="bg-white rounded-xl border border-[#E2E6EC] shadow-sm p-6">
                         <JobTemplateManager />
+                    </div>
+                )}
+
+                {activeTab === 'admin' && isAdmin && (
+                    <div className="bg-white rounded-xl border border-[#E2E6EC] shadow-sm p-6">
+                        <CompanyRoleManager />
                     </div>
                 )}
             </div>

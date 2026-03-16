@@ -1,0 +1,24 @@
+{
+    "name": "CompanyRole",
+    "fields": {
+        "role_title": {
+            "type": "string",
+            "required": true
+        },
+        "company": {
+            "type": "string",
+            "required": true
+        },
+        "status": {
+            "type": "string",
+            "required": true
+        },
+        "created_by": {
+            "type": "string"
+        },
+        "created_at": {
+            "type": "string",
+            "format": "date-time"
+        }
+    }
+}
