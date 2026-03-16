@@ -89,7 +89,7 @@ function App() {
           <Route path="/appdocumentation" element={<W name="AppDocumentation"><AppDocumentation /></W>} />
           <Route path="/report_architecture" element={<W name="REPORT_ARCHITECTURE"><REPORT_ARCHITECTURE /></W>} />
           <Route path="/featurerequests" element={<W name="FeatureRequests"><FeatureRequests /></W>} />
-          <Route path="/developerportal" element={<W name="ChangeTracker"><ChangeTracker /></W>} />
+          <Route path="/changetracker" element={<W name="ChangeTracker"><ChangeTracker /></W>} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
         <Toaster />
