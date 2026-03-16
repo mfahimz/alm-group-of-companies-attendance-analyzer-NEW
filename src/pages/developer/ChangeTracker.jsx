@@ -363,18 +363,15 @@ export default function ChangeTracker() {
                         Streamlined, inline-editable management for all system changes, user requests, and CEO approvals.
                     </p>
                 </div>
-                <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-                    <div className="relative w-full md:w-64 group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                <div className="flex items-center gap-4 w-full md:w-80">
+                    <div className="relative w-full group">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10" />
                         <Input 
-                            placeholder="Search changes..." 
+                            placeholder="Type to filter changes..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white transition-all text-sm rounded-xl"
+                            className="pl-11 h-11 bg-white border-2 border-indigo-100 hover:border-indigo-200 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all text-sm rounded-2xl shadow-sm placeholder:text-slate-400"
                         />
-                    </div>
-                    <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-                        <Terminal className="w-5 h-5" />
                     </div>
                 </div>
             </header>
