@@ -44,7 +44,7 @@ import BusinessDocumentation from './pages/BusinessDocumentation';
 import AppDocumentation from './pages/AppDocumentation';
 import REPORT_ARCHITECTURE from './pages/REPORT_ARCHITECTURE';
 import FeatureRequests from './pages/FeatureRequests';
-import DeveloperPortal from './pages/developer/DeveloperPortal';
+import DeveloperPortal from './pages/DeveloperPortal';
 
 const W = ({ name, children }) => <Layout currentPageName={name}>{children}</Layout>;
 
