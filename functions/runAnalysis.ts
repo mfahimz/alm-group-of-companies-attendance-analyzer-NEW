@@ -1504,16 +1504,13 @@ Deno.serve(async (req: Request) => {
             //   Where late_minutes and early_checkout_minutes are the RAW values stored here.
             //   No other fields (approved, other, deductible, ramadan_gift) are involved.
             // ============================================================================
-            // Al Maraghi Rule: Grace carry-forward is 15 minutes per working day.
-            // Annual Leave days with zero punches are excluded from workingDays (see line 832).
-            const effectiveBaseGrace = isAlMaraghiMotors ? (baseGrace * workingDays) : baseGrace;
-            const totalGraceMinutes = Math.max(0, effectiveBaseGrace) + Math.max(0, carriedGrace);
+            const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
             // lateMinutes and earlyCheckoutMinutes are ALREADY net of per-day approved reductions.
             // Do NOT subtract totalApprovedMinutes again — that would be double-dipping.
             const rawLateEarly = Math.max(0, lateMinutes) + Math.max(0, earlyCheckoutMinutes);
             const deductibleMinutes = Math.max(0, rawLateEarly - totalGraceMinutes);
 
-            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, WorkingDays=${workingDays}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
 
             // Build set of LOP-adjacent weekly off dates for storage
             const lopAdjacentWeeklyOffDates = Object.entries(dateStatusMap)
