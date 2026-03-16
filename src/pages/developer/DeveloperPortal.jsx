@@ -12,6 +12,8 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ChangeManagement from '@/components/developer/ChangeManagement';
 
 const SECTIONS = ["Changes", "User Requests", "CEO Approval"];
 const PRIORITIES = ["Low", "Medium", "High", "Critical"];
@@ -164,6 +166,7 @@ function KanbanColumn({ section, cards, onUpdate, onDelete, onAdd, onOpenNotes }
 export default function DeveloperPortal() {
     const queryClient = useQueryClient();
     const [selectedNotes, setSelectedNotes] = useState(null);
+    const [activeTab, setActiveTab] = useState('board');
 
     const { data: user } = useQuery({
         queryKey: ['currentUser'],
@@ -288,23 +291,38 @@ export default function DeveloperPortal() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Change Management</h1>
                     <p className="text-slate-500">Kanban workflow for tracking development tasks</p>
                 </div>
+                
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+                    <TabsList className="bg-slate-100 p-1">
+                        <TabsTrigger value="board" className="px-4 py-2 text-sm font-medium">Board View</TabsTrigger>
+                        <TabsTrigger value="management" className="px-4 py-2 text-sm font-medium">Management View</TabsTrigger>
+                    </TabsList>
+                </Tabs>
             </header>
 
-            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                <div className="flex gap-4 overflow-x-auto pb-4">
-                    {SECTIONS.map(section => (
-                        <KanbanColumn 
-                            key={section}
-                            section={section}
-                            cards={allCards.filter(c => c.section_type === section).sort((a, b) => a.sort_order - b.sort_order)}
-                            onUpdate={handleUpdate}
-                            onDelete={handleDelete}
-                            onAdd={handleAdd}
-                            onOpenNotes={setSelectedNotes}
-                        />
-                    ))}
-                </div>
-            </DndContext>
+            <Tabs value={activeTab} className="w-full">
+                <TabsContent value="board" className="mt-0">
+                    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                        <div className="flex gap-4 overflow-x-auto pb-4">
+                            {SECTIONS.map(section => (
+                                <KanbanColumn 
+                                    key={section}
+                                    section={section}
+                                    cards={allCards.filter(c => c.section_type === section).sort((a, b) => a.sort_order - b.sort_order)}
+                                    onUpdate={handleUpdate}
+                                    onDelete={handleDelete}
+                                    onAdd={handleAdd}
+                                    onOpenNotes={setSelectedNotes}
+                                />
+                            ))}
+                        </div>
+                    </DndContext>
+                </TabsContent>
+                
+                <TabsContent value="management" className="mt-0">
+                    <ChangeManagement />
+                </TabsContent>
+            </Tabs>
 
             <Dialog open={!!selectedNotes} onOpenChange={() => setSelectedNotes(null)}>
                 <DialogContent className="sm:max-w-[700px]">
