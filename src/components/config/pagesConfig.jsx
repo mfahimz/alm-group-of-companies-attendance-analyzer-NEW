@@ -313,12 +313,11 @@ export const PAGES_CONFIG = {
         defaultRoles: ['admin']
     },
 
-    // Developer Portal
     ChangeTracker: {
         name: 'ChangeTracker',
         title: 'Developer Portal',
         icon: Terminal,
-        category: 'Main',
+        category: 'Developer',
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,

@@ -91,29 +91,6 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
                 </Link>
             ) : null}
 
-            {/* Direct Links (Main category - excluding Home) */}
-            {navStructure.main?.map((item) => {
-                if (!canAccessPage(item.name)) return null;
-                if (item.name === 'Home') return null; // Skip Home as it's handled above
-
-                const isActive = currentPageName === item.name;
-
-                return (
-                    <Link
-                        key={item.name}
-                        to={createPageUrl(item.name)}
-                        className={cn(
-                            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                            isActive && 'bg-[#0F1E36] text-white',
-                            !isActive && 'text-[#4B5563] hover:bg-[#F1F4F8]'
-                        )}
-                    >
-                        <item.icon className="w-4 h-4" />
-                        {item.title}
-                    </Link>
-                );
-            })}
-
             {/* Dropdown Menus */}
             {Object.entries(navStructure.dropdowns || {}).map(([key, dropdown]) => {
                 const accessibleItems = dropdown.items.filter(item => canAccessPage(item.name));
@@ -159,6 +136,29 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
                             </div>
                         </div>
                     </div>
+                );
+            })}
+
+            {/* Direct Links (e.g. Developer Portal - excluding Home) */}
+            {navStructure.main?.map((item) => {
+                if (!canAccessPage(item.name)) return null;
+                if (item.name === 'Home') return null; // Skip Home as it's handled above
+
+                const isActive = currentPageName === item.name;
+
+                return (
+                    <Link
+                        key={item.name}
+                        to={createPageUrl(item.name)}
+                        className={cn(
+                            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                            isActive && 'bg-[#0F1E36] text-white',
+                            !isActive && 'text-[#4B5563] hover:bg-[#F1F4F8]'
+                        )}
+                    >
+                        <item.icon className="w-4 h-4" />
+                        {item.title}
+                    </Link>
                 );
             })}
         </nav>
