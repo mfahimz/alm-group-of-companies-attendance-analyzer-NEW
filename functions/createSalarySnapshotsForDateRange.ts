@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
 
         // RECALCULATE attendance for custom date range
         // For Al Maraghi Motors: assumedDays are treated as fully present for salary
-        const recalculateEmployeeAttendance = (emp: any, dateFrom: string, dateTo: string, assumedDays: any[] = [], dayOverrides: any = {}) => {
+        const recalculateEmployeeAttendance = (emp: any, dateFrom: string, dateTo: string, assumedDays: any[] = []) => {
             const attendanceIdStr = String(emp.attendance_id);
             
             const employeePunches = punches.filter(p => 
@@ -475,15 +475,7 @@ Deno.serve(async (req) => {
                     presentDays++;
                 }
 
-                const dayOverride = dayOverrides[dateStr];
-
-                if (dayOverride && dayOverride.is_manual_minutes) {
-                    if (dayOverride.lateMinutes !== undefined) lateMinutes += dayOverride.lateMinutes;
-                    if (dayOverride.earlyCheckoutMinutes !== undefined) earlyCheckoutMinutes += dayOverride.earlyCheckoutMinutes;
-                    if (dayOverride.otherMinutes !== undefined) otherMinutes += dayOverride.otherMinutes;
-                    continue; // Skip the rest of the loop for this day as it's manually handled
-                }
-
+                // Calculate time issues
                 if (hasManualTimeException && !shouldSkipTimeCalc) {
                     if (dateException.late_minutes > 0) lateMinutes += dateException.late_minutes;
                     if (dateException.early_checkout_minutes > 0) earlyCheckoutMinutes += dateException.early_checkout_minutes;
@@ -572,7 +564,7 @@ Deno.serve(async (req) => {
         // ============================================================
         // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
         // ============================================================
-        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours, dayOverrides: any = {}) => {
+        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) {
                 return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
             }
@@ -747,13 +739,7 @@ Deno.serve(async (req) => {
                 let dayEarlyMinutes = 0;
                 let dayOtherMinutes = 0;
 
-                const dayOverride = dayOverrides[dateStr];
-                
-                if (dayOverride && dayOverride.is_manual_minutes) {
-                    if (dayOverride.lateMinutes !== undefined) dayLateMinutes = dayOverride.lateMinutes;
-                    if (dayOverride.earlyCheckoutMinutes !== undefined) dayEarlyMinutes = dayOverride.earlyCheckoutMinutes;
-                    if (dayOverride.otherMinutes !== undefined) dayOtherMinutes = dayOverride.otherMinutes;
-                } else if (hasManualTimeException) {
+                if (hasManualTimeException) {
                     if (dateException.late_minutes > 0) dayLateMinutes = dateException.late_minutes;
                     if (dateException.early_checkout_minutes > 0) dayEarlyMinutes = dateException.early_checkout_minutes;
                     if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
@@ -889,11 +875,7 @@ Deno.serve(async (req) => {
             let attendanceSource;
             
             // ALWAYS recalculate for custom date range with assumed present days support
-            let dayOverrides = {};
-            if (analysisResult?.day_overrides) {
-                try { dayOverrides = JSON.parse(analysisResult.day_overrides); } catch (e) { }
-            }
-            calculated = recalculateEmployeeAttendance(emp, date_from, date_to, assumedPresentDays, dayOverrides);
+            calculated = recalculateEmployeeAttendance(emp, date_from, date_to, assumedPresentDays);
 
             if (hasAnalysisResult) {
                 attendanceSource = 'ANALYZED';
@@ -948,7 +930,7 @@ Deno.serve(async (req) => {
             const currentMonthDeductibleHoursPay = Math.round(hourlyRate * deductibleHours * 100) / 100;
             
             // AL MARAGHI: Calculate extra prev month data (uses OT divisor and PREVIOUS MONTH salary)
-            const extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours, dayOverrides);
+            const extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
             const extraPrevMonthDeductibleMinutes = extraPrevMonthData.extraDeductibleMinutes;
             const extraPrevMonthLopDays = extraPrevMonthData.extraLopDays;
             const extraPrevMonthLopPay = extraPrevMonthData.extraLopPay;

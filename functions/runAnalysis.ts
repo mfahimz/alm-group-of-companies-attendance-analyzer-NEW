@@ -1007,20 +1007,11 @@ Deno.serve(async (req: Request) => {
                     }
                 }
 
-                // SKIP_PUNCH: Segmented AM/PM logic
-                // - punch_to_skip='AM_PUNCH_IN'  → zero out late_minutes for AM START
-                // - punch_to_skip='PM_PUNCH_OUT' → zero out early_checkout_minutes for PM END
-                // - no punch_to_skip value       → treat as Full Skip (both)
-                // - NEVER applies on leave days (SICK_LEAVE / ANNUAL_LEAVE)
-                // - PUBLIC_HOLIDAY is already handled via 'continue' above, so safe here
+                // BUG FIX #3: SKIP_PUNCH should NOT mark employee as absent or partial
+                // It should ONLY remove late/early minutes for that specific punch
+                // NEVER apply on leave days
                 const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
                 const isOnLeave = dateException && (dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE');
-                const skipPunchType: string | null = skipPunchException?.punch_to_skip || null;
-                const hasActiveSkip = !!(skipPunchException && !isOnLeave);
-                // AM skip: when punch_to_skip is 'AM_PUNCH_IN' or not set (full skip)
-                const isAmSkip = hasActiveSkip && (skipPunchType === 'AM_PUNCH_IN' || !skipPunchType);
-                // PM skip: when punch_to_skip is 'PM_PUNCH_OUT' or not set (full skip)
-                const isPmSkip = hasActiveSkip && (skipPunchType === 'PM_PUNCH_OUT' || !skipPunchType);
 
                 // ================================================================
                 // MIDNIGHT SHIFT HANDLING (TASK 3 AUDIT)
@@ -1146,27 +1137,21 @@ Deno.serve(async (req: Request) => {
                     critical_abnormal_dates_set.add(dateStr);
                 }
 
-                // SKIP_PUNCH — 0-punch + any active skip → grant presence (LOP saver)
-                // If the employee has no punches at all but a skip exception covers this date,
-                // they are treated as Present (Skip Punch) instead of LOP.
-                let skipPunchGrantsPresent = false;
-                if (hasActiveSkip && filteredPunches.length === 0) {
-                    skipPunchGrantsPresent = true;
-                    presentDays++;
-                    dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                    auto_resolutions.push({
-                        date: dateStr,
-                        type: 'SKIP_PUNCH_PRESENT',
-                        details: `Skip Punch (${skipPunchType || 'Full'}) → Present (no punches on record)`
-                    });
-                    console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + active skip → Present (Skip Punch)`);
+                // CRITICAL FIX: If SKIP_PUNCH exception exists (and not on leave), 
+                // add a fake punch so employee is NOT marked as absent or partial
+                let hasSkipPunchApplied = false;
+                if (skipPunchException && !isOnLeave && skipPunchException.punch_to_skip) {
+                    hasSkipPunchApplied = true;
+                    // Add a fake "present" marker to ensure employee is counted as present
+                    // This prevents partial day detection and absence marking
+                    if (filteredPunches.length === 0) {
+                        filteredPunches = [{ _fake_skip_punch: true }];
+                    }
                 }
 
-                // Run normal punch matching for employees who have real punches.
-                // This runs REGARDLESS of skip type — the zeroing happens later (post-calculation).
                 let punchMatches = [];
                 let hasUnmatchedPunch = false;
-                if (shift && filteredPunches.length > 0) {
+                if (shift && filteredPunches.length > 0 && !hasSkipPunchApplied) {
                     punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
                     hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 }
@@ -1182,9 +1167,9 @@ Deno.serve(async (req: Request) => {
                     shift.am_end !== 'null' && shift.pm_start !== 'null';
                 const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
 
-                // Skip partial day detection when skip punch already granted presence (0-punch case)
+                // Skip partial day detection if SKIP_PUNCH is applied
                 // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches
-                const partialDayResult = skipPunchGrantsPresent
+                const partialDayResult = hasSkipPunchApplied
                     ? { isPartial: false, reason: '' }
                     : detectPartialDay(filteredPunches, shift, nextDateStr);
 
@@ -1216,10 +1201,9 @@ Deno.serve(async (req: Request) => {
                     }
                 } else {
                     // No punches for this day
-                    // Guard: if skip punch already granted presence, do NOT mark as LOP
-                    if (skipPunchGrantsPresent) {
-                        // Already handled above (presentDays++ and dateStatusMap set to PRESENT_SKIP_PUNCH)
-                    } else if (!dateException || (dateException.type !== 'MANUAL_PRESENT' && dateException.type !== 'MANUAL_HALF')) {
+                    // Check if there's an exception that handles this day (already processed above)
+                    // Only count as LOP if no exception covers it
+                    if (!dateException || (dateException.type !== 'MANUAL_PRESENT' && dateException.type !== 'MANUAL_HALF')) {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
                     } else {
@@ -1263,9 +1247,7 @@ Deno.serve(async (req: Request) => {
                 let dayOtherMinutes = 0;
 
                 // 1. Calculation phase: Calculate from punches if valid shift/punches exist
-                // Note: hasSkipPunchApplied removed — we always run matching for real punches
-                // and then zero out the relevant side AFTER calculation (see SKIP_PUNCH zeroing below).
-                if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
+                if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !hasSkipPunchApplied) {
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
 
@@ -1288,46 +1270,9 @@ Deno.serve(async (req: Request) => {
                     }
                 }
 
-                // SKIP_PUNCH zeroing: After all punch-based calculation, zero out the relevant
-                // minute bucket for the skipped punch point. This is the core of the AM/PM split.
-                // - AM skip → late_minutes for this day = 0 (missing punch-in is forgiven)
-                // - PM skip → early_checkout_minutes for this day = 0 (missing punch-out is forgiven)
-                // - skipPunchGrantsPresent (0 punches) → both = 0 (no punches, no deductions)
-                if (isAmSkip) {
-                    if (dayLateMinutes > 0) {
-                        console.log(`[runAnalysis] SKIP_PUNCH (AM): Employee ${attendanceIdStr}, Date ${dateStr}: Zeroing late_minutes (was ${dayLateMinutes})`);
-                    }
-                    dayLateMinutes = 0;
-                }
-                if (isPmSkip) {
-                    if (dayEarlyMinutes > 0) {
-                        console.log(`[runAnalysis] SKIP_PUNCH (PM): Employee ${attendanceIdStr}, Date ${dateStr}: Zeroing early_checkout_minutes (was ${dayEarlyMinutes})`);
-                    }
-                    dayEarlyMinutes = 0;
-                }
-
                 // 2. Override phase: If manual adjustment exists, it takes precedence for that SPECIFIC field.
                 // This ensures that a manual "Late" override doesn't wipe out punch-based "Early Checkout" minutes.
-                
-                // Fetch manual overrides from the existing AnalysisResult string if available
-                let manualOverrideForDate = null;
-                try {
-                    const existingResult = existingResultsByAttendanceId.get(String(attendance_id));
-                    if (existingResult && existingResult.day_overrides) {
-                        const overrides = JSON.parse(existingResult.day_overrides);
-                        if (overrides[dateStr] && overrides[dateStr].is_manual_minutes) {
-                            manualOverrideForDate = overrides[dateStr];
-                        }
-                    }
-                } catch (e) { }
-
-                if (manualOverrideForDate) {
-                    if (manualOverrideForDate.lateMinutes !== undefined) dayLateMinutes = manualOverrideForDate.lateMinutes;
-                    if (manualOverrideForDate.earlyCheckoutMinutes !== undefined) dayEarlyMinutes = manualOverrideForDate.earlyCheckoutMinutes;
-                    if (manualOverrideForDate.otherMinutes !== undefined) dayOtherMinutes = manualOverrideForDate.otherMinutes;
-                    
-                    console.log(`[runAnalysis] MANUAL OVERRIDE: Employee ${attendanceIdStr}, Date ${dateStr}: Using manual minutes (late: ${dayLateMinutes}, early: ${dayEarlyMinutes}, other: ${dayOtherMinutes})`);
-                } else if (dateException && !shouldSkipTimeCalculation) {
+                if (dateException && !shouldSkipTimeCalculation) {
                     // Specific manual overrides
                     if (dateException.late_minutes !== undefined && dateException.late_minutes > 0) {
                         dayLateMinutes = Math.abs(dateException.late_minutes);
@@ -1339,6 +1284,11 @@ Deno.serve(async (req: Request) => {
                         dayOtherMinutes = Math.abs(dateException.other_minutes);
                         // Track that these other minutes came FROM an existing exception
                         otherMinutesFromExceptions[dateStr] = dayOtherMinutes;
+                    }
+
+                    // MANUAL types (e.g. MANUAL_LATE) often indicate the day is present even if no punches
+                    if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && filteredPunches.length === 0) {
+                        // Handled above in presentDays increment block, but here we ensure minutes are counted
                     }
                 }
 
@@ -1557,10 +1507,10 @@ Deno.serve(async (req: Request) => {
             report_run_id: reportRun.id
         }, null, 5000);
 
-        const existingResultsByAttendanceId = new Map(
+        const existingRamadanGiftMinutesByAttendanceId = new Map(
             existingResultsForReport
                 .filter(r => r.attendance_id !== null && r.attendance_id !== undefined)
-                .map(r => [String(r.attendance_id), r])
+                .map(r => [String(r.attendance_id), Math.max(0, Number(r.ramadan_gift_minutes || 0))])
         );
 
         // Process all employees and build results array
@@ -1593,16 +1543,13 @@ Deno.serve(async (req: Request) => {
                 }
 
                 processedAttendanceIds.add(idStr);
-                const existingResult = existingResultsByAttendanceId.get(String(attendance_id));
                 const result = await analyzeEmployee(attendance_id);
-                const preservedRamadanGiftMinutes = existingResult ? Math.max(0, Number(existingResult.ramadan_gift_minutes || 0)) : 0;
-                const preservedDayOverrides = existingResult ? existingResult.day_overrides : null;
+                const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
 
                 allResults.push({
                     project_id,
                     report_run_id: reportRun.id,
                     ramadan_gift_minutes: preservedRamadanGiftMinutes,
-                    day_overrides: preservedDayOverrides,
                     ...result
                 });
 

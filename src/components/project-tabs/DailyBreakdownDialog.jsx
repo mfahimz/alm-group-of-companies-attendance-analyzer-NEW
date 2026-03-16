@@ -3,11 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Edit } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import EditDayRecordDialog from './EditDayRecordDialog';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 /**
  * Midnight buffer: punches between 12:00 AM and 02:00 AM (120 min after midnight).
@@ -25,115 +22,565 @@ export default function DailyBreakdownDialog({
     exceptions,
     employees,
     reportRun,
-    project
+    project,
+    parseTime,
+    formatTime,
+    matchPunchesToShiftPoints,
+    detectPartialDay,
+    filterMultiplePunches
 }) {
     const [editingDay, setEditingDay] = useState(null);
     const queryClient = useQueryClient();
-    const [isUpdatingShift, setIsUpdatingShift] = useState(false);
-    
-    // Check if company is Al Maraghi to enable seconds parsing
-    const includeSeconds = project?.company?.includes('Al Maraghi');
-
-    const parseTime = (timeStr, forceIncludeSeconds = false) => {
-        try {
-            if (!timeStr || timeStr === '—' || timeStr === '-') return null;
-
-            const useSeconds = forceIncludeSeconds || includeSeconds;
-
-            // HH:MM:SS AM/PM
-            if (useSeconds) {
-                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-                if (timeMatch) {
-                    let hours = parseInt(timeMatch[1]);
-                    const minutes = parseInt(timeMatch[2]);
-                    const seconds = parseInt(timeMatch[3]);
-                    const period = timeMatch[4].toUpperCase();
-                    if (period === 'PM' && hours !== 12) hours += 12;
-                    if (period === 'AM' && hours === 12) hours = 0;
-                    const date = new Date();
-                    date.setHours(hours, minutes, seconds, 0);
-                    return date;
-                }
-            }
-
-            // HH:MM AM/PM
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-            if (timeMatch) {
-                let hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const period = timeMatch[3].toUpperCase();
-                if (period === 'PM' && hours !== 12) hours += 12;
-                if (period === 'AM' && hours === 12) hours = 0;
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-
-            // 24h format
-            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-            if (timeMatch) {
-                const hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
-                const date = new Date();
-                date.setHours(hours, minutes, seconds, 0);
-                return date;
-            }
-
-            // Timestamp format: 1/16/2026 8:37
-            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-            if (dateTimeMatch) {
-                const hours = parseInt(dateTimeMatch[1]);
-                const minutes = parseInt(dateTimeMatch[2]);
-                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
-                const date = new Date();
-                date.setHours(hours, minutes, seconds, 0);
-                return date;
-            }
-
-            return null;
-        } catch {
-            return null;
-        }
-    };
-
-    const formatTime = (timeStr) => {
-        if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
-        if (/AM|PM/i.test(timeStr)) return timeStr;
-
-        const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-        if (!match) return '—';
-
-        let hours = parseInt(match[1]);
-        const minutes = match[2];
-
-        const period = hours >= 12 ? 'PM' : 'AM';
-        if (hours > 12) hours -= 12;
-        if (hours === 0) hours = 12;
-
-        return `${hours}:${minutes} ${period}`;
-    };
+    const includeSeconds = true; // Unified
+    const isFinalized = reportRun.is_final || project.status === 'closed';
 
     const isWithinMidnightBuffer = (timestampRaw) => {
-        const parsed = parseTime(timestampRaw);
+        const parsed = parseTime(timestampRaw, includeSeconds);
         if (!parsed) return false;
         const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
         return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
     };
 
-    const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr = null) => {
+    const formatDate = (dateStr) => {
+        const date = new Date(dateStr);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+
+    const extractTime = (ts) => {
+        if (project.company === 'Al Maraghi Automotive') {
+            const matchWithSeconds = ts.match(/(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))/i);
+            if (matchWithSeconds) return matchWithSeconds[1];
+        }
+        const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+        if (match) return match[1];
+        const dateTimeMatch = ts.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})/);
+        if (dateTimeMatch) {
+            let hours = parseInt(dateTimeMatch[1]);
+            const minutes = dateTimeMatch[2];
+            const period = hours >= 12 ? 'PM' : 'AM';
+            if (hours > 12) hours -= 12;
+            if (hours === 0) hours = 12;
+            return `${hours}:${minutes} ${period}`;
+        }
+        return ts;
+    };
+
+    const getDailyBreakdown = useMemo(() => {
+        if (!selectedEmployee) return [];
+
+        const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
+        const breakdown = [];
+        const startDate = new Date(reportRun.date_from);
+        const endDate = new Date(reportRun.date_to);
+
+        let dayOverrides = {};
+        if (currentResult.day_overrides) {
+            try { dayOverrides = JSON.parse(currentResult.day_overrides); } catch (e) { dayOverrides = {}; }
+        }
+
+        const attendanceIdStr = String(currentResult.attendance_id);
+
+        // MIDNIGHT FIX: Fetch punches including day before and day after for crossover
+        const dayBeforeStart = new Date(startDate);
+        dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+        const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
+        const dayAfterEnd = new Date(endDate);
+        dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+        const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
+
+        const allEmployeePunchesExtended = punches.filter(p =>
+            String(p.attendance_id) === attendanceIdStr &&
+            p.punch_date >= dayBeforeStartStr &&
+            p.punch_date <= dayAfterEndStr
+        );
+
+        const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
+        const employeeExceptions = exceptions.filter(e =>
+            (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+            e.use_in_analysis !== false &&
+            e.is_custom_type !== true
+        );
+        const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
+
+        const dayNameToNumber = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
+        const isShiftEffective = (s) => {
+            if (!s.effective_from || !s.effective_to) return true;
+            const from = new Date(s.effective_from);
+            const to = new Date(s.effective_to);
+            const cd = new Date(new Date().setHours(0, 0, 0, 0)); // placeholder, overridden below
+            return true; // simplified - actual check done inline
+        };
+
+        const checkShiftEffective = (s, currentDate) => {
+            if (!s.effective_from || !s.effective_to) return true;
+            const from = new Date(s.effective_from); from.setHours(0, 0, 0, 0);
+            const to = new Date(s.effective_to); to.setHours(0, 0, 0, 0);
+            const cd = new Date(currentDate); cd.setHours(0, 0, 0, 0);
+            return cd >= from && cd <= to;
+        };
+
+        // Precompute LOP-adjacent weekly off dates from stored result
+        const lopAdjacentWeeklyOffDates = new Set(
+            (currentResult.lop_adjacent_weekly_off_dates || '')
+                .split(',').map(d => d.trim()).filter(Boolean)
+        );
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const currentDate = new Date(d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay();
+
+            let weeklyOffDay = null;
+            if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+            } else if (employee?.weekly_off) {
+                weeklyOffDay = dayNameToNumber[employee.weekly_off];
+            }
+
+            // If this weekly off day was counted as LOP-adjacent, include it in breakdown with special flag
+            if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                if (lopAdjacentWeeklyOffDates.has(dateStr)) {
+                    breakdown.push({
+                        date: formatDate(dateStr),
+                        dateStr,
+                        punches: 0,
+                        crossoverPunches: 0,
+                        shiftEndsNearMidnight: false,
+                        punchTimes: '',
+                        punchTimesShort: '-',
+                        allPunchTimes: '',
+                        punchObjects: [],
+                        nextDateStr: '',
+                        shift: 'Weekly Off',
+                        exception: '-',
+                        status: 'Weekly Off (LOP)',
+                        abnormal: false,
+                        isCriticalAbnormal: false,
+                        lateInfo: '-',
+                        lateMinutesTotal: 0,
+                        earlyCheckoutInfo: '-',
+                        otherMinutes: 0,
+                        hasOverride: false,
+                        partialDayReason: null,
+                        punchMatches: [],
+                        hasUnmatchedPunch: false,
+                        hasFarExtendedMatch: false,
+                        isLopAdjacentWeeklyOff: true
+                    });
+                }
+                continue;
+            }
+
+            // ================================================================
+            // MIDNIGHT SHIFT FIX: Mirror backend runAnalysis logic
+            // ================================================================
+            const nextDateObj = new Date(currentDate);
+            nextDateObj.setDate(nextDateObj.getDate() + 1);
+            const nextDateStr = nextDateObj.toISOString().split('T')[0];
+
+            const prevDateObj = new Date(currentDate);
+            prevDateObj.setDate(prevDateObj.getDate() - 1);
+            const prevDateStr = prevDateObj.toISOString().split('T')[0];
+
+            // Check if previous day's shift ended near midnight
+            let prevShiftEndsNearMidnight = false;
+            {
+                const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
+                const prevGeneralShifts = employeeShifts.filter(s => !s.date);
+                const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
+                for (const ps of prevShiftCandidates) {
+                    const pEndTime = parseTime(ps.pm_end, includeSeconds);
+                    if (pEndTime) {
+                        const h = pEndTime.getHours();
+                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
+                    }
+                }
+            }
+
+            // Get punches for this date
+            let rawDayPunches = allEmployeePunchesExtended.filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+
+            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
+            if (prevShiftEndsNearMidnight) {
+                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
+            }
+
+            // Find shift for this date
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const currentDayName = dayNames[dayOfWeek];
+
+            // Find matching exceptions
+            const matchingExceptions = employeeExceptions.filter(ex => {
+                try {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return currentDate >= exFrom && currentDate <= exTo;
+                } catch { return false; }
+            });
+
+            const dateException = matchingExceptions.length > 0
+                ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                : null;
+
+            let shift = employeeShifts.find(s => s.date === dateStr && checkShiftEffective(s, currentDate));
+
+            if (!shift) {
+                const applicableShifts = employeeShifts.filter(s => !s.date && checkShiftEffective(s, currentDate));
+                for (const s of applicableShifts) {
+                    if (s.applicable_days) {
+                        try {
+                            const arr = JSON.parse(s.applicable_days);
+                            if (Array.isArray(arr) && arr.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
+                                shift = s; break;
+                            }
+                        } catch {
+                            if (s.applicable_days.toLowerCase().includes(currentDayName.toLowerCase())) {
+                                shift = s; break;
+                            }
+                        }
+                    }
+                }
+                if (!shift) {
+                    if (dayOfWeek === 5) {
+                        shift = employeeShifts.find(s => s.is_friday_shift && !s.date && checkShiftEffective(s, currentDate));
+                        if (!shift) shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && checkShiftEffective(s, currentDate));
+                    } else {
+                        shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && checkShiftEffective(s, currentDate));
+                    }
+                }
+            }
+
+            if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                const isFriday = dayOfWeek === 5;
+                if (dateException.include_friday || !isFriday) {
+                    shift = {
+                        am_start: dateException.new_am_start, am_end: dateException.new_am_end,
+                        pm_start: dateException.new_pm_start, pm_end: dateException.new_pm_end
+                    };
+                }
+            }
+
+            // Check if THIS shift ends near midnight → grab next-day crossover punches
+            let shiftEndsNearMidnight = false;
+            if (shift) {
+                const pmEndTime = parseTime(shift.pm_end);
+                if (pmEndTime) {
+                    const h = pmEndTime.getHours();
+                    if (h === 23 || h === 0) shiftEndsNearMidnight = true;
+                }
+            }
+
+            // MIDNIGHT FIX: Grab crossover punches from next day
+            if (shiftEndsNearMidnight) {
+                const nextDayPunches = allEmployeePunchesExtended
+                    .filter(p => p.punch_date === nextDateStr)
+                    .filter(p => isWithinMidnightBuffer(p.timestamp_raw));
+                const seenIds = new Set(rawDayPunches.map(p => p.id));
+                const uniqueNextDayPunches = nextDayPunches.filter(p => !seenIds.has(p.id));
+                if (uniqueNextDayPunches.length > 0) {
+                    rawDayPunches = [...rawDayPunches, ...uniqueNextDayPunches];
+                    // Re-sort: next-day punches should sort after today's punches
+                    rawDayPunches.sort((a, b) => {
+                        const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                        const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                        const aIsNextDay = a.punch_date === nextDateStr;
+                        const bIsNextDay = b.punch_date === nextDateStr;
+                        const aTime = (timeA?.getTime() || 0) + (aIsNextDay ? 24 * 60 * 60 * 1000 : 0);
+                        const bTime = (timeB?.getTime() || 0) + (bIsNextDay ? 24 * 60 * 60 * 1000 : 0);
+                        return aTime - bTime;
+                    });
+                }
+            }
+
+            // filterMultiplePunches may lose _isNextDayPunch info, so tag punches first
+            const taggedRawPunches = rawDayPunches.map(p => ({
+                ...p,
+                _isNextDayPunch: p.punch_date === nextDateStr
+            }));
+            const dayPunches = filterMultiplePunches(taggedRawPunches, shift);
+
+            const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
+                shift.am_end !== '—' && shift.pm_start !== '—' &&
+                shift.am_end !== '-' && shift.pm_start !== '-';
+            const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
+
+            const partialDayResult = detectPartialDay(dayPunches, shift);
+
+            // MIDNIGHT FIX: Pass nextDateStr to matchPunchesToShiftPoints for proper PM_END matching
+            let punchMatches = [];
+            let hasUnmatchedPunch = false;
+            let hasFarExtendedMatch = false;
+            if (shift && dayPunches.length > 0) {
+                // For midnight shifts, adjust PM_END and punch times in matching
+                // We use a wrapper that handles midnight crossover
+                punchMatches = matchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr);
+                hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+                hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
+            }
+
+            // Calculate late/early
+            let lateInfo = '';
+            let lateMinutesTotal = 0;
+            let earlyCheckoutInfo = '';
+            let currentOtherMinutes = 0;
+            let exceptionLateMinutes = 0;
+            let exceptionEarlyMinutes = 0;
+
+            if (dateException && !dayOverrides[dateStr]) {
+                if (!['OFF', 'PUBLIC_HOLIDAY', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE'].includes(dateException.type)) {
+                    if (dateException.late_minutes > 0) exceptionLateMinutes = dateException.late_minutes;
+                    if (dateException.early_checkout_minutes > 0) exceptionEarlyMinutes = dateException.early_checkout_minutes;
+                    if (dateException.other_minutes > 0) currentOtherMinutes = dateException.other_minutes;
+                }
+            }
+
+            let allowedMinutesForDay = 0;
+            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
+                allowedMinutesForDay = dateException.allowed_minutes || 0;
+            }
+
+            const shouldSkipTimeCalc = dateException && [
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+            ].includes(dateException.type);
+
+            const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
+            // NOTE: isFinalized is intentionally NOT included here.
+            // This is a display-only breakdown — edit actions are already gated by project.status !== 'closed'.
+            // For closed/finalized projects, we still compute per-day late/early from punches so that
+            // department heads and admins can see *which day* the minutes came from, not just the stored total.
+            let dayLateMinutes = 0;
+            let dayEarlyMinutes = 0;
+
+            // 1. Calculation phase: Compute from punches if valid shift exists
+            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
+                for (const match of punchMatches) {
+                    if (!match.matchedTo) continue;
+                    const punchTime = match.punch.time;
+                    const shiftTime = match.shiftTime;
+
+                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                        if (punchTime > shiftTime) {
+                            const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                            dayLateMinutes += minutes;
+                        }
+                    }
+
+                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                        if (punchTime < shiftTime) {
+                            const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                            dayEarlyMinutes += minutes;
+                        }
+                    }
+                }
+            }
+
+            // 2. Override phase: Specific manual adjustments (if present and > 0)
+            let isLateOverridden = false;
+            let isEarlyOverridden = false;
+            
+            if (dateException && !shouldSkipTimeCalc) {
+                if (exceptionLateMinutes > 0) {
+                    dayLateMinutes = exceptionLateMinutes;
+                    isLateOverridden = true;
+                }
+                if (exceptionEarlyMinutes > 0) {
+                    dayEarlyMinutes = exceptionEarlyMinutes;
+                    isEarlyOverridden = true;
+                }
+            }
+
+            // 3. Deduction Reduction phase: Apply allowed minutes
+            const rawDayMinutes = dayLateMinutes + dayEarlyMinutes;
+            if (allowedMinutesForDay > 0 && rawDayMinutes > 0) {
+                const remaining = Math.max(0, rawDayMinutes - allowedMinutesForDay);
+                const lateRatio = dayLateMinutes / rawDayMinutes;
+                const earlyRatio = dayEarlyMinutes / rawDayMinutes;
+                dayLateMinutes = Math.round(remaining * lateRatio);
+                dayEarlyMinutes = Math.round(remaining * earlyRatio);
+            }
+
+            // 4. Formatting phase: Build info strings for UI display
+            lateMinutesTotal = dayLateMinutes;
+            if (dayLateMinutes > 0) {
+                const source = isLateOverridden ? '(from exception)' : (allowedMinutesForDay > 0 ? `(after ${allowedMinutesForDay} allowed)` : '');
+                lateInfo = `${dayLateMinutes} min ${source}`.trim();
+            } else {
+                lateInfo = '-';
+            }
+
+            if (dayEarlyMinutes > 0) {
+                const source = isEarlyOverridden ? '(from exception)' : (allowedMinutesForDay > 0 ? `(after ${allowedMinutesForDay} allowed)` : '');
+                earlyCheckoutInfo = `${dayEarlyMinutes} min ${source}`.trim();
+            } else {
+                earlyCheckoutInfo = '-';
+            }
+
+            // Determine status
+            let status = 'Absent';
+            if (dateException) {
+                if (dateException.type === 'OFF') status = 'Off';
+                else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
+                else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
+                else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
+                else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
+                else if (dateException.type === 'SICK_LEAVE') status = 'Sick Leave';
+                else if (dateException.type === 'ANNUAL_LEAVE') status = dayPunches.length > 0 ? 'Present' : 'Annual Leave';
+                else if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
+                    status = dayPunches.length > 0 ? 'Present' : 'Present (Manual)';
+                } else if (dayPunches.length > 0) {
+                    status = 'Present';
+                }
+            } else if (dayPunches.length > 0) {
+                if (partialDayResult.isPartial) status = 'Half Day (Partial)';
+                else status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+            }
+
+            const abnormalDatesArray = (currentResult.abnormal_dates || '').split(',').map(d => d.trim()).filter(Boolean);
+            let isAbnormal = abnormalDatesArray.includes(dateStr);
+            const notesText = currentResult.notes || '';
+            const criticalDatesArray = (notesText.match(/\d{4}-\d{2}-\d{2}/g) || []);
+            const isCriticalAbnormal = criticalDatesArray.includes(dateStr);
+
+            const dayOverride = dayOverrides[dateStr];
+
+            if (dayOverride) {
+                if (dayOverride.shiftOverride) {
+                    shift = {
+                        am_start: dayOverride.shiftOverride.am_start, am_end: dayOverride.shiftOverride.am_end,
+                        pm_start: dayOverride.shiftOverride.pm_start, pm_end: dayOverride.shiftOverride.pm_end
+                    };
+                    if (dayPunches.length > 0) {
+                        punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
+                        hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+                        lateInfo = ''; lateMinutesTotal = 0; earlyCheckoutInfo = '';
+                        
+                        let overLate = 0;
+                        let overEarly = 0;
+
+                        for (const match of punchMatches) {
+                            if (!match.matchedTo) continue;
+                            const punchTime = match.punch.time;
+                            const shiftTime = match.shiftTime;
+                            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                                if (punchTime > shiftTime) {
+                                    const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                                    overLate += minutes;
+                                    const label = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
+                                    if (lateInfo) lateInfo += ' | ';
+                                    lateInfo += `${label}: ${minutes} min late`;
+                                }
+                            }
+                            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                                if (punchTime < shiftTime) {
+                                    const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                                    overEarly += minutes;
+                                    if (earlyCheckoutInfo && earlyCheckoutInfo !== '-') {
+                                        earlyCheckoutInfo = `${parseInt(earlyCheckoutInfo) + minutes} min`;
+                                    } else {
+                                        earlyCheckoutInfo = `${minutes} min`;
+                                    }
+                                }
+                            }
+                        }
+                        lateMinutesTotal = overLate;
+                    }
+                }
+                if (dayOverride.type === 'MANUAL_PRESENT') status = 'Present (Edited)';
+                else if (dayOverride.type === 'MANUAL_ABSENT') status = 'Absent (Edited)';
+                else if (dayOverride.type === 'MANUAL_HALF') status = 'Half Day (Edited)';
+                else if (dayOverride.type === 'OFF') status = 'Off (Edited)';
+                else if (dayOverride.type === 'SICK_LEAVE') status = 'Sick Leave (Admin)';
+
+                if (dayOverride.lateMinutes !== undefined) {
+                    lateMinutesTotal = Math.max(0, dayOverride.lateMinutes);
+                    lateInfo = dayOverride.lateMinutes > 0 ? `${Math.max(0, dayOverride.lateMinutes)} min (edited)` : '-';
+                }
+                if (dayOverride.earlyCheckoutMinutes !== undefined) {
+                    earlyCheckoutInfo = dayOverride.earlyCheckoutMinutes > 0 ? `${Math.max(0, dayOverride.earlyCheckoutMinutes)} min (edited)` : '-';
+                }
+                if (dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes > 0) {
+                    currentOtherMinutes = Math.max(0, dayOverride.otherMinutes);
+                }
+                if (dayOverride.isAbnormal !== undefined) isAbnormal = dayOverride.isAbnormal;
+            }
+
+            // Apply exception minutes
+            if (exceptionLateMinutes > 0 && !dayOverride) {
+                lateMinutesTotal = Math.abs(exceptionLateMinutes);
+                lateInfo = `${Math.abs(exceptionLateMinutes)} min (from exception)`;
+            }
+            if (exceptionEarlyMinutes > 0 && !dayOverride) {
+                earlyCheckoutInfo = `${Math.abs(exceptionEarlyMinutes)} min (from exception)`;
+            }
+
+            // Count punches that actually belong to THIS date (exclude crossover from next day)
+            const ownDatePunchCount = rawDayPunches.filter(p => p.punch_date === dateStr).length;
+            const crossoverPunchCount = rawDayPunches.filter(p => p.punch_date === nextDateStr).length;
+
+            breakdown.push({
+                date: formatDate(dateStr),
+                dateStr,
+                punches: ownDatePunchCount,
+                crossoverPunches: crossoverPunchCount,
+                shiftEndsNearMidnight,
+                punchTimes: dayPunches.map(p => p.timestamp_raw).join(', '),
+                punchTimesShort: dayPunches.map(p => extractTime(p.timestamp_raw)).join(', '),
+                allPunchTimes: rawDayPunches.map(p => p.timestamp_raw).join(', '),
+                punchObjects: dayPunches,
+                nextDateStr,
+                shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
+                exception: dateException ? dateException.type : '-',
+                status,
+                abnormal: isAbnormal,
+                isCriticalAbnormal,
+                lateInfo: lateInfo || '-',
+                lateMinutesTotal: Math.max(0, lateMinutesTotal || 0),
+                earlyCheckoutInfo: earlyCheckoutInfo || '-',
+                otherMinutes: Math.max(0, currentOtherMinutes),
+                hasOverride: !!dayOverride,
+                partialDayReason: partialDayResult.reason,
+                punchMatches,
+                hasUnmatchedPunch,
+                hasFarExtendedMatch
+            });
+        }
+
+        return breakdown;
+    }, [selectedEmployee, enrichedResults, punches, shifts, exceptions, employees, reportRun, project]);
+
+    /**
+     * matchPunchesToShiftPoints with midnight crossover support
+     * For shifts ending at midnight (00:00), adjust PM_END to 24:00
+     * and adjust next-day punches to sort correctly
+     */
+    function matchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr) {
         if (!shift || dayPunches.length === 0) return [];
 
         const punchesWithTime = dayPunches.map(p => {
             const time = parseTime(p.timestamp_raw);
             if (!time) return null;
-            const isNextDay = nextDateStr && (p.punch_date === nextDateStr || p._isNextDayPunch);
+            // If punch is from next day (midnight crossover), add 24h
+            const isNextDay = nextDateStr && p.punch_date === nextDateStr;
             const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
-            return { ...p, time: adjustedTime, _isNextDayPunch: !!isNextDay };
-        }).filter(p => p).sort((a, b) => a.time.getTime() - b.time.getTime());
+            return { ...p, time: adjustedTime, _originalTime: time, _isNextDayPunch: isNextDay };
+        }).filter(p => p).sort((a, b) => a.time - b.time);
 
         if (punchesWithTime.length === 0) return [];
 
+        // Adjust PM_END if it's midnight (00:00)
         const pmEndTime = parseTime(shift.pm_end);
         let adjustedPmEnd = pmEndTime;
         if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
@@ -141,10 +588,10 @@ export default function DailyBreakdownDialog({
         }
 
         const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start || '' },
-            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end || '' },
-            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start || '' },
-            { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end || '' }
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
+            { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time);
 
         const matches = [];
@@ -156,26 +603,29 @@ export default function DailyBreakdownDialog({
             let isExtendedMatch = false;
             let isFarExtendedMatch = false;
 
+            // Try 120 min window (Extended for Ramadan shifts)
             for (const sp of shiftPoints) {
                 if (usedShiftPoints.has(sp.type)) continue;
-                const distance = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
+                const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance; closestMatch = sp;
                 }
             }
+            // Try 120 min window
             if (!closestMatch) {
                 for (const sp of shiftPoints) {
                     if (usedShiftPoints.has(sp.type)) continue;
-                    const distance = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
+                    const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance; closestMatch = sp; isExtendedMatch = true;
                     }
                 }
             }
+            // Try 180 min window
             if (!closestMatch) {
                 for (const sp of shiftPoints) {
                     if (usedShiftPoints.has(sp.type)) continue;
-                    const distance = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
+                    const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance; closestMatch = sp; isFarExtendedMatch = true;
                     }
@@ -189,392 +639,161 @@ export default function DailyBreakdownDialog({
                 matches.push({ punch, matchedTo: null, shiftTime: null, distance: null, isExtendedMatch: false, isFarExtendedMatch: false });
             }
         }
+
         return matches;
-    };
-
-    const detectPartialDay = (dayPunches, shift) => {
-        if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time).sort((a, b) => a.time.getTime() - b.time.getTime());
-        if (pts.length < 2) return { isPartial: false, reason: null };
-        const amStart = parseTime(shift.am_start), amEnd = parseTime(shift.am_end), pmStart = parseTime(shift.pm_start);
-        let pmEnd = parseTime(shift.pm_end);
-        if (!amStart || !pmEnd) return { isPartial: false, reason: null };
-        if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
-        const mid = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—';
-        const expected = !mid ? (pmEnd.getTime() - amStart.getTime()) / 60000 : ((amEnd.getTime() - amStart.getTime()) / 60000 + (pmEnd.getTime() - pmStart.getTime()) / 60000);
-        const actual = (pts[pts.length - 1].time.getTime() - pts[0].time.getTime()) / 60000;
-        if (expected > 0 && actual < expected * 0.5 && actual > 0) return { isPartial: true, reason: `Worked ${Math.round(actual)} min (expected ${Math.round(expected)} min)` };
-        return { isPartial: false, reason: null };
-    };
-
-    const filterMultiplePunches = (punchList) => {
-        if (punchList.length <= 1) return punchList;
-        const punchesWithTime = punchList.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time);
-        if (punchesWithTime.length === 0) return punchList;
-        const deduped = [];
-        for (let i = 0; i < punchesWithTime.length; i++) {
-            const current = punchesWithTime[i];
-            const isDuplicate = deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10);
-            if (!isDuplicate) deduped.push(current);
-        }
-        return deduped.sort((a, b) => a.time.getTime() - b.time.getTime());
-    };
-
-    const formatDate = (dateStr) => {
-        const date = new Date(dateStr);
-        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-    };
-
-    const extractTime = (ts) => {
-        if (includeSeconds) {
-            const m = ts.match(/(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))/i);
-            if (m) return m[1];
-        }
-        const m = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
-        if (m) return m[1];
-        return ts;
-    };
-
-    const updateAnalysisResult = useMutation({
-        mutationFn: (updates) => base44.entities.AnalysisResult.update(selectedEmployee.id, updates),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['results']);
-            toast.success('Shift override saved locally');
-        }
-    });
-
-    const handleShiftChange = async (dateStr, selectedShiftId) => {
-        setIsUpdatingShift(true);
-        try {
-            const newShift = shifts.find(s => s.id === selectedShiftId);
-            if (!newShift) return;
-
-            let dayOverrides = {};
-            try {
-                if (selectedEmployee.day_overrides) dayOverrides = JSON.parse(selectedEmployee.day_overrides);
-            } catch (e) { }
-
-            dayOverrides[dateStr] = {
-                ...(dayOverrides[dateStr] || {}),
-                shiftOverride: {
-                    am_start: newShift.am_start,
-                    am_end: newShift.am_end || '',
-                    pm_start: newShift.pm_start || '',
-                    pm_end: newShift.pm_end
-                },
-                // Explicitly set is_ramadan_day to false when a shift is overridden to Normal
-                is_ramadan_day: false
-            };
-
-            await updateAnalysisResult.mutateAsync({
-                day_overrides: JSON.stringify(dayOverrides)
-            });
-        } catch (error) {
-            toast.error('Failed to update shift');
-        } finally {
-            setIsUpdatingShift(false);
-        }
-    };
-
-    const getDailyBreakdown = useMemo(() => {
-        if (!selectedEmployee) return [];
-
-        const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
-        const breakdown = [];
-        const startDate = new Date(reportRun.date_from);
-        const endDate = new Date(reportRun.date_to);
-
-        let dayOverrides = {};
-        try { if (currentResult.day_overrides) dayOverrides = JSON.parse(currentResult.day_overrides); } catch (e) { }
-
-        const attendanceIdStr = String(currentResult.attendance_id);
-        const dayBefore = new Date(startDate); dayBefore.setDate(dayBefore.getDate() - 1);
-        const dayAfter = new Date(endDate); dayAfter.setDate(dayAfter.getDate() + 1);
-        
-        const empPunches = punches.filter(p => 
-            String(p.attendance_id) === attendanceIdStr && 
-            p.punch_date >= dayBefore.toISOString().split('T')[0] && 
-            p.punch_date <= dayAfter.toISOString().split('T')[0]
-        );
-        const empShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-        const empExceptions = exceptions.filter(e => (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr));
-        const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            const currentDate = new Date(d);
-            const dateStr = currentDate.toISOString().split('T')[0];
-            const dayOfWeek = currentDate.getDay();
-            const nextDateStr = new Date(d.getTime() + 86400000).toISOString().split('T')[0];
-            const prevDateStr = new Date(d.getTime() - 86400000).toISOString().split('T')[0];
-
-            let shift = empShifts.find(s => s.date === dateStr);
-            if (!shift) {
-                shift = empShifts.find(s => !s.date && s.applicable_days?.includes(dayNames[dayOfWeek]));
-                if (!shift) shift = empShifts.find(s => !s.date && !s.is_friday_shift);
-            }
-
-            const override = dayOverrides[dateStr];
-            if (override?.shiftOverride) {
-                shift = { ...shift, ...override.shiftOverride };
-            }
-
-            // Detect SKIP_PUNCH exception for this date
-            const matchingExcsForDate = empExceptions.filter(ex => {
-                try {
-                    const exFrom = new Date(ex.date_from);
-                    const exTo = new Date(ex.date_to);
-                    return currentDate >= exFrom && currentDate <= exTo;
-                } catch { return false; }
-            });
-            const skipPunchEx = matchingExcsForDate.find(ex => ex.type === 'SKIP_PUNCH');
-            const dayException = matchingExcsForDate.find(ex => ex.type !== 'SKIP_PUNCH') || null;
-            const isOnLeave = dayException && (dayException.type === 'SICK_LEAVE' || dayException.type === 'ANNUAL_LEAVE');
-            const skipPunchType = skipPunchEx?.punch_to_skip || null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | null
-            const hasActiveSkip = !!(skipPunchEx && !isOnLeave);
-            const isAmSkip = hasActiveSkip && (skipPunchType === 'AM_PUNCH_IN' || !skipPunchType);
-            const isPmSkip = hasActiveSkip && (skipPunchType === 'PM_PUNCH_OUT' || !skipPunchType);
-
-            let dayPunches = empPunches.filter(p => p.punch_date === dateStr);
-            const shiftEndsMidnight = shift && (parseTime(shift.pm_end)?.getHours() === 0 || parseTime(shift.pm_end)?.getHours() === 23);
-            
-            if (shiftEndsMidnight) {
-                const crossover = empPunches.filter(p => p.punch_date === nextDateStr && isWithinMidnightBuffer(p.timestamp_raw));
-                dayPunches = [...dayPunches, ...crossover.map(p => ({ ...p, _isNextDayPunch: true }))];
-            }
-
-            const dedupedPunches = filterMultiplePunches(dayPunches);
-            const punchMatches = matchPunchesToShiftPoints(dedupedPunches, shift, nextDateStr);
-            
-            let lateMins = 0;
-            let earlyMins = 0;
-            punchMatches.forEach(m => {
-                if (m.matchedTo && m.shiftTime) {
-                    const diff = (m.punch.time.getTime() - m.shiftTime.getTime()) / 60000;
-                    if ((m.matchedTo === 'AM_START' || m.matchedTo === 'PM_START') && diff > 0) lateMins += Math.round(diff);
-                    if ((m.matchedTo === 'AM_END' || m.matchedTo === 'PM_END') && diff < 0) earlyMins += Math.round(Math.abs(diff));
-                }
-            });
-
-            // SKIP_PUNCH zeroing: mirror the backend logic exactly
-            if (isAmSkip) lateMins = 0;
-            if (isPmSkip) earlyMins = 0;
-
-            if (override?.lateMinutes !== undefined) lateMins = override.lateMinutes;
-            if (override?.earlyCheckoutMinutes !== undefined) earlyMins = override.earlyCheckoutMinutes;
-
-            // Determine daily status
-            let dayStatus;
-            if (override?.type) {
-                dayStatus = override.type;
-            } else if (hasActiveSkip && dayPunches.length === 0) {
-                // 0-punch + active skip = Present (Skip Punch), NOT Absent
-                dayStatus = 'Present (Skip Punch)';
-            } else if (dayPunches.length > 0) {
-                dayStatus = detectPartialDay(dedupedPunches, shift).isPartial ? 'Half Day' : 'Present';
-            } else {
-                dayStatus = 'Absent';
-            }
-
-            breakdown.push({
-                date: formatDate(dateStr),
-                dateStr,
-                punches: dayPunches.length,
-                punchMatches,
-                shift: shift ? `${shift.am_start} - ${shift.pm_end}` : 'No Shift',
-                status: dayStatus,
-                lateMinutesTotal: lateMins,
-                earlyCheckoutInfo: earlyMins > 0 ? `${earlyMins}` : '0',
-                otherMinutes: override?.otherMinutes || 0,
-                abnormal: override?.isAbnormal || punchMatches.some(m => !m.matchedTo),
-                shiftObject: shift,
-                hasOverride: !!override,
-                isManual: !!override?.is_manual_minutes,
-                isSkipPunch: hasActiveSkip,
-                skipPunchType
-            });
-        }
-        return breakdown;
-    }, [selectedEmployee, enrichedResults, punches, shifts, exceptions, employees, reportRun, project]);
-
-    const handleMinutesChange = async (day, field, value) => {
-        const newValue = parseInt(value) || 0;
-        const currentVal = field === 'lateMinutes' ? day.lateMinutesTotal : 
-                          field === 'earlyCheckoutMinutes' ? parseInt(day.earlyCheckoutInfo) || 0 : 
-                          day.otherMinutes;
-        
-        if (newValue === currentVal) return;
-
-        try {
-            let dayOverrides = {};
-            try {
-                if (selectedEmployee.day_overrides) dayOverrides = JSON.parse(selectedEmployee.day_overrides);
-            } catch (e) { }
-
-            const existing = dayOverrides[day.dateStr] || {};
-            dayOverrides[day.dateStr] = {
-                ...existing,
-                [field]: newValue,
-                is_manual_minutes: true,
-                is_ramadan_day: false,
-                // Preserve original values if not already present
-                originalLateMinutes: existing.originalLateMinutes ?? (field === 'lateMinutes' ? day.lateMinutesTotal : (existing.lateMinutes ?? day.lateMinutesTotal)),
-                originalEarlyCheckout: existing.originalEarlyCheckout ?? (field === 'earlyCheckoutMinutes' ? (parseInt(day.earlyCheckoutInfo) || 0) : (existing.earlyCheckoutMinutes ?? (parseInt(day.earlyCheckoutInfo) || 0))),
-                originalOtherMinutes: existing.originalOtherMinutes ?? (field === 'otherMinutes' ? day.otherMinutes : (existing.otherMinutes ?? day.otherMinutes))
-            };
-
-            // Calculate new totals for the whole result
-            const latest = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
-            
-            // We need to recalculate the totals similar to EditDayRecordDialog
-            const recalculateTotals = (result, overrides) => {
-                let late = result.late_minutes || 0, early = result.early_checkout_minutes || 0, other = result.other_minutes || 0;
-                const abnormal = new Set((result.abnormal_dates || '').split(',').filter(Boolean));
-                
-                Object.entries(overrides).forEach(([date, ov]) => {
-                    if (ov) {
-                        late = late - (ov.originalLateMinutes || 0) + (ov.lateMinutes || 0);
-                        early = early - (ov.originalEarlyCheckout || 0) + (ov.earlyCheckoutMinutes || 0);
-                        other = other - (ov.originalOtherMinutes || 0) + (ov.otherMinutes || 0);
-                        if (ov.isAbnormal) abnormal.add(date); else abnormal.delete(date);
-                    }
-                });
-                const totalGrace = result.grace_minutes || 0;
-                const baseAfterGrace = Math.max(0, (late + early) - totalGrace);
-                const deductible = Math.max(0, baseAfterGrace - (result.approved_minutes || 0));
-                return { late, early, other, deductible, abnormal: Array.from(abnormal).join(',') };
-            };
-
-            const totals = recalculateTotals(latest, dayOverrides);
-
-            await updateAnalysisResult.mutateAsync({
-                day_overrides: JSON.stringify(dayOverrides),
-                late_minutes: totals.late,
-                early_checkout_minutes: totals.early,
-                other_minutes: totals.other,
-                deductible_minutes: totals.deductible,
-                abnormal_dates: totals.abnormal
-            });
-        } catch (error) {
-            toast.error('Failed to update minutes');
-        }
-    };
+    }
 
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Daily Breakdown: {selectedEmployee?.name}</DialogTitle>
+                        <DialogTitle>
+                            Daily Breakdown: {selectedEmployee?.attendance_id} - {selectedEmployee?.name}
+                        </DialogTitle>
                     </DialogHeader>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Punches</TableHead>
-                                <TableHead>Shifts</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="w-[80px]">Late</TableHead>
-                                <TableHead className="w-[80px]">Early</TableHead>
-                                <TableHead className="w-[80px]">Other</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {getDailyBreakdown.map((day, idx) => (
-                                <TableRow key={idx} className={day.abnormal ? 'bg-amber-50' : ''}>
-                                    <TableCell>{day.date}</TableCell>
-                                    <TableCell>
-                                        <div className="text-xs">
-                                            {day.punchMatches.map((m, i) => (
-                                                <div key={i} className={!m.matchedTo ? 'text-red-500 font-bold' : ''}>
-                                                    {extractTime(m.punch.timestamp_raw)} {m.matchedTo ? `→ ${m.matchedTo}` : '🔴'}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Select 
-                                            value={shifts.find(s => s.am_start === day.shiftObject?.am_start && s.pm_end === day.shiftObject?.pm_end)?.id || 'current'}
-                                            onValueChange={(val) => handleShiftChange(day.dateStr, val)}
-                                            disabled={isUpdatingShift}
-                                        >
-                                            <SelectTrigger className="h-8 text-[10px]">
-                                                <SelectValue placeholder={day.shift} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="current" disabled>{day.shift}</SelectItem>
-                                                {shifts.filter(s => String(s.attendance_id) === String(selectedEmployee?.attendance_id)).map(s => (
-                                                    <SelectItem key={s.id} value={s.id}>{s.am_start} - {s.pm_end}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-xs">{day.status}</span>
-                                            {day.isSkipPunch && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-medium bg-cyan-100 text-cyan-800 border border-cyan-200">
-                                                    ⏭ Skip Punch
-                                                </span>
-                                            )}
-                                            {day.isManual && !day.isSkipPunch && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-medium bg-blue-100 text-blue-800">
-                                                    Edited
-                                                </span>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col gap-0.5">
-                                            <input
-                                                type="number"
-                                                defaultValue={day.lateMinutesTotal}
-                                                onBlur={(e) => handleMinutesChange(day, 'lateMinutes', e.target.value)}
-                                                className={`w-full h-7 px-1 text-[10px] border rounded focus:ring-1 focus:ring-blue-500 outline-none ${day.isManual ? 'text-blue-600 font-medium' : ''} ${day.isSkipPunch && day.lateMinutesTotal === 0 ? 'bg-cyan-50' : ''}`}
-                                            />
-                                            <span className="text-[8px] text-muted-foreground ml-1">min</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col gap-0.5">
-                                            <input
-                                                type="number"
-                                                defaultValue={parseInt(day.earlyCheckoutInfo) || 0}
-                                                onBlur={(e) => handleMinutesChange(day, 'earlyCheckoutMinutes', e.target.value)}
-                                                className={`w-full h-7 px-1 text-[10px] border rounded focus:ring-1 focus:ring-blue-500 outline-none ${day.isManual ? 'text-blue-600 font-medium' : ''} ${day.isSkipPunch && parseInt(day.earlyCheckoutInfo) === 0 ? 'bg-cyan-50' : ''}`}
-                                            />
-                                            <span className="text-[8px] text-muted-foreground ml-1">min</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col gap-0.5">
-                                            <input
-                                                type="number"
-                                                defaultValue={day.otherMinutes}
-                                                onBlur={(e) => handleMinutesChange(day, 'otherMinutes', e.target.value)}
-                                                className={`w-full h-7 px-1 text-[10px] border rounded focus:ring-1 focus:ring-blue-500 outline-none ${day.isManual ? 'text-blue-600 font-medium' : ''}`}
-                                            />
-                                            <span className="text-[8px] text-muted-foreground ml-1">min</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="sm" onClick={() => setEditingDay(day)}>
-                                            <Edit className="w-4 h-4" />
-                                        </Button>
-                                    </TableCell>
+                    <div className="mt-4">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Punches</TableHead>
+                                    <TableHead>Punch Times</TableHead>
+                                    <TableHead>Shift</TableHead>
+                                    <TableHead>Exception</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Late Min</TableHead>
+                                    <TableHead>Early Min</TableHead>
+                                    <TableHead>Other Min</TableHead>
+                                    <TableHead>Abnormal</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {getDailyBreakdown.map((day, idx) => (
+                                    <TableRow key={idx} className={`${day.isLopAdjacentWeeklyOff ? 'bg-rose-100 border-l-4 border-l-rose-500' : day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.isLopAdjacentWeeklyOff ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{day.date}</span>
+                                                {day.isLopAdjacentWeeklyOff && (
+                                                    <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[9px] font-bold rounded uppercase tracking-wide">
+                                                        Double Deduction
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1">
+                                                <span>{day.punches}</span>
+                                                {day.crossoverPunches > 0 && (
+                                                    <span className="text-[9px] text-indigo-600 font-medium" title={`+${day.crossoverPunches} punch(es) from next day (midnight crossover)`}>
+                                                        +{day.crossoverPunches}🌙
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs max-w-xs">
+                                            <div title={day.allPunchTimes || day.punchTimes}>
+                                                {day.punchMatches && day.punchMatches.length > 0 ? (
+                                                    <div className="space-y-0.5">
+                                                        {day.punchMatches.map((match, matchIdx) => {
+                                                            const isNextDayPunch = match.punch._isNextDayPunch;
+                                                            return (
+                                                                <div key={matchIdx} className="flex items-center gap-1">
+                                                                    {isNextDayPunch && (
+                                                                        <span className="text-[8px] text-indigo-500 font-semibold" title="This punch is from the next calendar day (midnight crossover)">🌙</span>
+                                                                    )}
+                                                                    <span className={match.matchedTo ? (match.isFarExtendedMatch ? 'text-red-600 font-bold' : match.isExtendedMatch ? 'text-amber-600 font-semibold' : isNextDayPunch ? 'text-indigo-600 font-medium' : '') : 'text-red-600 font-bold'}>
+                                                                        {extractTime(match.punch.timestamp_raw)}
+                                                                    </span>
+                                                                    {match.matchedTo && (
+                                                                        <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : isNextDayPunch ? 'text-indigo-500' : 'text-slate-500'}`}>
+                                                                            →{match.matchedTo.replace(/_/g, ' ')}
+                                                                            {isNextDayPunch && ' (next day)'}
+                                                                            {match.isFarExtendedMatch && ' 🔴'}
+                                                                            {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
+                                                                        </span>
+                                                                    )}
+                                                                    {!match.matchedTo && (
+                                                                        <span className="text-[9px] text-red-600 font-bold">🔴 NO MATCH</span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <>{day.punchTimesShort || '-'}</>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            <div className="flex items-center gap-1">
+                                                <span>{day.shift}</span>
+                                                {day.shiftEndsNearMidnight && (
+                                                    <span className="text-[8px] text-indigo-500" title="Shift ends near midnight - punches after 12AM are pulled into this day">🌙</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">{day.exception}</TableCell>
+                                        <TableCell>
+                                            <div>
+                                                <span className={`px-2 py-1 rounded text-xs font-medium
+                                                    ${day.isLopAdjacentWeeklyOff ? 'bg-rose-600 text-white' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Present') && !day.status.includes('Half') ? 'bg-green-100 text-green-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
+                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Off') && !day.status.includes('LOP') ? 'bg-slate-100 text-slate-700' : ''}
+                                                `}>
+                                                    {day.status}
+                                                </span>
+                                                {day.partialDayReason && (
+                                                    <span className="text-amber-600 block text-[10px] mt-1">{day.partialDayReason}</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.lateMinutesTotal > 0 ? (
+                                                <span className="text-orange-600 font-medium">{Math.max(0, day.lateMinutesTotal)} min</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
+                                                <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.otherMinutes > 0 ? (
+                                                <span className="text-purple-600 font-medium">{Math.max(0, day.otherMinutes)} min</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.abnormal && <span className="text-amber-600 font-medium">Yes</span>}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {project.status !== 'closed' && (
+                                                <Button size="sm" variant="ghost" onClick={() => setEditingDay(day)}>
+                                                    <Edit className="w-4 h-4 text-indigo-600" />
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </DialogContent>
             </Dialog>
 
             <EditDayRecordDialog
                 open={!!editingDay}
                 onClose={() => setEditingDay(null)}
-                onSave={() => queryClient.invalidateQueries(['results'])}
+                onSave={() => queryClient.invalidateQueries(['results', reportRun.id])}
                 dayRecord={editingDay}
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}
@@ -583,7 +802,7 @@ export default function DailyBreakdownDialog({
                     [selectedEmployee?.attendance_id]: {
                         daily_details: getDailyBreakdown.reduce((acc, day) => ({
                             ...acc,
-                            [day.dateStr]: { punches: day.punchMatches.map(m => m.punch) }
+                            [day.dateStr]: { punches: day.punchObjects || [] }
                         }), {})
                     }
                 }}
