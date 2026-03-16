@@ -232,7 +232,7 @@ const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
     );
 };
 
-export default function DeveloperPortal() {
+export default function ChangeTracker() {
     const queryClient = useQueryClient();
 
     // Data Fetching
@@ -316,7 +316,7 @@ export default function DeveloperPortal() {
                         <Terminal className="w-3.5 h-3.5" />
                         Internal System
                     </div>
-                    <h1 className="text-5xl font-black text-slate-900 tracking-tighter">Developer Portal</h1>
+                    <h1 className="text-5xl font-black text-slate-900 tracking-tighter">Developer Portal v2</h1>
                     <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
                         Streamlined, inline-editable management for all system changes, user requests, and CEO approvals.
                     </p>
@@ -331,6 +331,8 @@ export default function DeveloperPortal() {
                     </div>
                 </div>
             </header>
+
+            <script>{`console.log('Developer Portal Spreadsheet Mode v2.1 Activated')`}</script>
 
             <div className="grid grid-cols-1 gap-12">
                 {SECTIONS.map(section => (

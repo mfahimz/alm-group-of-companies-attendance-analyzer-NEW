@@ -314,8 +314,8 @@ export const PAGES_CONFIG = {
     },
 
     // Developer Portal
-    DeveloperPortal: {
-        name: 'DeveloperPortal',
+    ChangeTracker: {
+        name: 'ChangeTracker',
         title: 'Developer Portal',
         icon: Terminal,
         category: 'Main',

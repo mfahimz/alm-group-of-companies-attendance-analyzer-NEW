@@ -1,4 +1,4 @@
-// Cache bust 2026-03-16T10:31 - force rebuild
+// Cache bust 2026-03-16T17:25 - force rebuild
 import './App.css'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -44,7 +44,7 @@ import BusinessDocumentation from './pages/BusinessDocumentation';
 import AppDocumentation from './pages/AppDocumentation';
 import REPORT_ARCHITECTURE from './pages/REPORT_ARCHITECTURE';
 import FeatureRequests from './pages/FeatureRequests';
-import DeveloperPortal from './pages/developer/DeveloperPortal';
+import ChangeTracker from './pages/developer/ChangeTracker';
 
 const W = ({ name, children }) => <Layout currentPageName={name}>{children}</Layout>;
 
@@ -89,7 +89,7 @@ function App() {
           <Route path="/appdocumentation" element={<W name="AppDocumentation"><AppDocumentation /></W>} />
           <Route path="/report_architecture" element={<W name="REPORT_ARCHITECTURE"><REPORT_ARCHITECTURE /></W>} />
           <Route path="/featurerequests" element={<W name="FeatureRequests"><FeatureRequests /></W>} />
-          <Route path="/developerportal" element={<W name="DeveloperPortal"><DeveloperPortal /></W>} />
+          <Route path="/developerportal" element={<W name="ChangeTracker"><ChangeTracker /></W>} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
         <Toaster />

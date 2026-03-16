@@ -82,7 +82,7 @@ import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import SoftwareDoc from './pages/SoftwareDoc';
-import DeveloperPortal from './pages/developer/DeveloperPortal';
+import ChangeTracker from './pages/developer/ChangeTracker';
 import __Layout from './Layout.jsx';
 
 
@@ -122,7 +122,7 @@ export const PAGES = {
     "UserProfile": UserProfile,
     "Users": Users,
     "SoftwareDoc": SoftwareDoc,
-    "DeveloperPortal": DeveloperPortal,
+    "ChangeTracker": ChangeTracker,
 }
 
 export const pagesConfig = {
