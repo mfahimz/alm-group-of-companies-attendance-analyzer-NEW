@@ -1,54 +1,168 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Terminal, Plus, Clock, CheckCircle2, AlertCircle, PlayCircle, Snowflake, Braces, GitPullRequest, Trash2, Save, X } from 'lucide-react';
+import { Terminal, Plus, Trash2, Braces } from 'lucide-react';
 import { toast } from 'sonner';
+import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
-const CATEGORIES = ["Logic", "UI", "Architecture"];
+const SECTIONS = ["Changes", "User Requests", "CEO Approval"];
 const PRIORITIES = ["Low", "Medium", "High", "Critical"];
-const STATUSES = ["Pending", "In Progress", "Frozen", "Completed"];
-
-const StatusIcon = ({ status }) => {
-    switch (status) {
-        case 'Pending': return <Clock className="w-4 h-4 text-slate-400" />;
-        case 'In Progress': return <PlayCircle className="w-4 h-4 text-blue-500" />;
-        case 'Frozen': return <AlertCircle className="w-4 h-4 text-amber-500" />;
-        case 'Completed': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
-        default: return null;
-    }
-};
 
 const PriorityBadge = ({ priority }) => {
-    const variants = {
-        Low: "outline",
-        Medium: "secondary",
-        High: "destructive",
-        Critical: "destructive"
+    const colors = {
+        Low: "bg-blue-100 text-blue-700",
+        Medium: "bg-yellow-100 text-yellow-700",
+        High: "bg-orange-100 text-orange-700",
+        Critical: "bg-red-100 text-red-700"
     };
-    return <Badge variant={variants[priority] || "default"}>{priority}</Badge>;
+    return <Badge className={`${colors[priority]} text-xs font-medium`}>{priority}</Badge>;
 };
+
+const StatusBadge = ({ status }) => {
+    const colors = {
+        Pending: "bg-slate-100 text-slate-600",
+        "In Progress": "bg-indigo-100 text-indigo-700",
+        Frozen: "bg-amber-100 text-amber-700",
+        Completed: "bg-emerald-100 text-emerald-700"
+    };
+    return <Badge variant="outline" className={`${colors[status]} text-xs`}>{status}</Badge>;
+};
+
+function KanbanCard({ card, onUpdate, onDelete, onOpenNotes }) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [title, setTitle] = useState(card.title);
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (title.trim() && title !== card.title) {
+                onUpdate(card.id, { title });
+            }
+            setIsEditing(false);
+        }
+    };
+
+    const handleBlur = () => {
+        if (title.trim() && title !== card.title) {
+            onUpdate(card.id, { title });
+        }
+        setIsEditing(false);
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+            <Card className="mb-2 p-3 hover:shadow-md transition-shadow cursor-move bg-white border border-slate-200">
+                <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                            {isEditing ? (
+                                <Textarea
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    onBlur={handleBlur}
+                                    className="min-h-[60px] text-sm resize-none"
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            ) : (
+                                <p 
+                                    className="text-sm text-slate-800 cursor-text whitespace-pre-wrap"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEditing(true);
+                                    }}
+                                >
+                                    {card.title}
+                                </p>
+                            )}
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-slate-400 hover:text-red-600"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(card.id);
+                            }}
+                        >
+                            <Trash2 className="w-3 h-3" />
+                        </Button>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <PriorityBadge priority={card.priority} />
+                        <StatusBadge status={card.status} />
+                        {card.technical_notes && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 px-2 text-slate-500"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenNotes(card);
+                                }}
+                            >
+                                <Braces className="w-3 h-3" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </Card>
+        </div>
+    );
+}
+
+function KanbanColumn({ section, cards, onUpdate, onDelete, onAdd, onOpenNotes }) {
+    return (
+        <div className="flex-1 min-w-[320px]">
+            <div className="bg-slate-100 rounded-lg p-4 h-[calc(100vh-280px)]">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-slate-800">{section}</h3>
+                    <Badge variant="secondary" className="text-xs">{cards.length}</Badge>
+                </div>
+                <div className="space-y-2 overflow-y-auto h-[calc(100%-60px)] pr-2">
+                    <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                        {cards.map((card) => (
+                            <KanbanCard 
+                                key={card.id} 
+                                card={card} 
+                                onUpdate={onUpdate}
+                                onDelete={onDelete}
+                                onOpenNotes={onOpenNotes}
+                            />
+                        ))}
+                    </SortableContext>
+                </div>
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full mt-2"
+                    onClick={() => onAdd(section)}
+                >
+                    <Plus className="w-4 h-4 mr-1" /> Add Card
+                </Button>
+            </div>
+        </div>
+    );
+}
 
 export default function DeveloperPortal() {
     const queryClient = useQueryClient();
-    const [editingId, setEditingId] = useState(null);
-    const [editForm, setEditForm] = useState({});
-    const [newRequest, setNewRequest] = useState({
-        title: '',
-        category: 'Logic',
-        priority: 'Medium',
-        description: '',
-        status: 'Pending',
-        technical_notes: ''
-    });
     const [selectedNotes, setSelectedNotes] = useState(null);
 
     const { data: user } = useQuery({
@@ -56,30 +170,39 @@ export default function DeveloperPortal() {
         queryFn: () => base44.auth.me()
     });
 
-    const { data: requests = [], isLoading } = useQuery({
+    const { data: allCards = [] } = useQuery({
         queryKey: ['developerChangeRequests'],
-        queryFn: () => base44.entities.DeveloperChangeLog.list('-created_at')
+        queryFn: () => base44.entities.DeveloperChangeLog.list('sort_order')
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }) => base44.entities.DeveloperChangeLog.update(id, data),
+        onMutate: async ({ id, data }) => {
+            await queryClient.cancelQueries({ queryKey: ['developerChangeRequests'] });
+            const previous = queryClient.getQueryData(['developerChangeRequests']);
+            queryClient.setQueryData(['developerChangeRequests'], old =>
+                old.map(card => card.id === id ? { ...card, ...data } : card)
+            );
+            return { previous };
+        },
+        onError: (err, variables, context) => {
+            queryClient.setQueryData(['developerChangeRequests'], context.previous);
+            toast.error('Update failed');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
+        }
     });
 
     const createMutation = useMutation({
-        mutationFn: (requestData) => base44.entities.DeveloperChangeLog.create({
-            ...requestData,
+        mutationFn: (cardData) => base44.entities.DeveloperChangeLog.create({
+            ...cardData,
             created_by: user?.email,
             created_at: new Date().toISOString()
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
-            toast.success('Request added');
-            setNewRequest({ title: '', category: 'Logic', priority: 'Medium', description: '', status: 'Pending', technical_notes: '' });
-        }
-    });
-
-    const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => base44.entities.DeveloperChangeLog.update(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
-            toast.success('Changes saved');
-            setEditingId(null);
+            toast.success('Card added');
         }
     });
 
@@ -87,25 +210,71 @@ export default function DeveloperPortal() {
         mutationFn: (id) => base44.entities.DeveloperChangeLog.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
-            toast.success('Request deleted');
+            toast.success('Card deleted');
         }
     });
 
-    const handleAdd = () => {
-        if (!newRequest.title) {
-            toast.error('Title is required');
-            return;
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (!over) return;
+
+        const activeCard = allCards.find(c => c.id === active.id);
+        const overCard = allCards.find(c => c.id === over.id);
+
+        if (!activeCard) return;
+
+        // Determine target section
+        let targetSection = activeCard.section_type;
+        if (overCard) {
+            targetSection = overCard.section_type;
         }
-        createMutation.mutate(newRequest);
+
+        const sectionCards = allCards.filter(c => c.section_type === targetSection);
+        const oldIndex = sectionCards.findIndex(c => c.id === active.id);
+        const newIndex = sectionCards.findIndex(c => c.id === over.id);
+
+        if (activeCard.section_type !== targetSection) {
+            // Moving to different section
+            updateMutation.mutate({ 
+                id: active.id, 
+                data: { section_type: targetSection, sort_order: newIndex }
+            });
+        } else if (oldIndex !== newIndex) {
+            // Reordering within same section
+            const reordered = arrayMove(sectionCards, oldIndex, newIndex);
+            reordered.forEach((card, index) => {
+                if (card.sort_order !== index) {
+                    updateMutation.mutate({ id: card.id, data: { sort_order: index } });
+                }
+            });
+        }
     };
 
-    const startEditing = (req) => {
-        setEditingId(req.id);
-        setEditForm(req);
+    const handleUpdate = (id, data) => {
+        updateMutation.mutate({ id, data });
     };
 
-    const handleSaveEdit = () => {
-        updateMutation.mutate({ id: editingId, data: editForm });
+    const handleDelete = (id) => {
+        if (confirm('Delete this card?')) {
+            deleteMutation.mutate(id);
+        }
+    };
+
+    const handleAdd = (section) => {
+        createMutation.mutate({
+            title: 'New task...',
+            section_type: section,
+            priority: 'Medium',
+            status: 'Pending',
+            sort_order: allCards.filter(c => c.section_type === section).length
+        });
     };
 
     return (
@@ -117,260 +286,57 @@ export default function DeveloperPortal() {
                         <span>Developer Portal</span>
                     </div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Change Management</h1>
-                    <p className="text-slate-500">
-                        Excel-style maintenance for architectural and logic changes.
-                    </p>
+                    <p className="text-slate-500">Kanban workflow for tracking development tasks</p>
                 </div>
             </header>
 
-            <Card className="border-none shadow-sm overflow-hidden bg-white">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="hover:bg-transparent">
-                            <TableHead className="w-[200px]">Title</TableHead>
-                            <TableHead className="w-[120px]">Category</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead className="w-[120px]">Priority</TableHead>
-                            <TableHead className="w-[140px]">Status</TableHead>
-                            <TableHead className="w-[100px]">Notes</TableHead>
-                            <TableHead className="w-[100px] text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {/* Inline Add Row */}
-                        <TableRow className="bg-slate-50/50">
-                            <TableCell>
-                                <Input 
-                                    placeholder="New request title..." 
-                                    className="h-8 text-sm"
-                                    value={newRequest.title}
-                                    onChange={(e) => setNewRequest({...newRequest, title: e.target.value})}
-                                />
-                            </TableCell>
-                            <TableCell>
-                                <Select 
-                                    value={newRequest.category} 
-                                    onValueChange={(val) => setNewRequest({...newRequest, category: val})}
-                                >
-                                    <SelectTrigger className="h-8 text-xs bg-white">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </TableCell>
-                            <TableCell>
-                                <Input 
-                                    placeholder="Quick description..." 
-                                    className="h-8 text-sm"
-                                    value={newRequest.description}
-                                    onChange={(e) => setNewRequest({...newRequest, description: e.target.value})}
-                                />
-                            </TableCell>
-                            <TableCell>
-                                <Select 
-                                    value={newRequest.priority} 
-                                    onValueChange={(val) => setNewRequest({...newRequest, priority: val})}
-                                >
-                                    <SelectTrigger className="h-8 text-xs bg-white">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </TableCell>
-                            <TableCell>
-                                <Select 
-                                    value={newRequest.status} 
-                                    onValueChange={(val) => setNewRequest({...newRequest, status: val})}
-                                >
-                                    <SelectTrigger className="h-8 text-xs bg-white">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </TableCell>
-                            <TableCell>
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-8 h-8 px-2 text-slate-400 hover:text-indigo-600"
-                                    onClick={() => setSelectedNotes({ isNew: true })}
-                                >
-                                    <Braces className="w-4 h-4" />
-                                </Button>
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <Button 
-                                    size="sm" 
-                                    className="h-8 bg-indigo-600 hover:bg-indigo-700 h-8"
-                                    onClick={handleAdd}
-                                    disabled={createMutation.isPending}
-                                >
-                                    <Plus className="w-4 h-4" />
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-
-                        {/* Existing Requests */}
-                        {isLoading ? (
-                            <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-400">Loading data...</TableCell></TableRow>
-                        ) : requests.length === 0 ? (
-                            <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-400">No requests found. Start by adding one above.</TableCell></TableRow>
-                        ) : (
-                            requests.map((req) => (
-                                <TableRow key={req.id} className={editingId === req.id ? "bg-indigo-50/30" : ""}>
-                                    {editingId === req.id ? (
-                                        <>
-                                            <TableCell>
-                                                <Input 
-                                                    className="h-8 text-sm"
-                                                    value={editForm.title}
-                                                    onChange={(e) => setEditForm({...editForm, title: e.target.value})}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Select 
-                                                    value={editForm.category} 
-                                                    onValueChange={(val) => setEditForm({...editForm, category: val})}
-                                                >
-                                                    <SelectTrigger className="h-8 text-xs bg-white">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input 
-                                                    className="h-8 text-sm"
-                                                    value={editForm.description}
-                                                    onChange={(e) => setEditForm({...editForm, description: e.target.value})}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Select 
-                                                    value={editForm.priority} 
-                                                    onValueChange={(val) => setEditForm({...editForm, priority: val})}
-                                                >
-                                                    <SelectTrigger className="h-8 text-xs bg-white">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Select 
-                                                    value={editForm.status} 
-                                                    onValueChange={(val) => setEditForm({...editForm, status: val})}
-                                                >
-                                                    <SelectTrigger className="h-8 text-xs bg-white">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
-                                                    className="h-8 h-8 px-2 text-indigo-600"
-                                                    onClick={() => setSelectedNotes(req)}
-                                                >
-                                                    <Braces className="w-4 h-4" />
-                                                </Button>
-                                            </TableCell>
-                                            <TableCell className="text-right space-x-1">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={handleSaveEdit}>
-                                                    <Save className="w-4 h-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400" onClick={() => setEditingId(null)}>
-                                                    <X className="w-4 h-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <TableCell className="font-medium cursor-pointer" onClick={() => startEditing(req)}>{req.title}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="text-[10px] uppercase">{req.category}</Badge>
-                                            </TableCell>
-                                            <TableCell className="max-w-[300px] truncate text-slate-500 cursor-pointer" onClick={() => startEditing(req)}>
-                                                {req.description}
-                                            </TableCell>
-                                            <TableCell>
-                                                <PriorityBadge priority={req.priority} />
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <StatusIcon status={req.status} />
-                                                    <span>{req.status}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
-                                                    className="h-8 h-8 px-2 text-slate-400 hover:text-indigo-600"
-                                                    onClick={() => setSelectedNotes(req)}
-                                                >
-                                                    <Braces className="w-4 h-4" />
-                                                </Button>
-                                            </TableCell>
-                                            <TableCell className="text-right space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEditing(req)}>
-                                                    <GitPullRequest className="w-4 h-4 text-indigo-400" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 p-0" onClick={() => deleteMutation.mutate(req.id)}>
-                                                    <Trash2 className="w-4 h-4 text-rose-400" />
-                                                </Button>
-                                            </TableCell>
-                                        </>
-                                    )}
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </Card>
+            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                    {SECTIONS.map(section => (
+                        <KanbanColumn 
+                            key={section}
+                            section={section}
+                            cards={allCards.filter(c => c.section_type === section).sort((a, b) => a.sort_order - b.sort_order)}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            onAdd={handleAdd}
+                            onOpenNotes={setSelectedNotes}
+                        />
+                    ))}
+                </div>
+            </DndContext>
 
             <Dialog open={!!selectedNotes} onOpenChange={() => setSelectedNotes(null)}>
                 <DialogContent className="sm:max-w-[700px]">
                     <DialogHeader>
-                        <DialogTitle>Implementation Prompt Base</DialogTitle>
-                        <DialogDescription>
-                            Rich technical notes and prompt sequences for this change.
-                        </DialogDescription>
+                        <DialogTitle>Technical Notes</DialogTitle>
+                        <DialogDescription>Implementation details and prompts</DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                         <Textarea 
-                            className="min-h-[400px] font-mono text-sm bg-slate-900 text-slate-100 p-4 rounded-lg focus:ring-indigo-500"
-                            placeholder="Paste implementation prompts or technical architecture details here..."
-                            value={selectedNotes?.isNew ? newRequest.technical_notes : (editingId === selectedNotes?.id ? editForm.technical_notes : selectedNotes?.technical_notes)}
+                            className="min-h-[400px] font-mono text-sm bg-slate-900 text-slate-100 p-4 rounded-lg"
+                            placeholder="Add implementation notes..."
+                            value={selectedNotes?.technical_notes || ''}
                             onChange={(e) => {
-                                if (selectedNotes?.isNew) {
-                                    setNewRequest({...newRequest, technical_notes: e.target.value});
-                                } else if (editingId === selectedNotes?.id) {
-                                    setEditForm({...editForm, technical_notes: e.target.value});
-                                } else {
-                                    // If not editing, we might want to allow quick update or require entering edit mode
-                                    setEditForm({...selectedNotes, technical_notes: e.target.value});
-                                    setEditingId(selectedNotes.id);
-                                }
+                                const updated = { ...selectedNotes, technical_notes: e.target.value };
+                                setSelectedNotes(updated);
                             }}
                         />
                     </div>
                     <DialogFooter>
-                        <Button onClick={() => setSelectedNotes(null)}>Close</Button>
+                        <Button 
+                            onClick={() => {
+                                if (selectedNotes?.id) {
+                                    updateMutation.mutate({ 
+                                        id: selectedNotes.id, 
+                                        data: { technical_notes: selectedNotes.technical_notes } 
+                                    });
+                                }
+                                setSelectedNotes(null);
+                            }}
+                        >
+                            Save & Close
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
