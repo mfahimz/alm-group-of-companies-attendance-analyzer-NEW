@@ -1,5 +1,5 @@
 {
-    "name": "CompanyRole",
+    "name": "CompanyRoleMaster",
     "fields": {
         "role_title": {
             "type": "string",

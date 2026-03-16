@@ -85,13 +85,13 @@ export default function CompanyRoleManager() {
 
     const { data: roles = [], isLoading } = useQuery({
         queryKey: ['companyRoles'],
-        queryFn: () => base44.entities.CompanyRole.list('-created_at', 1000)
+        queryFn: () => base44.entities.CompanyRoleMaster.list('-created_at', 1000)
     });
 
     const createMutation = useMutation({
         mutationFn: async () => {
             const me = await base44.auth.me();
-            return base44.entities.CompanyRole.create({
+            return base44.entities.CompanyRoleMaster.create({
                 role_title: 'New Role',
                 company: COMPANIES[0],
                 status: 'Open',
@@ -106,7 +106,7 @@ export default function CompanyRoleManager() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: (role) => base44.entities.CompanyRole.update(role.id, role),
+        mutationFn: (role) => base44.entities.CompanyRoleMaster.update(role.id, role),
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['companyRoles'] });
         },
@@ -114,7 +114,7 @@ export default function CompanyRoleManager() {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (id) => base44.entities.CompanyRole.delete(id),
+        mutationFn: (id) => base44.entities.CompanyRoleMaster.delete(id),
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['companyRoles'] });
             toast.success('Role deleted');
@@ -176,7 +176,7 @@ export default function CompanyRoleManager() {
                                     <tbody className="divide-y divide-slate-100">
                                         {groupedRoles[company].length === 0 ? (
                                             <tr>
-                                                <td colSpan="4" className="py-8 text-center text-slate-400 text-sm italic">
+                                                <td colSpan={4} className="py-8 text-center text-slate-400 text-sm italic">
                                                     No roles defined for this company
                                                 </td>
                                             </tr>
