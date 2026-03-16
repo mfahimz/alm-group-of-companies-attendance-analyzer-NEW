@@ -13,10 +13,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const COMPANY_NAMES = {
-    MOTORS: 'Al Maraghi Motors',
-    PARTS: 'Naser Mohsin Auto Parts'
-};
+/**
+ * ResumeDashboard provides an overview of hiring statistics.
+ * All company references are now dynamic from the Company entity.
+ * No company names are hardcoded.
+ */
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
     <div className="bg-white border border-[#E2E6EC] rounded-xl p-5 shadow-sm flex items-center gap-4">
@@ -82,7 +83,14 @@ export default function ResumeDashboard({ onNewScan }) {
         queryFn: () => base44.entities.ResumeScanResult.list('-created_date', 5000)
     });
 
-    if (loadingTemplates || loadingScans) {
+    const { data: companiesRaw = [], isLoading: loadingCompanies } = useQuery({
+        queryKey: ['companies-active'],
+        queryFn: () => base44.entities.Company.list()
+    });
+
+    const companies = companiesRaw.filter(c => c.active);
+
+    if (loadingTemplates || loadingScans || loadingCompanies) {
         return (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -92,13 +100,14 @@ export default function ResumeDashboard({ onNewScan }) {
     }
 
     // Processing logic
-    const getStats = (companyKeyword) => {
-        const filteredTemplates = templates.filter(t => 
-            !companyKeyword || t.position_name?.toLowerCase().includes(companyKeyword.toLowerCase())
-        );
-        const filteredScans = scans.filter(s => 
-            !companyKeyword || s.position_applied?.toLowerCase().includes(companyKeyword.toLowerCase())
-        );
+    const getStats = (companyName) => {
+        // JobTemplate and ScanResult matching:
+        // 1. Identify templates belonging to this company via the 'company' field.
+        // 2. Identify scans matching those templates via position_applied.
+        const companyTemplates = templates.filter(t => t.company === companyName);
+        const templateNames = new Set(companyTemplates.map(t => t.position_name));
+
+        const filteredScans = scans.filter(s => templateNames.has(s.position_applied));
         const selectedScans = filteredScans.filter(s => s.evaluation_status === 'Selected');
 
         // Top positions calculation
@@ -114,22 +123,21 @@ export default function ResumeDashboard({ onNewScan }) {
             .map(([name, count]) => ({ name, count }));
 
         return {
-            openPositions: filteredTemplates.length,
+            openPositions: companyTemplates.length,
             talentPool: selectedScans.length,
             totalScans: filteredScans.length,
             topPositions
         };
     };
 
+    const totalSelectedCount = scans.filter(s => s.evaluation_status === 'Selected').length;
+    
     const globalStats = {
         openPositions: templates.length,
-        talentPool: scans.filter(s => s.evaluation_status === 'Selected').length,
+        talentPool: totalSelectedCount,
         totalScans: scans.length,
-        totalSelected: scans.filter(s => s.evaluation_status === 'Selected').length
+        totalSelected: totalSelectedCount
     };
-
-    const motorsStats = getStats('Motors');
-    const partsStats = getStats('Parts');
 
     return (
         <div className="space-y-8">
@@ -175,14 +183,13 @@ export default function ResumeDashboard({ onNewScan }) {
 
             {/* SECTION 2: SUB-DASHBOARDS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <CompanySubDashboard 
-                    name={COMPANY_NAMES.MOTORS} 
-                    stats={motorsStats} 
-                />
-                <CompanySubDashboard 
-                    name={COMPANY_NAMES.PARTS} 
-                    stats={partsStats} 
-                />
+                {companies.map(company => (
+                    <CompanySubDashboard 
+                        key={company.id}
+                        name={company.name} 
+                        stats={getStats(company.name)} 
+                    />
+                ))}
             </div>
         </div>
     );

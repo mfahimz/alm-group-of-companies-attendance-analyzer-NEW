@@ -161,33 +161,37 @@ export default function TalentPool() {
 
     const nationalities = useMemo(() => ['All', ...new Set(candidates.map(c => c.nationality).filter(Boolean))], [candidates]);
 
+    const { data: companiesRaw = [], isLoading: loadingCos } = useQuery({
+        queryKey: ['companies-active'],
+        queryFn: () => base44.entities.Company.list()
+    });
+
+    const companies = companiesRaw.filter(c => c.active);
+
     // Grouping Logic
+    // All company references are now dynamic from the Company entity.
+    // No company names are hardcoded.
     const groupedData = useMemo(() => {
-        const companies = {
-            'Al Maraghi Motors': { keyword: 'Motors', roles: [] },
-            'Naser Mohsin Auto Parts': { keyword: 'Parts', roles: [] }
-        };
-
-        const rolesList = jobTemplates.map(t => ({
-            name: t.position_name,
-            company: t.position_name?.includes('Motors') ? 'Al Maraghi Motors' : t.position_name?.includes('Parts') ? 'Naser Mohsin Auto Parts' : null
-        })).filter(r => r.company);
-
-        Object.keys(companies).forEach(companyName => {
-            const companyKeyword = companies[companyName].keyword;
-            const companyRoles = rolesList.filter(r => r.company === companyName);
-            
-            companies[companyName].roles = companyRoles.map(role => ({
-                name: role.name,
-                candidates: filteredCandidates.filter(c => 
-                    c.matched_template_name === role.name && 
-                    c.matched_template_name.includes(companyKeyword)
-                )
-            }));
+        const result = {};
+        
+        // Initialize groups for all active companies
+        companies.forEach(company => {
+            result[company.name] = { roles: [] };
         });
 
-        return companies;
-    }, [filteredCandidates, jobTemplates]);
+        // Group templates by their company field
+        jobTemplates.forEach(template => {
+            const companyName = template.company;
+            if (companyName && result[companyName]) {
+                result[companyName].roles.push({
+                    name: template.position_name,
+                    candidates: filteredCandidates.filter(c => c.matched_template_name === template.position_name)
+                });
+            }
+        });
+
+        return result;
+    }, [filteredCandidates, jobTemplates, companies]);
 
     const toggleRole = (roleName) => {
         setExpandedRoles(prev => {
@@ -359,10 +363,14 @@ export default function TalentPool() {
 
             {/* Candidates Grouped View */}
             <div className="space-y-8">
-                {isLoading ? (
+                {isLoading || loadingCos ? (
                     <div className="py-20 text-center bg-white border border-[#E2E6EC] rounded-xl">
                         <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
                         <p className="text-sm text-slate-500">Loading talent pool...</p>
+                    </div>
+                ) : Object.keys(groupedData).length === 0 ? (
+                    <div className="py-20 text-center bg-white border border-[#E2E6EC] rounded-xl">
+                        <p className="text-sm text-slate-500 italic">No companies or roles defined yet.</p>
                     </div>
                 ) : Object.keys(groupedData).map(companyName => (
                     <div key={companyName} className="space-y-4">

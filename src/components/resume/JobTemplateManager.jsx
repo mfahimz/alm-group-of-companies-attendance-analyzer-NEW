@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 const EMPTY_TEMPLATE = {
     position_name: '',
     department: '',
+    company: '', // Dynamic company field from Company entity
     min_experience_years: '',
     required_education: '',
     required_skills: '',
@@ -23,7 +24,13 @@ const EMPTY_TEMPLATE = {
     mandatory_rules: [] // Array of field names that are mandatory
 };
 
-function TemplateForm({ template, onSave, onCancel, isSaving }) {
+/**
+ * JobTemplateManager handles position screening criteria.
+ * All company references are now dynamic from the Company entity.
+ * No company names are hardcoded.
+ */
+
+function TemplateForm({ template, onSave, onCancel, isSaving, companies }) {
     const [form, setForm] = useState(template || EMPTY_TEMPLATE);
     const [quickText, setQuickText] = useState('');
     const [quickParsing, setQuickParsing] = useState(false);
@@ -102,6 +109,7 @@ Return JSON with these fields (use empty string if not mentioned):
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!form.position_name.trim()) { toast.error('Position name is required'); return; }
+        if (!form.company) { toast.error('Company is required'); return; }
         if (!form.min_experience_years && form.min_experience_years !== 0) { toast.error('Minimum experience is required'); return; }
         if (!form.required_education.trim()) { toast.error('Required education is required'); return; }
         if (!form.required_skills.trim()) { toast.error('Required skills are required'); return; }
@@ -151,8 +159,8 @@ Return JSON with these fields (use empty string if not mentioned):
                 </div>
             </div>
 
-            {/* Position & Department */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Position, Department & Company */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Position Name *</Label>
                     <Input placeholder="e.g. Service Technician" value={form.position_name} onChange={e => set('position_name', e.target.value)} />
@@ -160,6 +168,19 @@ Return JSON with these fields (use empty string if not mentioned):
                 <div>
                     <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Department</Label>
                     <Input placeholder="e.g. Service, HR, Finance" value={form.department} onChange={e => set('department', e.target.value)} />
+                </div>
+                <div>
+                    <Label className="text-xs font-medium text-[#4B5563] mb-1.5 block">Company *</Label>
+                    <select 
+                        className="w-full h-10 px-3 rounded-md border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                        value={form.company}
+                        onChange={e => set('company', e.target.value)}
+                    >
+                        <option value="">Select Company...</option>
+                        {companies.map(c => (
+                            <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -261,7 +282,7 @@ function TemplateCard({ template, onEdit, onDelete }) {
                     <div>
                         <p className="text-sm font-semibold text-[#1F2937]">{template.position_name}</p>
                         <div className="flex items-center gap-2">
-                            <p className="text-xs text-[#6B7280]">{template.department}{template.min_experience_years ? ` • ${template.min_experience_years}+ yrs exp` : ''}</p>
+                            <p className="text-xs text-[#6B7280]">{template.company || 'No Company'} • {template.department}{template.min_experience_years ? ` • ${template.min_experience_years}+ yrs exp` : ''}</p>
                             {template.mandatory_rules?.length > 0 && (
                                 <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
                                     {template.mandatory_rules.length} Mandatory Rules
@@ -312,6 +333,13 @@ export default function JobTemplateManager() {
         queryKey: ['jobTemplates'],
         queryFn: () => base44.entities.JobTemplate.list('-created_date', 100)
     });
+
+    const { data: companiesRaw = [] } = useQuery({
+        queryKey: ['companies-active'],
+        queryFn: () => base44.entities.Company.list()
+    });
+
+    const companies = companiesRaw.filter(c => c.active);
 
     const saveMutation = useMutation({
         mutationFn: (data) => data.id
@@ -377,6 +405,7 @@ export default function JobTemplateManager() {
                     onSave={(data) => saveMutation.mutate(data)}
                     onCancel={handleCancel}
                     isSaving={saveMutation.isPending}
+                    companies={companies}
                 />
             )}
 

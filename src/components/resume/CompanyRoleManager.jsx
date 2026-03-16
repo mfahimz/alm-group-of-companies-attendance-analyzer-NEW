@@ -12,10 +12,17 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const COMPANIES = ['Al Maraghi Motors', 'Naser Mohsin Auto Parts'];
+// Statuses remain static as they are part of the business workflow, 
+// but Companies are now fetched live from the Company entity.
 const STATUSES = ['Open', 'Watch'];
 
-function InlineRoleRow({ role, onSave, onDelete }) {
+/**
+ * CompanyRoleMaster handles the master list of roles.
+ * All company references are now dynamic from the Company entity.
+ * No company names are hardcoded.
+ */
+
+function InlineRoleRow({ role, onSave, onDelete, companies }) {
     const [localRole, setLocalRole] = useState(role);
 
     const handleBlur = (field, value) => {
@@ -52,7 +59,7 @@ function InlineRoleRow({ role, onSave, onDelete }) {
                         onSave({ ...role, company: val });
                     }}
                 >
-                    {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
             </td>
             <td className="py-3 px-4">
@@ -88,12 +95,19 @@ export default function CompanyRoleManager() {
         queryFn: () => base44.entities.CompanyRoleMaster.list('-created_at', 1000)
     });
 
+    const { data: companiesRaw = [] } = useQuery({
+        queryKey: ['companies-active'],
+        queryFn: () => base44.entities.Company.list()
+    });
+
+    const companies = companiesRaw.filter(c => c.active);
+
     const createMutation = useMutation({
         mutationFn: async () => {
             const me = await base44.auth.me();
             return base44.entities.CompanyRoleMaster.create({
                 role_title: 'New Role',
-                company: COMPANIES[0],
+                company: companies[0]?.name || '',
                 status: 'Open',
                 created_by: me?.email || 'System',
                 created_at: new Date().toISOString()
@@ -123,12 +137,12 @@ export default function CompanyRoleManager() {
 
     const groupedRoles = useMemo(() => {
         const groups = {};
-        COMPANIES.forEach(c => groups[c] = []);
+        companies.forEach(c => groups[c.name] = []);
         roles.forEach(r => {
             if (groups[r.company]) groups[r.company].push(r);
         });
         return groups;
-    }, [roles]);
+    }, [roles, companies]);
 
     return (
         <div className="space-y-6">
@@ -153,50 +167,54 @@ export default function CompanyRoleManager() {
                 </div>
             ) : (
                 <div className="space-y-8">
-                    {COMPANIES.map(company => (
-                        <div key={company} className="space-y-3">
-                            <div className="flex items-center gap-2 bg-slate-50 p-2 px-4 rounded-lg border border-slate-100">
-                                <Building2 className="w-4 h-4 text-slate-600" />
-                                <h3 className="font-bold text-slate-800 text-sm">{company}</h3>
-                                <span className="ml-auto text-xs font-bold bg-white px-2 py-0.5 rounded border text-slate-500">
-                                    {groupedRoles[company].length} Roles
-                                </span>
-                            </div>
+                    {companies.map(companyObj => {
+                        const company = companyObj.name;
+                        return (
+                            <div key={company} className="space-y-3">
+                                <div className="flex items-center gap-2 bg-slate-50 p-2 px-4 rounded-lg border border-slate-100">
+                                    <Building2 className="w-4 h-4 text-slate-600" />
+                                    <h3 className="font-bold text-slate-800 text-sm">{company}</h3>
+                                    <span className="ml-auto text-xs font-bold bg-white px-2 py-0.5 rounded border text-slate-500">
+                                        {groupedRoles[company]?.length || 0} Roles
+                                    </span>
+                                </div>
 
-                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                                <table className="w-full text-left">
-                                    <thead className="bg-[#FAFBFD] border-b border-slate-200">
-                                        <tr>
-                                            <th className="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role Title</th>
-                                            <th className="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-1/4">Company</th>
-                                            <th className="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-1/5">Status</th>
-                                            <th className="py-3 px-4 text-right w-16"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {groupedRoles[company].length === 0 ? (
+                                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-[#FAFBFD] border-b border-slate-200">
                                             <tr>
-                                                <td colSpan={4} className="py-8 text-center text-slate-400 text-sm italic">
-                                                    No roles defined for this company
-                                                </td>
+                                                <th className="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role Title</th>
+                                                <th className="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-1/4">Company</th>
+                                                <th className="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-1/5">Status</th>
+                                                <th className="py-3 px-4 text-right w-16"></th>
                                             </tr>
-                                        ) : (
-                                            groupedRoles[company].map(role => (
-                                                <InlineRoleRow 
-                                                    key={role.id} 
-                                                    role={role} 
-                                                    onSave={(data) => updateMutation.mutate(data)}
-                                                    onDelete={(id) => {
-                                                        if (window.confirm('Delete this role?')) deleteMutation.mutate(id);
-                                                    }}
-                                                />
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {(!groupedRoles[company] || groupedRoles[company].length === 0) ? (
+                                                <tr>
+                                                    <td colSpan={4} className="py-8 text-center text-slate-400 text-sm italic">
+                                                        No roles defined for this company
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                groupedRoles[company].map(role => (
+                                                    <InlineRoleRow 
+                                                        key={role.id} 
+                                                        role={role} 
+                                                        onSave={(data) => updateMutation.mutate(data)}
+                                                        onDelete={(id) => {
+                                                            if (window.confirm('Delete this role?')) deleteMutation.mutate(id);
+                                                        }}
+                                                        companies={companies}
+                                                    />
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
