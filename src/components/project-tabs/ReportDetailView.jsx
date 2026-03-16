@@ -20,7 +20,7 @@ import DailyBreakdownDialog from './DailyBreakdownDialog';
 import DeductibleCell from './DeductibleCell';
 import ReportTableRow from './ReportTableRow';
 import * as XLSX from 'xlsx';
-import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
+import ExcelPreviewModal from '@/components/ui/ExcelPreviewDialog';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -324,9 +324,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return {
                 ...p,
                 time: adjustedTime,
-                _isNextDayPunch: isNextDayPunch
+                _isNextDayPunch: !!isNextDayPunch
             };
-        }).filter(p => p).sort((a, b) => a.time - b.time);
+        }).filter(p => p).sort((a, b) => a.time.getTime() - b.time.getTime());
 
         if (punchesWithTime.length === 0) return [];
 
@@ -356,7 +356,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
@@ -368,7 +368,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance;
@@ -382,7 +382,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance;
@@ -413,14 +413,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 });
             }
         }
-
         return matches;
     };
 
-
     const detectPartialDay = (dayPunches, shift, nextDateStr = null) => {
         if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time).sort((a, b) => a.time.getTime() - b.time.getTime());
         if (pts.length < 2) return { isPartial: false, reason: null };
         const amStart = parseTime(shift.am_start), amEnd = parseTime(shift.am_end), pmStart = parseTime(shift.pm_start);
         let pmEnd = parseTime(shift.pm_end);
@@ -428,42 +426,29 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
         const mid = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
         const single = shift.is_single_shift === true || !mid;
-        const expected = single ? (pmEnd - amStart) / 60000 : ((amEnd ? (amEnd - amStart) / 60000 : 0) + (pmStart ? (pmEnd - pmStart) / 60000 : 0));
-        const actual = (pts[pts.length - 1].time - pts[0].time) / 60000;
-        if (expected > 0 && actual < expected * 0.5 && actual > 0) return { isPartial: true, reason: `Worked ${Math.round(actual)} min (expected ${Math.round(expected)} min)` };
+        const expected = single ? (pmEnd.getTime() - amStart.getTime()) / 60000 : ((amEnd ? (amEnd.getTime() - amStart.getTime()) / 60000 : 0) + (pmStart ? (pmEnd.getTime() - pmStart.getTime()) / 60000 : 0));
+        const actual = (pts[pts.length - 1].time.getTime() - pts[0].time.getTime()) / 60000;
+        if (expected > 0 && actual / expected < 0.5 && actual > 0) return { isPartial: true, reason: `Worked ${Math.round(actual)} min (expected ${Math.round(expected)} min)` };
         return { isPartial: false, reason: null };
     };
 
     const filterMultiplePunches = (punchList, shift) => {
         if (punchList.length <= 1) return punchList;
-
-        const punchesWithTime = punchList.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw)
-        })).filter(p => p.time);
-
+        const punchesWithTime = punchList.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time);
         if (punchesWithTime.length === 0) return punchList;
-
         const deduped = [];
         for (let i = 0; i < punchesWithTime.length; i++) {
             const current = punchesWithTime[i];
-            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
-            if (!isDuplicate) {
-                deduped.push(current);
-            }
+            const isDuplicate = deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10);
+            if (!isDuplicate) deduped.push(current);
         }
-
-        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
+        const sortedPunches = deduped.sort((a, b) => a.time.getTime() - b.time.getTime());
         return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
     };
 
     const calculateEmployeeTotals = (result, dateFrom, dateTo) => {
-        // CRITICAL FIX: For finalized reports, return stored values WITHOUT recalculation
-        // Finalized reports must be immutable - no punch/shift/exception recalculation
         const isFinalized = reportRun.is_final || project.status === 'closed';
-
         if (isFinalized) {
-            // Return stored values AS-IS from finalized AnalysisResult
             return {
                 totalLateMinutes: result.late_minutes || 0,
                 totalEarlyCheckout: result.early_checkout_minutes || 0,
@@ -476,61 +461,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annualLeaveCount: result.annual_leave_count || 0
             };
         }
-
-        // NON-FINALIZED ONLY: Recalculate from live punch data
         const attendanceIdStr = String(result.attendance_id);
-
-        const dayBeforeStart = new Date(dateFrom);
-        dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
-        const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
-
-        const dayAfterEnd = new Date(dateTo);
-        dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
-        const dayAfterEndStr = dayAfterEnd.toISOString().split('T')[0];
-
-        const employeePunches = punches.filter(p =>
-            String(p.attendance_id) === attendanceIdStr &&
-            p.punch_date >= dayBeforeStartStr &&
-            p.punch_date <= dayAfterEndStr
-        );
+        const dayBeforeStart = new Date(dateFrom); dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+        const dayAfterEnd = new Date(dateTo); dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+        const employeePunches = punches.filter(p => String(p.attendance_id) === attendanceIdStr && p.punch_date >= dayBeforeStart.toISOString().split('T')[0] && p.punch_date <= dayAfterEnd.toISOString().split('T')[0]);
         const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-        const employeeExceptions = exceptions.filter(e =>
-            (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
-            e.use_in_analysis !== false &&
-            e.is_custom_type !== true
-        );
-
+        const employeeExceptions = exceptions.filter(e => (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) && e.use_in_analysis !== false && e.is_custom_type !== true);
         const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-
-        // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive' || project.company === 'Al Maraghi Motors';
-
         let dayOverrides = {};
-        if (result.day_overrides) {
-            try {
-                dayOverrides = JSON.parse(result.day_overrides);
-            } catch (e) { }
-        }
-
-        let totalLateMinutes = 0;
-        let totalEarlyCheckout = 0;
-        let totalOtherMinutes = 0;
-        let workingDays = 0;
-        let presentDays = 0;
-        let fullAbsenceCount = 0;
-        let halfAbsenceCount = 0;
-        let sickLeaveCount = 0;
-        let annualLeaveCount = 0;
-
-        const startDate = new Date(dateFrom);
-        const endDate = new Date(dateTo);
-
-        const dayNameToNumber = {
-            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-            'Thursday': 4, 'Friday': 5, 'Saturday': 6
-        };
-
-        // Calculate annual leave as CALENDAR DAYS (not working days) - same as salary calculation
+        if (result.day_overrides) { try { dayOverrides = JSON.parse(result.day_overrides); } catch (e) { } }
+        let totalLateMinutes = 0, totalEarlyCheckout = 0, totalOtherMinutes = 0, workingDays = 0, presentDays = 0, fullAbsenceCount = 0, halfAbsenceCount = 0, sickLeaveCount = 0, annualLeaveCount = 0;
+        const startDate = new Date(dateFrom), endDate = new Date(dateTo);
+        const dayNameToNumber = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
         const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
         const annualLeaveDatesProcessed = new Set();
 
@@ -540,12 +482,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const exTo = new Date(alEx.date_to);
 
                 // Clamp to report date range
-                const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
-                const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
+                const rangeStart = exFrom.getTime() < startDate.getTime() ? new Date(startDate) : new Date(exFrom);
+                const rangeEnd = exTo.getTime() > endDate.getTime() ? new Date(endDate) : new Date(exTo);
 
-                if (rangeStart <= rangeEnd) {
+                if (rangeStart.getTime() <= rangeEnd.getTime()) {
                     // Count each calendar day individually
-                    for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+                    for (let d = new Date(rangeStart); d.getTime() <= rangeEnd.getTime(); d.setDate(d.getDate() + 1)) {
                         const dateStr = d.toISOString().split('T')[0];
                         annualLeaveDatesProcessed.add(dateStr);
                     }
@@ -629,7 +571,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const matchingExceptionsCalc = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
-                return currentDate >= exFrom && currentDate <= exTo;
+                return currentDate.getTime() >= exFrom.getTime() && currentDate.getTime() <= exTo.getTime();
             });
 
             const dateException = matchingExceptionsCalc && matchingExceptionsCalc.length > 0
@@ -801,10 +743,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     const punchTime = match.punch.time;
                     const shiftTime = match.shiftTime;
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                        if (punchTime > shiftTime) dayLateMinutes += Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                        if (punchTime.getTime() > shiftTime.getTime()) {
+                            dayLateMinutes += Math.round(Math.abs(punchTime.getTime() - shiftTime.getTime()) / (1000 * 60));
+                        }
                     }
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                        if (punchTime < shiftTime) dayEarlyMinutes += Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                        if (punchTime.getTime() < shiftTime.getTime()) {
+                            dayEarlyMinutes += Math.round(Math.abs(shiftTime.getTime() - punchTime.getTime()) / (1000 * 60));
+                        }
                     }
                 }
             }
@@ -896,6 +842,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                 return {
                     ...result,
+                    id: result.id,
+                    attendance_id: result.attendance_id,
                     name: employee?.name || 'Unknown',
                     working_days: result.working_days || 0,
                     present_days: result.manual_present_days ?? result.present_days ?? 0,
@@ -909,10 +857,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     approved_minutes: approvedMin,
                     deductible_minutes: effectiveDeductible,
                     ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
-                    // effective = raw deductible (after grace) minus ramadan gift
                     effective_deductible_minutes: Math.max(0, effectiveDeductible - Math.max(0, result.ramadan_gift_minutes || 0)),
                     grace_minutes: graceMin,
-                    has_no_punches: hasNoPunches
+                    has_no_punches: hasNoPunches,
+                    notes: result.notes || '',
+                    // Keep original manual fields for export or other uses
+                    manual_present_days: result.manual_present_days,
+                    manual_full_absence_count: result.manual_full_absence_count,
+                    manual_annual_leave_count: result.manual_annual_leave_count,
+                    manual_sick_leave_count: result.manual_sick_leave_count
                 };
             }
 
@@ -934,15 +887,31 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const dynamicDeductible = Math.max(0, Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout) - graceMinutes);
 
             return {
-                ...result, name: employee?.name || 'Unknown', working_days: workingDays,
-                present_days: result.manual_present_days ?? presentDays, full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
-                half_absence_count: halfAbsenceCount, sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
-                annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
-                early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
-                approved_minutes: result.approved_minutes || 0, deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
+                ...result,
+                id: result.id,
+                attendance_id: result.attendance_id,
+                name: employee?.name || 'Unknown',
+                working_days: workingDays,
+                present_days: result.manual_present_days ?? presentDays,
+                full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
+                half_absence_count: halfAbsenceCount,
+                sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
+                annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount,
+                late_minutes: Math.max(0, totalLateMinutes),
+                early_checkout_minutes: Math.max(0, totalEarlyCheckout),
+                other_minutes: Math.max(0, totalOtherMinutes),
+                approved_minutes: result.approved_minutes || 0,
+                deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
                 ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
                 effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - Math.max(0, result.ramadan_gift_minutes || 0)),
-                grace_minutes: graceMinutes, has_no_punches: hasNoPunches
+                grace_minutes: graceMinutes,
+                has_no_punches: hasNoPunches,
+                notes: result.notes || '',
+                // Keep original manual fields
+                manual_present_days: result.manual_present_days,
+                manual_full_absence_count: result.manual_full_absence_count,
+                manual_annual_leave_count: result.manual_annual_leave_count,
+                manual_sick_leave_count: result.manual_sick_leave_count
             };
         });
     }, [results, employees, punches, shifts, exceptions, reportRun, project, ramadanGiftOverrides]);
@@ -1007,15 +976,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     }, [enrichedResults, searchTerm, riskFilter, sort]);
 
     const updateVerificationMutation = useMutation({
-        mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
-            verified_employees: verifiedList.join(',')
-        }),
+        mutationFn: (verifiedList = []) => {
+            const list = Array.isArray(verifiedList) ? verifiedList : [];
+            return base44.entities.ReportRun.update(reportRun.id, {
+                verified_employees: list.join(',')
+            });
+        },
         onSuccess: () => {
             // Don't invalidate - local state is already updated
         },
         onError: () => {
             // Only invalidate on error to refetch correct state
-            queryClient.invalidateQueries(['reportRun', reportRun.id]);
+            queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
             toast.error('Failed to update verification');
         },
         retry: 3,
@@ -1375,7 +1347,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     } else {
                         let currentRange = { start: sortedDates[0], end: sortedDates[0] };
                         for (let i = 1; i < sortedDates.length; i++) {
-                            const dayDiff = (new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / (1000 * 60 * 60 * 24);
+                            const d1 = new Date(sortedDates[i]);
+                            const d2 = new Date(sortedDates[i - 1]);
+                            const dayDiff = (d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24);
                             if (dayDiff === 1) { currentRange.end = sortedDates[i]; }
                             else { ranges.push({ ...currentRange }); currentRange = { start: sortedDates[i], end: sortedDates[i] }; }
                         }
@@ -1508,8 +1482,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return exceptionsToCreate.length;
         },
         onSuccess: async (exceptionCount) => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
-            queryClient.invalidateQueries(['reportRun', reportRun.id]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
             toast.success(`Report saved! ${exceptionCount} exception${exceptionCount !== 1 ? 's' : ''} created from edits.`);
 
             // Note: Approval links functionality removed - department heads now use pre-approval system
@@ -1573,10 +1547,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     r.name,
                     r.has_no_punches ? 'No' : 'Yes',
                     Math.max(0, r.working_days || 0),
-                    Math.max(0, (r.manual_present_days ?? r.present_days) || 0),
-                    Math.max(0, r.manual_annual_leave_count ?? r.annual_leave_count ?? 0),
-                    Math.max(0, r.manual_sick_leave_count ?? r.sick_leave_count ?? 0),
-                    Math.max(0, (r.manual_full_absence_count ?? r.full_absence_count) || 0),
+                    Math.max(0, r.present_days || 0),
+                    Math.max(0, r.annual_leave_count || 0),
+                    Math.max(0, r.sick_leave_count || 0),
+                    Math.max(0, r.full_absence_count || 0),
                     Math.max(0, r.half_absence_count || 0),
                     minutesToHours(Math.max(0, late)),
                     minutesToHours(Math.max(0, early))
@@ -1637,7 +1611,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             await base44.entities.AnalysisResult.update(id, { grace_minutes });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['results', reportRun.id]);
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
             setEditingGraceMinutes(null);
             toast.success('Grace minutes updated');
         },
@@ -1651,7 +1625,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             await base44.entities.AnalysisResult.update(id, { [field]: value });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['results', reportRun.id]);
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
             toast.success('Value updated - will be used in salary calculation');
         },
         onError: () => {
@@ -1832,48 +1806,44 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 <CardContent className="p-0 sm:p-6">
                     <div className="border rounded-lg relative overflow-x-auto overflow-y-auto max-h-[600px]">
                         <table className="w-full min-w-max caption-bottom text-sm">
-                            <thead className="sticky top-0 z-10 bg-slate-50">
-                                <tr className="border-b">
-                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50 sticky left-0 z-20">Verified</th>
-                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[48px] z-20">
-                                        ID
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[120px] z-20">
-                                        Name
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="working_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                            <thead className="bg-slate-50 sticky top-0 z-30">
+                                <tr className="hover:bg-transparent border-b border-slate-200">
+                                    <th className="h-10 px-2 text-center align-middle font-medium text-muted-foreground bg-slate-50 w-[50px]">Mark</th>
+                                    <SortableTableHead label="Attendance ID" sortKey="attendance_id" currentSort={sort} onSort={setSort} className="text-center">ID</SortableTableHead>
+                                    <SortableTableHead label="Name" sortKey="name" currentSort={sort} onSort={setSort}>Employee Name</SortableTableHead>
+                                    <SortableTableHead label="Working Days" sortKey="working_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Working Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="present_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="Present Days" sortKey="present_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Present Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="annual_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="Annual Leave" sortKey="annual_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Annual Leave
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="sick_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="Sick Leave" sortKey="sick_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Sick Leave
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="LOP Days" sortKey="full_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         LOP Days
                                     </SortableTableHead>
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50 text-rose-600 text-[11px]" title="Weekly off days adjacent to LOP, counted as additional LOP">
                                         +Weekly Off LOP
                                     </th>
-                                    <SortableTableHead sortKey="half_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="Half Days" sortKey="half_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Half Days
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="Late Minutes" sortKey="late_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Late Minutes
                                     </SortableTableHead>
-                                    <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="Early Checkout" sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Early Checkout
                                     </SortableTableHead>
                                     {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
-                                        <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                        <SortableTableHead label="Approved Minutes" sortKey="approved_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                             Approved Minutes
                                         </SortableTableHead>
                                     )}
-                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
+                                    <SortableTableHead label="Other Minutes" sortKey="other_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Other Minutes
                                     </SortableTableHead>
                                     {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>}
@@ -1920,11 +1890,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 employees={employees}
                 reportRun={reportRun}
                 project={project}
-                parseTime={parseTime}
-                formatTime={formatTime}
-                matchPunchesToShiftPoints={matchPunchesToShiftPoints}
-                detectPartialDay={detectPartialDay}
-                filterMultiplePunches={filterMultiplePunches}
             />
 
             <GraceMinutesDialog
@@ -1942,7 +1907,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 isUser={isUser}
                 isSupervisor={isSupervisor}
             />
-            <ExcelPreviewDialog
+            <ExcelPreviewModal
                 isOpen={isPreviewOpen}
                 onClose={() => setIsPreviewOpen(false)}
                 data={previewData}

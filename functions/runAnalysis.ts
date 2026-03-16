@@ -1272,7 +1272,26 @@ Deno.serve(async (req: Request) => {
 
                 // 2. Override phase: If manual adjustment exists, it takes precedence for that SPECIFIC field.
                 // This ensures that a manual "Late" override doesn't wipe out punch-based "Early Checkout" minutes.
-                if (dateException && !shouldSkipTimeCalculation) {
+                
+                // Fetch manual overrides from the existing AnalysisResult string if available
+                let manualOverrideForDate = null;
+                try {
+                    const existingResult = existingResultsByAttendanceId.get(String(attendance_id));
+                    if (existingResult && existingResult.day_overrides) {
+                        const overrides = JSON.parse(existingResult.day_overrides);
+                        if (overrides[dateStr] && overrides[dateStr].is_manual_minutes) {
+                            manualOverrideForDate = overrides[dateStr];
+                        }
+                    }
+                } catch (e) { }
+
+                if (manualOverrideForDate) {
+                    if (manualOverrideForDate.lateMinutes !== undefined) dayLateMinutes = manualOverrideForDate.lateMinutes;
+                    if (manualOverrideForDate.earlyCheckoutMinutes !== undefined) dayEarlyMinutes = manualOverrideForDate.earlyCheckoutMinutes;
+                    if (manualOverrideForDate.otherMinutes !== undefined) dayOtherMinutes = manualOverrideForDate.otherMinutes;
+                    
+                    console.log(`[runAnalysis] MANUAL OVERRIDE: Employee ${attendanceIdStr}, Date ${dateStr}: Using manual minutes (late: ${dayLateMinutes}, early: ${dayEarlyMinutes}, other: ${dayOtherMinutes})`);
+                } else if (dateException && !shouldSkipTimeCalculation) {
                     // Specific manual overrides
                     if (dateException.late_minutes !== undefined && dateException.late_minutes > 0) {
                         dayLateMinutes = Math.abs(dateException.late_minutes);
@@ -1284,11 +1303,6 @@ Deno.serve(async (req: Request) => {
                         dayOtherMinutes = Math.abs(dateException.other_minutes);
                         // Track that these other minutes came FROM an existing exception
                         otherMinutesFromExceptions[dateStr] = dayOtherMinutes;
-                    }
-
-                    // MANUAL types (e.g. MANUAL_LATE) often indicate the day is present even if no punches
-                    if ((dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') && filteredPunches.length === 0) {
-                        // Handled above in presentDays increment block, but here we ensure minutes are counted
                     }
                 }
 
@@ -1507,10 +1521,10 @@ Deno.serve(async (req: Request) => {
             report_run_id: reportRun.id
         }, null, 5000);
 
-        const existingRamadanGiftMinutesByAttendanceId = new Map(
+        const existingResultsByAttendanceId = new Map(
             existingResultsForReport
                 .filter(r => r.attendance_id !== null && r.attendance_id !== undefined)
-                .map(r => [String(r.attendance_id), Math.max(0, Number(r.ramadan_gift_minutes || 0))])
+                .map(r => [String(r.attendance_id), r])
         );
 
         // Process all employees and build results array
@@ -1543,13 +1557,16 @@ Deno.serve(async (req: Request) => {
                 }
 
                 processedAttendanceIds.add(idStr);
+                const existingResult = existingResultsByAttendanceId.get(String(attendance_id));
                 const result = await analyzeEmployee(attendance_id);
-                const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
+                const preservedRamadanGiftMinutes = existingResult ? Math.max(0, Number(existingResult.ramadan_gift_minutes || 0)) : 0;
+                const preservedDayOverrides = existingResult ? existingResult.day_overrides : null;
 
                 allResults.push({
                     project_id,
                     report_run_id: reportRun.id,
                     ramadan_gift_minutes: preservedRamadanGiftMinutes,
+                    day_overrides: preservedDayOverrides,
                     ...result
                 });
 

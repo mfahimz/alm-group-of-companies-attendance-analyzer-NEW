@@ -916,7 +916,7 @@ Deno.serve(async (req) => {
         //   - Previous month LOP days: ONLY 31/12/2025 counts
         //   - This is a one-time exception, NOT a global rule change
         // ============================================================
-        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours) => {
+        const calculateExtraPrevMonthData = (emp: any, graceMinutes: number, prevMonthSalaryAmount: number, workingHours: number, dayOverrides: Record<string, any> = {}) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) {
                 return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
             }
@@ -1108,7 +1108,13 @@ Deno.serve(async (req) => {
                 let dayEarlyMinutes = 0;
                 let dayOtherMinutes = 0;
 
-                if (hasManualTimeException) {
+                const dayOverride = dayOverrides[dateStr];
+
+                if (dayOverride && dayOverride.is_manual_minutes) {
+                    if (dayOverride.lateMinutes !== undefined) dayLateMinutes = dayOverride.lateMinutes;
+                    if (dayOverride.earlyCheckoutMinutes !== undefined) dayEarlyMinutes = dayOverride.earlyCheckoutMinutes;
+                    if (dayOverride.otherMinutes !== undefined) dayOtherMinutes = dayOverride.otherMinutes;
+                } else if (hasManualTimeException) {
                     if (dateException.late_minutes > 0) dayLateMinutes = dateException.late_minutes;
                     if (dateException.early_checkout_minutes > 0) dayEarlyMinutes = dateException.early_checkout_minutes;
                     if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
@@ -1458,7 +1464,11 @@ Deno.serve(async (req) => {
                 prevMonthDivisor: otDivisor
             };
             if (isAlMaraghi && hasExtraPrevMonthRange && emp.attendance_id) {
-                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
+                let dayOverrides = {};
+                if (analysisResult?.day_overrides) {
+                    try { dayOverrides = JSON.parse(analysisResult.day_overrides); } catch (e) { }
+                }
+                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours, dayOverrides);
             }
 
             // Salary leave days follow ANNUAL_LEAVE exception overrides (salary_leave_days)
