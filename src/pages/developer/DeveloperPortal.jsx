@@ -1,211 +1,268 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Terminal, Plus, Trash2, Braces } from 'lucide-react';
+import { 
+    Terminal, 
+    Plus, 
+    Trash2, 
+    Loader2, 
+    CheckCircle2, 
+    AlertCircle,
+    ChevronDown
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import ChangeManagement from '@/components/developer/ChangeManagement';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
+// --- Constants ---
 const SECTIONS = ["Changes", "User Requests", "CEO Approval"];
+const CATEGORIES = ["Logic", "UI", "Architecture"];
 const PRIORITIES = ["Low", "Medium", "High", "Critical"];
+const STATUSES = ["Pending", "In Progress", "Frozen", "Completed"];
 
-const PriorityBadge = ({ priority }) => {
-    const colors = {
-        Low: "bg-blue-100 text-blue-700",
-        Medium: "bg-yellow-100 text-yellow-700",
-        High: "bg-orange-100 text-orange-700",
-        Critical: "bg-red-100 text-red-700"
+const EditableRow = ({ item, onUpdate, onDelete }) => {
+    const [localItem, setLocalItem] = useState(item);
+    const [isSaving, setIsSaving] = useState(false);
+    const [hasError, setHasError] = useState(false);
+
+    // Sync with external updates
+    useEffect(() => {
+        setLocalItem(item);
+    }, [item]);
+
+    const handleChange = (field, value) => {
+        setLocalItem(prev => ({ ...prev, [field]: value }));
     };
-    return <Badge className={`${colors[priority]} text-xs font-medium`}>{priority}</Badge>;
-};
 
-const StatusBadge = ({ status }) => {
-    const colors = {
-        Pending: "bg-slate-100 text-slate-600",
-        "In Progress": "bg-indigo-100 text-indigo-700",
-        Frozen: "bg-amber-100 text-amber-700",
-        Completed: "bg-emerald-100 text-emerald-700"
-    };
-    return <Badge variant="outline" className={`${colors[status]} text-xs`}>{status}</Badge>;
-};
+    const handleSave = async (updatedField = null) => {
+        const currentData = updatedField ? { ...localItem, ...updatedField } : localItem;
+        
+        const hasChanged = 
+            currentData.title !== item.title ||
+            currentData.category !== item.category ||
+            currentData.priority !== item.priority ||
+            currentData.status !== item.status ||
+            currentData.description !== item.description;
 
-function KanbanCard({ card, onUpdate, onDelete, onOpenNotes }) {
-    const [isEditing, setIsEditing] = useState(false);
-    const [title, setTitle] = useState(card.title);
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+        if (!hasChanged) return;
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
+        setIsSaving(true);
+        setHasError(false);
+        try {
+            await onUpdate(item.id, currentData);
+            setHasError(false);
+        } catch (error) {
+            setHasError(true);
+            // Revert local state to last known good state if save fails? 
+            // Or keep it so user can fix and retry. User asked for retry capability.
+            toast.error(`Auto-save failed: ${item.title || 'Untitled'}`);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            if (title.trim() && title !== card.title) {
-                onUpdate(card.id, { title });
-            }
-            setIsEditing(false);
+        if (e.key === 'Enter') {
+            e.target.blur();
         }
-    };
-
-    const handleBlur = () => {
-        if (title.trim() && title !== card.title) {
-            onUpdate(card.id, { title });
-        }
-        setIsEditing(false);
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-            <Card className="mb-2 p-3 hover:shadow-md transition-shadow cursor-move bg-white border border-slate-200">
-                <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                            {isEditing ? (
-                                <Textarea
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    onBlur={handleBlur}
-                                    className="min-h-[60px] text-sm resize-none"
-                                    autoFocus
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            ) : (
-                                <p 
-                                    className="text-sm text-slate-800 cursor-text whitespace-pre-wrap"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsEditing(true);
-                                    }}
-                                >
-                                    {card.title}
-                                </p>
-                            )}
-                        </div>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 text-slate-400 hover:text-red-600"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(card.id);
-                            }}
-                        >
-                            <Trash2 className="w-3 h-3" />
-                        </Button>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <PriorityBadge priority={card.priority} />
-                        <StatusBadge status={card.status} />
-                        {card.technical_notes && (
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-6 px-2 text-slate-500"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenNotes(card);
-                                }}
-                            >
-                                <Braces className="w-3 h-3" />
-                            </Button>
+        <tr className="hover:bg-slate-50/80 transition-colors group border-b border-slate-100 last:border-0">
+            <td className="p-1 w-[25%]">
+                <Input 
+                    value={localItem.title || ''} 
+                    onChange={(e) => handleChange('title', e.target.value)}
+                    onBlur={() => handleSave()}
+                    onKeyDown={handleKeyDown}
+                    className="h-8 text-sm bg-transparent border-transparent hover:border-slate-200 focus:bg-white focus:border-slate-300 shadow-none focus:ring-0 px-2"
+                    placeholder="Title..."
+                />
+            </td>
+            <td className="p-1 w-32">
+                <Select 
+                    value={localItem.category || "Logic"} 
+                    onValueChange={(v) => {
+                        handleChange('category', v);
+                        handleSave({ category: v });
+                    }}
+                >
+                    <SelectTrigger className="h-8 text-xs border-transparent hover:border-slate-200 bg-transparent focus:ring-0 shadow-none px-2">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {CATEGORIES.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </td>
+            <td className="p-1 w-32">
+                <Select 
+                    value={localItem.priority || "Medium"} 
+                    onValueChange={(v) => {
+                        handleChange('priority', v);
+                        handleSave({ priority: v });
+                    }}
+                >
+                    <SelectTrigger className="h-8 text-xs border-transparent hover:border-slate-200 bg-transparent focus:ring-0 shadow-none px-2">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {PRIORITIES.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </td>
+            <td className="p-1 w-40">
+                <Select 
+                    value={localItem.status || "Pending"} 
+                    onValueChange={(v) => {
+                        handleChange('status', v);
+                        handleSave({ status: v });
+                    }}
+                >
+                    <SelectTrigger className="h-8 text-xs border-transparent hover:border-slate-200 bg-transparent focus:ring-0 shadow-none px-2">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {STATUSES.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </td>
+            <td className="p-1 flex-1">
+                <Input 
+                    value={localItem.description || ''} 
+                    onChange={(e) => handleChange('description', e.target.value)}
+                    onBlur={() => handleSave()}
+                    onKeyDown={handleKeyDown}
+                    className="h-8 text-sm bg-transparent border-transparent hover:border-slate-200 focus:bg-white focus:border-slate-300 shadow-none focus:ring-0 px-2 text-slate-500"
+                    placeholder="Description..."
+                />
+            </td>
+            <td className="p-1 w-20 text-right">
+                <div className="flex items-center justify-end gap-1.5 px-2">
+                    <div className="min-w-[14px]">
+                        {isSaving ? (
+                            <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                        ) : hasError ? (
+                            <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                        ) : (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 opacity-0 group-hover:opacity-40 transition-opacity" />
                         )}
                     </div>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        onClick={() => onDelete(item.id)}
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                 </div>
+            </td>
+        </tr>
+    );
+};
+
+const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center gap-3 px-1">
+                <div className="bg-indigo-600 w-1.5 h-5 rounded-full" />
+                <h2 className="text-lg font-black text-slate-800 tracking-tight">{title}</h2>
+                <Badge variant="secondary" className="bg-slate-100 text-slate-500 border-slate-200 text-[10px] font-bold">
+                    {items.length}
+                </Badge>
+            </div>
+            
+            <Card className="border-slate-200 shadow-sm overflow-hidden bg-white">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            <tr>
+                                <th className="px-3 py-2">Title</th>
+                                <th className="px-3 py-2">Category</th>
+                                <th className="px-3 py-2">Priority</th>
+                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2">Description</th>
+                                <th className="px-3 py-2 w-20 text-right"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {items.map(item => (
+                                <EditableRow 
+                                    key={item.id} 
+                                    item={item} 
+                                    onUpdate={onUpdate} 
+                                    onDelete={onDelete} 
+                                />
+                            ))}
+                        </tbody>
+                    </table>
+                    
+                    {items.length === 0 && (
+                        <div className="py-14 flex flex-col items-center justify-center text-slate-400">
+                            <div className="p-4 bg-slate-50 rounded-2xl mb-4">
+                                <Plus className="w-8 h-8 opacity-10" />
+                            </div>
+                            <p className="text-sm italic font-medium">No {title} logged yet.</p>
+                            <p className="text-xs opacity-60">Click the button below to add your first entry.</p>
+                        </div>
+                    )}
+                </div>
+                
+                <Button 
+                    variant="ghost" 
+                    className="w-full h-10 rounded-none border-t border-slate-50 hover:bg-slate-50/50 text-indigo-600 text-xs font-bold gap-2"
+                    onClick={() => onAdd(title)}
+                >
+                    <Plus className="w-4 h-4" />
+                    New {title.slice(0, -1)} Entry
+                </Button>
             </Card>
         </div>
     );
-}
-
-function KanbanColumn({ section, cards, onUpdate, onDelete, onAdd, onOpenNotes }) {
-    return (
-        <div className="flex-1 min-w-[320px]">
-            <div className="bg-slate-100 rounded-lg p-4 h-[calc(100vh-280px)]">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-slate-800">{section}</h3>
-                    <Badge variant="secondary" className="text-xs">{cards.length}</Badge>
-                </div>
-                <div className="space-y-2 overflow-y-auto h-[calc(100%-60px)] pr-2">
-                    <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                        {cards.map((card) => (
-                            <KanbanCard 
-                                key={card.id} 
-                                card={card} 
-                                onUpdate={onUpdate}
-                                onDelete={onDelete}
-                                onOpenNotes={onOpenNotes}
-                            />
-                        ))}
-                    </SortableContext>
-                </div>
-                <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full mt-2"
-                    onClick={() => onAdd(section)}
-                >
-                    <Plus className="w-4 h-4 mr-1" /> Add Card
-                </Button>
-            </div>
-        </div>
-    );
-}
+};
 
 export default function DeveloperPortal() {
     const queryClient = useQueryClient();
-    const [selectedNotes, setSelectedNotes] = useState(null);
-    const [activeTab, setActiveTab] = useState('board');
 
+    // Data Fetching
     const { data: user } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
 
-    const { data: allCards = [] } = useQuery({
+    const { data: allRecords = [], isLoading } = useQuery({
         queryKey: ['developerChangeRequests'],
-        queryFn: () => base44.entities.DeveloperChangeLog.list('sort_order')
+        queryFn: () => base44.entities.DeveloperChangeLog.list('-created_at')
     });
 
+    // Mutations
     const updateMutation = useMutation({
         mutationFn: ({ id, data }) => base44.entities.DeveloperChangeLog.update(id, data),
-        onMutate: async ({ id, data }) => {
-            await queryClient.cancelQueries({ queryKey: ['developerChangeRequests'] });
-            const previous = queryClient.getQueryData(['developerChangeRequests']);
-            queryClient.setQueryData(['developerChangeRequests'], old =>
-                old.map(card => card.id === id ? { ...card, ...data } : card)
-            );
-            return { previous };
-        },
-        onError: (err, variables, context) => {
-            queryClient.setQueryData(['developerChangeRequests'], context.previous);
-            toast.error('Update failed');
-        },
-        onSettled: () => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
         }
     });
 
     const createMutation = useMutation({
-        mutationFn: (cardData) => base44.entities.DeveloperChangeLog.create({
-            ...cardData,
-            created_by: user?.email,
+        mutationFn: (data) => base44.entities.DeveloperChangeLog.create({
+            ...data,
+            created_by: user?.email || 'admin',
             created_at: new Date().toISOString()
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
-            toast.success('Card added');
+            toast.success('Row added successfully');
         }
     });
 
@@ -213,151 +270,86 @@ export default function DeveloperPortal() {
         mutationFn: (id) => base44.entities.DeveloperChangeLog.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
-            toast.success('Card deleted');
+            toast.success('Row deleted');
         }
     });
 
-    const sensors = useSensors(
-        useSensor(PointerSensor),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    );
-
-    const handleDragEnd = (event) => {
-        const { active, over } = event;
-        if (!over) return;
-
-        const activeCard = allCards.find(c => c.id === active.id);
-        const overCard = allCards.find(c => c.id === over.id);
-
-        if (!activeCard) return;
-
-        // Determine target section
-        let targetSection = activeCard.section_type;
-        if (overCard) {
-            targetSection = overCard.section_type;
-        }
-
-        const sectionCards = allCards.filter(c => c.section_type === targetSection);
-        const oldIndex = sectionCards.findIndex(c => c.id === active.id);
-        const newIndex = sectionCards.findIndex(c => c.id === over.id);
-
-        if (activeCard.section_type !== targetSection) {
-            // Moving to different section
-            updateMutation.mutate({ 
-                id: active.id, 
-                data: { section_type: targetSection, sort_order: newIndex }
-            });
-        } else if (oldIndex !== newIndex) {
-            // Reordering within same section
-            const reordered = arrayMove(sectionCards, oldIndex, newIndex);
-            reordered.forEach((card, index) => {
-                if (card.sort_order !== index) {
-                    updateMutation.mutate({ id: card.id, data: { sort_order: index } });
-                }
-            });
-        }
-    };
-
-    const handleUpdate = (id, data) => {
-        updateMutation.mutate({ id, data });
+    // Handlers
+    const handleUpdate = async (id, data) => {
+        return updateMutation.mutateAsync({ id, data });
     };
 
     const handleDelete = (id) => {
-        if (confirm('Delete this card?')) {
+        if (confirm('Permanently delete this row?')) {
             deleteMutation.mutate(id);
         }
     };
 
     const handleAdd = (section) => {
         createMutation.mutate({
-            title: 'New task...',
+            title: '',
             section_type: section,
+            category: 'Logic',
             priority: 'Medium',
             status: 'Pending',
-            sort_order: allCards.filter(c => c.section_type === section).length
+            description: ''
         });
     };
 
-    return (
-        <div className="space-y-6">
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-indigo-600 font-semibold mb-2">
-                        <Terminal className="w-5 h-5" />
-                        <span>Developer Portal</span>
-                    </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Change Management</h1>
-                    <p className="text-slate-500">Kanban workflow for tracking development tasks</p>
+    if (isLoading) {
+        return (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+                <div className="text-center">
+                    <p className="text-slate-900 font-bold">Loading Portal</p>
+                    <p className="text-slate-400 text-sm">Fetching change logs from the cloud...</p>
                 </div>
-                
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-                    <TabsList className="bg-slate-100 p-1">
-                        <TabsTrigger value="board" className="px-4 py-2 text-sm font-medium">Board View</TabsTrigger>
-                        <TabsTrigger value="management" className="px-4 py-2 text-sm font-medium">Management View</TabsTrigger>
-                    </TabsList>
-                </Tabs>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-100 pb-8">
+                <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-black uppercase tracking-widest border border-indigo-100">
+                        <Terminal className="w-3.5 h-3.5" />
+                        Internal System
+                    </div>
+                    <h1 className="text-5xl font-black text-slate-900 tracking-tighter">Developer Portal</h1>
+                    <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
+                        Streamlined, inline-editable management for all system changes, user requests, and CEO approvals.
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="text-right hidden md:block">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Signed in as</p>
+                        <p className="text-sm font-medium text-slate-700">{user?.email || 'Administrator'}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                        <Terminal className="w-5 h-5" />
+                    </div>
+                </div>
             </header>
 
-            <Tabs value={activeTab} className="w-full">
-                <TabsContent value="board" className="mt-0">
-                    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                        <div className="flex gap-4 overflow-x-auto pb-4">
-                            {SECTIONS.map(section => (
-                                <KanbanColumn 
-                                    key={section}
-                                    section={section}
-                                    cards={allCards.filter(c => c.section_type === section).sort((a, b) => a.sort_order - b.sort_order)}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                    onAdd={handleAdd}
-                                    onOpenNotes={setSelectedNotes}
-                                />
-                            ))}
-                        </div>
-                    </DndContext>
-                </TabsContent>
-                
-                <TabsContent value="management" className="mt-0">
-                    <ChangeManagement />
-                </TabsContent>
-            </Tabs>
+            <div className="grid grid-cols-1 gap-12">
+                {SECTIONS.map(section => (
+                    <SectionContainer 
+                        key={section}
+                        title={section}
+                        items={allRecords.filter(r => r.section_type === section)}
+                        onUpdate={handleUpdate}
+                        onDelete={handleDelete}
+                        onAdd={handleAdd}
+                    />
+                ))}
+            </div>
 
-            <Dialog open={!!selectedNotes} onOpenChange={() => setSelectedNotes(null)}>
-                <DialogContent className="sm:max-w-[700px]">
-                    <DialogHeader>
-                        <DialogTitle>Technical Notes</DialogTitle>
-                        <DialogDescription>Implementation details and prompts</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Textarea 
-                            className="min-h-[400px] font-mono text-sm bg-slate-900 text-slate-100 p-4 rounded-lg"
-                            placeholder="Add implementation notes..."
-                            value={selectedNotes?.technical_notes || ''}
-                            onChange={(e) => {
-                                const updated = { ...selectedNotes, technical_notes: e.target.value };
-                                setSelectedNotes(updated);
-                            }}
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button 
-                            onClick={() => {
-                                if (selectedNotes?.id) {
-                                    updateMutation.mutate({ 
-                                        id: selectedNotes.id, 
-                                        data: { technical_notes: selectedNotes.technical_notes } 
-                                    });
-                                }
-                                setSelectedNotes(null);
-                            }}
-                        >
-                            Save & Close
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <footer className="pt-20 pb-10 text-center border-t border-slate-100">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                    Powered by Base44 • Attendance Analyzer v4.0.0
+                </p>
+            </footer>
         </div>
     );
 }
