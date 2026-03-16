@@ -12,7 +12,11 @@ import {
     Loader2, 
     CheckCircle2, 
     AlertCircle,
-    ChevronDown
+    ChevronDown,
+    Search,
+    ArrowUpDown,
+    SortAsc,
+    SortDesc
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
@@ -135,7 +139,12 @@ const EditableRow = ({ item, onUpdate, onDelete }) => {
     );
 };
 
-const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
+const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd, sortConfig, onSort }) => {
+    const SortIcon = ({ column }) => {
+        if (sortConfig.key !== column) return <ArrowUpDown className="w-3 h-3 opacity-30 group-hover:opacity-100 transition-opacity" />;
+        return sortConfig.direction === 'asc' ? <SortAsc className="w-3 h-3 text-indigo-600" /> : <SortDesc className="w-3 h-3 text-indigo-600" />;
+    };
+
     return (
         <div className="space-y-3">
             <div className="flex items-center gap-3 px-1">
@@ -151,9 +160,30 @@ const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
                             <tr>
-                                <th className="px-3 py-3">Change</th>
-                                <th className="px-3 py-3">Priority</th>
-                                <th className="px-3 py-3">Status</th>
+                                <th 
+                                    className="px-3 py-3 cursor-pointer hover:bg-slate-100 transition-colors group select-none"
+                                    onClick={() => onSort('description')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Change <SortIcon column="description" />
+                                    </div>
+                                </th>
+                                <th 
+                                    className="px-3 py-3 cursor-pointer hover:bg-slate-100 transition-colors group select-none w-32"
+                                    onClick={() => onSort('priority')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Priority <SortIcon column="priority" />
+                                    </div>
+                                </th>
+                                <th 
+                                    className="px-3 py-3 cursor-pointer hover:bg-slate-100 transition-colors group select-none w-40"
+                                    onClick={() => onSort('status')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Status <SortIcon column="status" />
+                                    </div>
+                                </th>
                                 <th className="px-3 py-3 w-24 text-right">
                                     <Button 
                                         variant="ghost" 
@@ -183,8 +213,8 @@ const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
                             <div className="p-4 bg-slate-50 rounded-2xl mb-4">
                                 <Plus className="w-8 h-8 opacity-10" />
                             </div>
-                            <p className="text-sm italic font-medium">No {title} logged yet.</p>
-                            <p className="text-xs opacity-60">Click the + button in the header to add an entry.</p>
+                            <p className="text-sm italic font-medium">No results found.</p>
+                            <p className="text-xs opacity-60">Try adjusting your filters or click the + button to add an entry.</p>
                         </div>
                     )}
                 </div>
@@ -195,6 +225,12 @@ const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
 
 export default function ChangeTracker() {
     const queryClient = useQueryClient();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: 'description', direction: 'asc' });
+
+    // Weight maps for intelligent sorting
+    const priorityWeight = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
+    const statusWeight = { 'Pending': 1, 'In Progress': 2, 'Frozen': 3, 'Completed': 4 };
 
     // Data Fetching
     const { data: user } = useQuery({
@@ -204,7 +240,7 @@ export default function ChangeTracker() {
 
     const { data: allRecords = [], isLoading } = useQuery({
         queryKey: ['developerChangeRequests'],
-        queryFn: () => base44.entities.DeveloperChangeLog.list('-created_at')
+        queryFn: () => base44.entities.DeveloperChangeLog.list()
     });
 
     // Mutations
@@ -257,6 +293,51 @@ export default function ChangeTracker() {
         });
     };
 
+    const handleSort = (key) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    // Filter and Sort Logic
+    const processedRecords = React.useMemo(() => {
+        let result = [...allRecords];
+
+        // Search Filter
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            result = result.filter(r => 
+                (r.description || '').toLowerCase().includes(query) ||
+                (r.section_type || '').toLowerCase().includes(query)
+            );
+        }
+
+        // Sorting
+        result.sort((a, b) => {
+            let valA = a[sortConfig.key];
+            let valB = b[sortConfig.key];
+
+            // Custom weights for specific columns
+            if (sortConfig.key === 'priority') {
+                valA = priorityWeight[valA] || 0;
+                valB = priorityWeight[valB] || 0;
+            } else if (sortConfig.key === 'status') {
+                valA = statusWeight[valA] || 0;
+                valB = statusWeight[valB] || 0;
+            } else {
+                valA = (valA || '').toString().toLowerCase();
+                valB = (valB || '').toString().toLowerCase();
+            }
+
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return result;
+    }, [allRecords, searchQuery, sortConfig]);
+
     if (isLoading) {
         return (
             <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
@@ -282,10 +363,15 @@ export default function ChangeTracker() {
                         Streamlined, inline-editable management for all system changes, user requests, and CEO approvals.
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="text-right hidden md:block">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Signed in as</p>
-                        <p className="text-sm font-medium text-slate-700">{user?.email || 'Administrator'}</p>
+                <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                    <div className="relative w-full md:w-64 group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                        <Input 
+                            placeholder="Search changes..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white transition-all text-sm rounded-xl"
+                        />
                     </div>
                     <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
                         <Terminal className="w-5 h-5" />
@@ -300,10 +386,12 @@ export default function ChangeTracker() {
                     <SectionContainer 
                         key={section}
                         title={section}
-                        items={allRecords.filter(r => r.section_type === section)}
+                        items={processedRecords.filter(r => r.section_type === section)}
                         onUpdate={handleUpdate}
                         onDelete={handleDelete}
                         onAdd={handleAdd}
+                        sortConfig={sortConfig}
+                        onSort={handleSort}
                     />
                 ))}
             </div>
