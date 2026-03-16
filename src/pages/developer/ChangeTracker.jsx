@@ -15,6 +15,7 @@ import {
     ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -26,7 +27,6 @@ import { cn } from '@/lib/utils';
 
 // --- Constants ---
 const SECTIONS = ["Changes", "User Requests", "CEO Approval"];
-const CATEGORIES = ["Logic", "UI", "Architecture"];
 const PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const STATUSES = ["Pending", "In Progress", "Frozen", "Completed"];
 
@@ -48,8 +48,6 @@ const EditableRow = ({ item, onUpdate, onDelete }) => {
         const currentData = updatedField ? { ...localItem, ...updatedField } : localItem;
         
         const hasChanged = 
-            currentData.title !== item.title ||
-            currentData.category !== item.category ||
             currentData.priority !== item.priority ||
             currentData.status !== item.status ||
             currentData.description !== item.description;
@@ -63,49 +61,24 @@ const EditableRow = ({ item, onUpdate, onDelete }) => {
             setHasError(false);
         } catch (error) {
             setHasError(true);
-            // Revert local state to last known good state if save fails? 
-            // Or keep it so user can fix and retry. User asked for retry capability.
-            toast.error(`Auto-save failed: ${item.title || 'Untitled'}`);
+            toast.error(`Auto-save failed`);
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.target.blur();
-        }
-    };
-
     return (
         <tr className="hover:bg-slate-50/80 transition-colors group border-b border-slate-100 last:border-0">
-            <td className="p-1 w-[25%]">
-                <Input 
-                    value={localItem.title || ''} 
-                    onChange={(e) => handleChange('title', e.target.value)}
+            <td className="p-2 flex-1 min-w-[400px]">
+                <Textarea 
+                    value={localItem.description || ''} 
+                    onChange={(e) => handleChange('description', e.target.value)}
                     onBlur={() => handleSave()}
-                    onKeyDown={handleKeyDown}
-                    className="h-8 text-sm bg-transparent border-transparent hover:border-slate-200 focus:bg-white focus:border-slate-300 shadow-none focus:ring-0 px-2"
-                    placeholder="Title..."
+                    className="min-h-[60px] w-full text-sm bg-transparent border-transparent hover:border-slate-200 focus:bg-white focus:border-slate-300 shadow-none focus:ring-0 px-2 py-1.5 resize-y transition-all"
+                    placeholder="Describe the change..."
                 />
             </td>
-            <td className="p-1 w-32">
-                <Select 
-                    value={localItem.category || "Logic"} 
-                    onValueChange={(v) => {
-                        handleChange('category', v);
-                        handleSave({ category: v });
-                    }}
-                >
-                    <SelectTrigger className="h-8 text-xs border-transparent hover:border-slate-200 bg-transparent focus:ring-0 shadow-none px-2">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {CATEGORIES.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </td>
-            <td className="p-1 w-32">
+            <td className="p-2 w-32 align-top pt-3">
                 <Select 
                     value={localItem.priority || "Medium"} 
                     onValueChange={(v) => {
@@ -121,7 +94,7 @@ const EditableRow = ({ item, onUpdate, onDelete }) => {
                     </SelectContent>
                 </Select>
             </td>
-            <td className="p-1 w-40">
+            <td className="p-2 w-40 align-top pt-3">
                 <Select 
                     value={localItem.status || "Pending"} 
                     onValueChange={(v) => {
@@ -137,17 +110,7 @@ const EditableRow = ({ item, onUpdate, onDelete }) => {
                     </SelectContent>
                 </Select>
             </td>
-            <td className="p-1 flex-1">
-                <Input 
-                    value={localItem.description || ''} 
-                    onChange={(e) => handleChange('description', e.target.value)}
-                    onBlur={() => handleSave()}
-                    onKeyDown={handleKeyDown}
-                    className="h-8 text-sm bg-transparent border-transparent hover:border-slate-200 focus:bg-white focus:border-slate-300 shadow-none focus:ring-0 px-2 text-slate-500"
-                    placeholder="Description..."
-                />
-            </td>
-            <td className="p-1 w-20 text-right">
+            <td className="p-2 w-20 text-right align-top pt-3">
                 <div className="flex items-center justify-end gap-1.5 px-2">
                     <div className="min-w-[14px]">
                         {isSaving ? (
@@ -188,12 +151,19 @@ const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
                             <tr>
-                                <th className="px-3 py-2">Title</th>
-                                <th className="px-3 py-2">Category</th>
-                                <th className="px-3 py-2">Priority</th>
-                                <th className="px-3 py-2">Status</th>
-                                <th className="px-3 py-2">Description</th>
-                                <th className="px-3 py-2 w-20 text-right"></th>
+                                <th className="px-3 py-3">Change</th>
+                                <th className="px-3 py-3">Priority</th>
+                                <th className="px-3 py-3">Status</th>
+                                <th className="px-3 py-3 w-24 text-right">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
+                                        onClick={() => onAdd(title)}
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </Button>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -214,19 +184,10 @@ const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd }) => {
                                 <Plus className="w-8 h-8 opacity-10" />
                             </div>
                             <p className="text-sm italic font-medium">No {title} logged yet.</p>
-                            <p className="text-xs opacity-60">Click the button below to add your first entry.</p>
+                            <p className="text-xs opacity-60">Click the + button in the header to add an entry.</p>
                         </div>
                     )}
                 </div>
-                
-                <Button 
-                    variant="ghost" 
-                    className="w-full h-10 rounded-none border-t border-slate-50 hover:bg-slate-50/50 text-indigo-600 text-xs font-bold gap-2"
-                    onClick={() => onAdd(title)}
-                >
-                    <Plus className="w-4 h-4" />
-                    New {title.slice(0, -1)} Entry
-                </Button>
             </Card>
         </div>
     );
@@ -287,7 +248,7 @@ export default function ChangeTracker() {
 
     const handleAdd = (section) => {
         createMutation.mutate({
-            title: '',
+            title: 'Request',
             section_type: section,
             category: 'Logic',
             priority: 'Medium',

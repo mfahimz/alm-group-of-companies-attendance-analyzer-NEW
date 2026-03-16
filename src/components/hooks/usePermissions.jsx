@@ -96,8 +96,8 @@ export const usePermissions = () => {
         const pageConfig = getPageConfig(pageName);
         if (!pageConfig) return false;
 
-        // SPECIAL CASE: DeveloperPortal is always accessible to admins
-        if (pageName === 'DeveloperPortal' && userRole === 'admin') return true;
+        // SPECIAL CASE: ChangeTracker is always accessible to admins
+        if (pageName === 'ChangeTracker' && userRole === 'admin') return true;
 
         // ONLY show pages that exist in PagePermission entity
         const permission = pagePermissions.find(p => p.page_name === pageName);
