@@ -36,6 +36,16 @@
             "required": false,
             "description": "Implementation prompts, code pointers, and technical constraints."
         },
+        "section_type": {
+            "type": "string",
+            "required": false,
+            "description": "Kanban column the card belongs to. Used by DeveloperPortal.jsx to group cards into board columns (e.g. Changes, User Requests, CEO Approval)."
+        },
+        "sort_order": {
+            "type": "number",
+            "required": false,
+            "description": "Card position within its Kanban column. Used by DeveloperPortal.jsx to maintain drag-and-drop ordering within a section."
+        },
         "implemented_by": {
             "type": "string",
             "required": false,
