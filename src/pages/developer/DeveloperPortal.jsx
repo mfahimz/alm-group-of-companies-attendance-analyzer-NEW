@@ -1,12 +1,3 @@
-// FIX 4: Moved from src/pages/developer/DeveloperPortal.jsx to src/pages/DeveloperPortal.jsx.
-// AI_RULES.md Rule 4 explicitly prohibits subfolders inside src/pages/. The previous location
-// at src/pages/developer/ violated this constraint. App.jsx import path updated to match.
-//
-// FIX 2: ChangeManagement component was an orphaned dead component — it was never imported
-// or rendered anywhere in the application. It is now integrated here via a tab toggle so
-// users can access both the Kanban board view and the structured Change Requests form view
-// from within the Developer Portal page.
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -21,9 +12,6 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-// FIX 2: Imported ChangeManagement so it is rendered within the Developer Portal.
-// Previously ChangeManagement.jsx existed but was never imported or rendered anywhere in the app.
-import ChangeManagement from '@/components/developer/ChangeManagement';
 
 const SECTIONS = ["Changes", "User Requests", "CEO Approval"];
 const PRIORITIES = ["Low", "Medium", "High", "Critical"];
@@ -93,7 +81,7 @@ function KanbanCard({ card, onUpdate, onDelete, onOpenNotes }) {
                                     onClick={(e) => e.stopPropagation()}
                                 />
                             ) : (
-                                <p
+                                <p 
                                     className="text-sm text-slate-800 cursor-text whitespace-pre-wrap"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -104,9 +92,9 @@ function KanbanCard({ card, onUpdate, onDelete, onOpenNotes }) {
                                 </p>
                             )}
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
                             className="h-6 w-6 text-slate-400 hover:text-red-600"
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -120,9 +108,9 @@ function KanbanCard({ card, onUpdate, onDelete, onOpenNotes }) {
                         <PriorityBadge priority={card.priority} />
                         <StatusBadge status={card.status} />
                         {card.technical_notes && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
                                 className="h-6 px-2 text-slate-500"
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -142,7 +130,7 @@ function KanbanCard({ card, onUpdate, onDelete, onOpenNotes }) {
 function KanbanColumn({ section, cards, onUpdate, onDelete, onAdd, onOpenNotes }) {
     return (
         <div className="flex-1 min-w-[320px]">
-            <div className="bg-slate-100 rounded-lg p-4 h-[calc(100vh-360px)]">
+            <div className="bg-slate-100 rounded-lg p-4 h-[calc(100vh-280px)]">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-slate-800">{section}</h3>
                     <Badge variant="secondary" className="text-xs">{cards.length}</Badge>
@@ -150,9 +138,9 @@ function KanbanColumn({ section, cards, onUpdate, onDelete, onAdd, onOpenNotes }
                 <div className="space-y-2 overflow-y-auto h-[calc(100%-60px)] pr-2">
                     <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
                         {cards.map((card) => (
-                            <KanbanCard
-                                key={card.id}
-                                card={card}
+                            <KanbanCard 
+                                key={card.id} 
+                                card={card} 
                                 onUpdate={onUpdate}
                                 onDelete={onDelete}
                                 onOpenNotes={onOpenNotes}
@@ -160,9 +148,9 @@ function KanbanColumn({ section, cards, onUpdate, onDelete, onAdd, onOpenNotes }
                         ))}
                     </SortableContext>
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
+                <Button 
+                    variant="outline" 
+                    size="sm" 
                     className="w-full mt-2"
                     onClick={() => onAdd(section)}
                 >
@@ -176,9 +164,6 @@ function KanbanColumn({ section, cards, onUpdate, onDelete, onAdd, onOpenNotes }
 export default function DeveloperPortal() {
     const queryClient = useQueryClient();
     const [selectedNotes, setSelectedNotes] = useState(null);
-    // FIX 2: activeTab controls which view is shown — 'kanban' or 'requests'.
-    // 'requests' renders the ChangeManagement component which was previously orphaned.
-    const [activeTab, setActiveTab] = useState('kanban');
 
     const { data: user } = useQuery({
         queryKey: ['currentUser'],
@@ -257,8 +242,8 @@ export default function DeveloperPortal() {
 
         if (activeCard.section_type !== targetSection) {
             // Moving to different section
-            updateMutation.mutate({
-                id: active.id,
+            updateMutation.mutate({ 
+                id: active.id, 
                 data: { section_type: targetSection, sort_order: newIndex }
             });
         } else if (oldIndex !== newIndex) {
@@ -303,87 +288,58 @@ export default function DeveloperPortal() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Change Management</h1>
                     <p className="text-slate-500">Kanban workflow for tracking development tasks</p>
                 </div>
-                {/* FIX 2: Tab toggle to switch between Kanban board and Change Requests form view.
-                    The Change Requests tab renders ChangeManagement which was previously orphaned. */}
-                <div className="bg-slate-100 p-1 rounded-lg flex items-center gap-1 border border-slate-200">
-                    <Button
-                        variant={activeTab === 'kanban' ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="h-8 text-xs font-semibold"
-                        onClick={() => setActiveTab('kanban')}
-                    >
-                        Kanban Board
-                    </Button>
-                    <Button
-                        variant={activeTab === 'requests' ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="h-8 text-xs font-semibold"
-                        onClick={() => setActiveTab('requests')}
-                    >
-                        Change Requests
-                    </Button>
-                </div>
             </header>
 
-            {/* FIX 2: Conditionally render either the Kanban board or the ChangeManagement component */}
-            {activeTab === 'kanban' ? (
-                <>
-                    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                        <div className="flex gap-4 overflow-x-auto pb-4">
-                            {SECTIONS.map(section => (
-                                <KanbanColumn
-                                    key={section}
-                                    section={section}
-                                    cards={allCards.filter(c => c.section_type === section).sort((a, b) => a.sort_order - b.sort_order)}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                    onAdd={handleAdd}
-                                    onOpenNotes={setSelectedNotes}
-                                />
-                            ))}
-                        </div>
-                    </DndContext>
+            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                    {SECTIONS.map(section => (
+                        <KanbanColumn 
+                            key={section}
+                            section={section}
+                            cards={allCards.filter(c => c.section_type === section).sort((a, b) => a.sort_order - b.sort_order)}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            onAdd={handleAdd}
+                            onOpenNotes={setSelectedNotes}
+                        />
+                    ))}
+                </div>
+            </DndContext>
 
-                    <Dialog open={!!selectedNotes} onOpenChange={() => setSelectedNotes(null)}>
-                        <DialogContent className="sm:max-w-[700px]">
-                            <DialogHeader>
-                                <DialogTitle>Technical Notes</DialogTitle>
-                                <DialogDescription>Implementation details and prompts</DialogDescription>
-                            </DialogHeader>
-                            <div className="py-4">
-                                <Textarea
-                                    className="min-h-[400px] font-mono text-sm bg-slate-900 text-slate-100 p-4 rounded-lg"
-                                    placeholder="Add implementation notes..."
-                                    value={selectedNotes?.technical_notes || ''}
-                                    onChange={(e) => {
-                                        const updated = { ...selectedNotes, technical_notes: e.target.value };
-                                        setSelectedNotes(updated);
-                                    }}
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    onClick={() => {
-                                        if (selectedNotes?.id) {
-                                            updateMutation.mutate({
-                                                id: selectedNotes.id,
-                                                data: { technical_notes: selectedNotes.technical_notes }
-                                            });
-                                        }
-                                        setSelectedNotes(null);
-                                    }}
-                                >
-                                    Save & Close
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </>
-            ) : (
-                // FIX 2: ChangeManagement is now rendered here. It uses DeveloperChangeLog
-                // (fixed in ChangeManagement.jsx) so both views read from the same entity.
-                <ChangeManagement />
-            )}
+            <Dialog open={!!selectedNotes} onOpenChange={() => setSelectedNotes(null)}>
+                <DialogContent className="sm:max-w-[700px]">
+                    <DialogHeader>
+                        <DialogTitle>Technical Notes</DialogTitle>
+                        <DialogDescription>Implementation details and prompts</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Textarea 
+                            className="min-h-[400px] font-mono text-sm bg-slate-900 text-slate-100 p-4 rounded-lg"
+                            placeholder="Add implementation notes..."
+                            value={selectedNotes?.technical_notes || ''}
+                            onChange={(e) => {
+                                const updated = { ...selectedNotes, technical_notes: e.target.value };
+                                setSelectedNotes(updated);
+                            }}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button 
+                            onClick={() => {
+                                if (selectedNotes?.id) {
+                                    updateMutation.mutate({ 
+                                        id: selectedNotes.id, 
+                                        data: { technical_notes: selectedNotes.technical_notes } 
+                                    });
+                                }
+                                setSelectedNotes(null);
+                            }}
+                        >
+                            Save & Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
