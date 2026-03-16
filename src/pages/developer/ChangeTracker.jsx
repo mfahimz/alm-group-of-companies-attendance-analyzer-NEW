@@ -72,7 +72,10 @@ const EditableRow = ({ item, onUpdate, onDelete }) => {
     };
 
     return (
-        <tr className="hover:bg-slate-50/80 transition-colors group border-b border-slate-100 last:border-0">
+        <tr className={cn(
+            "hover:bg-slate-50/80 transition-colors group border-b border-slate-100 last:border-0",
+            localItem.status === 'Completed' && "bg-emerald-50/60 hover:bg-emerald-100/60"
+        )}>
             <td className="p-2 flex-1 min-w-[400px]">
                 <Textarea 
                     value={localItem.description || ''} 
@@ -315,6 +318,14 @@ export default function ChangeTracker() {
 
         // Sorting
         result.sort((a, b) => {
+            // Rule 1: 'Completed' tasks are always pinned to the bottom
+            const isACompleted = a.status === 'Completed';
+            const isBCompleted = b.status === 'Completed';
+
+            if (isACompleted && !isBCompleted) return 1;
+            if (!isACompleted && isBCompleted) return -1;
+
+            // Rule 2: Normal sorting logic for non-completed items (or between two completed items)
             let valA = a[sortConfig.key];
             let valB = b[sortConfig.key];
 
