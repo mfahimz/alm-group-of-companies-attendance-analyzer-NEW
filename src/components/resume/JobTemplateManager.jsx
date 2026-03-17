@@ -31,12 +31,26 @@ const EMPTY_TEMPLATE = {
  */
 
 function TemplateForm({ template, onSave, onCancel, isSaving, companies }) {
-    const [form, setForm] = useState(() => ({ ...EMPTY_TEMPLATE, ...template }));
+    // Utility to ensure company is always a string even if stored as object in legacy records
+    const normalizeCompany = (t) => {
+        if (!t?.company) return '';
+        return typeof t.company === 'string' ? t.company : (t.company?.name || '');
+    };
+
+    const [form, setForm] = useState(() => ({ 
+        ...EMPTY_TEMPLATE, 
+        ...template,
+        company: normalizeCompany(template)
+    }));
     
     // Support switching between templates while form is open
     useEffect(() => {
         if (template) {
-            setForm({ ...EMPTY_TEMPLATE, ...template });
+            setForm({ 
+                ...EMPTY_TEMPLATE, 
+                ...template,
+                company: normalizeCompany(template)
+            });
         } else {
             setForm(EMPTY_TEMPLATE);
         }
@@ -364,14 +378,9 @@ export default function JobTemplateManager() {
             const { id, created_date, updated_date, ...rest } = data;
             const me = await base44.auth.me();
             
-            // Find the selected company object to get its stable ID (if any)
-            const selectedCompany = companies.find(c => c.name === data.company);
-            
             const payload = {
                 ...rest,
-                company: (data.company || '').trim(), // Company name string
-                company_name: (data.company || '').trim(), // Alias for compatibility
-                company_id: selectedCompany?.id || '', // Company GUID relation
+                company: (data.company || '').trim(),
                 min_experience_years: data.min_experience_years !== '' ? parseFloat(data.min_experience_years) || 0 : 0,
                 updated_at: new Date().toISOString()
             };
