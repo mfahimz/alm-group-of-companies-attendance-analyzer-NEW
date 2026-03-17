@@ -8,9 +8,12 @@ import {
     Trash2, 
     Building2, 
     Users, 
-    Loader2 
+    Loader2,
+    FileDown,
+    Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 // Statuses remain static as they are part of the business workflow, 
 // but Companies are now fetched live from the Company entity.
@@ -90,6 +93,10 @@ function InlineRoleRow({ role, onSave, onDelete, companies }) {
 export default function CompanyRoleManager() {
     const qc = useQueryClient();
 
+    const [isAdding, setIsAdding] = useState(false);
+    const [newRole, setNewRole] = useState({ role_title: '', company: '', status: 'Open' });
+    const fileInputRef = React.useRef(null);
+
     const { data: roles = [], isLoading } = useQuery({
         queryKey: ['companyRoles'],
         queryFn: () => base44.entities.CompanyRoleMaster.list('-created_at', 1000)
@@ -103,31 +110,28 @@ export default function CompanyRoleManager() {
     const companies = companiesRaw.filter(c => c.active);
 
     const createMutation = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (roleData) => {
             const me = await base44.auth.me();
-            if (!companies[0]?.name) {
-                throw new Error('No active companies available to assign a role.');
-            }
             return base44.entities.CompanyRoleMaster.create({
-                role_title: 'New Role',
-                company: companies[0]?.name,
-                status: 'Open',
+                ...roleData,
                 created_by: me?.email || 'System',
                 created_at: new Date().toISOString()
             });
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['companyRoles'] });
-            toast.success('Role added');
+            setIsAdding(false);
+            setNewRole({ role_title: '', company: '', status: 'Open' });
+            toast.success('Role added successfully');
         },
-        onError: (err) => {
-            toast.error('Failed to add role: ' + err.message);
-            console.error('Role creation error:', err);
-        }
+        onError: (err) => toast.error('Failed to add role: ' + err.message)
     });
 
     const updateMutation = useMutation({
-        mutationFn: (role) => base44.entities.CompanyRoleMaster.update(role.id, role),
+        mutationFn: (role) => {
+            const { id, created_by, created_at, ...fields } = role;
+            return base44.entities.CompanyRoleMaster.update(id, fields);
+        },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['companyRoles'] });
         },
@@ -142,11 +146,85 @@ export default function CompanyRoleManager() {
         }
     });
 
+    // Inline row logic: Handle manual save of the new role row shown at the top
+    const handleSaveNewRole = () => {
+        if (!newRole.role_title.trim()) { toast.error('Role title is required'); return; }
+        if (!newRole.company) { toast.error('Company is required'); return; }
+        createMutation.mutate(newRole);
+    };
+
+    // Excel import mapping logic: Parse file, match company names, and create records
+    const handleImportExcel = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet);
+
+                if (rows.length === 0) {
+                    toast.error('The selected Excel file has no data.');
+                    return;
+                }
+
+                let imported = 0;
+                let skipped = [];
+                const me = await base44.auth.me();
+                const userEmail = me?.email || 'System';
+
+                for (const row of rows) {
+                    const title = row['Role Title'] || row['role title'];
+                    const company = row['Company'] || row['company'];
+
+                    if (!title || !company) {
+                        skipped.push('Missing required columns (Role Title/Company)');
+                        continue;
+                    }
+
+                    const matched = companies.find(c => 
+                        c.name.trim().toLowerCase() === company.trim().toLowerCase()
+                    );
+
+                    if (matched) {
+                        await base44.entities.CompanyRoleMaster.create({
+                            role_title: title.trim(),
+                            company: matched.name,
+                            status: 'Open',
+                            created_by: userEmail,
+                            created_at: new Date().toISOString()
+                        });
+                        imported++;
+                    } else {
+                        skipped.push(`"${company}" company not matched`);
+                    }
+                }
+
+                qc.invalidateQueries({ queryKey: ['companyRoles'] });
+                if (imported > 0) toast.success(`Successfully imported ${imported} roles`);
+                if (skipped.length > 0) {
+                    const uniqueSkipped = Array.from(new Set(skipped));
+                    toast.warning(`Skipped ${skipped.length} rows. Reasons: ${uniqueSkipped.join(', ')}`);
+                }
+                if (imported === 0) toast.error('No roles match active companies. Nothing imported.');
+            } catch (err) {
+                toast.error('Failed to parse Excel file: ' + err.message);
+            }
+        };
+        reader.readAsBinaryString(file);
+        e.target.value = ''; // Reset input to allow re-selecting same file
+    };
+
     const groupedRoles = useMemo(() => {
         const groups = {};
         companies.forEach(c => groups[c.name] = []);
         roles.forEach(r => {
-            if (groups[r.company]) groups[r.company].push(r);
+            if (groups[r.company]) {
+                groups[r.company].push(r);
+            }
         });
         return groups;
     }, [roles, companies]);
@@ -158,15 +236,94 @@ export default function CompanyRoleManager() {
                     <h2 className="text-xl font-bold text-slate-900">Company Roles Master</h2>
                     <p className="text-sm text-slate-500">Define active and future roles per company.</p>
                 </div>
-                <Button 
-                    onClick={() => createMutation.mutate()} 
-                    disabled={createMutation.isPending}
-                    className="bg-[#0F1E36] hover:bg-[#1a3a5a]"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Role
-                </Button>
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept=".xlsx" 
+                        onChange={handleImportExcel} 
+                    />
+                    <Button 
+                        variant="outline"
+                        onClick={() => fileInputRef.current.click()}
+                        className="border-slate-300 text-slate-700"
+                    >
+                        <FileDown className="w-4 h-4 mr-2" />
+                        Import from Excel
+                    </Button>
+                    <Button 
+                        onClick={() => setIsAdding(true)} 
+                        disabled={isAdding}
+                        className="bg-[#0F1E36] hover:bg-[#1a3a5a]"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Role
+                    </Button>
+                </div>
             </div>
+
+            {isAdding && (
+                <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden shadow-sm ring-1 ring-indigo-50 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="bg-indigo-50 px-4 py-2 flex items-center gap-2 border-b border-indigo-100">
+                        <Plus className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Configure New Role</span>
+                    </div>
+                    <table className="w-full text-left">
+                        <tbody className="bg-indigo-50/20">
+                            <tr>
+                                <td className="py-4 px-4">
+                                    <Input 
+                                        value={newRole.role_title} 
+                                        onChange={e => setNewRole({...newRole, role_title: e.target.value})}
+                                        placeholder="Enter role title..."
+                                        className="h-10 bg-white border-indigo-100 focus:border-indigo-400"
+                                    />
+                                </td>
+                                <td className="py-4 px-4 w-1/4">
+                                    <select 
+                                        value={newRole.company} 
+                                        onChange={e => setNewRole({...newRole, company: e.target.value})}
+                                        className="h-10 w-full rounded-md border border-indigo-100 text-sm px-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="">Select Company...</option>
+                                        {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                </td>
+                                <td className="py-4 px-4 w-1/5">
+                                    <select 
+                                        value={newRole.status} 
+                                        onChange={e => setNewRole({...newRole, status: e.target.value})}
+                                        className="h-10 w-full rounded-md border border-indigo-100 text-sm px-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </td>
+                                <td className="py-4 px-4 text-right w-40 whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            onClick={() => setIsAdding(false)}
+                                            className="text-slate-500 hover:text-slate-700"
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button 
+                                            size="sm" 
+                                            onClick={handleSaveNewRole} 
+                                            disabled={createMutation.isPending}
+                                            className="bg-indigo-600 hover:bg-indigo-700"
+                                        >
+                                            {createMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Role'}
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {isLoading ? (
                 <div className="py-20 text-center">

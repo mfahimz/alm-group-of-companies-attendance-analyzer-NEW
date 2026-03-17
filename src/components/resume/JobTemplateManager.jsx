@@ -342,11 +342,30 @@ export default function JobTemplateManager() {
     const companies = companiesRaw.filter(c => c.active);
 
     const saveMutation = useMutation({
+        // FIX: The company field fix involves explicitly mapping fields to avoid sending read-only 
+        // system fields (like created_date) which can cause the platform to reject the save or 
+        // fail to persist correctly. By selecting only the defined schema fields, we ensure 
+        // reliable persistence and proper reloading of the company value.
         mutationFn: (data) => {
-            const { id, ...fields } = data;
+            const { id } = data;
+            const fieldsToSave = {
+                position_name: data.position_name,
+                department: data.department,
+                company: data.company,
+                min_experience_years: data.min_experience_years,
+                required_education: data.required_education,
+                required_skills: data.required_skills,
+                preferred_skills: data.preferred_skills,
+                required_certifications: data.required_certifications,
+                required_languages: data.required_languages,
+                industry_experience: data.industry_experience,
+                notes: data.notes,
+                is_active: data.is_active !== undefined ? data.is_active : true,
+                mandatory_rules: data.mandatory_rules || []
+            };
             return id
-                ? base44.entities.JobTemplate.update(id, fields)
-                : base44.entities.JobTemplate.create(fields);
+                ? base44.entities.JobTemplate.update(id, fieldsToSave)
+                : base44.entities.JobTemplate.create(fieldsToSave);
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['jobTemplates'] });
