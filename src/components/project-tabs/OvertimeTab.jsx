@@ -19,7 +19,7 @@ import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
  * Handles the display of total and the popover for multiple entries
  */
 function EntryCell({ value, onSave, title, disabled }) {
-    const entries = Array.isArray(value) ? value : (value ? [{ amount: parseFloat(value), desc: 'Initial' }] : []);
+    const entries = Array.isArray(value) ? value : (value ? [{ amount: parseFloat(value), desc: '' }] : []);
     const total = entries.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
     
     const [localEntries, setLocalEntries] = useState(entries);
@@ -270,6 +270,26 @@ export default function OvertimeTab({ project }) {
                 String(s.attendance_id) === String(emp.attendance_id)
             );
 
+            // Helper to parse adjustment data from DB into structured entries array
+            const loadAdjustment = (dbValue) => {
+                if (!dbValue) return [];
+                if (Array.isArray(dbValue)) return dbValue;
+                
+                // Attempt to parse JSON stringified array of entries (preserves descriptions)
+                if (typeof dbValue === 'string' && (dbValue.trim().startsWith('[') || dbValue.trim().startsWith('{'))) {
+                    try {
+                        const parsed = JSON.parse(dbValue);
+                        if (Array.isArray(parsed)) return parsed;
+                    } catch (e) {
+                        // Not valid JSON, fall back to numeric parsing
+                    }
+                }
+                
+                // Fallback for numeric values or plain strings (no fallback description like "Imported")
+                const num = parseFloat(dbValue);
+                return (isNaN(num) || num === 0) ? [] : [{ amount: num, desc: '' }];
+            };
+
             return {
                 hrms_id: emp.hrms_id,
                 attendance_id: emp.attendance_id,
@@ -278,15 +298,15 @@ export default function OvertimeTab({ project }) {
                 normalOtHours: editableData[emp.attendance_id]?.normalOtHours ?? otRecord?.normalOtHours ?? 0,
                 specialOtHours: editableData[emp.attendance_id]?.specialOtHours ?? otRecord?.specialOtHours ?? 0,
                 otRecordId: otRecord?.id,
-                // Adjustment fields from OvertimeData (editable anytime) or SalarySnapshot (after finalization)
+                // Adjustment fields from OvertimeData (stores JSON to preserve descriptions) or SalarySnapshot (numeric sum for payroll)
                 snapshotId: snapshot?.id,
                 attendanceSource: snapshot?.attendance_source || null,
-                bonus: editableAdjustments[emp.attendance_id]?.bonus ?? (Array.isArray(snapshot?.bonus) ? snapshot.bonus : (snapshot?.bonus ? [{amount: snapshot.bonus, desc: 'Imported'}] : (Array.isArray(otRecord?.bonus) ? otRecord.bonus : (otRecord?.bonus ? [{amount: otRecord.bonus, desc: 'Imported'}] : [])))),
-                incentive: editableAdjustments[emp.attendance_id]?.incentive ?? (Array.isArray(snapshot?.incentive) ? snapshot.incentive : (snapshot?.incentive ? [{amount: snapshot.incentive, desc: 'Imported'}] : (Array.isArray(otRecord?.incentive) ? otRecord.incentive : (otRecord?.incentive ? [{amount: otRecord.incentive, desc: 'Imported'}] : [])))),
-                open_leave_salary: editableAdjustments[emp.attendance_id]?.open_leave_salary ?? (Array.isArray(snapshot?.open_leave_salary) ? snapshot.open_leave_salary : (snapshot?.open_leave_salary ? [{amount: snapshot.open_leave_salary, desc: 'Imported'}] : (Array.isArray(otRecord?.open_leave_salary) ? otRecord.open_leave_salary : (otRecord?.open_leave_salary ? [{amount: otRecord.open_leave_salary, desc: 'Imported'}] : [])))),
-                variable_salary: editableAdjustments[emp.attendance_id]?.variable_salary ?? (Array.isArray(snapshot?.variable_salary) ? snapshot.variable_salary : (snapshot?.variable_salary ? [{amount: snapshot.variable_salary, desc: 'Imported'}] : (Array.isArray(otRecord?.variable_salary) ? otRecord.variable_salary : (otRecord?.variable_salary ? [{amount: otRecord.variable_salary, desc: 'Imported'}] : [])))),
-                otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? (Array.isArray(snapshot?.otherDeduction) ? snapshot.otherDeduction : (snapshot?.otherDeduction ? [{amount: snapshot.otherDeduction, desc: 'Imported'}] : (Array.isArray(otRecord?.otherDeduction) ? otRecord.otherDeduction : (otRecord?.otherDeduction ? [{amount: otRecord.otherDeduction, desc: 'Imported'}] : [])))),
-                advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? (Array.isArray(snapshot?.advanceSalaryDeduction) ? snapshot.advanceSalaryDeduction : (snapshot?.advanceSalaryDeduction ? [{amount: snapshot.advanceSalaryDeduction, desc: 'Imported'}] : (Array.isArray(otRecord?.advanceSalaryDeduction) ? otRecord.advanceSalaryDeduction : (otRecord?.advanceSalaryDeduction ? [{amount: otRecord.advanceSalaryDeduction, desc: 'Imported'}] : []))))
+                bonus: editableAdjustments[emp.attendance_id]?.bonus ?? loadAdjustment(otRecord?.bonus ?? snapshot?.bonus),
+                incentive: editableAdjustments[emp.attendance_id]?.incentive ?? loadAdjustment(otRecord?.incentive ?? snapshot?.incentive),
+                open_leave_salary: editableAdjustments[emp.attendance_id]?.open_leave_salary ?? loadAdjustment(otRecord?.open_leave_salary ?? snapshot?.open_leave_salary),
+                variable_salary: editableAdjustments[emp.attendance_id]?.variable_salary ?? loadAdjustment(otRecord?.variable_salary ?? snapshot?.variable_salary),
+                otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? loadAdjustment(otRecord?.otherDeduction ?? snapshot?.otherDeduction),
+                advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? loadAdjustment(otRecord?.advanceSalaryDeduction ?? snapshot?.advanceSalaryDeduction)
             };
         });
     }, [employees, overtimeRecords, editableData, editableAdjustments, salarySnapshots, project?.custom_employee_ids, isAlMaraghiMotors]);
@@ -399,13 +419,13 @@ export default function OvertimeTab({ project }) {
                     // Flatten arrays to single numeric sums for backend compatibility
                     normalOtHours: flattenToSum(edits.normalOtHours ?? persistedOtRecord?.normalOtHours ?? 0, 'Normal OT', employee.name),
                     specialOtHours: flattenToSum(edits.specialOtHours ?? persistedOtRecord?.specialOtHours ?? 0, 'Special OT', employee.name),
-                    // Preserve and flatten existing adjustment values when saving OT
-                    bonus: flattenToSum(employee.bonus, 'Bonus', employee.name),
-                    incentive: flattenToSum(employee.incentive, 'Incentive', employee.name),
-                    open_leave_salary: flattenToSum(employee.open_leave_salary, 'Open Leave Salary', employee.name),
-                    variable_salary: flattenToSum(employee.variable_salary, 'Variable Salary', employee.name),
-                    otherDeduction: flattenToSum(employee.otherDeduction, 'Other Deduction', employee.name),
-                    advanceSalaryDeduction: flattenToSum(employee.advanceSalaryDeduction, 'Advance Salary Deduction', employee.name)
+                    // Save adjustment descriptions as JSON strings to OvertimeData to preserve them
+                    bonus: JSON.stringify(employee.bonus),
+                    incentive: JSON.stringify(employee.incentive),
+                    open_leave_salary: JSON.stringify(employee.open_leave_salary),
+                    variable_salary: JSON.stringify(employee.variable_salary),
+                    otherDeduction: JSON.stringify(employee.otherDeduction),
+                    advanceSalaryDeduction: JSON.stringify(employee.advanceSalaryDeduction)
                 };
 
                 if (employee.otRecordId) {
@@ -525,8 +545,18 @@ export default function OvertimeTab({ project }) {
                 const employee = overtimeData.find(e => String(e.attendance_id) === String(attendanceId));
                 if (!employee) return;
 
-                const adjustmentData = {
-                    // Flatten arrays to single numeric sums for backend compatibility
+                // OvertimeData stores structured JSON to preserve adjustment descriptions
+                const otAdjustmentData = {
+                    bonus: JSON.stringify(edits.bonus ?? employee.bonus),
+                    incentive: JSON.stringify(edits.incentive ?? employee.incentive),
+                    open_leave_salary: JSON.stringify(edits.open_leave_salary ?? employee.open_leave_salary),
+                    variable_salary: JSON.stringify(edits.variable_salary ?? employee.variable_salary),
+                    otherDeduction: JSON.stringify(edits.otherDeduction ?? employee.otherDeduction),
+                    advanceSalaryDeduction: JSON.stringify(edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction)
+                };
+
+                // SalarySnapshot continues to store numeric sums for payroll calculations
+                const snapshotAdjustmentData = {
                     bonus: flattenToSum(edits.bonus ?? employee.bonus, 'Bonus', employee.name),
                     incentive: flattenToSum(edits.incentive ?? employee.incentive, 'Incentive', employee.name),
                     open_leave_salary: flattenToSum(edits.open_leave_salary ?? employee.open_leave_salary, 'Open Leave Salary', employee.name),
@@ -540,7 +570,7 @@ export default function OvertimeTab({ project }) {
                     otUpdates.push({
                         id: employee.otRecordId,
                         data: {
-                            ...adjustmentData,
+                            ...otAdjustmentData,
                             normalOtHours: employee.normalOtHours ?? 0,
                             specialOtHours: employee.specialOtHours ?? 0
                         }
@@ -554,7 +584,7 @@ export default function OvertimeTab({ project }) {
                         department: employee.department || '',
                         normalOtHours: employee.normalOtHours ?? 0,
                         specialOtHours: employee.specialOtHours ?? 0,
-                        ...adjustmentData
+                        ...otAdjustmentData
                     });
                 }
 
@@ -562,7 +592,7 @@ export default function OvertimeTab({ project }) {
                 if (employee.snapshotId) {
                     snapshotUpdates.push({
                         id: employee.snapshotId,
-                        data: adjustmentData
+                        data: snapshotAdjustmentData
                     });
                 }
             });
