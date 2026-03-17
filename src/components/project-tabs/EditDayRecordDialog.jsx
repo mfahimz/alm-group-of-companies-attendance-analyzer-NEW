@@ -711,11 +711,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             value={formData.lateMinutes}
                             onChange={(e) => setFormData({ ...formData, lateMinutes: parseInt(e.target.value) || 0 })}
                             placeholder="0"
-                            disabled={formData.shiftOverride.enabled}
-                            className={formData.shiftOverride.enabled ? 'bg-slate-100' : ''}
                         />
                         <p className="text-xs text-slate-500 mt-1">
-                            {formData.shiftOverride.enabled ? 'Auto-calculated from shift override' : 'Combined AM + PM late minutes'}
+                            Combined AM + PM late minutes{formData.shiftOverride.enabled && ' (auto-calculated from shift override but editable)'}
                         </p>
                     </div>
 
@@ -729,11 +727,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             value={formData.earlyCheckoutMinutes}
                             onChange={(e) => setFormData({ ...formData, earlyCheckoutMinutes: parseInt(e.target.value) || 0 })}
                             placeholder="0"
-                            disabled={formData.shiftOverride.enabled}
-                            className={formData.shiftOverride.enabled ? 'bg-slate-100' : ''}
                         />
                         <p className="text-xs text-slate-500 mt-1">
-                            {formData.shiftOverride.enabled ? 'Auto-calculated from shift override' : 'Combined AM + PM early checkout minutes'}
+                            Combined AM + PM early checkout minutes{formData.shiftOverride.enabled && ' (auto-calculated from shift override but editable)'}
                         </p>
                     </div>
 
