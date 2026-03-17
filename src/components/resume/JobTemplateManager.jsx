@@ -295,7 +295,7 @@ function TemplateCard({ template, onEdit, onDelete }) {
                     <div>
                         <p className="text-sm font-semibold text-[#1F2937]">{template.position_name}</p>
                         <div className="flex items-center gap-2">
-                            <p className="text-xs text-[#6B7280]">{template.company || 'No Company'} • {template.department}{template.min_experience_years ? ` • ${template.min_experience_years}+ yrs exp` : ''}</p>
+                            <p className="text-xs text-[#6B7280]">{(template.company_name || (typeof template.company === 'string' ? template.company : template.company?.name)) || 'No Company'} • {template.department}{template.min_experience_years ? ` • ${template.min_experience_years}+ yrs exp` : ''}</p>
                             {template.mandatory_rules?.length > 0 && (
                                 <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
                                     {template.mandatory_rules.length} Mandatory Rules
@@ -364,10 +364,14 @@ export default function JobTemplateManager() {
             const { id, created_date, updated_date, ...rest } = data;
             const me = await base44.auth.me();
             
+            // Find the selected company object to get its stable ID (if any)
+            const selectedCompany = companies.find(c => c.name === data.company);
+            
             const payload = {
                 ...rest,
-                company: (data.company || '').trim(),
-                company_name: (data.company || '').trim(), // Alias for schema compatibility
+                company: (data.company || '').trim(), // Company name string
+                company_name: (data.company || '').trim(), // Alias for compatibility
+                company_id: selectedCompany?.id || '', // Company GUID relation
                 min_experience_years: data.min_experience_years !== '' ? parseFloat(data.min_experience_years) || 0 : 0,
                 updated_at: new Date().toISOString()
             };
