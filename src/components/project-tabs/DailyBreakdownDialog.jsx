@@ -126,8 +126,8 @@ export default function DailyBreakdownDialog({
             return cd >= from && cd <= to;
         };
 
-        // Precompute LOP-adjacent weekly off dates from stored result
-        const lopAdjacentWeeklyOffDates = new Set(
+        // Precompute LOP-adjacent dates (WO or PH) from stored result
+        const lopAdjacentDates = new Set(
             (currentResult.lop_adjacent_weekly_off_dates || '')
                 .split(',').map(d => d.trim()).filter(Boolean)
         );
@@ -146,7 +146,7 @@ export default function DailyBreakdownDialog({
 
             // If this weekly off day was counted as LOP-adjacent, include it in breakdown with special flag
             if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                if (lopAdjacentWeeklyOffDates.has(dateStr)) {
+                if (lopAdjacentDates.has(dateStr)) {
                     breakdown.push({
                         date: formatDate(dateStr),
                         dateStr,
@@ -172,7 +172,7 @@ export default function DailyBreakdownDialog({
                         punchMatches: [],
                         hasUnmatchedPunch: false,
                         hasFarExtendedMatch: false,
-                        isLopAdjacentWeeklyOff: true
+                        isLopAdjacent: true
                     });
                 }
                 continue;
@@ -439,6 +439,7 @@ export default function DailyBreakdownDialog({
             
             if (dateException) {
                 if (dateException.type === 'OFF') status = 'Off';
+                else if (dateException.type === 'PUBLIC_HOLIDAY') status = 'Public Holiday';
                 else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
                 else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
                 else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
@@ -559,7 +560,7 @@ export default function DailyBreakdownDialog({
                 nextDateStr,
                 shift: shift ? `${formatTime(shift.am_start)} - ${formatTime(shift.am_end)} / ${formatTime(shift.pm_start)} - ${formatTime(shift.pm_end)}` : 'No shift',
                 exception: dateException ? dateException.type : '-',
-                status,
+                status: lopAdjacentDates.has(dateStr) ? `${status} (LOP)` : status,
                 abnormal: isAbnormal,
                 isCriticalAbnormal,
                 lateInfo: lateInfo || '-',
@@ -570,7 +571,8 @@ export default function DailyBreakdownDialog({
                 partialDayReason: partialDayResult.reason,
                 punchMatches,
                 hasUnmatchedPunch,
-                hasFarExtendedMatch
+                hasFarExtendedMatch,
+                isLopAdjacent: lopAdjacentDates.has(dateStr)
             });
         }
 
@@ -687,11 +689,11 @@ export default function DailyBreakdownDialog({
                             </TableHeader>
                             <TableBody>
                                 {getDailyBreakdown.map((day, idx) => (
-                                    <TableRow key={idx} className={`${day.isLopAdjacentWeeklyOff ? 'bg-rose-100 border-l-4 border-l-rose-500' : day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.isLopAdjacentWeeklyOff ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                    <TableRow key={idx} className={`${day.isLopAdjacent ? 'bg-rose-100 border-l-4 border-l-rose-500' : day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.isLopAdjacent ? 'border-l-4 border-l-indigo-400' : ''}`}>
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-1.5">
                                                 <span>{day.date}</span>
-                                                {day.isLopAdjacentWeeklyOff && (
+                                                {day.isLopAdjacent && (
                                                     <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[9px] font-bold rounded uppercase tracking-wide">
                                                         Double Deduction
                                                     </span>
@@ -754,12 +756,12 @@ export default function DailyBreakdownDialog({
                                         <TableCell>
                                             <div>
                                                 <span className={`px-2 py-1 rounded text-xs font-medium
-                                                    ${day.isLopAdjacentWeeklyOff ? 'bg-rose-600 text-white' : ''}
-                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Present') && !day.status.includes('Half') && !day.status.includes('Skip Punch') ? 'bg-green-100 text-green-700' : ''}
-                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Skip Punch') ? 'bg-cyan-100 text-cyan-700' : ''}
-                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
-                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
-                                                    ${!day.isLopAdjacentWeeklyOff && day.status.includes('Off') && !day.status.includes('LOP') ? 'bg-slate-100 text-slate-700' : ''}
+                                                    ${day.isLopAdjacent ? 'bg-rose-600 text-white' : ''}
+                                                    ${!day.isLopAdjacent && day.status.includes('Present') && !day.status.includes('Half') && !day.status.includes('Skip Punch') ? 'bg-green-100 text-green-700' : ''}
+                                                    ${!day.isLopAdjacent && day.status.includes('Skip Punch') ? 'bg-cyan-100 text-cyan-700' : ''}
+                                                    ${!day.isLopAdjacent && day.status.includes('Absent') ? 'bg-red-100 text-red-700' : ''}
+                                                    ${!day.isLopAdjacent && day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
+                                                    ${!day.isLopAdjacent && (day.status.includes('Off') || day.status.includes('Public Holiday')) && !day.status.includes('LOP') ? 'bg-slate-100 text-slate-700' : ''}
                                                 `}>
                                                     {day.status}
                                                 </span>

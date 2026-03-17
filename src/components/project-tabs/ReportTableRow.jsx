@@ -77,12 +77,12 @@ export default function ReportTableRow({
                         : (result.full_absence_count > 0 ? 'text-red-600 font-medium' : '')}
                 />
             </td>
-            {/* LOP-adjacent weekly off column */}
+            {/* LOP-adjacent off day column */}
             <td className="p-2 align-middle">
                 {result.lop_adjacent_weekly_off_count > 0 ? (
                     <span
                         className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-xs font-bold rounded cursor-help"
-                        title={`${result.lop_adjacent_weekly_off_count} weekly off day(s) adjacent to LOP also counted as LOP.\nDates: ${result.lop_adjacent_weekly_off_dates || 'N/A'}`}
+                        title={`${result.lop_adjacent_weekly_off_count} off day(s) (weekly off or holiday) adjacent to LOP also counted as LOP.\nDates: ${result.lop_adjacent_weekly_off_dates || 'N/A'}`}
                     >
                         +{result.lop_adjacent_weekly_off_count}
                     </span>

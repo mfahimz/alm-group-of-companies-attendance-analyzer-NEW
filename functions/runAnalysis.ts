@@ -1417,47 +1417,93 @@ Deno.serve(async (req: Request) => {
             }
 
             // ================================================================
-            // LOP-ADJACENT WEEKLY OFF RULE
-            // If the day BEFORE or AFTER an employee's weekly off is LOP,
-            // the weekly off is also counted as LOP (double deduction).
-            // Exception: Sick leave adjacent to weekly off does NOT trigger this.
-            // Annual leave adjacent to weekly off is already handled separately.
+            // LOP-ADJACENT BLOCK RULE (REWRITTEN per RULE 1-4)
+            // ================================================================
+            // RULE 1: Weekly Off adjacent to LOP becomes LOP (if no leave).
+            // RULE 2: Public Holiday (or block of PH/WO) adjacent to LOP 
+            //         becomes LOP. The entire connected block converts to LOP.
+            // RULE 3 & 4: Days within Annual Leave or Sick Leave range are 
+            //             PROTECTED and exempt from LOP-adjacent conversion.
             // ================================================================
             {
-                // Find all WEEKLY_OFF dates
-                const weeklyOffDates = Object.entries(dateStatusMap)
-                    .filter(([, status]) => status === 'WEEKLY_OFF')
-                    .map(([dateStr]) => dateStr);
+                const allDatesInRange = [];
+                for (let dl = new Date(startDate); dl <= endDate; dl = new Date(dl.setDate(dl.getDate() + 1))) {
+                    allDatesInRange.push(toDateStr(dl));
+                }
 
-                for (const woDateStr of weeklyOffDates) {
-                    const woDate = new Date(woDateStr);
+                let currentOffBlock = [];
+                for (let i = 0; i < allDatesInRange.length; i++) {
+                    const dStr = allDatesInRange[i];
+                    const status = (dateStatusMap as Record<string, string>)[dStr];
 
-                    const prevDate = new Date(woDate);
+                    if (status === 'WEEKLY_OFF' || status === 'PUBLIC_HOLIDAY') {
+                        currentOffBlock.push(dStr);
+                    } else {
+                        if (currentOffBlock.length > 0) {
+                            applyLopAdjacentToBlock(currentOffBlock);
+                            currentOffBlock = [];
+                        }
+                    }
+                }
+                if (currentOffBlock.length > 0) {
+                    applyLopAdjacentToBlock(currentOffBlock);
+                }
+
+                function applyLopAdjacentToBlock(block: string[]) {
+                    if (block.length === 0) return;
+                    
+                    const firstDateStr = block[0];
+                    const lastDateStr = block[block.length - 1];
+
+                    const prevDate = new Date(firstDateStr);
                     prevDate.setDate(prevDate.getDate() - 1);
                     const prevDateStr = toDateStr(prevDate);
 
-                    const nextDate = new Date(woDate);
+                    const nextDate = new Date(lastDateStr);
                     nextDate.setDate(nextDate.getDate() + 1);
                     const nextDateStr = toDateStr(nextDate);
 
-                    const prevStatus = dateStatusMap[prevDateStr];
-                    const nextStatus = dateStatusMap[nextDateStr];
+                    const prevStatus = (dateStatusMap as Record<string, string>)[prevDateStr];
+                    const nextStatus = (dateStatusMap as Record<string, string>)[nextDateStr];
 
-                    const prevIsLOP = prevStatus === 'LOP';
-                    const nextIsLOP = nextStatus === 'LOP';
+                    // Block is adjacent to LOP if any side is LOP (Manual or Punch-based)
+                    if (prevStatus === 'LOP' || nextStatus === 'LOP') {
+                        for (const dateStr of block) {
+                            // RULE 3 & 4: Check for PROTECTIVE LEAVE (Annual or Sick)
+                            // This ensures days already covered by leave don't get double deduction.
+                            const isProtectedByLeave = employeeExceptions.some((ex: any) => {
+                                if (ex.type !== 'ANNUAL_LEAVE' && ex.type !== 'SICK_LEAVE') return false;
+                                try {
+                                    const exFrom = new Date(ex.date_from);
+                                    const exTo = new Date(ex.date_to);
+                                    const checkDate = new Date(dateStr);
+                                    // Normalize for comparison
+                                    checkDate.setHours(0, 0, 0, 0);
+                                    exFrom.setHours(0, 0, 0, 0);
+                                    exTo.setHours(0, 0, 0, 0);
+                                    return checkDate >= exFrom && checkDate <= exTo;
+                                } catch { return false; }
+                            });
 
-                    if (prevIsLOP || nextIsLOP) {
-                        // Weekly off adjacent to LOP → count weekly off as LOP too
-                        lopAdjacentWeeklyOffCount++;
-                        fullAbsenceCount++;
-                        dateStatusMap[woDateStr] = 'LOP_ADJACENT_WEEKLY_OFF';
-                        console.log(`[runAnalysis] LOP-adjacent weekly off: Employee ${attendanceIdStr}, Weekly off ${woDateStr} (prev=${prevStatus}, next=${nextStatus}) → counted as LOP`);
+                            if (!isProtectedByLeave) {
+                                const originalStatus = (dateStatusMap as Record<string, string>)[dateStr];
+                                fullAbsenceCount++;
+                                lopAdjacentWeeklyOffCount++;
+                                (dateStatusMap as Record<string, string>)[dateStr] = originalStatus === 'WEEKLY_OFF' 
+                                    ? 'LOP_ADJACENT_WEEKLY_OFF' 
+                                    : 'LOP_ADJACENT_PUBLIC_HOLIDAY';
+                                
+                                console.log(`[runAnalysis] LOP-adjacent deduction: Employee ${attendanceIdStr}, Date ${dateStr} (${originalStatus}) → LOP`);
+                            } else {
+                                console.log(`[runAnalysis] LOP-adjacent bypass (Protected by ${employeeExceptions.find((ex: any) => dateStr >= ex.date_from && dateStr <= ex.date_to)?.type}): Employee ${attendanceIdStr}, Date ${dateStr}`);
+                            }
+                        }
                     }
                 }
             }
 
             const criticalDatesFormatted = critical_abnormal_dates_set.size > 0
-                ? [...critical_abnormal_dates_set].sort().map(d => new Date(d).toLocaleDateString()).join(', ')
+                ? [...critical_abnormal_dates_set].sort().map(d => new Date(d as string).toLocaleDateString()).join(', ')
                 : '';
             const autoResolutionNotes = auto_resolutions.length > 0
                 ? auto_resolutions.map(r => `${new Date(r.date).toLocaleDateString()}: ${r.details}`).join(' | ')
@@ -1512,9 +1558,9 @@ Deno.serve(async (req: Request) => {
 
             console.log(`[runAnalysis] Employee ${attendanceIdStr}: Late=${lateMinutes}(net), Early=${earlyCheckoutMinutes}(net), Approved(display)=${totalApprovedMinutes}, BaseGrace=${baseGrace}, Carried=${carriedGrace}, TotalGrace=${totalGraceMinutes}, Deductible=${deductibleMinutes}, Other=${otherMinutes}(NOT in deductible)`);
 
-            // Build set of LOP-adjacent weekly off dates for storage
+            // Build set of LOP-adjacent weekly off and holiday dates for storage
             const lopAdjacentWeeklyOffDates = Object.entries(dateStatusMap)
-                .filter(([, status]) => status === 'LOP_ADJACENT_WEEKLY_OFF')
+                .filter(([, status]) => String(status).startsWith('LOP_ADJACENT_'))
                 .map(([dateStr]) => dateStr)
                 .sort()
                 .join(', ');
@@ -1544,7 +1590,7 @@ Deno.serve(async (req: Request) => {
                 // otherMinutesFromExceptions = from existing exceptions (already exist, skip)
                 _otherMinutesDetails: (Object.keys(otherMinutesByDate).length > 0) ? {
                     attendance_id: attendanceIdStr,
-                    other_minutes: Object.values(otherMinutesByDate).reduce((sum, v) => sum + v, 0),
+                    other_minutes: Object.values(otherMinutesByDate).reduce((sum: number, v: any) => sum + v, 0),
                     employee_name: employee?.name || attendanceIdStr,
                     breakdown: otherMinutesByDate
                 } : null
@@ -1686,7 +1732,7 @@ Deno.serve(async (req: Request) => {
                     const dates = Object.keys(breakdown);
 
                     for (const dateStr of dates) {
-                        const minutesForDate = breakdown[dateStr];
+                        const minutesForDate = (breakdown as Record<string, number>)[dateStr];
                         if (!minutesForDate || minutesForDate <= 0) continue;
 
                         await base44.asServiceRole.entities.Exception.create({
