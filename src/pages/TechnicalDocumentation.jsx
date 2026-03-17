@@ -349,7 +349,7 @@ export default function TechnicalDocumentation() {
                     <ul>
                         <li><strong>PUBLIC_HOLIDAY:</strong> attendance_id = "ALL", marks day as non-working for all employees</li>
                         <li><strong>SHIFT_OVERRIDE:</strong> Temporarily changes shift times for specific dates</li>
-                        <li><strong>MANUAL_PRESENT/ABSENT/HALF:</strong> Forces attendance status regardless of punch data</li>
+                        <li><strong>MANUAL_PRESENT/ABSENT:</strong> Forces attendance status regardless of punch data</li>
                         <li><strong>MANUAL_LATE/EARLY_CHECKOUT/OTHER_MINUTES:</strong> Manually adds or adjusts late/early minutes</li>
                         <li><strong>SICK_LEAVE/ANNUAL_LEAVE:</strong> Marks leave days (counted separately from absences)</li>
                         <li><strong>WEEKLY_OFF_OVERRIDE:</strong> Changes an employee's weekly off day for a date range</li>
@@ -767,7 +767,7 @@ export default function TechnicalDocumentation() {
                     <div className="bg-slate-100 border border-slate-300 rounded p-3 text-sm">
                         <p className="font-semibold mb-2">Exceptions are applied in this priority order (highest to lowest):</p>
                         <ol>
-                            <li><strong>MANUAL_PRESENT / MANUAL_ABSENT / MANUAL_HALF:</strong> Overrides everything, sets status directly</li>
+                            <li><strong>MANUAL_PRESENT / MANUAL_ABSENT:</strong> Overrides everything, sets status directly</li>
                             <li><strong>PUBLIC_HOLIDAY:</strong> Marks day as OFF, no further processing</li>
                             <li><strong>SICK_LEAVE / ANNUAL_LEAVE:</strong> Marks day as leave, counted separately</li>
                             <li><strong>SHIFT_OVERRIDE:</strong> Replaces shift timings for the day</li>

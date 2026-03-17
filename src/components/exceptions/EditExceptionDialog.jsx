@@ -188,7 +188,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                     <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-                                    <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+
                                     <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                     <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                     <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>

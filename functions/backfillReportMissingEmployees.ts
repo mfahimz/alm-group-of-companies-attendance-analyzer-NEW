@@ -154,10 +154,10 @@ Deno.serve(async (req) => {
 
             const deduped = [];
             for (const current of punchesWithTime) {
-                const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
+                const isDuplicate = deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10);
                 if (!isDuplicate) deduped.push(current);
             }
-            return deduped.sort((a, b) => a.time - b.time);
+            return deduped.sort((a, b) => a.time.getTime() - b.time.getTime());
         };
 
         const matchPunchesToShiftPoints = (dayPunches: any[], shift: any) => {
@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
             const punchesWithTime = dayPunches.map(p => ({
                 ...p,
                 time: p.time || parseTime(p.timestamp_raw)
-            })).filter(p => p.time).sort((a, b) => a.time - b.time);
+            })).filter((p: any) => p.time).sort((a: any, b: any) => a.time.getTime() - b.time.getTime());
             
             if (punchesWithTime.length === 0) return [];
             
@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
                 
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance;
                         closestMatch = shiftPoint;
@@ -323,10 +323,7 @@ Deno.serve(async (req) => {
                     } else if (dateException.type === 'MANUAL_ABSENT') {
                         fullAbsenceCount++;
                         continue;
-                    } else if (dateException.type === 'MANUAL_HALF') {
-                        presentDays++;
-                        halfAbsenceCount++;
-                        continue;
+
                     } else if (dateException.type === 'SICK_LEAVE') {
                         sickLeaveCount++;
                         continue;
@@ -417,7 +414,7 @@ Deno.serve(async (req) => {
                 );
 
                 const shouldSkipTimeCalc = dateException && [
-                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
                 ].includes(dateException.type);
 
                 // Count attendance

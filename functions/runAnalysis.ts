@@ -340,7 +340,7 @@ Deno.serve(async (req: Request) => {
                     for (const shiftPoint of shiftPoints) {
                         if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                        const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                        const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                         if (distance <= 120 && distance < minDistance) {
                             minDistance = distance;
@@ -354,7 +354,7 @@ Deno.serve(async (req: Request) => {
                     for (const shiftPoint of shiftPoints) {
                         if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                        const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                        const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                         if (distance <= 180 && distance < minDistance) {
                             minDistance = distance;
@@ -399,68 +399,7 @@ Deno.serve(async (req: Request) => {
          * 3. If actual worked time is < 50% of expected, it's flagged as a partial day.
          * 4. PRECISION: Shift times must be parsed with 'includeSeconds' to avoid "null" shift points.
          */
-        const detectPartialDay = (dayPunches: any[], shift: any, nextDateStr: string | null = null) => {
-            if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
 
-            const punchesWithTime = dayPunches.map(p => {
-                const time = parseTime(p.timestamp_raw);
-                if (!time) return null;
-                // MIDNIGHT FIX: Adjust time for next-day crossover punches
-                const isNextDay = nextDateStr && p.punch_date === nextDateStr;
-                const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
-                return { ...p, time: adjustedTime };
-            }).filter(p => p).sort((a, b) => a.time - b.time);
-
-            if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
-
-            const firstPunch = punchesWithTime[0].time;
-            const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
-
-            const amStart = parseTime(shift.am_start);
-            const amEnd = parseTime(shift.am_end);
-            const pmStart = parseTime(shift.pm_start);
-            let pmEnd = parseTime(shift.pm_end);
-
-            if (!amStart || !pmEnd) return { isPartial: false, reason: null };
-
-            // MIDNIGHT FIX: If shift ends at midnight, adjust to 24:00
-            if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) {
-                pmEnd = new Date(pmEnd.getTime() + 24 * 60 * 60 * 1000);
-            }
-
-            // CRITICAL FIX: For split/two-shift schedules (e.g., Ramadan day+night),
-            // calculate expected working time as sum of ACTUAL shift blocks, NOT span from first to last.
-            // Otherwise a long break between shifts (e.g., 12PM-8PM gap) inflates expected time
-            // and causes false partial-day detection.
-            const hasMiddleTimes = amEnd && pmStart &&
-                String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' &&
-                shift.am_end !== '—' && shift.pm_start !== '—' &&
-                shift.am_end !== '-' && shift.pm_start !== '-';
-            const isSingleShift = shift.is_single_shift === true || !hasMiddleTimes;
-
-            let expectedMinutes;
-            if (isSingleShift) {
-                // Single shift: expected = pm_end - am_start (full span)
-                expectedMinutes = (pmEnd - amStart) / (1000 * 60);
-            } else {
-                // Two-shift / split shift: expected = (am block) + (pm block)
-                // This avoids counting the break between shifts
-                const amBlock = amEnd ? (amEnd - amStart) / (1000 * 60) : 0;
-                const pmBlock = pmStart ? (pmEnd - pmStart) / (1000 * 60) : 0;
-                expectedMinutes = amBlock + pmBlock;
-            }
-
-            const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
-
-            if (expectedMinutes > 0 && actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
-                return {
-                    isPartial: true,
-                    reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)`
-                };
-            }
-
-            return { isPartial: false, reason: null };
-        };
 
         // MIDNIGHT BUFFER: Helper to check if a punch timestamp falls within the midnight buffer window
         // (i.e., between 12:00 AM and 02:00 AM = 120 minutes after midnight)
@@ -486,7 +425,7 @@ Deno.serve(async (req: Request) => {
             const deduped = [];
             for (let i = 0; i < punchesWithTime.length; i++) {
                 const current = punchesWithTime[i];
-                const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
+                const isDuplicate = deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10);
                 if (!isDuplicate) {
                     deduped.push(current);
                 }
@@ -558,12 +497,12 @@ Deno.serve(async (req: Request) => {
             let totalApprovedMinutes = 0;
             let lopAdjacentWeeklyOffCount = 0; // Weekly off days adjacent to LOP counted as LOP
             const otherMinutesByDate = {}; // Track other minutes per date (only from NON-exception sources)
-            const otherMinutesFromExceptions = {}; // Track other minutes that came from existing exceptions (DO NOT re-create)
+            const otherMinutesFromExceptions: Record<string, number> = {}; // Track other minutes that came from existing exceptions (DO NOT re-create)
             const abnormal_dates_set = new Set();
             const critical_abnormal_dates_set = new Set();
-            const auto_resolutions = [];
+            const auto_resolutions: any[] = [];
             // Track per-date status for LOP-adjacent weekly off calculation (done after main loop)
-            const dateStatusMap = {}; // dateStr -> 'LOP' | 'SICK_LEAVE' | 'PRESENT' | 'ANNUAL_LEAVE' | 'OTHER'
+            const dateStatusMap: Record<string, string> = {}; // dateStr -> 'LOP' | 'SICK_LEAVE' | 'PRESENT' | 'ANNUAL_LEAVE' | 'OTHER'
 
             const startDate = new Date(date_from);
             const endDate = new Date(date_to);
@@ -778,11 +717,6 @@ Deno.serve(async (req: Request) => {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
                         continue;
-                    } else if (dateException.type === 'MANUAL_HALF') {
-                        presentDays++;
-                        halfAbsenceCount++;
-                        dateStatusMap[dateStr] = 'PRESENT';
-                        continue;  // Skip punch-based counting to prevent double-counting
                     } else if (dateException.type === 'SICK_LEAVE') {
                         // Sick leave counts as WORKING DAY (no deduction from working_days)
                         // Day is tracked separately as sick_leave_count
@@ -1140,7 +1074,7 @@ Deno.serve(async (req: Request) => {
                     return aTime - bTime;
                 });
 
-                let filteredPunches = filterMultiplePunches(dayPunches, shift, includeSeconds);
+                let filteredPunches: any[] = filterMultiplePunches(dayPunches, shift, includeSeconds);
 
                 // Log missing shift AFTER filteredPunches is computed
                 if (!shift && filteredPunches.length > 0 && !dateException) {
@@ -1174,20 +1108,26 @@ Deno.serve(async (req: Request) => {
                     }
                 }
 
-                let punchMatches = [];
+                let punchMatches: any[] = [];
                 let hasUnmatchedPunch = false;
                 // Allow punch matching even when skip is applied (we'll zero out specific minutes after)
                 // Only skip matching if we have a fake-only punch list
-                const hasOnlyFakePunches = filteredPunches.length > 0 && filteredPunches.every(p => p._fake_skip_punch);
+                const hasOnlyFakePunches = filteredPunches.length > 0 && filteredPunches.every((p: any) => p._fake_skip_punch);
                 if (shift && filteredPunches.length > 0 && !hasOnlyFakePunches) {
                     punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
                     hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 }
 
-                // SINGLE SHIFT DETECTION: Check both the flag AND the actual time fields
-                // A shift is single if:
-                //   1. is_single_shift flag is true, OR
-                //   2. The middle time fields (am_end, pm_start) are empty/dash (only 2 time points exist)
+                // ================================================================
+                // PUNCH COMPLETENESS RULE (REPLACED detectPartialDay)
+                // ================================================================
+                // This logic determines Present, Half Day, or Absent status based on punch counts.
+                // 1. Single Shift (2 expected): 0=LOP, 1=Half, 2=Present
+                // 2. Split Shift (4 expected): 0=LOP, 1=Half, 2=Half, 3=Present, 4=Present
+                // Bypasses: SKIP_PUNCH or FULL_SKIP exceptions only.
+                // ================================================================
+                
+                const punchCount = filteredPunches.length;
                 const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
                     String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
                     shift.am_end !== '—' && shift.pm_start !== '—' &&
@@ -1195,51 +1135,51 @@ Deno.serve(async (req: Request) => {
                     shift.am_end !== 'null' && shift.pm_start !== 'null';
                 const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
 
-                // Skip partial day detection if SKIP_PUNCH is applied
-                // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches
-                const partialDayResult = hasSkipPunchApplied
-                    ? { isPartial: false, reason: '' }
-                    : detectPartialDay(filteredPunches, shift, nextDateStr);
-
-                if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
-                    if (filteredPunches.length === 0) {
-                        presentDays++;
-                    }
-                }
-
-                if (filteredPunches.length > 0) {
-                    // SKIP_PUNCH LOP SAVER: If we forced presence due to 0 punches + FULL_SKIP,
-                    // mark as 'PRESENT_SKIP_PUNCH' to ensure correct status downstream
+                if (punchCount > 0) {
                     if (skipPunchForced0PunchPresent) {
+                        // LOP SAVER: If presence was forced via SKIP_PUNCH + 0 punches
                         presentDays++;
                         dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                    } else if (partialDayResult.isPartial && !hasSkipPunchApplied) {
-                        presentDays++;
-                        halfAbsenceCount++;
-                        dateStatusMap[dateStr] = 'PRESENT';
-                        auto_resolutions.push({
-                            date: dateStr,
-                            type: 'PARTIAL_DAY_DETECTED',
-                            details: partialDayResult.reason
-                        });
-                    } else {
-                        presentDays++;
-                        dateStatusMap[dateStr] = hasSkipPunchApplied ? 'PRESENT_SKIP_PUNCH' : 'PRESENT';
-                    }
-
-                    if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial && !hasSkipPunchApplied) {
-                        if (filteredPunches.length < 2 && !isSingleShift) {
-                            halfAbsenceCount++;
+                    } else if (!hasSkipPunchApplied) {
+                        // NORMAL PUNCH COMPLETENESS LOGIC
+                        if (isSingleShift) {
+                            if (punchCount === 1) {
+                                // CHANGE 2: Single shift, 1 punch = Half Day
+                                presentDays++;
+                                halfAbsenceCount++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Single shift, 1 punch → Half Day`);
+                            } else {
+                                // 2 or more punches = Present
+                                presentDays++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                            }
+                        } else {
+                            // SPLIT SHIFT (4 expected)
+                            if (punchCount === 1 || punchCount === 2) {
+                                // CHANGE 2: Split shift, 1 or 2 punches = Half Day
+                                presentDays++;
+                                halfAbsenceCount++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Split shift, ${punchCount} punch(es) → Half Day`);
+                            } else {
+                                // 3 or 4 punches = Present
+                                presentDays++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                            }
                         }
+                    } else {
+                        // SKIP_PUNCH is applied, always Present
+                        presentDays++;
+                        dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
                     }
                 } else {
-                    // No punches for this day
-                    // Check if there's an exception that handles this day (already processed above)
-                    // Only count as LOP if no exception covers it
-                    if (!dateException || (dateException.type !== 'MANUAL_PRESENT' && dateException.type !== 'MANUAL_HALF')) {
+                    // Zero punches
+                    if (!dateException || (dateException.type !== 'MANUAL_PRESENT')) {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
                     } else {
+                        presentDays++;
                         dateStatusMap[dateStr] = 'PRESENT';
                     }
                 }
@@ -1272,7 +1212,7 @@ Deno.serve(async (req: Request) => {
                 );
 
                 const shouldSkipTimeCalculation = dateException && [
-                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
                 ].includes(dateException.type);
 
                 if (hasManualTimeException) {

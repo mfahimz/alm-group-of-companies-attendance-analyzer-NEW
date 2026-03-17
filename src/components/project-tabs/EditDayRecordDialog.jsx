@@ -100,7 +100,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         const punchesWithTime = dayPunches.map(p => ({
             ...p,
             time: parseTime(p.timestamp_raw)
-        })).filter(p => p.time).sort((a, b) => a.time - b.time);
+        })).filter(p => p.time).sort((a, b) => a.time.getTime() - b.time.getTime());
         
         if (punchesWithTime.length === 0) return [];
         
@@ -122,7 +122,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
                 
-                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
                 
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
@@ -134,7 +134,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
                     
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
                     
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance;
@@ -305,8 +305,6 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 let statusType = 'MANUAL_PRESENT';
                 if (dayRecord.status.includes('Absent')) {
                     statusType = 'MANUAL_ABSENT';
-                } else if (dayRecord.status.includes('Half')) {
-                    statusType = 'MANUAL_HALF';
                 } else if (dayRecord.status.includes('Off')) {
                     statusType = 'OFF';
                 } else if (dayRecord.status.includes('Present')) {
@@ -676,7 +674,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             <SelectContent>
                                 <SelectItem value="MANUAL_PRESENT">Present</SelectItem>
                                 <SelectItem value="MANUAL_ABSENT">Absent</SelectItem>
-                                <SelectItem value="MANUAL_HALF">Half Day</SelectItem>
+
                                 <SelectItem value="OFF">Off/Leave</SelectItem>
                                 {isAdmin && (
                                     <SelectItem value="SICK_LEAVE">Sick Leave (Admin Only)</SelectItem>

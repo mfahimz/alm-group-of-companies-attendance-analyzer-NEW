@@ -418,21 +418,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
 
-    const detectPartialDay = (dayPunches, shift, nextDateStr = null) => {
-        if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
-        const pts = dayPunches.map(p => ({ ...p, time: parseTime(p.timestamp_raw) })).filter(p => p.time).sort((a, b) => a.time - b.time);
-        if (pts.length < 2) return { isPartial: false, reason: null };
-        const amStart = parseTime(shift.am_start), amEnd = parseTime(shift.am_end), pmStart = parseTime(shift.pm_start);
-        let pmEnd = parseTime(shift.pm_end);
-        if (!amStart || !pmEnd) return { isPartial: false, reason: null };
-        if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
-        const mid = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
-        const single = shift.is_single_shift === true || !mid;
-        const expected = single ? (pmEnd - amStart) / 60000 : ((amEnd ? (amEnd - amStart) / 60000 : 0) + (pmStart ? (pmEnd - pmStart) / 60000 : 0));
-        const actual = (pts[pts.length - 1].time - pts[0].time) / 60000;
-        if (expected > 0 && actual < expected * 0.5 && actual > 0) return { isPartial: true, reason: `Worked ${Math.round(actual)} min (expected ${Math.round(expected)} min)` };
-        return { isPartial: false, reason: null };
-    };
+
 
     const filterMultiplePunches = (punchList, shift) => {
         if (punchList.length <= 1) return punchList;
@@ -743,20 +729,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift, nextDateStr);
             }
 
-            const partialDayResult = detectPartialDay(dayPunches, shift, nextDateStr);
+
 
             // TRACK ATTENDANCE STATUS
             if (dayOverride) {
                 if (dayOverride.type === 'MANUAL_PRESENT') presentDays++;
                 else if (dayOverride.type === 'MANUAL_ABSENT') fullAbsenceCount++;
-                else if (dayOverride.type === 'MANUAL_HALF') { presentDays++; halfAbsenceCount++; }
                 else if (dayOverride.type === 'OFF') workingDays--;
                 else if (dayOverride.type === 'SICK_LEAVE') sickLeaveCount++;
             } else if (dateException) {
                 if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') workingDays--;
                 else if (dateException.type === 'MANUAL_PRESENT') presentDays++;
                 else if (dateException.type === 'MANUAL_ABSENT') fullAbsenceCount++;
-                else if (dateException.type === 'MANUAL_HALF') { presentDays++; halfAbsenceCount++; }
                 else if (dateException.type === 'SICK_LEAVE') sickLeaveCount++;
                 else if (dateException.type === 'ANNUAL_LEAVE') {
                     if (dayPunches.length === 0) workingDays--;
@@ -764,14 +748,29 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 } else if (dayPunches.length > 0) presentDays++;
                 else fullAbsenceCount++;
             } else if (dayPunches.length > 0) {
-                presentDays++;
-                if (partialDayResult.isPartial) halfAbsenceCount++;
+                // PUNCH COMPLETENESS STATUS (FRONTEND - ReportDetailView)
+                if (isSingleShift) {
+                    if (dayPunches.length === 1) {
+                        presentDays++;
+                        halfAbsenceCount++;
+                    } else {
+                        presentDays++;
+                    }
+                } else {
+                    // Split shift: 1-2 = Half, 3-4 = Present
+                    if (dayPunches.length === 1 || dayPunches.length === 2) {
+                        presentDays++;
+                        halfAbsenceCount++;
+                    } else {
+                        presentDays++;
+                    }
+                }
             } else {
                 fullAbsenceCount++;
             }
 
             const shouldSkipTimeCalc = dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type) || (dayOverride?.type === 'SICK_LEAVE');
 
             let allowedMinutesForDay = 0;
@@ -1923,7 +1922,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 parseTime={parseTime}
                 formatTime={formatTime}
                 matchPunchesToShiftPoints={matchPunchesToShiftPoints}
-                detectPartialDay={detectPartialDay}
                 filterMultiplePunches={filterMultiplePunches}
             />
 

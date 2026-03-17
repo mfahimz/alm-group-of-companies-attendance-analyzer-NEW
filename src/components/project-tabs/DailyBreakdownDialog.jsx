@@ -26,7 +26,6 @@ export default function DailyBreakdownDialog({
     parseTime,
     formatTime,
     matchPunchesToShiftPoints,
-    detectPartialDay,
     filterMultiplePunches
 }) {
     const [editingDay, setEditingDay] = useState(null);
@@ -317,7 +316,7 @@ export default function DailyBreakdownDialog({
                 shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(dayPunches, shift);
+
 
             // MIDNIGHT FIX: Pass nextDateStr to matchPunchesToShiftPoints for proper PM_END matching
             let punchMatches = [];
@@ -353,7 +352,7 @@ export default function DailyBreakdownDialog({
             }
 
             const shouldSkipTimeCalc = dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
             const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
@@ -442,7 +441,6 @@ export default function DailyBreakdownDialog({
                 else if (dateException.type === 'PUBLIC_HOLIDAY') status = 'Public Holiday';
                 else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
                 else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
-                else if (dateException.type === 'MANUAL_HALF') status = 'Half Day (Manual)';
                 else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
                 else if (dateException.type === 'SICK_LEAVE') status = 'Sick Leave';
                 else if (dateException.type === 'ANNUAL_LEAVE') status = dayPunches.length > 0 ? 'Present' : 'Annual Leave';
@@ -452,8 +450,13 @@ export default function DailyBreakdownDialog({
                     status = 'Present';
                 }
             } else if (dayPunches.length > 0) {
-                if (partialDayResult.isPartial) status = 'Half Day (Partial)';
-                else status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                // PUNCH COMPLETENESS STATUS (FRONTEND)
+                if (isSingleShift) {
+                    status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                } else {
+                    // Split shift: 1-2 = Half, 3-4 = Present
+                    status = dayPunches.length >= 3 ? 'Present' : 'Half Day';
+                }
             }
             
             // SKIP_PUNCH status override: if skip applied and would have been absent
@@ -517,7 +520,6 @@ export default function DailyBreakdownDialog({
                 }
                 if (dayOverride.type === 'MANUAL_PRESENT') status = 'Present (Edited)';
                 else if (dayOverride.type === 'MANUAL_ABSENT') status = 'Absent (Edited)';
-                else if (dayOverride.type === 'MANUAL_HALF') status = 'Half Day (Edited)';
                 else if (dayOverride.type === 'OFF') status = 'Off (Edited)';
                 else if (dayOverride.type === 'SICK_LEAVE') status = 'Sick Leave (Admin)';
 
@@ -568,7 +570,7 @@ export default function DailyBreakdownDialog({
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 otherMinutes: Math.max(0, currentOtherMinutes),
                 hasOverride: !!dayOverride,
-                partialDayReason: partialDayResult.reason,
+                partialDayReason: null,
                 punchMatches,
                 hasUnmatchedPunch,
                 hasFarExtendedMatch,

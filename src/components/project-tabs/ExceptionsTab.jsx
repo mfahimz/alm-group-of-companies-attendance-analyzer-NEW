@@ -660,20 +660,7 @@ const TYPE_MAP = {
     'present': 'MANUAL_PRESENT',
     'manual absent': 'MANUAL_ABSENT',
     'absent': 'MANUAL_ABSENT',
-    'manual half': 'MANUAL_HALF',
-    'half day': 'MANUAL_HALF',
-    'half': 'MANUAL_HALF',
-    'sick leave': 'SICK_LEAVE',
-    'sick': 'SICK_LEAVE',
-    'annual leave': 'ANNUAL_LEAVE',
-    'annual': 'ANNUAL_LEAVE',
-    'vacation': 'ANNUAL_LEAVE',
-    // Also accept the exact system codes
-    'public_holiday': 'PUBLIC_HOLIDAY',
-    'shift_override': 'SHIFT_OVERRIDE',
-    'manual_present': 'MANUAL_PRESENT',
     'manual_absent': 'MANUAL_ABSENT',
-    'manual_half': 'MANUAL_HALF',
     'sick_leave': 'SICK_LEAVE',
     'annual_leave': 'ANNUAL_LEAVE',
     'allowed minutes': 'ALLOWED_MINUTES',
@@ -1180,7 +1167,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             'SHIFT_OVERRIDE': 'bg-orange-100 text-orange-700 border-orange-200',
             'MANUAL_PRESENT': 'bg-green-100 text-green-700 border-green-200',
             'MANUAL_ABSENT': 'bg-red-100 text-red-700 border-red-200',
-            'MANUAL_HALF': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+
             'ALLOWED_MINUTES': 'bg-indigo-100 text-indigo-700 border-indigo-200',
             'SKIP_PUNCH': 'bg-cyan-100 text-cyan-700 border-cyan-200',
             'DAY_SWAP': 'bg-pink-100 text-pink-700 border-pink-200'
@@ -1231,7 +1218,7 @@ Exception types:
 - SHIFT_OVERRIDE: Temporary change to work hours/shift timings
 - MANUAL_PRESENT: Mark someone as present when they have no punches
 - MANUAL_ABSENT: Mark someone as absent (LOP)
-- MANUAL_HALF: Mark someone as half day present
+
 - SICK_LEAVE: Medical leave
 - ANNUAL_LEAVE: Vacation/paid leave
 - ALLOWED_MINUTES: Excuse late arrival or early checkout (natural calamity, personal reasons)
@@ -1807,7 +1794,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                             <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                             <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-                                            <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                             <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
@@ -2283,7 +2270,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                             <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                             <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-                                            <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+
                                             <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                             <SelectItem value="ANNUAL_LEAVE">Annual Leave</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
@@ -2544,7 +2531,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
                                     <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                     <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-                                    <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+
                                 </SelectContent>
                             </Select>
                         </div>

@@ -270,43 +270,7 @@ export default function RunAnalysisTab({ project }) {
         return matches;
     };
 
-    const detectPartialDay = (dayPunches, shift, nextDateStr, includeSeconds = false) => {
-        if (!shift || dayPunches.length < 2) return { isPartial: false, reason: null };
 
-        const punchesWithTime = dayPunches.map(p => {
-            const time = parseTime(p.timestamp_raw, includeSeconds);
-            if (!time) return null;
-            const isNextDay = nextDateStr && p.punch_date === nextDateStr;
-            const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
-            return { ...p, time: adjustedTime };
-        }).filter(p => p).sort((a, b) => a.time - b.time);
-
-        if (punchesWithTime.length < 2) return { isPartial: false, reason: null };
-
-        const firstPunch = punchesWithTime[0].time;
-        const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
-
-        const amStart = parseTime(shift.am_start, includeSeconds);
-        const pmEndTime = parseTime(shift.pm_end, includeSeconds);
-        let adjustedPmEnd = pmEndTime;
-        if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
-            adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
-        }
-
-        if (!amStart || !adjustedPmEnd) return { isPartial: false, reason: null };
-
-        const expectedMinutes = (adjustedPmEnd - amStart) / (1000 * 60);
-        const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
-
-        if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
-            return {
-                isPartial: true,
-                reason: `Worked ${Math.round(actualMinutes)} min (expected ${Math.round(expectedMinutes)} min)`
-            };
-        }
-
-        return { isPartial: false, reason: null };
-    };
 
     const filterMultiplePunches = (punchList, shift, includeSeconds = false) => {
         if (punchList.length <= 1) return punchList;
@@ -437,9 +401,6 @@ export default function RunAnalysisTab({ project }) {
                 } else if (dateException.type === 'MANUAL_ABSENT') {
                     full_absence_count++;
                     continue;
-                } else if (dateException.type === 'MANUAL_HALF') {
-                    present_days++;
-                    half_absence_count++;
                 } else if (dateException.type === 'SICK_LEAVE') {
                     // Sick leave counts as WORKING DAY (no deduction from working_days)
                     // Day is tracked separately as sick_leave_count
@@ -638,7 +599,7 @@ export default function RunAnalysisTab({ project }) {
                 shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(filteredPunches, shift, nextDateStr, includeSeconds);
+
 
             // Handle manual late/early exceptions marking day as present
             if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
@@ -648,21 +609,21 @@ export default function RunAnalysisTab({ project }) {
             }
 
             if (filteredPunches.length > 0) {
-                if (partialDayResult.isPartial) {
-                    present_days++;
-                    half_absence_count++;
-                    auto_resolutions.push({
-                        date: dateStr,
-                        type: 'PARTIAL_DAY_DETECTED',
-                        details: partialDayResult.reason
-                    });
-                } else {
-                    present_days++;
-                }
-
-                if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
-                    if (filteredPunches.length < 2 && !isSingleShift) {
+                // PUNCH COMPLETENESS STATUS (FRONTEND - RunAnalysisTab)
+                if (isSingleShift) {
+                    if (filteredPunches.length === 1) {
+                        present_days++;
                         half_absence_count++;
+                    } else {
+                        present_days++;
+                    }
+                } else {
+                    // Split shift: 1-2 = Half, 3-4 = Present
+                    if (filteredPunches.length === 1 || filteredPunches.length === 2) {
+                        present_days++;
+                        half_absence_count++;
+                    } else {
+                        present_days++;
                     }
                 }
             } else {
@@ -694,7 +655,7 @@ export default function RunAnalysisTab({ project }) {
             );
 
             const shouldSkipTimeCalculation = dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'MANUAL_HALF', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
             ].includes(dateException.type);
 
             // Use manual exception minutes if present, otherwise calculate from punches

@@ -81,7 +81,7 @@ export default function BulkEditExceptionDialog({ open, onClose, selectedExcepti
                                         <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                         <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                         <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-                                        <SelectItem value="MANUAL_HALF">Manual Half Day</SelectItem>
+
                                     </SelectContent>
                                 </Select>
                             </div>
