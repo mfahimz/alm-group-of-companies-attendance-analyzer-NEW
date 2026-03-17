@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +31,16 @@ export default function PreApprovalDialog({
 
     const [showLimitWarning, setShowLimitWarning] = useState(false);
     const queryClient = useQueryClient();
+
+    // Get current user role using the pre-initialized client
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me(),
+        staleTime: Infinity
+    });
+
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
 
     const todayUAE = nowInUAE();
     const minAllowedDate = formatDateForInput(subDays(todayUAE, 5));
@@ -64,15 +74,24 @@ export default function PreApprovalDialog({
 
             // Update half-yearly minutes usage first (only for companies that support it)
             if (supportsHalfYearlyMinutes) {
-                const updateResponse = await base44.functions.invoke('updateQuarterlyMinutes', {
-                    employee_id: String(selectedEmployee.hrms_id),
-                    company: selectedEmployee.company,
-                    date: data.date_from,
-                    minutes_to_add: minutesToApprove
-                });
+                const availableMinutes = halfYearlyMinutes?.remaining_minutes || 0;
+                
+                // Admin and CEO bypass the limit; however, excess minutes are intentionally not tracked in used_minutes
+                const minutesToUpdate = isAdminOrCEO 
+                    ? Math.min(minutesToApprove, availableMinutes) 
+                    : minutesToApprove;
+                
+                if (minutesToUpdate > 0) {
+                    const updateResponse = await base44.functions.invoke('updateQuarterlyMinutes', {
+                        employee_id: String(selectedEmployee.hrms_id),
+                        company: selectedEmployee.company,
+                        date: data.date_from,
+                        minutes_to_add: minutesToUpdate
+                    });
 
-                if (!updateResponse.data.success) {
-                    throw new Error(updateResponse.data.error || 'Failed to update half-yearly minutes');
+                    if (!updateResponse.data.success) {
+                        throw new Error(updateResponse.data.error || 'Failed to update half-yearly minutes');
+                    }
                 }
             }
 
@@ -145,7 +164,8 @@ export default function PreApprovalDialog({
         // Only check half-yearly minutes balance for companies that support it
         if (supportsHalfYearlyMinutes) {
             const availableMinutes = halfYearlyMinutes?.remaining_minutes || 0;
-            if (minutes > availableMinutes) {
+            // Admin and CEO bypass the balance check validation
+            if (!isAdminOrCEO && minutes > availableMinutes) {
                 setShowLimitWarning(true);
                 return;
             }
@@ -286,6 +306,16 @@ export default function PreApprovalDialog({
                                     onChange={(e) => setFormData({ ...formData, allowed_minutes: e.target.value })}
                                     min="1"
                                 />
+                                {isAdminOrCEO && formData.allowed_minutes && supportsHalfYearlyMinutes && 
+                                    parseInt(formData.allowed_minutes) > (halfYearlyMinutes?.remaining_minutes || 0) && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-md p-2 flex items-start gap-2 text-amber-800 text-xs mt-2">
+                                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                        <p>
+                                            Warning: The entered amount is {parseInt(formData.allowed_minutes) - (halfYearlyMinutes?.remaining_minutes || 0)} minutes more than the available balance. 
+                                            Only the available balance will be deducted from the allowance.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <Label>Apply To *</Label>

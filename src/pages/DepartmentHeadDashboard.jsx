@@ -34,14 +34,32 @@ export default function DepartmentHeadDashboard() {
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isDepartmentHead = userRole === 'department_head';
     const isCEO = userRole === 'ceo';
+    const isAdmin = userRole === 'admin';
     const isHRManager = userRole === 'hr_manager';
+    
+    // Admin and CEO bypass the department head filter
+    const isAdminOrCEO = isAdmin || isCEO;
+
     // CEO/HR Manager can access if they have hrms_id (linked to dept head record)
     const hasDeptHeadLink = (isCEO || isHRManager) && !!currentUser?.hrms_id;
-    const canVerifyDeptHead = isDepartmentHead || hasDeptHeadLink;
+    const canVerifyDeptHead = isDepartmentHead || hasDeptHeadLink || isAdminOrCEO;
 
     const { data: deptHeadVerification, isLoading: verificationLoading } = useQuery({
         queryKey: ['deptHeadVerification', canVerifyDeptHead, currentUser?.email],
         queryFn: async () => {
+            if (isAdminOrCEO) {
+                // Skip the backend check for admin and ceo
+                return {
+                    verified: true,
+                    assignment: {
+                        company: currentUser.company,
+                        department: 'All Departments',
+                        employee_id: 'SYSTEM_ADMIN',
+                        managed_employee_ids: 'ALL'
+                    }
+                };
+            }
+
             if (!canVerifyDeptHead) {
                 console.log('[DeptHeadDashboard] Skipping verification - not a department head role or no dept head link');
                 return null;
@@ -207,6 +225,14 @@ export default function DepartmentHeadDashboard() {
     const { data: employees = [] } = useQuery({
         queryKey: ['deptEmployees', deptHeadAssignment?.company, deptHeadAssignment?.department, deptHeadVerification?.assignment?.managed_employee_ids],
         queryFn: async () => {
+            // Admin and CEO load all active employees for the company directly
+            if (isAdminOrCEO) {
+                return await base44.entities.Employee.filter({
+                    company: currentUser.company,
+                    active: true
+                });
+            }
+
             if (!deptHeadVerification?.verified) return [];
             
             const managedIds = deptHeadVerification.assignment.managed_employee_ids 
@@ -228,7 +254,7 @@ export default function DepartmentHeadDashboard() {
                 String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
             );
         },
-        enabled: !!deptHeadVerification?.verified,
+        enabled: !!deptHeadVerification?.verified || isAdminOrCEO,
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,

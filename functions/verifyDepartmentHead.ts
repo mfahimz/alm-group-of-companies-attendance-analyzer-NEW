@@ -14,8 +14,27 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Check if user has department_head, ceo, or hr_manager role (CEO/HR Manager can optionally have dept head link)
         const userRole = user.extended_role || user.role || 'user';
+
+        // Admin and CEO bypass: Return successful verification with all active employees for the company as the managed list
+        if (userRole === 'admin' || userRole === 'ceo') {
+            const allEmployees = await base44.asServiceRole.entities.Employee.filter({
+                company: user.company,
+                active: true
+            });
+            
+            return Response.json({
+                verified: true,
+                assignment: {
+                    company: user.company,
+                    department: 'All Departments',
+                    employee_id: 'SYSTEM_ADMIN',
+                    managed_employee_ids: allEmployees.map(e => String(e.id)).join(',')
+                }
+            });
+        }
+
+        // Check if user has department_head, ceo, or hr_manager role (CEO/HR Manager can optionally have dept head link)
         if (userRole !== 'department_head' && userRole !== 'ceo' && userRole !== 'hr_manager') {
             return Response.json({
                 error: 'Access denied: Not a department head',
