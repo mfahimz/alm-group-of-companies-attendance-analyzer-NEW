@@ -193,15 +193,18 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
         const gender = (scan.gender || '').toLowerCase();
         const rec = (scan.ai_recommendation || '');
         const evalStatus = (scan.evaluation_status || 'Pending');
-        const experience = scan.years_experience || 0;
+        
+        // FIX 3: Parse as float and strip non-numeric characters
+        const expRaw = String(scan.years_experience ?? '0').replace(/[^0-9.]/g, '');
+        const experience = parseFloat(expRaw) || 0;
 
         // Search text filter (Name or Position)
         if (filters.search && !name.includes(filters.search.toLowerCase()) && !pos.includes(filters.search.toLowerCase())) return false;
 
-        // Nationality filter
-        if (filters.nationality && !nationality.includes(filters.nationality.toLowerCase())) return false;
+        // Nationality filter - FIX 1: Trimmed case-insensitive matching
+        if (filters.nationality && nationality.trim() !== filters.nationality.toLowerCase().trim()) return false;
         
-        // Location filter
+        // Location filter - FIX 2: Search across full string
         if (filters.location && !location.includes(filters.location.toLowerCase())) return false;
         
         // Gender filter
@@ -213,8 +216,8 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
         // Evaluation Status filter
         if (filters.status && filters.status !== 'All' && evalStatus !== filters.status) return false;
 
-        // Years of Experience filter (minimum)
-        if (filters.minExperience && experience < parseInt(filters.minExperience)) return false;
+        // Years of Experience filter (minimum) - FIX 3: Parse float
+        if (filters.minExperience && experience < parseFloat(filters.minExperience)) return false;
 
         return true;
     });
@@ -223,7 +226,11 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
      * Unique values for dropdowns are derived from the current dataset
      * to ensure the filter options are always relevant.
      */
-    const uniqueNationalities = Array.from(new Set(scans.map(s => s.nationality).filter(Boolean))).sort();
+    const uniqueNationalities = Array.from(new Set(scans.map(s => s.nationality?.trim()).filter(n => 
+        n && !['-', '—', 'not specified', 'unknown'].includes(n.toLowerCase())
+    ))).sort();
+
+    const uniqueRecommendations = Array.from(new Set(scans.map(s => s.ai_recommendation).filter(Boolean))).sort();
 
     return (
         <div className="flex flex-col h-full">
@@ -283,7 +290,7 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                             className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#E2E6EC] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0F1E36] appearance-none"
                         >
                             <option value="All">Recommendation (All)</option>
-                            {Object.keys(RECOMMENDATION_COLORS).map(r => <option key={r} value={r}>{r}</option>)}
+                            {uniqueRecommendations.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
                     </div>
 
@@ -413,24 +420,24 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                     </thead>
                     <tbody>
                         {filteredScans.map((scan, idx) => {
-                            // Resolve nationality and location from top-level fields or fallback to extracted_data
-                            // This ensures older records or those without direct fields still show data correctly.
                             const extra = (() => {
                                 try { return scan.extracted_data ? JSON.parse(scan.extracted_data) : {}; }
                                 catch { return {}; }
                             })();
 
-                            const resolvedNationality = (scan.nationality && !['Not Specified', 'Unknown', ''].includes(scan.nationality.trim()))
-                                ? scan.nationality
-                                : (extra.nationality && !['Not Specified', 'Unknown', ''].includes(extra.nationality.trim()))
-                                    ? extra.nationality
-                                    : '—';
+                            const isInvalid = (val) => !val || ['-', '—', 'not specified', 'unknown', ''].includes(val.trim().toLowerCase());
 
-                            const resolvedLocation = (scan.location && !['Not Specified', 'Unknown', ''].includes(scan.location.trim()))
+                            const resolvedNationality = !isInvalid(scan.nationality)
+                                ? scan.nationality
+                                : (!isInvalid(extra.nationality) ? extra.nationality : '—');
+
+                            const rawLocation = !isInvalid(scan.location)
                                 ? scan.location
-                                : (extra.current_location && !['Not Specified', 'Unknown', ''].includes(extra.current_location.trim()))
-                                    ? extra.current_location
-                                    : '—';
+                                : (!isInvalid(extra.current_location) ? extra.current_location : '—');
+
+                            const resolvedLocation = rawLocation !== '—' 
+                                ? rawLocation.split(',')[0].trim() 
+                                : '—';
 
                             return (
                                 <tr
