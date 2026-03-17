@@ -191,6 +191,86 @@ function CodeComparisonSection({ comparison }) {
     );
 }
 
+function DecidingFactors({ score, label, recency, redFlags = [] }) {
+    const recencyConfig = {
+        'High': 'bg-green-100 text-green-800 border-green-200',
+        'Medium': 'bg-amber-100 text-amber-800 border-amber-200',
+        'Low': 'bg-red-100 text-red-800 border-red-200'
+    };
+    
+    const labelConfig = {
+        'Exact Match': 'bg-green-100 text-green-800 border-green-200',
+        'Partial Match': 'bg-blue-100 text-blue-800 border-blue-200',
+        'No Match': 'bg-slate-100 text-slate-800 border-slate-200'
+    };
+
+    return (
+        <div className="bg-white border border-[#E2E6EC] rounded-xl p-5 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between border-b border-[#F1F5F9] pb-3">
+                <h3 className="text-sm font-bold text-[#1F2937] flex items-center gap-2">
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> Deciding Factors
+                </h3>
+                <span className="text-[10px] font-bold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded tracking-tighter uppercase">ATS Insights</span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Title Match Card */}
+                <div className="p-3 border border-[#F1F5F9] rounded-lg bg-[#F8FAFC]">
+                    <p className="text-[10px] font-bold text-[#64748B] uppercase mb-1.5 tracking-tight">Title Match Score</p>
+                    <div className="flex items-center justify-between">
+                        <span className="text-2xl font-black text-[#1E293B]">{score ?? 0}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${labelConfig[label] || labelConfig['No Match']}`}>
+                            {label || 'No Match'}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Recency Card */}
+                <div className="p-3 border border-[#F1F5F9] rounded-lg bg-[#F8FAFC]">
+                    <p className="text-[10px] font-bold text-[#64748B] uppercase mb-1.5 tracking-tight">Experience Recency</p>
+                    <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-black border ${recencyConfig[recency] || recencyConfig['Low']}`}>
+                            {recency || 'Low'}
+                        </span>
+                        <span className="text-[9px] text-[#94A3B8] font-medium uppercase">
+                            {recency === 'High' ? 'Within 3 Years' : recency === 'Medium' ? '3-6 Years ago' : 'Older than 6y'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Red Flags */}
+            <div className="p-3 border border-[#F1F5F9] rounded-lg bg-[#F8FAFC]">
+                <p className="text-[10px] font-bold text-[#64748B] uppercase mb-2 tracking-tight">Red Flag Detection</p>
+                {redFlags && redFlags.length > 0 ? (
+                    <ul className="grid grid-cols-1 gap-1.5">
+                        {redFlags.map((flag, i) => (
+                            <li key={i} className="flex items-start gap-2 text-[11px] text-red-700 font-medium bg-red-50/50 p-2 rounded border border-red-100/50">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                                {flag}
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <div className="flex items-center gap-2 text-[11px] text-green-700 font-bold bg-green-50/50 p-2 rounded border border-green-100/50">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        No red flags detected
+                    </div>
+                )}
+            </div>
+
+            <div className="flex flex-col gap-1 border-t border-[#F1F5F9] pt-3 mt-1">
+                <p className="text-[9px] text-[#94A3B8] italic leading-tight">
+                    * Automated scoring based on job title alignment, role recency, and profile variance.
+                </p>
+                <p className="text-[9px] font-bold text-[#64748B] uppercase tracking-wider">
+                    Planned Updates: GAP 1 keyword density • GAP 2 structure validation • GAP 6 ATS readability scoring
+                </p>
+            </div>
+        </div>
+    );
+}
+
 export default function ResumeScanResultView({ result, onNewScan }) {
     if (!result) return null;
 
@@ -222,6 +302,11 @@ export default function ResumeScanResultView({ result, onNewScan }) {
 
     const missingSkills = (() => {
         try { return typeof result.missing_skills === 'string' ? JSON.parse(result.missing_skills) : (result.missing_skills || []); }
+        catch { return []; }
+    })();
+
+    const redFlags = (() => {
+        try { return typeof result.red_flags === 'string' ? JSON.parse(result.red_flags) : (result.red_flags || []); }
         catch { return []; }
     })();
 
@@ -331,6 +416,14 @@ export default function ResumeScanResultView({ result, onNewScan }) {
                     })()}
                 </div>
             )}
+
+            {/* Deciding Factors — ATS Specifics */}
+            <DecidingFactors 
+                score={result.title_match_score}
+                label={result.title_match_label}
+                recency={result.experience_recency}
+                redFlags={redFlags}
+            />
 
             {/* Section 1: Extracted Resume Data */}
             <Section title="📄 Extracted Resume Data" defaultOpen={true}>

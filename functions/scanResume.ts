@@ -305,6 +305,54 @@ Deno.serve(async (req) => {
                 // For now, we'll let the AI also flag mandatory failures in its summary if we mention them in the prompt
             }
 
+            // --- CHANGE 1: Title match score ---
+            const posName = (criteria.position_name || '').toLowerCase();
+            const candTitle = (extractedData.current_or_last_position || '').toLowerCase();
+            let title_match_score = 0;
+            let title_match_label = "No Match";
+            if (posName && candTitle) {
+                if (posName === candTitle) {
+                    title_match_score = 100;
+                    title_match_label = "Exact Match";
+                } else if (posName.includes(candTitle) || candTitle.includes(posName)) {
+                    title_match_score = 60;
+                    title_match_label = "Partial Match";
+                }
+            }
+
+            // --- CHANGE 2: Experience recency score ---
+            const currentYear = new Date().getFullYear();
+            const experienceEntries = extractedData.experience || [];
+            let experience_recency = "Low";
+            let latestRelevantYear = -1;
+            
+            for (const exp of experienceEntries) {
+                const role = (exp.role || '').toLowerCase();
+                const isRelevant = posName && role && (posName.includes(role) || role.includes(posName));
+                
+                if (isRelevant) {
+                    const dur = (exp.duration || '').toLowerCase();
+                    if (dur.includes('present') || dur.includes('current') || dur.includes('now') || (dur.includes(String(currentYear)) && !dur.includes('-'))) {
+                        latestRelevantYear = currentYear;
+                        break; 
+                    } else {
+                        const years = dur.match(/\b(20\d\d)\b/g); 
+                        if (years) {
+                            const endYear = Math.max(...years.map(y => parseInt(y)));
+                            if (endYear > latestRelevantYear) latestRelevantYear = endYear;
+                        }
+                    }
+                }
+            }
+            
+            if (latestRelevantYear >= currentYear - 3 && latestRelevantYear !== -1) {
+                experience_recency = "High";
+            } else if (latestRelevantYear >= currentYear - 6 && latestRelevantYear !== -1) {
+                experience_recency = "Medium";
+            } else {
+                experience_recency = "Low";
+            }
+
             const prompt = `You are an expert HR recruiter and ATS evaluator for Al Maraghi Auto Repairs, Abu Dhabi, UAE.
 
 You are evaluating this candidate specifically for the role of: ${criteria.position_name}.
@@ -332,7 +380,8 @@ Output a JSON with these exact fields:
 - missing_skills: array of strings
 - strengths: array of 3 specific strings
 - concerns: array of strings. If they failed mandatory rules, list them here.
-- experience_years: number (relevant to the role)`;
+- experience_years: number (relevant to the role)
+- red_flags: array of strings. Identify specific red flags: employment gaps longer than 6 months, job hopping (defined as more than two roles with less than 12 months tenure each), and industry mismatch where the candidate has no experience in the automotive or related technical service industry. If no red flags are found return an empty array.`;
 
             const aiResponse = await base44.integrations.Core.InvokeLLM({
                 prompt,
@@ -346,7 +395,8 @@ Output a JSON with these exact fields:
                         missing_skills: { type: "array", items: { type: "string" } },
                         strengths: { type: "array", items: { type: "string" } },
                         concerns: { type: "array", items: { type: "string" } },
-                        experience_years: { type: "number" }
+                        experience_years: { type: "number" },
+                        red_flags: { type: "array", items: { type: "string" } }
                     }
                 }
             });
@@ -361,7 +411,10 @@ Output a JSON with these exact fields:
                 aiResponse,
                 codeComparison,
                 criteriaText,
-                failedMandatory
+                failedMandatory,
+                title_match_score,
+                title_match_label,
+                experience_recency
             };
         }
 
@@ -398,7 +451,10 @@ Output a JSON with these exact fields:
             evaluations.push({
                 criteria: crit,
                 ...evalResult,
-                aiScore: evalResult.aiResponse.score
+                aiScore: evalResult.aiResponse.score,
+                title_match_score: evalResult.title_match_score,
+                title_match_label: evalResult.title_match_label,
+                experience_recency: evalResult.experience_recency
             });
         }
 
@@ -428,6 +484,10 @@ Output a JSON with these exact fields:
             strengths: JSON.stringify(best.aiResponse?.strengths || []),
             concerns: JSON.stringify(best.aiResponse?.concerns || []),
             years_experience: best.aiResponse?.experience_years ?? extractedData?.relevant_years_experience ?? extractedData?.total_years_experience ?? 0,
+            title_match_score: best.title_match_score,
+            title_match_label: best.title_match_label,
+            experience_recency: best.experience_recency,
+            red_flags: JSON.stringify(best.aiResponse?.red_flags || []),
             scanned_by: user.email,
             status: 'completed',
             evaluation_status: best.failedMandatory.length > 0 ? 'Rejected' : 'Pending',
@@ -467,6 +527,10 @@ Output a JSON with these exact fields:
                 code_comparison: best.codeComparison,
                 matched_template_name: best.criteria.position_name,
                 failed_mandatory: best.failedMandatory,
+                title_match_score: best.title_match_score,
+                title_match_label: best.title_match_label,
+                experience_recency: best.experience_recency,
+                red_flags: best.aiResponse?.red_flags || [],
                 template_scores: criteriaList.length > 1 ? evaluations.map(e => ({
                     template_name: e.criteria.position_name,
                     score: e.aiScore
