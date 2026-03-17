@@ -1623,16 +1623,19 @@ Deno.serve(async (req: Request) => {
 
         // CHUNK MODE: Only delete results for employees in THIS chunk
         if (_chunk_offset !== undefined && allResults.length > 0) {
-            const attendanceIdsToDelete = allResults.map(r => r.attendance_id);
-            for (const aid of attendanceIdsToDelete) {
-                const existing = await base44.asServiceRole.entities.AnalysisResult.filter({
-                    project_id,
-                    report_run_id: reportRun.id,
-                    attendance_id: aid
-                });
-                if (existing.length > 0) {
-                    await base44.asServiceRole.entities.AnalysisResult.delete(existing[0].id);
+            // Use already-fetched existingResultsForReport to avoid per-employee API calls (rate limit fix)
+            const attendanceIdsToDelete = new Set(allResults.map(r => String(r.attendance_id)));
+            const toDelete = existingResultsForReport.filter(r => attendanceIdsToDelete.has(String(r.attendance_id)));
+            if (toDelete.length > 0) {
+                // Delete in batches of 50 to avoid rate limits
+                for (let i = 0; i < toDelete.length; i += 50) {
+                    const batch = toDelete.slice(i, i + 50);
+                    await Promise.all(batch.map(r => base44.asServiceRole.entities.AnalysisResult.delete(r.id)));
+                    if (i + 50 < toDelete.length) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
                 }
+                console.log(`[runAnalysis] Deleted ${toDelete.length} existing chunk results`);
             }
         } else if (existingResultsForReport.length > 0 && _chunk_offset === undefined) {
             // Full run - delete all existing
