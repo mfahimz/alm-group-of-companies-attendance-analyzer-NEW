@@ -50,7 +50,6 @@
 import AIPayrollInsights from './pages/AIPayrollInsights';
 import AgentsDocumentation from './pages/AgentsDocumentation';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
-import AppDocumentation from './pages/AppDocumentation';
 import AuditLogs from './pages/AuditLogs';
 import BusinessDocumentation from './pages/BusinessDocumentation';
 import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
@@ -90,7 +89,6 @@ export const PAGES = {
     "AIPayrollInsights": AIPayrollInsights,
     "AgentsDocumentation": AgentsDocumentation,
     "AnnualLeaveManagement": AnnualLeaveManagement,
-    "AppDocumentation": AppDocumentation,
     "AuditLogs": AuditLogs,
     "BusinessDocumentation": BusinessDocumentation,
     "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,

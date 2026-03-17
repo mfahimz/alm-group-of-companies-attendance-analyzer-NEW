@@ -241,67 +241,6 @@ export const PAGES_CONFIG = {
         defaultRoles: ['admin']
     },
 
-    // Documentation Section
-    SoftwareDoc: {
-        name: 'SoftwareDoc',
-        title: 'Software Overview',
-        icon: BookText,
-        category: 'Documentation',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    TechnicalDocumentation: {
-        name: 'TechnicalDocumentation',
-        title: 'Technical Docs',
-        icon: Code,
-        category: 'Documentation',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    AgentsDocumentation: {
-        name: 'AgentsDocumentation',
-        title: 'Agents Guide',
-        icon: Cpu,
-        category: 'Documentation',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    BusinessDocumentation: {
-        name: 'BusinessDocumentation',
-        title: 'Business Logic',
-        icon: Briefcase,
-        category: 'Documentation',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    AppDocumentation: {
-        name: 'AppDocumentation',
-        title: 'App Manual',
-        icon: BookOpen,
-        category: 'Documentation',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-    REPORT_ARCHITECTURE: {
-        name: 'REPORT_ARCHITECTURE',
-        title: 'Report Architecture',
-        icon: BarChart3,
-        category: 'Documentation',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
 
     ChangeTracker: {
         name: 'ChangeTracker',
@@ -428,10 +367,4 @@ export const NAV_CATEGORIES = {
         order: 100,
         renderAs: 'direct'
     },
-    Documentation: {
-        label: 'Knowledge Base',
-        icon: BookText,
-        order: 10,
-        renderAs: 'dropdown'
-    }
 };
