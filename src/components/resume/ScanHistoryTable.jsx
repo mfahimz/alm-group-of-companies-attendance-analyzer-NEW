@@ -420,15 +420,15 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
                                 catch { return {}; }
                             })();
 
-                            const resolvedNationality = (scan.nationality && scan.nationality !== 'Not Specified' && scan.nationality !== 'Unknown')
+                            const resolvedNationality = (scan.nationality && !['Not Specified', 'Unknown', ''].includes(scan.nationality.trim()))
                                 ? scan.nationality
-                                : (extra.nationality && extra.nationality !== 'Not Specified' && extra.nationality !== 'Unknown')
+                                : (extra.nationality && !['Not Specified', 'Unknown', ''].includes(extra.nationality.trim()))
                                     ? extra.nationality
                                     : '—';
 
-                            const resolvedLocation = (scan.location && scan.location !== 'Not Specified' && scan.location !== 'Unknown')
+                            const resolvedLocation = (scan.location && !['Not Specified', 'Unknown', ''].includes(scan.location.trim()))
                                 ? scan.location
-                                : (extra.current_location && extra.current_location !== 'Not Specified' && extra.current_location !== 'Unknown')
+                                : (extra.current_location && !['Not Specified', 'Unknown', ''].includes(extra.current_location.trim()))
                                     ? extra.current_location
                                     : '—';
 

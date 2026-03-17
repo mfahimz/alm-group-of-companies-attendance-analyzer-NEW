@@ -182,11 +182,24 @@ export default function TalentPool() {
         jobTemplates.forEach(template => {
             const companyName = template.company;
             if (companyName && result[companyName]) {
+                const templatePos = (template.position_name || '').trim().toLowerCase();
+
                 result[companyName].roles.push({
                     name: template.position_name,
                     // Unified position check: matched_template_name is set for multi-scans, 
                     // position_applied is set for single-scans. Checking both ensures all candidates appear.
-                    candidates: filteredCandidates.filter(c => (c.matched_template_name || c.position_applied) === template.position_name)
+                    // If candidate has a company field saved, we respect it. 
+                    // Otherwise we fall back to matching position name against templates.
+                    candidates: filteredCandidates.filter(c => {
+                        const scanPos = (c.matched_template_name || c.position_applied || '').trim().toLowerCase();
+                        const scanCompany = c.company || '';
+
+                        const posMatches = scanPos === templatePos;
+                        const companyMatches = scanCompany === companyName;
+
+                        // Show if position matches AND (company matches OR no company saved yet)
+                        return posMatches && (companyMatches || scanCompany === '');
+                    })
                 });
             }
         });

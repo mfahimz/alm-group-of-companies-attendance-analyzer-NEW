@@ -107,10 +107,24 @@ export default function ResumeDashboard({ onNewScan }) {
         const companyTemplates = templates.filter(t => t.company === companyName);
         const templateNames = new Set(companyTemplates.map(t => (t.position_name || '').trim().toLowerCase()));
         
-        // Match scans to templates using case-insensitive and trimmed comparison
+        // Match scans to templates using case-insensitive and trimmed comparison.
+        // If a scan has a company field, we use it directly to filter.
+        // If not, we fall back to matching by position name against templates for this company.
         const filteredScans = scans.filter(s => {
-            const pos = (s.position_applied || '').trim().toLowerCase();
-            return templateNames.has(pos);
+            const scanPos = (s.position_applied || '').trim().toLowerCase();
+            const scanCompany = s.company || '';
+            const isMatchingPosition = templateNames.has(scanPos);
+
+            if (scanCompany === companyName) {
+                return isMatchingPosition;
+            }
+
+            // Fallback for records scanned before the company field was added
+            if (!scanCompany || scanCompany === '') {
+                return isMatchingPosition;
+            }
+
+            return false;
         });
         const selectedScans = filteredScans.filter(s => s.evaluation_status === 'Selected');
 

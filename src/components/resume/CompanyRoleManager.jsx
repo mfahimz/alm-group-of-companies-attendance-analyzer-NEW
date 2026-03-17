@@ -105,9 +105,12 @@ export default function CompanyRoleManager() {
     const createMutation = useMutation({
         mutationFn: async () => {
             const me = await base44.auth.me();
+            if (!companies[0]?.name) {
+                throw new Error('No active companies available to assign a role.');
+            }
             return base44.entities.CompanyRoleMaster.create({
                 role_title: 'New Role',
-                company: companies[0]?.name || '',
+                company: companies[0]?.name,
                 status: 'Open',
                 created_by: me?.email || 'System',
                 created_at: new Date().toISOString()
@@ -116,6 +119,10 @@ export default function CompanyRoleManager() {
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['companyRoles'] });
             toast.success('Role added');
+        },
+        onError: (err) => {
+            toast.error('Failed to add role: ' + err.message);
+            console.error('Role creation error:', err);
         }
     });
 
