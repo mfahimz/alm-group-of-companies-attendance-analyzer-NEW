@@ -356,7 +356,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
+                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
 
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
@@ -368,7 +368,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
 
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance;
@@ -382,7 +382,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
+                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
 
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance;
@@ -426,34 +426,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         let pmEnd = parseTime(shift.pm_end);
         if (!amStart || !pmEnd) return { isPartial: false, reason: null };
         if (pmEnd.getHours() === 0 && pmEnd.getMinutes() === 0) pmEnd = new Date(pmEnd.getTime() + 86400000);
-        
-        const hasMiddleTimes = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
-        const isSingleShift = shift.is_single_shift === true || !hasMiddleTimes;
-
-        // Segment completion check for split shifts
-        if (!isSingleShift && amStart && amEnd && pmStart && pmEnd) {
-            const hasAMPunches = pts.some(p => {
-                const time = p.time.getTime();
-                return (Math.abs(time - amStart.getTime()) / 60000 <= 180) ||
-                    (Math.abs(time - amEnd.getTime()) / 60000 <= 180);
-            });
-
-            const hasPMPunches = pts.some(p => {
-                const time = p.time.getTime();
-                return (Math.abs(time - pmStart.getTime()) / 60000 <= 180) ||
-                    (Math.abs(time - pmEnd.getTime()) / 60000 <= 180);
-            });
-
-            if (!hasAMPunches || !hasPMPunches) {
-                const missingSegment = !hasAMPunches ? 'AM' : 'PM';
-                return {
-                    isPartial: true,
-                    reason: `Missed entire ${missingSegment} segment`
-                };
-            }
-        }
-
-        const expected = isSingleShift ? (pmEnd - amStart) / 60000 : ((amEnd ? (amEnd - amStart) / 60000 : 0) + (pmStart ? (pmEnd - pmStart) / 60000 : 0));
+        const mid = amEnd && pmStart && String(shift.am_end || '').trim() !== '' && String(shift.pm_start || '').trim() !== '' && shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-';
+        const single = shift.is_single_shift === true || !mid;
+        const expected = single ? (pmEnd - amStart) / 60000 : ((amEnd ? (amEnd - amStart) / 60000 : 0) + (pmStart ? (pmEnd - pmStart) / 60000 : 0));
         const actual = (pts[pts.length - 1].time - pts[0].time) / 60000;
         if (expected > 0 && actual < expected * 0.5 && actual > 0) return { isPartial: true, reason: `Worked ${Math.round(actual)} min (expected ${Math.round(expected)} min)` };
         return { isPartial: false, reason: null };
@@ -768,30 +743,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 punchMatchesTotals = matchPunchesToShiftPoints(dayPunches, shift, nextDateStr);
             }
 
-            // MANDATORY PUNCH COMPLETENESS RULE:
-            // Count punches after deduplication and midnight carry-forward.
-            // Strict enforcement with only SKIP_PUNCH and FULL_SKIP bypasses.
-            let punchCompletenessHalfDayTriggered = false;
-            // Bypass rule only if a skip exception exists for this specific day
-            const isSkipPunchBypassed = dateException && (dateException.type === 'SKIP_PUNCH' || dateException.type === 'FULL_SKIP');
-            
-            if (!isSkipPunchBypassed && shift) {
-                const punchCount = dayPunches.length;
-                if (isSingleShift) {
-                    if (punchCount === 1) {
-                        punchCompletenessHalfDayTriggered = true;
-                    }
-                } else {
-                    // For split shifts, 1 or 2 punches result in Half Day. 0 punches are handled by LOP logic.
-                    if (punchCount > 0 && punchCount <= 2) {
-                        punchCompletenessHalfDayTriggered = true;
-                    }
-                }
-            }
-
-            const partialDayResult = (isSkipPunchBypassed || punchCompletenessHalfDayTriggered)
-                ? { isPartial: false, reason: '' }
-                : detectPartialDay(dayPunches, shift, nextDateStr);
+            const partialDayResult = detectPartialDay(dayPunches, shift, nextDateStr);
 
             // TRACK ATTENDANCE STATUS
             if (dayOverride) {
@@ -843,69 +795,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             let dayEarlyMinutes = 0;
 
             // 1. Calculation phase: punches (regardless of partial day status - match backend)
-            if (shift && punchMatchesTotals.length > 0 && !shouldSkipTimeCalc && !punchCompletenessHalfDayTriggered) {
-                const matchedShiftPoints = new Set(punchMatchesTotals.filter(m => m.matchedTo).map(m => m.matchedTo));
-
-                if (matchedShiftPoints.size === 0) {
-                    // Boundary-based calculation for NO MATCH days
-                    const firstPunch = punchMatchesTotals[0].punch.time;
-                    const lastPunch = punchMatchesTotals[punchMatchesTotals.length - 1].punch.time;
-                    const shiftStart = parseTime(shift.am_start);
-                    const pmEndTimeRaw = parseTime(shift.pm_end);
-                    let shiftEnd = pmEndTimeRaw;
-                    if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
-                        shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
+            if (shift && punchMatchesTotals.length > 0 && !shouldSkipTimeCalc) {
+                for (const match of punchMatchesTotals) {
+                    if (!match.matchedTo) continue;
+                    const punchTime = match.punch.time;
+                    const shiftTime = match.shiftTime;
+                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                        if (punchTime > shiftTime) dayLateMinutes += Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
                     }
-
-                    if (shiftStart && firstPunch > shiftStart) {
-                        dayLateMinutes = Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                        if (punchTime < shiftTime) dayEarlyMinutes += Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
                     }
-                    if (shiftEnd && lastPunch < shiftEnd) {
-                        dayEarlyMinutes = Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
-                    }
-                } else {
-                    for (const match of punchMatchesTotals) {
-                        if (!match.matchedTo) continue;
-
-                        const punchTime = match.punch.time;
-                        const shiftTime = match.shiftTime;
-
-                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                            if (punchTime > shiftTime) {
-                                const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
-                                dayLateMinutes += minutes;
-                            }
-                        }
-
-                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                            if (punchTime < shiftTime) {
-                                const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
-                                dayEarlyMinutes += minutes;
-                            }
-                        }
-                    }
-
-                        // FALLBACK for missing boundary matches
-                        // The fallback calculates a penalty from the nearest punch within a 4-hour window
-                        // when no match was found within any standard matching window.
-                        if (!matchedShiftPoints.has('AM_START')) {
-                            const shiftStart = parseTime(shift.am_start);
-                            const amFallbackPunch = punchMatchesTotals.find(m => shiftStart && Math.abs(m.punch.time.getTime() - shiftStart.getTime()) / (1000 * 60) <= 240)?.punch.time;
-                            if (shiftStart && amFallbackPunch && amFallbackPunch > shiftStart) {
-                                dayLateMinutes += Math.round(Math.abs((amFallbackPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
-                            }
-                                  if (!matchedShiftPoints.has('PM_END')) {
-                            const pmEndTimeRaw = parseTime(shift.pm_end);
-                            let shiftEnd = pmEndTimeRaw;
-                            if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
-                                shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
-                            }
-                            const pmFallbackPunch = [...punchMatchesTotals].reverse().find(m => shiftEnd && Math.abs(m.punch.time.getTime() - shiftEnd.getTime()) / (1000 * 60) <= 240)?.punch.time;
-                            if (shiftEnd && pmFallbackPunch && pmFallbackPunch < shiftEnd) {
-                                dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - pmFallbackPunch.getTime()) / (1000 * 60)));
-                            }
-                        }
-                    }              }
+                }
             }
 
             // 2. Override phases
@@ -924,16 +825,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const totalDayMinutesNet = dayLateMinutes + dayEarlyMinutes;
             if (allowedMinutesForDay > 0 && totalDayMinutesNet > 0) {
                 const remaining = Math.max(0, totalDayMinutesNet - allowedMinutesForDay);
-                if (totalDayMinutesNet === 0) {
-                    // Zero guard prevents NaN corruption when an employee has no late or early minutes on a given day.
-                    dayLateMinutes = 0;
-                    dayEarlyMinutes = 0;
-                } else {
-                    const lateRatio = dayLateMinutes / totalDayMinutesNet;
-                    const earlyRatio = dayEarlyMinutes / totalDayMinutesNet;
-                    dayLateMinutes = Math.round(remaining * lateRatio);
-                    dayEarlyMinutes = Math.round(remaining * earlyRatio);
-                }
+                const lateRatio = dayLateMinutes / totalDayMinutesNet;
+                const earlyRatio = dayEarlyMinutes / totalDayMinutesNet;
+                dayLateMinutes = Math.round(remaining * lateRatio);
+                dayEarlyMinutes = Math.round(remaining * earlyRatio);
             }
 
             totalLateMinutes += dayLateMinutes;
