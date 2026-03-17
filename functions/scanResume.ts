@@ -190,6 +190,7 @@ Deno.serve(async (req) => {
                     full_name: { type: "string" },
                     email: { type: "string" },
                     phone: { type: "string" },
+                    mobile_number: { type: "string", description: "The candidate's primary mobile or phone number if available." },
                     total_years_experience: { type: "number", description: "Total years across all jobs" },
                     relevant_years_experience: {
                         type: "number",
@@ -238,7 +239,48 @@ Deno.serve(async (req) => {
             if (extractionResult.status !== 'success') {
                 throw new Error('Extraction failed: ' + (extractionResult.error || 'Unknown error'));
             }
-            return extractionResult.output;
+
+            const output = extractionResult.output;
+
+            // Country Detection Logic
+            function detectCountry(num: string) {
+                if (!num) return null;
+                const clean = num.replace(/\D/g, '');
+                const raw = num.trim();
+
+                // International codes first (most reliable)
+                if (raw.startsWith('+971') || raw.startsWith('00971') || clean.startsWith('971')) return 'UAE';
+                if (raw.startsWith('+966') || raw.startsWith('00966') || clean.startsWith('966')) return 'Saudi Arabia';
+                if (raw.startsWith('+974') || raw.startsWith('00974') || clean.startsWith('974')) return 'Qatar';
+                if (raw.startsWith('+965') || raw.startsWith('00965') || clean.startsWith('965')) return 'Kuwait';
+                if (raw.startsWith('+973') || raw.startsWith('00973') || clean.startsWith('973')) return 'Bahrain';
+                if (raw.startsWith('+968') || raw.startsWith('00968') || clean.startsWith('968')) return 'Oman';
+                if (raw.startsWith('+91') || raw.startsWith('0091') || clean.startsWith('91')) return 'India';
+
+                // Local prefix logic
+                if (clean.startsWith('05')) {
+                    // Ambiguous between UAE and Saudi per prompt, defaulting to UAE based on prompt order 
+                    // unless it matches common lengths. But prompt says "matches UAE format ... label as UAE".
+                    return 'UAE'; 
+                }
+                
+                // Qatar: 3, 5, 6, 7 (length 8)
+                if ((/^[3567]/.test(clean) && clean.length === 8)) return 'Qatar';
+                // Kuwait: 5, 6, 9 (length 8)
+                if ((/^[569]/.test(clean) && clean.length === 8)) return 'Kuwait';
+                // Bahrain: 3 (length 8)
+                if (clean.startsWith('3') && clean.length === 8) return 'Bahrain';
+                // Oman: 7, 9 (length 8)
+                if (/^[79]/.test(clean) && clean.length === 8) return 'Oman';
+                // India: 6, 7, 8, 9 (length 10)
+                if (/^[6789]/.test(clean) && clean.length === 10) return 'India';
+
+                return null;
+            }
+
+            output.mobile_country = detectCountry(output.mobile_number || output.phone || '');
+            
+            return output;
         }
 
         // Helper: Evaluate extracted data against position criteria
@@ -368,6 +410,8 @@ Output a JSON with these exact fields:
             applicant_name: extractedData?.full_name || 'Unknown',
             applicant_email: extractedData?.email || '',
             applicant_phone: extractedData?.phone || '',
+            mobile_number: extractedData?.mobile_number || '',
+            mobile_country: extractedData?.mobile_country || '',
             position_applied: best.criteria.position_name || '',
             department: best.criteria.department || '',
             file_url: fileUrl,

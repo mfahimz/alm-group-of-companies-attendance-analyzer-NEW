@@ -31,7 +31,7 @@ const EMPTY_TEMPLATE = {
  */
 
 function TemplateForm({ template, onSave, onCancel, isSaving, companies }) {
-    const [form, setForm] = useState(template || EMPTY_TEMPLATE);
+    const [form, setForm] = useState(() => ({ ...EMPTY_TEMPLATE, ...template }));
     const [quickText, setQuickText] = useState('');
     const [quickParsing, setQuickParsing] = useState(false);
     const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
@@ -342,9 +342,12 @@ export default function JobTemplateManager() {
     const companies = companiesRaw.filter(c => c.active);
 
     const saveMutation = useMutation({
-        mutationFn: (data) => data.id
-            ? base44.entities.JobTemplate.update(data.id, data)
-            : base44.entities.JobTemplate.create(data),
+        mutationFn: (data) => {
+            const { id, ...fields } = data;
+            return id
+                ? base44.entities.JobTemplate.update(id, fields)
+                : base44.entities.JobTemplate.create(fields);
+        },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['jobTemplates'] });
             setShowForm(false);

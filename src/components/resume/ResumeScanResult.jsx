@@ -243,6 +243,22 @@ export default function ResumeScanResultView({ result, onNewScan }) {
                         </span>
                     </div>
                     {result.applicant_email && <p className="text-xs text-[#6B7280] mb-2">{result.applicant_email}</p>}
+                    
+                    {/* Mobile Number & Country Badge */}
+                    {result.mobile_number && (
+                        <div className="mb-2">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded text-sm font-semibold">
+                                <Phone className="w-4 h-4 text-indigo-700" />
+                                {result.mobile_number}
+                                {result.mobile_country && (
+                                    <span className="ml-1 px-1.5 py-0.5 bg-indigo-200 text-indigo-800 text-[10px] rounded uppercase tracking-wider">
+                                        {result.mobile_country}
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-2 justify-center sm:justify-start mb-2">
                         <RecommendIcon className={`w-4 h-4 ${config.iconColor}`} />
                         {/* Unified field: ai_recommendation used for badge */}
