@@ -340,7 +340,7 @@ Deno.serve(async (req: Request) => {
                     for (const shiftPoint of shiftPoints) {
                         if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                        const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                        const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                         if (distance <= 120 && distance < minDistance) {
                             minDistance = distance;
@@ -354,7 +354,7 @@ Deno.serve(async (req: Request) => {
                     for (const shiftPoint of shiftPoints) {
                         if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                        const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                        const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                         if (distance <= 180 && distance < minDistance) {
                             minDistance = distance;
@@ -1199,6 +1199,47 @@ Deno.serve(async (req: Request) => {
                     }
                 }
 
+                // SINGLE SHIFT DETECTION: Check both the flag AND the actual time fields
+                const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                    String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
+                    shift.am_end !== '—' && shift.pm_start !== '—' &&
+                    shift.am_end !== '-' && shift.pm_start !== '-' &&
+                    shift.am_end !== 'null' && shift.pm_start !== 'null';
+                const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
+
+                // ================================================================
+                // MANDATORY PUNCH COMPLETENESS RULE:
+                // Count punches after deduplication and midnight carry-forward.
+                // ----------------------------------------------------------------
+                // This rule ensures employees provide a minimum set of punches to qualify 
+                // for full minute-based calculation.
+                // 
+                // RULE: 
+                // 1. Split Shift (4 expected): 1 or 2 punches -> Half Day Partial, 0 lates, 0 early.
+                // 2. Single Shift (2 expected): 1 punch -> Half Day Partial, 0 lates, 0 early.
+                // 3. Statuses like 3 punches (split) or full sets (2/4) proceed normally.
+                //
+                // BYPASSES: Only SKIP_PUNCH and FULL_SKIP exceptions can bypass this rule.
+                // NOTE: Midnight carry-forward always runs PRIOR to this check to ensure
+                // late-night finishes are counted towards the current shift day.
+                // ================================================================
+                let punchCompletenessHalfDayTriggered = false;
+                if (!hasSkipPunchApplied && shift) {
+                    const punchCount = filteredPunches.length;
+                    if (isSingleShift) {
+                        if (punchCount === 1) {
+                            punchCompletenessHalfDayTriggered = true;
+                        }
+                    } else {
+                        // For split shifts, having only 1 or 2 punches is insufficient for 
+                        // boundary-to-boundary matching, defaulting to Half Day. 
+                        // 0 punches remain handled by LOP logic.
+                        if (punchCount > 0 && punchCount <= 2) {
+                            punchCompletenessHalfDayTriggered = true;
+                        }
+                    }
+                }
+
                 let punchMatches = [];
                 let hasUnmatchedPunch = false;
                 // Allow punch matching even when skip is applied (we'll zero out specific minutes after)
@@ -1209,20 +1250,9 @@ Deno.serve(async (req: Request) => {
                     hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 }
 
-                // SINGLE SHIFT DETECTION: Check both the flag AND the actual time fields
-                // A shift is single if:
-                //   1. is_single_shift flag is true, OR
-                //   2. The middle time fields (am_end, pm_start) are empty/dash (only 2 time points exist)
-                const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
-                    String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
-                    shift.am_end !== '—' && shift.pm_start !== '—' &&
-                    shift.am_end !== '-' && shift.pm_start !== '-' &&
-                    shift.am_end !== 'null' && shift.pm_start !== 'null';
-                const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
-
-                // Skip partial day detection if SKIP_PUNCH is applied
-                // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches
-                const partialDayResult = hasSkipPunchApplied
+                // Skip partial day detection if SKIP_PUNCH is applied or Completeness Rule triggered.
+                // MIDNIGHT FIX: Pass nextDateStr so detectPartialDay can handle crossover punches.
+                const partialDayResult = (hasSkipPunchApplied || punchCompletenessHalfDayTriggered)
                     ? { isPartial: false, reason: '' }
                     : detectPartialDay(filteredPunches, shift, nextDateStr);
 
@@ -1238,21 +1268,24 @@ Deno.serve(async (req: Request) => {
                     if (skipPunchForced0PunchPresent) {
                         presentDays++;
                         dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                    } else if (partialDayResult.isPartial && !hasSkipPunchApplied) {
+                    } else if ((partialDayResult.isPartial || punchCompletenessHalfDayTriggered) && !hasSkipPunchApplied) {
                         presentDays++;
                         halfAbsenceCount++;
                         dateStatusMap[dateStr] = 'PRESENT';
                         auto_resolutions.push({
                             date: dateStr,
                             type: 'PARTIAL_DAY_DETECTED',
-                            details: partialDayResult.reason
+                            details: punchCompletenessHalfDayTriggered 
+                                ? `Punch Completeness Rule: Found only ${filteredPunches.length} punches.`
+                                : partialDayResult.reason
                         });
                     } else {
                         presentDays++;
                         dateStatusMap[dateStr] = hasSkipPunchApplied ? 'PRESENT_SKIP_PUNCH' : 'PRESENT';
                     }
 
-                    if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial && !hasSkipPunchApplied) {
+                    if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && 
+                        !partialDayResult.isPartial && !punchCompletenessHalfDayTriggered && !hasSkipPunchApplied) {
                         if (filteredPunches.length < 2 && !isSingleShift) {
                             halfAbsenceCount++;
                         }
@@ -1313,7 +1346,7 @@ Deno.serve(async (req: Request) => {
                         // so we do NOT re-create them at the end of analysis
                         otherMinutesFromExceptions[dateStr] = Math.abs(dateException.other_minutes);
                     }
-                } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
+                } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !punchCompletenessHalfDayTriggered) {
                     let dayLateMinutes = 0;
                     let dayEarlyMinutes = 0;
                     
@@ -1323,8 +1356,6 @@ Deno.serve(async (req: Request) => {
                     if (matchedShiftPoints.size === 0) {
                         // NO MATCH days no longer grant zero penalty presence.
                         // Penalties are now calculated from shift start and end boundaries using the first and last punch of the day.
-                        const firstPunch = punchMatches[0].punch.time;
-                        const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
                         const shiftStart = parseTime(shift.am_start);
                         const pmEndTimeRaw = parseTime(shift.pm_end);
                         let shiftEnd = pmEndTimeRaw;
@@ -1332,11 +1363,16 @@ Deno.serve(async (req: Request) => {
                             shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
                         }
 
-                        if (shiftStart && firstPunch > shiftStart) {
-                            dayLateMinutes = Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                        // FALLBACK SCOPING: Only use punches within a 4-hour (240 min) window of the shift boundaries 
+                        // to prevent cross-segment punch contamination.
+                        const amFallbackPunch = punchMatches.find(m => shiftStart && Math.abs(m.punch.time.getTime() - shiftStart.getTime()) / (1000 * 60) <= 240)?.punch.time;
+                        const pmFallbackPunch = [...punchMatches].reverse().find(m => shiftEnd && Math.abs(m.punch.time.getTime() - shiftEnd.getTime()) / (1000 * 60) <= 240)?.punch.time;
+
+                        if (shiftStart && amFallbackPunch && amFallbackPunch > shiftStart) {
+                            dayLateMinutes = Math.round(Math.abs((amFallbackPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
                         }
-                        if (shiftEnd && lastPunch < shiftEnd) {
-                            dayEarlyMinutes = Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
+                        if (shiftEnd && pmFallbackPunch && pmFallbackPunch < shiftEnd) {
+                            dayEarlyMinutes = Math.round(Math.abs((shiftEnd.getTime() - pmFallbackPunch.getTime()) / (1000 * 60)));
                         }
                     } else {
                         for (const match of punchMatches) {
@@ -1361,24 +1397,24 @@ Deno.serve(async (req: Request) => {
                         }
 
                         // FALLBACK for missing boundary matches
-                        // The fallback always calculates a penalty from the nearest actual punch when no match was found within any window 
-                        // so that punching at wrong times always generates appropriate penalties.
+                        // The fallback calculates a penalty from the nearest punch within a 4-hour window
+                        // when no match was found within any standard matching window.
                         if (!matchedShiftPoints.has('AM_START')) {
-                            const firstPunch = punchMatches[0].punch.time;
                             const shiftStart = parseTime(shift.am_start);
-                            if (shiftStart && firstPunch > shiftStart) {
-                                dayLateMinutes += Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                            const amFallbackPunch = punchMatches.find(m => shiftStart && Math.abs(m.punch.time.getTime() - shiftStart.getTime()) / (1000 * 60) <= 240)?.punch.time;
+                            if (shiftStart && amFallbackPunch && amFallbackPunch > shiftStart) {
+                                dayLateMinutes += Math.round(Math.abs((amFallbackPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
                             }
                         }
                         if (!matchedShiftPoints.has('PM_END')) {
-                            const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
                             const pmEndTimeRaw = parseTime(shift.pm_end);
                             let shiftEnd = pmEndTimeRaw;
                             if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
                                 shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
                             }
-                            if (shiftEnd && lastPunch < shiftEnd) {
-                                dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
+                            const pmFallbackPunch = [...punchMatches].reverse().find(m => shiftEnd && Math.abs(m.punch.time.getTime() - shiftEnd.getTime()) / (1000 * 60) <= 240)?.punch.time;
+                            if (shiftEnd && pmFallbackPunch && pmFallbackPunch < shiftEnd) {
+                                dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - pmFallbackPunch.getTime()) / (1000 * 60)));
                             }
                         }
                     }
@@ -1414,13 +1450,19 @@ Deno.serve(async (req: Request) => {
                     // net of approved minutes. totalApprovedMinutes tracks the sum for display.
                     if (approvedMinutesForDay > 0) {
                         const dayTotal = dayLateMinutes + dayEarlyMinutes;
-                        const reduction = Math.min(approvedMinutesForDay, dayTotal);
-                        const lateRatio = dayLateMinutes / dayTotal;
-                        const earlyRatio = dayEarlyMinutes / dayTotal;
-                        dayLateMinutes = Math.max(0, dayLateMinutes - Math.round(reduction * lateRatio));
-                        dayEarlyMinutes = Math.max(0, dayEarlyMinutes - Math.round(reduction * earlyRatio));
-                        totalApprovedMinutes += reduction; // track actual reduction for display
-                        console.log(`[runAnalysis] ALLOWED_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: approved=${approvedMinutesForDay}, reduced by ${reduction} (late: ${dayLateMinutes}, early: ${dayEarlyMinutes})`);
+                        if (dayTotal === 0) {
+                            // Zero guard prevents NaN corruption when an employee has no late or early minutes on a given day.
+                            dayLateMinutes = 0;
+                            dayEarlyMinutes = 0;
+                        } else {
+                            const reduction = Math.min(approvedMinutesForDay, dayTotal);
+                            const lateRatio = dayLateMinutes / dayTotal;
+                            const earlyRatio = dayEarlyMinutes / dayTotal;
+                            dayLateMinutes = Math.max(0, dayLateMinutes - Math.round(reduction * lateRatio));
+                            dayEarlyMinutes = Math.max(0, dayEarlyMinutes - Math.round(reduction * earlyRatio));
+                            totalApprovedMinutes += reduction; // track actual reduction for display
+                            console.log(`[runAnalysis] ALLOWED_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: approved=${approvedMinutesForDay}, reduced by ${reduction} (late: ${dayLateMinutes}, early: ${dayEarlyMinutes})`);
+                        }
                     }
                     
                     lateMinutes += dayLateMinutes;

@@ -317,7 +317,30 @@ export default function DailyBreakdownDialog({
                 shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(dayPunches, shift);
+            // MANDATORY PUNCH COMPLETENESS RULE:
+            // Count punches after deduplication and midnight carry-forward.
+            // Strict enforcement with only SKIP_PUNCH and FULL_SKIP bypasses.
+            let punchCompletenessHalfDayTriggered = false;
+            // Bypass rule only if a skip exception exists for this specific day
+            const isSkipPunchBypassed = dateException && (dateException.type === 'SKIP_PUNCH' || dateException.type === 'FULL_SKIP');
+            
+            if (!isSkipPunchBypassed && shift) {
+                const punchCount = dayPunches.length;
+                if (isSingleShift) {
+                    if (punchCount === 1) {
+                        punchCompletenessHalfDayTriggered = true;
+                    }
+                } else {
+                    // For split shifts, 1 or 2 punches result in Half Day. 0 punches are handled by LOP logic.
+                    if (punchCount > 0 && punchCount <= 2) {
+                        punchCompletenessHalfDayTriggered = true;
+                    }
+                }
+            }
+
+            const partialDayResult = (isSkipPunchBypassed || punchCompletenessHalfDayTriggered)
+                ? { isPartial: false, reason: '' }
+                : detectPartialDay(dayPunches, shift);
 
             // MIDNIGHT FIX: Pass nextDateStr to matchPunchesToShiftPoints for proper PM_END matching
             let punchMatches = [];
@@ -367,7 +390,7 @@ export default function DailyBreakdownDialog({
             const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
 
             // 1. Calculation phase: Compute from punches if valid shift exists
-            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
+            if (shift && dayPunches.length > 0 && !shouldSkipTimeCalc && !punchCompletenessHalfDayTriggered) {
                 if (matchedShiftPoints.size === 0) {
                     // Boundary-based calculation for NO MATCH days
                     const firstPunch = punchMatches[0].punch.time;
@@ -407,25 +430,27 @@ export default function DailyBreakdownDialog({
                     }
 
                     // FALLBACK for missing boundary matches
+                    // The fallback calculates a penalty from the nearest punch within a 4-hour window
+                    // when no match was found within any standard matching window.
                     if (!matchedShiftPoints.has('AM_START')) {
-                        const firstPunch = punchMatches[0].punch.time;
                         const shiftStart = parseTime(shift.am_start, includeSeconds);
-                        if (shiftStart && firstPunch > shiftStart) {
-                            dayLateMinutes += Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                        const amFallbackPunch = punchMatches.find(m => shiftStart && Math.abs(m.punch.time.getTime() - shiftStart.getTime()) / (1000 * 60) <= 240)?.punch.time;
+                        if (shiftStart && amFallbackPunch && amFallbackPunch > shiftStart) {
+                            dayLateMinutes += Math.round(Math.abs((amFallbackPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
                         }
                     }
-                    if (!matchedShiftPoints.has('PM_END')) {
-                        const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
-                        const pmEndTimeRaw = parseTime(shift.pm_end, includeSeconds);
-                        let shiftEnd = pmEndTimeRaw;
-                        if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
-                            shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
-                        }
-                        if (shiftEnd && lastPunch < shiftEnd) {
-                            dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
+                        if (!matchedShiftPoints.has('PM_END')) {
+                            const pmEndTimeRaw = parseTime(shift.pm_end, includeSeconds);
+                            let shiftEnd = pmEndTimeRaw;
+                            if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
+                                shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
+                            }
+                            const pmFallbackPunch = [...punchMatches].reverse().find(m => shiftEnd && Math.abs(m.punch.time.getTime() - shiftEnd.getTime()) / (1000 * 60) <= 240)?.punch.time;
+                            if (shiftEnd && pmFallbackPunch && pmFallbackPunch < shiftEnd) {
+                                dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - pmFallbackPunch.getTime()) / (1000 * 60)));
+                            }
                         }
                     }
-                }
             }
 
             // 2. Override phase: Specific manual adjustments (if present and > 0)
@@ -447,10 +472,16 @@ export default function DailyBreakdownDialog({
             const rawDayMinutes = dayLateMinutes + dayEarlyMinutes;
             if (allowedMinutesForDay > 0 && rawDayMinutes > 0) {
                 const remaining = Math.max(0, rawDayMinutes - allowedMinutesForDay);
-                const lateRatio = dayLateMinutes / rawDayMinutes;
-                const earlyRatio = dayEarlyMinutes / rawDayMinutes;
-                dayLateMinutes = Math.round(remaining * lateRatio);
-                dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                if (rawDayMinutes === 0) {
+                    // Zero guard prevents NaN corruption when an employee has no late or early minutes on a given day.
+                    dayLateMinutes = 0;
+                    dayEarlyMinutes = 0;
+                } else {
+                    const lateRatio = dayLateMinutes / rawDayMinutes;
+                    const earlyRatio = dayEarlyMinutes / rawDayMinutes;
+                    dayLateMinutes = Math.round(remaining * lateRatio);
+                    dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                }
             }
 
             // 4. Formatting phase: Build info strings for UI display
@@ -492,7 +523,7 @@ export default function DailyBreakdownDialog({
                     status = 'Present';
                 }
             } else if (dayPunches.length > 0) {
-                if (partialDayResult.isPartial) status = 'Half Day (Partial)';
+                if (partialDayResult.isPartial || punchCompletenessHalfDayTriggered) status = 'Half Day (Partial)';
                 else status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
             }
             
@@ -675,7 +706,7 @@ export default function DailyBreakdownDialog({
             // Try 120 min window (Extended for Ramadan shifts)
             for (const sp of shiftPoints) {
                 if (usedShiftPoints.has(sp.type)) continue;
-                const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
+                const distance = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance; closestMatch = sp;
                 }
@@ -684,7 +715,7 @@ export default function DailyBreakdownDialog({
             if (!closestMatch) {
                 for (const sp of shiftPoints) {
                     if (usedShiftPoints.has(sp.type)) continue;
-                    const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance; closestMatch = sp; isExtendedMatch = true;
                     }
@@ -694,7 +725,7 @@ export default function DailyBreakdownDialog({
             if (!closestMatch) {
                 for (const sp of shiftPoints) {
                     if (usedShiftPoints.has(sp.type)) continue;
-                    const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance; closestMatch = sp; isFarExtendedMatch = true;
                     }

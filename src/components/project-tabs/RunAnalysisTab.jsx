@@ -207,7 +207,7 @@ export default function RunAnalysisTab({ project }) {
             for (const shiftPoint of shiftPoints) {
                 if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                 if (distance <= 60 && distance < minDistance) {
                     minDistance = distance;
@@ -220,7 +220,7 @@ export default function RunAnalysisTab({ project }) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                     if (distance <= 120 && distance < minDistance) {
                         minDistance = distance;
@@ -235,7 +235,7 @@ export default function RunAnalysisTab({ project }) {
                 for (const shiftPoint of shiftPoints) {
                     if (usedShiftPoints.has(shiftPoint.type)) continue;
 
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
 
                     if (distance <= 180 && distance < minDistance) {
                         minDistance = distance;
@@ -672,7 +672,30 @@ export default function RunAnalysisTab({ project }) {
                 shift.am_end !== '-' && shift.pm_start !== '-';
             const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
 
-            const partialDayResult = detectPartialDay(filteredPunches, shift, nextDateStr, includeSeconds);
+            // MANDATORY PUNCH COMPLETENESS RULE:
+            // Count punches after deduplication and midnight carry-forward.
+            // Strict enforcement with only SKIP_PUNCH and FULL_SKIP bypasses.
+            let punchCompletenessHalfDayTriggered = false;
+            // Bypass rule only if a skip exception exists for this specific day
+            const isSkipPunchBypassed = dateException && (dateException.type === 'SKIP_PUNCH' || dateException.type === 'FULL_SKIP');
+            
+            if (!isSkipPunchBypassed && shift) {
+                const punchCount = filteredPunches.length;
+                if (isSingleShift) {
+                    if (punchCount === 1) {
+                        punchCompletenessHalfDayTriggered = true;
+                    }
+                } else {
+                    // For split shifts, 1 or 2 punches result in Half Day. 0 punches are handled by LOP logic.
+                    if (punchCount > 0 && punchCount <= 2) {
+                        punchCompletenessHalfDayTriggered = true;
+                    }
+                }
+            }
+
+            const partialDayResult = (isSkipPunchBypassed || punchCompletenessHalfDayTriggered)
+                ? { isPartial: false, reason: '' }
+                : detectPartialDay(filteredPunches, shift, nextDateStr, includeSeconds);
 
             // Handle manual late/early exceptions marking day as present
             if (dateException && (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT')) {
@@ -682,19 +705,21 @@ export default function RunAnalysisTab({ project }) {
             }
 
             if (filteredPunches.length > 0) {
-                if (partialDayResult.isPartial) {
+                if (partialDayResult.isPartial || punchCompletenessHalfDayTriggered) {
                     present_days++;
                     half_absence_count++;
                     auto_resolutions.push({
                         date: dateStr,
                         type: 'PARTIAL_DAY_DETECTED',
-                        details: partialDayResult.reason
+                        details: punchCompletenessHalfDayTriggered 
+                            ? `Punch Completeness Rule: Found only ${filteredPunches.length} punches.`
+                            : partialDayResult.reason
                     });
                 } else {
                     present_days++;
                 }
 
-                if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial) {
+                if (rules?.attendance_calculation?.half_day_rule === 'punch_count_or_duration' && !partialDayResult.isPartial && !punchCompletenessHalfDayTriggered) {
                     if (filteredPunches.length < 2 && !isSingleShift) {
                         half_absence_count++;
                     }
@@ -743,7 +768,7 @@ export default function RunAnalysisTab({ project }) {
                 if (dateException.other_minutes && dateException.other_minutes > 0) {
                     other_minutes += dateException.other_minutes;
                 }
-            } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
+            } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation && !punchCompletenessHalfDayTriggered) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
 
@@ -751,6 +776,8 @@ export default function RunAnalysisTab({ project }) {
 
                 if (matchedShiftPoints.size === 0) {
                     // Boundary-based calculation for NO MATCH days
+                    // Note: In frontend we don't apply the 4h window for NO MATCH fallback to keep logic simpler, 
+                    // but we ensure it matches the backend's result for pure boundary distance.
                     const firstPunch = punchMatches[0].punch.time;
                     const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
                     const shiftStart = parseTime(shift.am_start, includeSeconds);
@@ -790,21 +817,21 @@ export default function RunAnalysisTab({ project }) {
 
                     // FALLBACK for missing boundary matches
                     if (!matchedShiftPoints.has('AM_START')) {
-                        const firstPunch = punchMatches[0].punch.time;
                         const shiftStart = parseTime(shift.am_start, includeSeconds);
-                        if (shiftStart && firstPunch > shiftStart) {
-                            dayLateMinutes += Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                        const amFallbackPunch = punchMatches.find(m => shiftStart && Math.abs(m.punch.time.getTime() - shiftStart.getTime()) / (1000 * 60) <= 240)?.punch.time;
+                        if (shiftStart && amFallbackPunch && amFallbackPunch > shiftStart) {
+                            dayLateMinutes += Math.round(Math.abs((amFallbackPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
                         }
                     }
                     if (!matchedShiftPoints.has('PM_END')) {
-                        const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
                         const pmEndTimeRaw = parseTime(shift.pm_end, includeSeconds);
                         let shiftEnd = pmEndTimeRaw;
                         if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
                             shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
                         }
-                        if (shiftEnd && lastPunch < shiftEnd) {
-                            dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
+                        const pmFallbackPunch = [...punchMatches].reverse().find(m => shiftEnd && Math.abs(m.punch.time.getTime() - shiftEnd.getTime()) / (1000 * 60) <= 240)?.punch.time;
+                        if (shiftEnd && pmFallbackPunch && pmFallbackPunch < shiftEnd) {
+                            dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - pmFallbackPunch.getTime()) / (1000 * 60)));
                         }
                     }
                 }
@@ -820,7 +847,11 @@ export default function RunAnalysisTab({ project }) {
                     const excessMinutes = Math.max(0, totalDayMinutes - approvedMinutesForDay);
 
                     // Proportionally distribute excess back to late and early
-                    if (totalDayMinutes > 0 && excessMinutes > 0) {
+                    if (totalDayMinutes === 0) {
+                        // Zero guard prevents NaN corruption when an employee has no late or early minutes on a given day.
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else if (excessMinutes > 0) {
                         const lateRatio = dayLateMinutes / totalDayMinutes;
                         const earlyRatio = dayEarlyMinutes / totalDayMinutes;
                         dayLateMinutes = Math.round(excessMinutes * lateRatio);
