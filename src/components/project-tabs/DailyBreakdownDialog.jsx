@@ -364,24 +364,65 @@ export default function DailyBreakdownDialog({
             let dayLateMinutes = 0;
             let dayEarlyMinutes = 0;
 
+            const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
+
             // 1. Calculation phase: Compute from punches if valid shift exists
             if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
-                for (const match of punchMatches) {
-                    if (!match.matchedTo) continue;
-                    const punchTime = match.punch.time;
-                    const shiftTime = match.shiftTime;
+                if (matchedShiftPoints.size === 0) {
+                    // Boundary-based calculation for NO MATCH days
+                    const firstPunch = punchMatches[0].punch.time;
+                    const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
+                    const shiftStart = parseTime(shift.am_start, includeSeconds);
+                    const pmEndTimeRaw = parseTime(shift.pm_end, includeSeconds);
+                    let shiftEnd = pmEndTimeRaw;
+                    if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
+                        shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
+                    }
 
-                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                        if (punchTime > shiftTime) {
-                            const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
-                            dayLateMinutes += minutes;
+                    if (shiftStart && firstPunch > shiftStart) {
+                        dayLateMinutes = Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                    }
+                    if (shiftEnd && lastPunch < shiftEnd) {
+                        dayEarlyMinutes = Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
+                    }
+                } else {
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+
+                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            if (punchTime > shiftTime) {
+                                const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                                dayLateMinutes += minutes;
+                            }
+                        }
+
+                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                            if (punchTime < shiftTime) {
+                                const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                                dayEarlyMinutes += minutes;
+                            }
                         }
                     }
 
-                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                        if (punchTime < shiftTime) {
-                            const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
-                            dayEarlyMinutes += minutes;
+                    // FALLBACK for missing boundary matches
+                    if (!matchedShiftPoints.has('AM_START')) {
+                        const firstPunch = punchMatches[0].punch.time;
+                        const shiftStart = parseTime(shift.am_start, includeSeconds);
+                        if (shiftStart && firstPunch > shiftStart) {
+                            dayLateMinutes += Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                        }
+                    }
+                    if (!matchedShiftPoints.has('PM_END')) {
+                        const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
+                        const pmEndTimeRaw = parseTime(shift.pm_end, includeSeconds);
+                        let shiftEnd = pmEndTimeRaw;
+                        if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
+                            shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
+                        }
+                        if (shiftEnd && lastPunch < shiftEnd) {
+                            dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
                         }
                     }
                 }
@@ -453,6 +494,18 @@ export default function DailyBreakdownDialog({
             } else if (dayPunches.length > 0) {
                 if (partialDayResult.isPartial) status = 'Half Day (Partial)';
                 else status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+            }
+            
+            // Critical Rule: If it has "NO MATCH" but has punshes AND no penalty fallback was applied (e.g. punches are somehow invalid),
+            // ensure it's at least Half Day if duration/completion check says so.
+            // Actually, detectPartialDay is already called above.
+            
+            // Boundary fallback status adjustment:
+            // If the day only has "NO MATCH" punches, we treat it as Present but with the fallback penalties.
+            // If the user wants no penalties, they can manual override.
+            if (dayPunches.length > 0 && matchedShiftPoints.size === 0 && !shouldSkipTimeCalc) {
+                // If all punches are NO MATCH, we keep it as Present/Half but with the high penalties computed above
+                if (status === 'Absent') status = 'Present'; // Safety
             }
             
             // SKIP_PUNCH status override: if skip applied and would have been absent

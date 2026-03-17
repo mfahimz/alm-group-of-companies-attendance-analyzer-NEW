@@ -287,6 +287,8 @@ export default function RunAnalysisTab({ project }) {
         const lastPunch = punchesWithTime[punchesWithTime.length - 1].time;
 
         const amStart = parseTime(shift.am_start, includeSeconds);
+        const amEnd = parseTime(shift.am_end, includeSeconds);
+        const pmStart = parseTime(shift.pm_start, includeSeconds);
         const pmEndTime = parseTime(shift.pm_end, includeSeconds);
         let adjustedPmEnd = pmEndTime;
         if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
@@ -295,7 +297,39 @@ export default function RunAnalysisTab({ project }) {
 
         if (!amStart || !adjustedPmEnd) return { isPartial: false, reason: null };
 
-        const expectedMinutes = (adjustedPmEnd - amStart) / (1000 * 60);
+        const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+            shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
+            shift.am_end !== '—' && shift.pm_start !== '—' &&
+            shift.am_end !== '-' && shift.pm_start !== '-';
+        const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
+
+        // Segment completion check for split shifts
+        if (!isSingleShift && amStart && amEnd && pmStart && adjustedPmEnd) {
+            const hasAMPunches = punchesWithTime.some(p => {
+                const time = p.time.getTime();
+                return (Math.abs(time - amStart.getTime()) / 60000 <= 180) ||
+                    (Math.abs(time - amEnd.getTime()) / 60000 <= 180);
+            });
+
+            const hasPMPunches = punchesWithTime.some(p => {
+                const time = p.time.getTime();
+                return (Math.abs(time - pmStart.getTime()) / 60000 <= 180) ||
+                    (Math.abs(time - adjustedPmEnd.getTime()) / 60000 <= 180);
+            });
+
+            if (!hasAMPunches || !hasPMPunches) {
+                const missingSegment = !hasAMPunches ? 'AM' : 'PM';
+                return {
+                    isPartial: true,
+                    reason: `Missed entire ${missingSegment} segment`
+                };
+            }
+        }
+
+        const expectedMinutes = (isSingleShift) ? 
+            (adjustedPmEnd - amStart) / (1000 * 60) :
+            ((amEnd - amStart) / 60000 + (adjustedPmEnd - pmStart) / 60000);
+            
         const actualMinutes = (lastPunch - firstPunch) / (1000 * 60);
 
         if (actualMinutes < expectedMinutes * 0.5 && actualMinutes > 0) {
@@ -713,23 +747,64 @@ export default function RunAnalysisTab({ project }) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
 
-                for (const match of punchMatches) {
-                    if (!match.matchedTo) continue;
+                const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
 
-                    const punchTime = match.punch.time;
-                    const shiftTime = match.shiftTime;
+                if (matchedShiftPoints.size === 0) {
+                    // Boundary-based calculation for NO MATCH days
+                    const firstPunch = punchMatches[0].punch.time;
+                    const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
+                    const shiftStart = parseTime(shift.am_start, includeSeconds);
+                    const pmEndTimeRaw = parseTime(shift.pm_end, includeSeconds);
+                    let shiftEnd = pmEndTimeRaw;
+                    if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
+                        shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
+                    }
 
-                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                        if (punchTime > shiftTime) {
-                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
-                            dayLateMinutes += minutes;
+                    if (shiftStart && firstPunch > shiftStart) {
+                        dayLateMinutes = Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                    }
+                    if (shiftEnd && lastPunch < shiftEnd) {
+                        dayEarlyMinutes = Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
+                    }
+                } else {
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+
+                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            if (punchTime > shiftTime) {
+                                const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                                dayLateMinutes += minutes;
+                            }
+                        }
+
+                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                            if (punchTime < shiftTime) {
+                                const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                                dayEarlyMinutes += minutes;
+                            }
                         }
                     }
 
-                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                        if (punchTime < shiftTime) {
-                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
-                            dayEarlyMinutes += minutes;
+                    // FALLBACK for missing boundary matches
+                    if (!matchedShiftPoints.has('AM_START')) {
+                        const firstPunch = punchMatches[0].punch.time;
+                        const shiftStart = parseTime(shift.am_start, includeSeconds);
+                        if (shiftStart && firstPunch > shiftStart) {
+                            dayLateMinutes += Math.round(Math.abs((firstPunch.getTime() - shiftStart.getTime()) / (1000 * 60)));
+                        }
+                    }
+                    if (!matchedShiftPoints.has('PM_END')) {
+                        const lastPunch = punchMatches[punchMatches.length - 1].punch.time;
+                        const pmEndTimeRaw = parseTime(shift.pm_end, includeSeconds);
+                        let shiftEnd = pmEndTimeRaw;
+                        if (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) {
+                            shiftEnd = new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000);
+                        }
+                        if (shiftEnd && lastPunch < shiftEnd) {
+                            dayEarlyMinutes += Math.round(Math.abs((shiftEnd.getTime() - lastPunch.getTime()) / (1000 * 60)));
                         }
                     }
                 }
