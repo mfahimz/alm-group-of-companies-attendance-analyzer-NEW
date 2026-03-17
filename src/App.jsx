@@ -37,12 +37,6 @@ import Maintenance from './pages/Maintenance';
 import AIPayrollInsights from './pages/AIPayrollInsights';
 import ResumeScanner from './pages/ResumeScanner';
 import AuditLogs from './pages/AuditLogs';
-import SoftwareDoc from './pages/SoftwareDoc';
-import TechnicalDocumentation from './pages/TechnicalDocumentation';
-import AgentsDocumentation from './pages/AgentsDocumentation';
-import BusinessDocumentation from './pages/BusinessDocumentation';
-import AppDocumentation from './pages/AppDocumentation';
-import REPORT_ARCHITECTURE from './pages/REPORT_ARCHITECTURE';
 import FeatureRequests from './pages/FeatureRequests';
 import ChangeTracker from './pages/developer/ChangeTracker';
 
@@ -82,12 +76,6 @@ function App() {
           <Route path="/aipayrollinsights" element={<W name="AIPayrollInsights"><AIPayrollInsights /></W>} />
           <Route path="/resumescanner" element={<W name="ResumeScanner"><ResumeScanner /></W>} />
           <Route path="/auditlogs" element={<W name="AuditLogs"><AuditLogs /></W>} />
-          <Route path="/softwaredoc" element={<W name="SoftwareDoc"><SoftwareDoc /></W>} />
-          <Route path="/technicaldocumentation" element={<W name="TechnicalDocumentation"><TechnicalDocumentation /></W>} />
-          <Route path="/agentsdocumentation" element={<W name="AgentsDocumentation"><AgentsDocumentation /></W>} />
-          <Route path="/businessdocumentation" element={<W name="BusinessDocumentation"><BusinessDocumentation /></W>} />
-          <Route path="/appdocumentation" element={<W name="AppDocumentation"><AppDocumentation /></W>} />
-          <Route path="/report_architecture" element={<W name="REPORT_ARCHITECTURE"><REPORT_ARCHITECTURE /></W>} />
           <Route path="/featurerequests" element={<W name="FeatureRequests"><FeatureRequests /></W>} />
           <Route path="/changetracker" element={<W name="ChangeTracker"><ChangeTracker /></W>} />
           <Route path="*" element={<PageNotFound />} />
