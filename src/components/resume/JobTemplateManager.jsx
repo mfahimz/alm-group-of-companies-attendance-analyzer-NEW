@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,16 @@ const EMPTY_TEMPLATE = {
 
 function TemplateForm({ template, onSave, onCancel, isSaving, companies }) {
     const [form, setForm] = useState(() => ({ ...EMPTY_TEMPLATE, ...template }));
+    
+    // Support switching between templates while form is open
+    useEffect(() => {
+        if (template) {
+            setForm({ ...EMPTY_TEMPLATE, ...template });
+        } else {
+            setForm(EMPTY_TEMPLATE);
+        }
+    }, [template]);
+
     const [quickText, setQuickText] = useState('');
     const [quickParsing, setQuickParsing] = useState(false);
     const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
@@ -342,30 +352,32 @@ export default function JobTemplateManager() {
     const companies = companiesRaw.filter(c => c.active);
 
     const saveMutation = useMutation({
-        // FIX: The company field fix involves explicitly mapping fields to avoid sending read-only 
-        // system fields (like created_date) which can cause the platform to reject the save or 
-        // fail to persist correctly. By selecting only the defined schema fields, we ensure 
-        // reliable persistence and proper reloading of the company value.
+        // Root Cause: The previous explicit field mapping might have missed or incorrectly 
+        // typed some fields, while a spreading approach might have included system fields.
+        // Fix: Use a clean payload that explicitly includes required fields like 'company'
+        // and ensures numeric fields like 'min_experience_years' are correctly typed.
         mutationFn: (data) => {
             const { id } = data;
-            const fieldsToSave = {
-                position_name: data.position_name,
-                department: data.department,
-                company: data.company,
-                min_experience_years: data.min_experience_years,
-                required_education: data.required_education,
-                required_skills: data.required_skills,
-                preferred_skills: data.preferred_skills,
-                required_certifications: data.required_certifications,
-                required_languages: data.required_languages,
-                industry_experience: data.industry_experience,
-                notes: data.notes,
+            // Clean payload to ensure data types match backend expectations
+            const payload = {
+                position_name: (data.position_name || '').trim(),
+                department: (data.department || '').trim(),
+                company: (data.company || '').trim(), 
+                min_experience_years: data.min_experience_years !== '' ? parseFloat(data.min_experience_years) || 0 : 0,
+                required_education: (data.required_education || '').trim(),
+                required_skills: (data.required_skills || '').trim(),
+                preferred_skills: (data.preferred_skills || '').trim(),
+                required_certifications: (data.required_certifications || '').trim(),
+                required_languages: (data.required_languages || '').trim(),
+                industry_experience: (data.industry_experience || '').trim(),
+                notes: (data.notes || '').trim(),
                 is_active: data.is_active !== undefined ? data.is_active : true,
                 mandatory_rules: data.mandatory_rules || []
             };
+            
             return id
-                ? base44.entities.JobTemplate.update(id, fieldsToSave)
-                : base44.entities.JobTemplate.create(fieldsToSave);
+                ? base44.entities.JobTemplate.update(id, payload)
+                : base44.entities.JobTemplate.create(payload);
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['jobTemplates'] });
