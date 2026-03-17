@@ -230,16 +230,6 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo', 'supervisor', 'hr_manager']
     },
-    ResumeScanner: {
-        name: 'ResumeScanner',
-        title: 'AI Resume Scanner',
-        icon: ScanLine,
-        category: 'HRManagement',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'supervisor']
-    },
     AuditLogs: {
         name: 'AuditLogs',
         title: 'Audit Logs',
@@ -364,6 +354,16 @@ export const PAGES_CONFIG = {
         requiresAuth: false,
         availableToAll: true,
         defaultRoles: []
+    },
+    ResumeScanner: {
+        name: 'ResumeScanner',
+        title: 'AI Resume Scanner',
+        icon: ScanLine,
+        category: 'Developer',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'supervisor']
     }
 };
 
