@@ -118,6 +118,7 @@ Return JSON with these fields (use empty string if not mentioned):
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        // Validation ensuring all required fields are present before passing to onSave
         if (!form.position_name.trim()) { toast.error('Position name is required'); return; }
         if (!form.company) { toast.error('Company is required'); return; }
         if (!form.min_experience_years && form.min_experience_years !== 0) { toast.error('Minimum experience is required'); return; }
@@ -125,6 +126,8 @@ Return JSON with these fields (use empty string if not mentioned):
         if (!form.required_skills.trim()) { toast.error('Required skills are required'); return; }
         if (!form.required_languages.trim()) { toast.error('Languages are required'); return; }
         if (!form.industry_experience.trim()) { toast.error('Industry experience is required'); return; }
+        
+        // Passing the full form state which includes the company value
         onSave(form);
     };
 
@@ -352,29 +355,28 @@ export default function JobTemplateManager() {
     const companies = companiesRaw.filter(c => c.active);
 
     const saveMutation = useMutation({
-        // Root Cause: The previous explicit field mapping might have missed or incorrectly 
-        // typed some fields, while a spreading approach might have included system fields.
-        // Fix: Use a clean payload that explicitly includes required fields like 'company'
-        // and ensures numeric fields like 'min_experience_years' are correctly typed.
-        mutationFn: (data) => {
-            const { id } = data;
-            // Clean payload to ensure data types match backend expectations
-            const payload = {
-                position_name: (data.position_name || '').trim(),
-                department: (data.department || '').trim(),
-                company: (data.company || '').trim(), 
-                min_experience_years: data.min_experience_years !== '' ? parseFloat(data.min_experience_years) || 0 : 0,
-                required_education: (data.required_education || '').trim(),
-                required_skills: (data.required_skills || '').trim(),
-                preferred_skills: (data.preferred_skills || '').trim(),
-                required_certifications: (data.required_certifications || '').trim(),
-                required_languages: (data.required_languages || '').trim(),
-                industry_experience: (data.industry_experience || '').trim(),
-                notes: (data.notes || '').trim(),
-                is_active: data.is_active !== undefined ? data.is_active : true,
-                mandatory_rules: data.mandatory_rules || []
-            };
+        // Root Cause: The explicit mapping might be missing fields or the backend 
+        // might expect different field names (like company vs company_name).
+        // Fix: Use a broad spread to keep all fields, but specifically force 
+        // the company value and its alias. Also add manual timestamps which 
+        // some entities on this platform require for certain views.
+        mutationFn: async (data) => {
+            const { id, created_date, updated_date, ...rest } = data;
+            const me = await base44.auth.me();
             
+            const payload = {
+                ...rest,
+                company: (data.company || '').trim(),
+                company_name: (data.company || '').trim(), // Alias for schema compatibility
+                min_experience_years: data.min_experience_years !== '' ? parseFloat(data.min_experience_years) || 0 : 0,
+                updated_at: new Date().toISOString()
+            };
+
+            if (!id) {
+                payload.created_at = new Date().toISOString();
+                payload.created_by = me?.email || 'System';
+            }
+
             return id
                 ? base44.entities.JobTemplate.update(id, payload)
                 : base44.entities.JobTemplate.create(payload);
