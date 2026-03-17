@@ -96,8 +96,9 @@ export const usePermissions = () => {
         const pageConfig = getPageConfig(pageName);
         if (!pageConfig) return false;
 
-        // SPECIAL CASE: ChangeTracker is always accessible to admins
+        // SPECIAL CASE: Developer tools always accessible to authorized roles
         if (pageName === 'ChangeTracker' && userRole === 'admin') return true;
+        if (pageName === 'ResumeScanner' && (userRole === 'admin' || userRole === 'supervisor')) return true;
 
         // ONLY show pages that exist in PagePermission entity
         const permission = pagePermissions.find(p => p.page_name === pageName);
