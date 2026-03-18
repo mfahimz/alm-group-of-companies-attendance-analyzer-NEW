@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 // Table components used by DailyBreakdownDialog (extracted)
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle } from 'lucide-react';
+import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from "@/components/ui/progress";
@@ -47,6 +47,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         status: 'Processing...'
     });
     const [ramadanGiftOverrides, setRamadanGiftOverrides] = useState({});
+    
+    // NEW DETECTION PANEL STATE
+    const [showDetectionPanel, setShowDetectionPanel] = useState(false);
+    const [activeDetectionTab, setActiveDetectionTab] = useState('mismatch'); // mismatch or no-match
 
     const queryClient = useQueryClient();
 
@@ -1006,6 +1010,277 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             });
     }, [enrichedResults, searchTerm, riskFilter, sort]);
 
+    // ==========================================================================================
+    // DETECTION LOGIC: SHIFT MISMATCH & NO MATCH (Isolated Feature)
+    // This block identifies problematic records based on punch data vs shift configuration.
+    // ==========================================================================================
+
+    /**
+     * Helper to extract the time portion of a full timestamp string for display.
+     */
+    const extractTime = (timestamp) => {
+        if (!timestamp) return '-';
+        const match = timestamp.match(/\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?/i);
+        return match ? match[0] : timestamp;
+    };
+    
+    /**
+     * Detection Logic Tab 1: Shift Mismatch
+     * Flagged if EVERY punch for a day falls > 180 minutes outside the shift boundary.
+     * This identifies employees punching for the wrong shift or extreme outliers.
+     */
+    const shiftMismatchDetections = React.useMemo(() => {
+        const flagged = [];
+        if (!reportRun?.date_to) return flagged;
+        
+        // --- LOCAL UTILITY COPIES (Strict Isolation) ---
+        const localParseTime = (timeStr) => {
+            if (!timeStr || timeStr === '—' || timeStr === '-') return null;
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i) || timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = (timeMatch[timeMatch.length - 1] || '').toUpperCase();
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                const d = new Date(); d.setHours(hours, minutes, 0, 0); return d;
+            }
+            const hms = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (hms) {
+                const d = new Date(); d.setHours(parseInt(hms[1]), parseInt(hms[2]), hms[3] ? parseInt(hms[3]) : 0, 0); return d;
+            }
+            return null;
+        };
+
+        const localIsWithinMidnightBuffer = (tsR) => {
+            const p = localParseTime(tsR);
+            return p ? (p.getHours() * 60 + p.getMinutes() <= 120) : false;
+        };
+
+        const startDate = new Date(reportRun.date_from);
+        const endDate = new Date(reportRun.date_to);
+
+        results.forEach(result => {
+            const employeeAttendanceId = result.attendance_id;
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === String(employeeAttendanceId));
+            const employeeExceptions = exceptions.filter(e => 
+                (e.attendance_id === 'ALL' || String(e.attendance_id) === String(employeeAttendanceId)) &&
+                e.use_in_analysis !== false
+            );
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDay = new Date(d);
+                const dateStr = currentDay.toISOString().split('T')[0];
+                
+                const hasException = employeeExceptions.some(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return currentDay >= exFrom && currentDay <= exTo;
+                });
+                if (hasException) continue;
+
+                let shift = employeeShifts.find(s => s.date === dateStr);
+                if (!shift) {
+                    const dayOfWeek = currentDay.getDay();
+                    shift = employeeShifts.find(s => (dayOfWeek === 5 ? s.is_friday_shift : !s.is_friday_shift) && !s.date);
+                    if (!shift && dayOfWeek === 5) shift = employeeShifts.find(s => !s.date);
+                }
+                if (!shift) continue;
+
+                const nextDayObj = new Date(currentDay);
+                nextDayObj.setDate(nextDayObj.getDate() + 1);
+                const nextDateStr = nextDayObj.toISOString().split('T')[0];
+                
+                // Fetch and combine today's and crossover punches
+                const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
+                const dayPunches = [
+                    ...empPunches.filter(p => p.punch_date === dateStr).map(p => ({ ...p, _isNext: false })),
+                    ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw'])).map(p => ({ ...p, _isNext: true }))
+                ].map(p => {
+                    const pt = localParseTime(p['timestamp_raw']);
+                    if (!pt) return null;
+                    const time = p._isNext ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
+                    return { ...p, time };
+                }).filter(Boolean).sort((a, b) => a.time.getTime() - b.time.getTime());
+
+                if (dayPunches.length === 0) continue;
+
+                const shiftStart = localParseTime(shift.am_start);
+                let shiftEnd = localParseTime(shift.pm_end);
+                if (shiftEnd && shiftEnd.getHours() === 0 && shiftEnd.getMinutes() === 0) {
+                    shiftEnd = new Date(shiftEnd.getTime() + 24 * 60 * 60 * 1000);
+                }
+
+                if (!shiftStart || !shiftEnd) continue;
+
+                const validWindowStart = shiftStart.getTime() - (180 * 60 * 1000);
+                const validWindowEnd = shiftEnd.getTime() + (180 * 60 * 1000);
+
+                const allOutside = dayPunches.every(p => {
+                    const t = p.time.getTime();
+                    return t < validWindowStart || t > validWindowEnd;
+                });
+
+                if (allOutside) {
+                    flagged.push({
+                        id: result.id,
+                        attendance_id: employeeAttendanceId,
+                        name: result.name,
+                        date: dateStr,
+                        displayDate: currentDay.toLocaleDateString(),
+                        punches: dayPunches.map(p => extractTime(p['timestamp_raw'])).join(', '),
+                        rawResult: result
+                    });
+                }
+            }
+        });
+
+        return flagged;
+    }, [results, punches, shifts, exceptions, reportRun]);
+
+    /**
+     * Detection Logic Tab 2: No Match
+     * Flagged if at least one punch for a day cannot be bound to any shift point.
+     * This identifies missing shift configurations or inconsistent punch patterns.
+     */
+    const noMatchDetections = React.useMemo(() => {
+        const flagged = [];
+        if (!reportRun?.date_to) return flagged;
+
+        // --- LOCAL UTILITY COPIES (Strict Isolation) ---
+        const localParseTime = (timeStr) => {
+            if (!timeStr || timeStr === '—' || timeStr === '-') return null;
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i) || timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const period = (timeMatch[timeMatch.length - 1] || '').toUpperCase();
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                const d = new Date(); d.setHours(hours, minutes, 0, 0); return d;
+            }
+            const hms = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (hms) {
+                const d = new Date(); d.setHours(parseInt(hms[1]), parseInt(hms[2]), hms[3] ? parseInt(hms[3]) : 0, 0); return d;
+            }
+            return null;
+        };
+
+        const localIsWithinMidnightBuffer = (tsR) => {
+            const p = localParseTime(tsR);
+            return p ? (p.getHours() * 60 + p.getMinutes() <= 120) : false;
+        };
+
+        const localFilterMultiplePunches = (punchList) => {
+            if (punchList.length <= 1) return punchList;
+            const withTime = punchList.map(p => ({ ...p, time: localParseTime(p.timestamp_raw) })).filter(p => p.time);
+            const deduped = [];
+            for (const current of withTime) {
+                if (!deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10)) {
+                    deduped.push(current);
+                }
+            }
+            return deduped.sort((a, b) => a.time.getTime() - b.time.getTime());
+        };
+
+        const localMatchPunches = (dayPunches, shift, nextDateStr) => {
+            if (!shift || dayPunches.length === 0) return [];
+            const punchesWithTime = dayPunches.map(p => {
+                const time = localParseTime(p.timestamp_raw);
+                if (!time) return null;
+                const adjustedTime = (nextDateStr && p.punch_date === nextDateStr) ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+                return { ...p, time: adjustedTime };
+            }).filter(Boolean).sort((a, b) => a.time.getTime() - b.time.getTime());
+
+            const pmEndTime = localParseTime(shift.pm_end);
+            const shiftPoints = [
+                { type: 'AM_START', time: localParseTime(shift.am_start) },
+                { type: 'AM_END', time: localParseTime(shift.am_end) },
+                { type: 'PM_START', time: localParseTime(shift.pm_start) },
+                { type: 'PM_END', time: (pmEndTime && pmEndTime.getHours() === 0 ? new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000) : pmEndTime) }
+            ].filter(sp => sp.time);
+
+            const matches = [];
+            const usedPoints = new Set();
+            for (const punch of punchesWithTime) {
+                let closest = null, minD = Infinity;
+                for (const sp of shiftPoints) {
+                    if (usedPoints.has(sp.type)) continue;
+                    const d = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
+                    if (d <= 180 && d < minD) { minD = d; closest = sp; }
+                }
+                if (closest) {
+                    matches.push({ punch, matchedTo: closest.type });
+                    usedPoints.add(closest.type);
+                } else {
+                    matches.push({ punch, matchedTo: null });
+                }
+            }
+            return matches;
+        };
+
+        const startDate = new Date(reportRun.date_from);
+        const endDate = new Date(reportRun.date_to);
+
+        results.forEach(result => {
+            const employeeAttendanceId = result.attendance_id;
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === String(employeeAttendanceId));
+            const employeeExceptions = exceptions.filter(e => 
+                (e.attendance_id === 'ALL' || String(e.attendance_id) === String(employeeAttendanceId)) &&
+                e.use_in_analysis !== false
+            );
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDay = new Date(d);
+                const dateStr = currentDay.toISOString().split('T')[0];
+
+                const hasException = employeeExceptions.some(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return currentDay >= exFrom && currentDay <= exTo;
+                });
+                if (hasException) continue;
+
+                let shift = employeeShifts.find(s => s.date === dateStr);
+                if (!shift) {
+                    const dayOfWeek = currentDay.getDay();
+                    shift = employeeShifts.find(s => (dayOfWeek === 5 ? s.is_friday_shift : !s.is_friday_shift) && !s.date);
+                }
+                if (!shift) continue;
+
+                const nextDayObj = new Date(currentDay);
+                nextDayObj.setDate(nextDayObj.getDate() + 1);
+                const nextDateStr = nextDayObj.toISOString().split('T')[0];
+                
+                const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
+                const combined = [
+                    ...empPunches.filter(p => p.punch_date === dateStr),
+                    ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw']))
+                ];
+
+                if (combined.length === 0) continue;
+
+                const filtered = localFilterMultiplePunches(combined);
+                const matches = localMatchPunches(filtered, shift, nextDateStr);
+                
+                const noMatches = matches.filter(m => m.matchedTo === null);
+                if (noMatches.length > 0) {
+                    flagged.push({
+                        id: result.id,
+                        attendance_id: employeeAttendanceId,
+                        name: result.name,
+                        date: dateStr,
+                        displayDate: currentDay.toLocaleDateString(),
+                        noMatchPunches: noMatches.map(m => extractTime(m.punch['timestamp_raw'])).join(', '),
+                        rawResult: result
+                    });
+                }
+            }
+        });
+
+        return flagged;
+    }, [results, punches, shifts, exceptions, reportRun]);
+
     const updateVerificationMutation = useMutation({
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
             verified_employees: verifiedList.join(',')
@@ -1823,6 +2098,172 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         </Button>
                     </div>
                 </CardContent>
+            </Card>
+
+            {/* DETECTION SUMMARY PANEL */}
+            <Card className="border shadow-sm overflow-hidden mb-6">
+                <div 
+                    className="flex items-center justify-between p-3 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                    onClick={() => setShowDetectionPanel(!showDetectionPanel)}
+                >
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-700">Audit Panel</span>
+                            <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Live Analysis</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded ${shiftMismatchDetections.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500 opacity-60'}`}>
+                                <span className="text-xs font-bold">Shift Mismatch</span>
+                                <span className="text-xs font-black">{shiftMismatchDetections.length}</span>
+                            </div>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded ${noMatchDetections.length > 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-500 opacity-60'}`}>
+                                <span className="text-xs font-bold">No Match</span>
+                                <span className="text-xs font-black">{noMatchDetections.length}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {showDetectionPanel ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                </div>
+
+                {showDetectionPanel && (
+                    <div className="border-t">
+                        <div className="flex border-b bg-white">
+                            <button 
+                                className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'mismatch' ? 'border-amber-500 text-amber-600 bg-amber-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                                onClick={() => setActiveDetectionTab('mismatch')}
+                            >
+                                Shift Mismatch Detections
+                            </button>
+                            <button 
+                                className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'no-match' ? 'border-rose-500 text-rose-600 bg-rose-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                                onClick={() => setActiveDetectionTab('no-match')}
+                            >
+                                No Match Detections
+                            </button>
+                        </div>
+                        
+                        <div className="p-4 max-h-[400px] overflow-y-auto bg-white">
+                            {activeDetectionTab === 'mismatch' ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                                        <div className="mt-0.5 text-amber-600 font-bold">ⓘ</div>
+                                        <p className="text-xs text-amber-800 leading-relaxed">
+                                            <strong>Detection Rule:</strong> Flags days where ALL recorded punches fall more than <strong>180 minutes</strong> outside the allocated shift start and end times. This typically indicates an employee working on an unscheduled shift or a data entry error. Zero-punch days and days with existing exceptions are automatically excluded.
+                                        </p>
+                                    </div>
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="text-left text-slate-400 border-b uppercase tracking-wider font-bold">
+                                                <th className="pb-2">Employee</th>
+                                                <th className="pb-2">Date</th>
+                                                <th className="pb-2">Punch Times</th>
+                                                <th className="pb-2 text-right">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {shiftMismatchDetections.length === 0 ? (
+                                                <tr><td colSpan="4" className="py-8 text-center text-slate-400 italic">No shift mismatch detections found for this period.</td></tr>
+                                            ) : (
+                                                shiftMismatchDetections.map((d, i) => (
+                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="py-3">
+                                                            <div className="font-bold text-slate-700">{d.name}</div>
+                                                            <div className="text-[10px] text-slate-400 font-mono">{d.attendance_id}</div>
+                                                        </td>
+                                                        <td className="py-3 text-slate-600 font-medium">{d.displayDate}</td>
+                                                        <td className="py-3 text-slate-500 max-w-[200px] truncate" title={d.punches}>{d.punches}</td>
+                                                        <td className="py-3 text-right">
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="outline" 
+                                                                className="h-8 text-amber-600 border-amber-200 hover:bg-amber-50"
+                                                                onClick={() => {
+                                                                    setSelectedEmployee(d.rawResult);
+                                                                    // Extract the row data needed for EditDayRecordDialog
+                                                                    const row = {
+                                                                        date: d.displayDate,
+                                                                        dateStr: d.date,
+                                                                        status: 'Present', 
+                                                                        abnormal: false,
+                                                                        shift: 'Mismatch Detected',
+                                                                        lateInfo: '-',
+                                                                        earlyCheckoutInfo: '-'
+                                                                    };
+                                                                    setEditingDay(row);
+                                                                }}
+                                                            >
+                                                                Fix Entry
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-3 p-3 bg-rose-50 border border-rose-100 rounded-lg">
+                                        <div className="mt-0.5 text-rose-600 font-bold">ⓘ</div>
+                                        <p className="text-xs text-rose-800 leading-relaxed">
+                                            <strong>Detection Rule:</strong> Flags days containing at least one punch that cannot be bound to any shift point (AM Start, AM End, PM Start, PM End) within the accepted time windows. This usually means the employee has extra punches or the shift configuration does not match their actual working hours.
+                                        </p>
+                                    </div>
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="text-left text-slate-400 border-b uppercase tracking-wider font-bold">
+                                                <th className="pb-2">Employee</th>
+                                                <th className="pb-2">Date</th>
+                                                <th className="pb-2">No Match Punches</th>
+                                                <th className="pb-2 text-right">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {noMatchDetections.length === 0 ? (
+                                                <tr><td colSpan="4" className="py-8 text-center text-slate-400 italic">No unbound punch detections found for this period.</td></tr>
+                                            ) : (
+                                                noMatchDetections.map((d, i) => (
+                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="py-3">
+                                                            <div className="font-bold text-slate-700">{d.name}</div>
+                                                            <div className="text-[10px] text-slate-400 font-mono">{d.attendance_id}</div>
+                                                        </td>
+                                                        <td className="py-3 text-slate-600 font-medium">{d.displayDate}</td>
+                                                        <td className="py-3">
+                                                            <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">{d.noMatchPunches}</span>
+                                                        </td>
+                                                        <td className="py-3 text-right">
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="outline" 
+                                                                className="h-8 text-rose-600 border-rose-200 hover:bg-rose-50"
+                                                                onClick={() => {
+                                                                    setSelectedEmployee(d.rawResult);
+                                                                    const row = {
+                                                                        date: d.displayDate,
+                                                                        dateStr: d.date,
+                                                                        status: 'Present',
+                                                                        abnormal: false,
+                                                                        shift: 'Binding Error',
+                                                                        lateInfo: '-',
+                                                                        earlyCheckoutInfo: '-'
+                                                                    };
+                                                                    setEditingDay(row);
+                                                                }}
+                                                            >
+                                                                Fix Entry
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </Card>
 
             <Card className="border-0 shadow-sm">
