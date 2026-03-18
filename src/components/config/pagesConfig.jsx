@@ -95,7 +95,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'hr_manager']
     },
     Salaries: {
         name: 'Salaries',
