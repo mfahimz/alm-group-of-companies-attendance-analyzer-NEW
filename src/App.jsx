@@ -39,6 +39,7 @@ import ResumeScanner from './pages/ResumeScanner';
 import AuditLogs from './pages/AuditLogs';
 import FeatureRequests from './pages/FeatureRequests';
 import ChangeTracker from './pages/developer/ChangeTracker';
+import AppDocumentation from './pages/AppDocumentation';
 
 const W = ({ name, children }) => <Layout currentPageName={name}>{children}</Layout>;
 
