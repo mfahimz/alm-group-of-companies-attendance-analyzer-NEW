@@ -1203,6 +1203,32 @@ Deno.serve(async (req: Request) => {
                     approvedMinutesForDay = 0;
                 }
 
+                // ----------------------------------------------------------------
+                // MANUAL_OTHER_MINUTES: scan ALL matching exceptions for this date
+                // and accumulate their allowed_minutes directly into otherMinutes.
+                //
+                // This is distinct from ALLOWED_MINUTES, which reduces deductible
+                // late/early minutes for the day. MANUAL_OTHER_MINUTES exceptions
+                // add purely to the other_minutes field in the AnalysisResult —
+                // they do NOT touch late or early checkout totals.
+                //
+                // Multiple MANUAL_OTHER_MINUTES exceptions on the same date are
+                // supported (e.g. one created by dept-head split + one manual edit).
+                // We use matchingExceptions (all exceptions for the date) rather than
+                // dateException (only the most recent one) so none are missed.
+                // ----------------------------------------------------------------
+                const manualOtherExceptions = matchingExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
+                for (const moEx of manualOtherExceptions) {
+                    const moMinutes = moEx.allowed_minutes || 0;
+                    if (moMinutes > 0) {
+                        otherMinutes += moMinutes;
+                        // Track that this date's other minutes came from an existing exception.
+                        // This prevents the post-analysis block from re-creating them.
+                        otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + moMinutes;
+                        console.log(`[runAnalysis] MANUAL_OTHER_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: adding ${moMinutes} to other_minutes`);
+                    }
+                }
+
                 const hasManualTimeException = dateException && (
                     dateException.type === 'MANUAL_LATE' ||
                     dateException.type === 'MANUAL_EARLY_CHECKOUT' ||

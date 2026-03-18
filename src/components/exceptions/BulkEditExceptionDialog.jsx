@@ -81,7 +81,13 @@ export default function BulkEditExceptionDialog({ open, onClose, selectedExcepti
                                         <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                         <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
                                         <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-
+                                        {/*
+                                         * MANUAL_OTHER_MINUTES: when set on an exception, the analysis engine
+                                         * reads allowed_minutes from the exception and adds it directly to the
+                                         * other_minutes field in the attendance analysis for that specific day.
+                                         * This is distinct from ALLOWED_MINUTES which reduces deductible minutes.
+                                         */}
+                                        <SelectItem value="MANUAL_OTHER_MINUTES">Manual Other Minutes</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
