@@ -79,6 +79,7 @@ function App() {
           <Route path="/auditlogs" element={<W name="AuditLogs"><AuditLogs /></W>} />
           <Route path="/featurerequests" element={<W name="FeatureRequests"><FeatureRequests /></W>} />
           <Route path="/changetracker" element={<W name="ChangeTracker"><ChangeTracker /></W>} />
+          <Route path="/appdocumentation" element={<W name="AppDocumentation"><AppDocumentation /></W>} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
         <Toaster />
