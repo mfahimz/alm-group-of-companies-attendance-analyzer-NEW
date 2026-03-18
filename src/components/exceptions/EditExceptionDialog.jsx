@@ -118,6 +118,13 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.allowed_minutes_type = formData.allowed_minutes_type || 'both';
         }
 
+        // MANUAL_OTHER_MINUTES: save the entered minutes into allowed_minutes.
+        // The analysis engine reads allowed_minutes for this type and adds it
+        // directly to other_minutes for the day — no late/early impact.
+        if (formData.type === 'MANUAL_OTHER_MINUTES' && formData.allowed_minutes) {
+            cleanedData.allowed_minutes = parseInt(formData.allowed_minutes);
+        }
+
         if (formData.type === 'ANNUAL_LEAVE' && formData.salary_leave_days !== '' && formData.salary_leave_days !== null && formData.salary_leave_days !== undefined) {
             const salaryLeaveDays = Number(formData.salary_leave_days);
             if (Number.isFinite(salaryLeaveDays) && salaryLeaveDays >= 0) {
@@ -145,6 +152,9 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
     const needsSkipPunch = formData.type === 'SKIP_PUNCH';
     const needsDaySwap = formData.type === 'DAY_SWAP';
+    // Controls the Other Minutes input — shown only for MANUAL_OTHER_MINUTES type.
+    // These minutes are added directly to the other_minutes field in analysis, not to late/early.
+    const needsManualOtherMinutes = formData.type === 'MANUAL_OTHER_MINUTES';
     
     // Calculate days between dates for annual leave
     const calculateDaysBetween = () => {
@@ -192,6 +202,14 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
                                     <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                     <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
+                                    {/*
+                                     * MANUAL_OTHER_MINUTES: adds the entered minutes directly to the
+                                     * other_minutes field in the attendance analysis for that specific day.
+                                     * This is distinct from ALLOWED_MINUTES, which reduces deductible
+                                     * late/early minutes. MANUAL_OTHER_MINUTES is purely additive to
+                                     * other_minutes and does NOT affect late or early checkout totals.
+                                     */}
+                                    <SelectItem value="MANUAL_OTHER_MINUTES">Manual Other Minutes</SelectItem>
                                     <SelectItem value="SKIP_PUNCH">Skip Specific Punch</SelectItem>
                                     <SelectItem value="DAY_SWAP">Day Swap (Weekly Off Override)</SelectItem>
                                     <SelectItem value="CUSTOM">Custom Type (Not used in analysis)</SelectItem>
@@ -322,6 +340,29 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                 min="1"
                             />
                             <p className="text-xs text-slate-500 mt-1">Minutes to add to early checkout total</p>
+                        </div>
+                    )}
+
+                    {/* MANUAL_OTHER_MINUTES input — shown only when the type is Manual Other Minutes.
+                        The entered value is saved to allowed_minutes and read by the analysis engine,
+                        which adds it directly to the other_minutes accumulator for the selected day.
+                        It does NOT reduce or affect late or early checkout minute totals. */}
+                    {needsManualOtherMinutes && (
+                        <div className="max-w-xs border-t pt-4">
+                            <Label>Other Minutes *</Label>
+                            <Input
+                                type="number"
+                                placeholder="e.g. 30"
+                                value={formData.allowed_minutes}
+                                onChange={(e) => {
+                                    const value = Math.abs(parseInt(e.target.value) || 0);
+                                    setFormData({ ...formData, allowed_minutes: value || '' });
+                                }}
+                                min="1"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Minutes added directly to other minutes in attendance analysis for this day
+                            </p>
                         </div>
                     )}
 
