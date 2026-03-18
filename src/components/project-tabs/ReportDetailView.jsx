@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 // Table components used by DailyBreakdownDialog (extracted)
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import EditDayRecordDialog from './EditDayRecordDialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from "@/components/ui/progress";
@@ -50,13 +51,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     
     // NEW DETECTION PANEL STATE
     const [showDetectionPanel, setShowDetectionPanel] = useState(false);
-    const [activeDetectionTab, setActiveDetectionTab] = useState('mismatch'); // mismatch or no-match
+    const [activeDetectionTab, setActiveDetectionTab] = React.useState('mismatch');
+ // mismatch or no-match
 
     const queryClient = useQueryClient();
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
+        queryFn: () => base44.auth.me(),
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
@@ -86,8 +90,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             return results;
         },
-        staleTime: 5 * 60 * 1000,
-        gcTime: 10 * 60 * 1000,
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -96,14 +100,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: allReportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
         queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
-        enabled: !!project?.id
+        enabled: !!project?.id,
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000
     });
 
     const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => base44.entities.Employee.filter({ company: project.company }),
-        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
-        gcTime: 30 * 60 * 1000,
+        staleTime: 30 * 60 * 1000, // Cache for 30 minutes
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -116,8 +122,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             return companies[0] || null;
         },
         enabled: !!project?.company,
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -127,8 +133,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         queryKey: ['ramadanSchedules', project.company],
         queryFn: () => base44.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 500),
         enabled: !!project?.company,
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -190,8 +196,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
+        // STAGGERED LOADING: Wait for primary analysis results to ensure initial load isn't overwhelmed
+        enabled: !!project?.id && allResults.length > 0,
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -200,8 +208,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
         queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
+        // STAGGERED LOADING: Wait for primary analysis results to avoid simultaneous API bursts
+        enabled: !!project?.id && allResults.length > 0,
+        staleTime: 30 * 60 * 1000,
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -210,8 +220,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
         queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        staleTime: 15 * 60 * 1000, // Cache for 15 minutes
-        gcTime: 30 * 60 * 1000,
+        // STAGGERED LOADING: Wait for primary analysis results before fetching extensive exception list
+        enabled: !!project?.id && allResults.length > 0,
+        staleTime: 30 * 60 * 1000, // Cache for 30 minutes
+        gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -2389,6 +2401,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 headers={previewHeaders}
                 fileName={`attendance_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`}
                 onConfirm={executeExcelDownload}
+            />
+            
+            <EditDayRecordDialog
+                open={!!editingDay}
+                onClose={() => setEditingDay(null)}
+                onSave={() => queryClient.invalidateQueries({ queryKey: ['results', reportRun.id] })}
+                dayRecord={editingDay}
+                project={project}
+                attendanceId={selectedEmployee?.attendance_id}
+                analysisResult={selectedEmployee}
+                dailyBreakdownData={{}}
             />
         </div>
     );
