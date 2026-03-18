@@ -722,7 +722,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 shift.am_end.trim() !== '' && shift.pm_start.trim() !== '' &&
                 shift.am_end !== '—' && shift.pm_start !== '—' &&
                 shift.am_end !== '-' && shift.pm_start !== '-';
-            const isSingleShift = shift?.is_single_shift || !hasMiddleTimes;
+            // Strict boolean equality is required because is_single_shift may be stored as the string 'false' or number 0 which are falsy but would incorrectly evaluate as truthy in a loose check; this must match backend runAnalysis.ts behavior exactly.
+            const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
 
             let punchMatchesTotals = [];
             if (shift && dayPunches.length > 0) {
