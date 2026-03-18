@@ -303,6 +303,16 @@ export const PAGES_CONFIG = {
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor']
+    },
+    AppDocumentation: {
+        name: 'AppDocumentation',
+        title: 'Software Application Documentation',
+        icon: BookOpen,
+        category: 'Developer',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin']
     }
 };
 
