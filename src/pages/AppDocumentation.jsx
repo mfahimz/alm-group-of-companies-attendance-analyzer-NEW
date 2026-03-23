@@ -1218,6 +1218,11 @@ export default function AppDocumentation() {
                                             <p className="text-xs text-slate-600 leading-relaxed">
                                                 Annual leaves are recorded with explicit date ranges. The system automatically counts calendar days for analysis. For overlapping projects, a <strong>Month Split rule</strong> applies where leave days are only counted for the "current" calendar month (the month with the most days in the project range).
                                             </p>
+                                            <div className="bg-indigo-50 border border-indigo-100 rounded p-2 mt-2">
+                                                <p className="text-[10px] text-indigo-700">
+                                                    <strong>Update:</strong> HR can now bulk import Annual Leaves via Excel/CSV with automatic exact and fuzzy employee name matching scoped by company. The import tool includes overlapping date detection to prevent duplicate leave entries.
+                                                </p>
+                                            </div>
                                             <div className="bg-slate-50 rounded-lg p-3 text-[10px] text-slate-500 italic">
                                                 <strong>Al Maraghi Motors Exception:</strong> Leaves starting in the project but ending after it are fully included to ensure seamless payroll salary enrollment.
                                             </div>

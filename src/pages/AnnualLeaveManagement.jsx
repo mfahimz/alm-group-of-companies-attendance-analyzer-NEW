@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Check, X, FileText, AlertCircle } from 'lucide-react';
+import { Plus, Check, X, FileText, AlertCircle, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { formatInUAE } from '@/components/ui/timezone';
 import Breadcrumb from '@/components/ui/Breadcrumb';
@@ -30,6 +31,13 @@ export default function AnnualLeaveManagement() {
         leave_type: 'annual',
         reason: ''
     });
+
+    const [importPreviewData, setImportPreviewData] = useState([]);
+    const [showImportDialog, setShowImportDialog] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState(0);
+
+    const fileInputRef = useRef(null);
 
     const queryClient = useQueryClient();
     const { selectedCompany: filterCompany } = useCompanyFilter();
@@ -139,6 +147,236 @@ export default function AnnualLeaveManagement() {
         const diffTime = Math.abs(end - start);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
         return diffDays;
+    };
+
+    function parseCSV(text) {
+        const result = [];
+        const lines = text.split(/\r?\n/).filter(line => line.trim());
+        if (lines.length === 0) return result;
+        
+        function splitLine(line) {
+            let inQuote = false;
+            let start = 0;
+            const cols = [];
+            for (let i = 0; i < line.length; i++) {
+                if (line[i] === '"') inQuote = !inQuote;
+                else if (line[i] === ',' && !inQuote) {
+                    cols.push(line.substring(start, i).replace(/^"|"$/g, '').trim());
+                    start = i + 1;
+                }
+            }
+            cols.push(line.substring(start).replace(/^"|"$/g, '').trim());
+            return cols;
+        }
+
+        const headers = splitLine(lines[0]).map(h => h.trim().toLowerCase());
+        for (let i = 1; i < lines.length; i++) {
+            const row = splitLine(lines[i]);
+            const obj = {};
+            headers.forEach((h, j) => {
+                obj[h] = row[j] || '';
+            });
+            result.push(obj);
+        }
+        return result;
+    }
+
+    const processImportData = (data) => {
+        if (!filterCompany) {
+            toast.error('Please select a company from the global filter before importing.');
+            return;
+        }
+        if (data.length === 0) {
+            toast.error('File is empty.');
+            return;
+        }
+        
+        const sampleRowArray = Object.keys(data[0]).map(k => k.trim().toLowerCase());
+        const hasEmpName = sampleRowArray.includes('employee name');
+        const hasStartDate = sampleRowArray.includes('leave start date');
+        const hasEndDate = sampleRowArray.includes('leave end date');
+        
+        if (!hasEmpName || !hasStartDate || !hasEndDate) {
+            toast.error('Missing required columns. Expected: Employee Name, Leave Start Date, Leave End Date.');
+            return;
+        }
+
+        /*
+         * COMPANY SCOPING RULE FOR EMPLOYEE MATCHING:
+         * To prevent cross-company data contamination, employee matching is strictly 
+         * scoped to the currently active company (`filterCompany`). 
+         * 
+         * FUZZY NAME MATCHING LOGIC:
+         * We first attempt an exact case-insensitive match on the employee's name.
+         * If that fails, we use a fuzzy approach: we check if the imported name contains 
+         * the employee's name or if the employee's name contains the imported name 
+         * (both case-insensitive) within the same company.
+         */
+        const companyEmployees = employees.filter(e => e.company === filterCompany);
+
+        const processedRows = data.map(row => {
+            const cleanRow = {};
+            Object.entries(row).forEach(([k, v]) => {
+                cleanRow[k.trim().toLowerCase()] = v;
+            });
+
+            const impName = typeof cleanRow['employee name'] === 'string' ? cleanRow['employee name'].trim() : String(cleanRow['employee name'] || '').trim();
+            const rawStart = cleanRow['leave start date'];
+            const rawEnd = cleanRow['leave end date'];
+
+            const parseDateString = (d) => {
+                if (!d) return null;
+                const parsed = new Date(d);
+                if (isNaN(parsed.getTime())) return null;
+                return parsed;
+            };
+
+            const sDateParsed = parseDateString(rawStart);
+            const eDateParsed = parseDateString(rawEnd);
+            
+            const sDateStr = sDateParsed ? sDateParsed.toISOString().split('T')[0] : '';
+            const eDateStr = eDateParsed ? eDateParsed.toISOString().split('T')[0] : '';
+
+            let matchedEmp = companyEmployees.find(e => e.name.toLowerCase() === impName.toLowerCase());
+            
+            if (!matchedEmp) {
+                // Fuzzy match fallback
+                matchedEmp = companyEmployees.find(e => 
+                    e.name.toLowerCase().includes(impName.toLowerCase()) || 
+                    impName.toLowerCase().includes(e.name.toLowerCase())
+                );
+            }
+
+            let status = matchedEmp ? 'Ready' : 'Unmatched';
+            let existingDuplicate = null;
+
+            /*
+             * DUPLICATE DETECTION APPROACH:
+             * For successfully matched rows, we check against the existing AnnualLeave records 
+             * across the entire list. If an existing record's date range overlaps with the 
+             * imported date range, it is flagged as a duplicate.
+             */
+            if (matchedEmp) {
+                existingDuplicate = leaves.find(l => {
+                    if (l.employee_id !== matchedEmp.hrms_id) return false;
+                    const existingStart = new Date(l.date_from);
+                    const existingEnd = new Date(l.date_to);
+                    const newStart = new Date(sDateStr);
+                    const newEnd = new Date(eDateStr);
+                    return (existingStart <= newEnd && existingEnd >= newStart);
+                });
+                
+                if (existingDuplicate) {
+                    status = 'Duplicate';
+                }
+            }
+
+            /*
+             * UNMATCHED ROWS:
+             * Unmatched rows are excluded (unchecked) by default to prevent data corruption.
+             */
+            const dayCount = calculateDays(sDateStr, eDateStr) || 0;
+            return {
+                originalName: impName,
+                matchedName: matchedEmp ? matchedEmp.name : '',
+                attendanceId: matchedEmp ? matchedEmp.attendance_id : '',
+                employeeId: matchedEmp ? matchedEmp.hrms_id : '',
+                leaveStart: sDateStr,
+                leaveEnd: eDateStr,
+                dayCount,
+                status,
+                selected: status === 'Ready',
+                existingDuplicate
+            };
+        });
+
+        setImportPreviewData(processedRows);
+        setShowImportDialog(true);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const bstr = evt.target.result;
+            try {
+                let data = [];
+                if (file.name.toLowerCase().endsWith('.csv')) {
+                    data = parseCSV(bstr);
+                } else {
+                    const wb = XLSX.read(bstr, { type: 'binary', cellText:false, cellDates:true });
+                    const wsname = wb.SheetNames[0];
+                    const ws = wb.Sheets[wsname];
+                    data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+                }
+                processImportData(data);
+            } catch (error) {
+                toast.error('Error parsing file.');
+            }
+        };
+
+        if (file.name.toLowerCase().endsWith('.csv')) {
+            reader.readAsText(file);
+        } else {
+            reader.readAsBinaryString(file);
+        }
+    };
+
+    /*
+     * BATCHING:
+     * Processing the imports in batches of 10 with a 300 millisecond delay 
+     * prevents rate limit errors on the Base44 API.
+     */
+    const executeImport = async () => {
+        const rowsToImport = importPreviewData.filter(r => r.selected);
+        if (rowsToImport.length === 0) {
+            toast.error('No rows selected for import.');
+            return;
+        }
+
+        setIsImporting(true);
+        setImportProgress(0);
+        let successCount = 0;
+        
+        const BATCH_SIZE = 10;
+        const DELAY_MS = 300;
+        
+        for (let i = 0; i < rowsToImport.length; i += BATCH_SIZE) {
+            const batch = rowsToImport.slice(i, i + BATCH_SIZE);
+            const promises = batch.map(row => {
+                const leaveData = {
+                    company: filterCompany,
+                    employee_id: row.employeeId,
+                    date_from: row.leaveStart,
+                    date_to: row.leaveEnd,
+                    leave_type: 'annual',
+                    reason: 'Bulk Import',
+                    attendance_id: row.attendanceId,
+                    employee_name: row.matchedName,
+                    total_days: row.dayCount,
+                    salary_leave_days: row.dayCount,
+                    status: 'approved',
+                    approved_by: currentUser.email,
+                    approval_date: new Date().toISOString()
+                };
+                return base44.entities.AnnualLeave.create(leaveData).then(() => { successCount++; });
+            });
+            
+            await Promise.allSettled(promises);
+            setImportProgress(Math.min(rowsToImport.length, i + BATCH_SIZE));
+            
+            if (i + BATCH_SIZE < rowsToImport.length) {
+                await new Promise(res => setTimeout(res, DELAY_MS));
+            }
+        }
+        
+        queryClient.invalidateQueries(['annualLeaves']);
+        toast.success(`Import complete! ${successCount} records created.`);
+        setIsImporting(false);
+        setShowImportDialog(false);
     };
 
     const createMutation = useMutation({
@@ -283,10 +521,29 @@ export default function AnnualLeaveManagement() {
                     <h1 className="text-3xl font-bold text-[#1F2937]">Annual Leave Management</h1>
                     <p className="text-[#6B7280] mt-1">Central repository for employee annual leaves</p>
                 </div>
-                <Button onClick={() => { resetForm(); setShowDialog(true); }} className="bg-[#0F1E36]">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Leave
-                </Button>
+                <div className="flex gap-2">
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept=".csv,.xlsx,.xls" 
+                        onChange={handleFileUpload} 
+                    />
+                    <Button onClick={() => {
+                        if (!filterCompany) {
+                            toast.error('Please select a company from the global filter before importing.');
+                        } else {
+                            fileInputRef.current?.click();
+                        }
+                    }} variant="outline" className="bg-white border-[#E2E6EC]">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import
+                    </Button>
+                    <Button onClick={() => { resetForm(); setShowDialog(true); }} className="bg-[#0F1E36]">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Leave
+                    </Button>
+                </div>
             </div>
 
             {/* Stats Cards */}
@@ -529,6 +786,122 @@ export default function AnnualLeaveManagement() {
                         <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
                         <Button onClick={handleSubmit} disabled={createMutation.isPending}>
                             {createMutation.isPending ? 'Saving...' : 'Save'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Import Preview Dialog */}
+            <Dialog open={showImportDialog} onOpenChange={(open) => !isImporting && setShowImportDialog(open)}>
+                <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Import Preview</DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="flex-1 overflow-auto space-y-4 pr-1">
+                        <div className="flex gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm">
+                            <div className="flex flex-col">
+                                <span className="font-semibold text-slate-700">Ready</span>
+                                <span className="text-lg font-bold text-green-600">{importPreviewData.filter(r => r.status === 'Ready').length}</span>
+                            </div>
+                            <div className="flex flex-col border-l border-slate-300 pl-4">
+                                <span className="font-semibold text-slate-700">Duplicates</span>
+                                <span className="text-lg font-bold text-amber-600">{importPreviewData.filter(r => r.status === 'Duplicate').length}</span>
+                            </div>
+                            <div className="flex flex-col border-l border-slate-300 pl-4">
+                                <span className="font-semibold text-slate-700">Unmatched</span>
+                                <span className="text-lg font-bold text-red-600">{importPreviewData.filter(r => r.status === 'Unmatched').length}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 mb-2">
+                            <Button size="sm" variant="outline" onClick={() => setImportPreviewData(importPreviewData.map(r => ({ ...r, selected: true })))}>
+                                Select All
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setImportPreviewData(importPreviewData.map(r => ({ ...r, selected: false })))}>
+                                Deselect All
+                            </Button>
+                        </div>
+
+                        <div className="rounded-md border">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-[#F8FAFC] border-b border-[#E2E6EC] sticky top-0">
+                                    <tr>
+                                        <th className="px-3 py-2 w-10"></th>
+                                        <th className="px-3 py-2 font-medium text-slate-700">Name (File)</th>
+                                        <th className="px-3 py-2 font-medium text-slate-700">Matched Name</th>
+                                        <th className="px-3 py-2 font-medium text-slate-700">Att. ID</th>
+                                        <th className="px-3 py-2 font-medium text-slate-700">Leave Start</th>
+                                        <th className="px-3 py-2 font-medium text-slate-700">Leave End</th>
+                                        <th className="px-3 py-2 font-medium text-slate-700">Days</th>
+                                        <th className="px-3 py-2 font-medium text-slate-700">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {importPreviewData.map((row, idx) => {
+                                        let rowColors = "";
+                                        let statusBadge = "";
+                                        if (row.status === 'Unmatched') {
+                                            rowColors = "bg-red-50 text-red-900";
+                                            statusBadge = <Badge className="bg-red-100 text-red-800 border-red-200">Unmatched</Badge>;
+                                        } else if (row.status === 'Duplicate') {
+                                            rowColors = "bg-amber-50 text-amber-900";
+                                            statusBadge = (
+                                                <div className="flex flex-col gap-1">
+                                                    <Badge className="bg-amber-100 text-amber-800 border-amber-200">Duplicate</Badge>
+                                                    <span className="text-[10px] text-amber-700">Overlaps {row.existingDuplicate?.date_from} to {row.existingDuplicate?.date_to}</span>
+                                                </div>
+                                            );
+                                        } else {
+                                            rowColors = "bg-white";
+                                            statusBadge = <Badge className="bg-green-100 text-green-800 border-green-200">Ready</Badge>;
+                                        }
+
+                                        return (
+                                            <tr key={idx} className={`border-b ${rowColors} hover:opacity-90`}>
+                                                <td className="px-3 py-2 text-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 cursor-pointer"
+                                                        checked={row.selected}
+                                                        onChange={() => {
+                                                            const newData = [...importPreviewData];
+                                                            newData[idx].selected = !newData[idx].selected;
+                                                            setImportPreviewData(newData);
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">{row.originalName}</td>
+                                                <td className="px-3 py-2 font-medium">{row.matchedName || '-'}</td>
+                                                <td className="px-3 py-2">{row.attendanceId || '-'}</td>
+                                                <td className="px-3 py-2">{row.leaveStart || '-'}</td>
+                                                <td className="px-3 py-2">{row.leaveEnd || '-'}</td>
+                                                <td className="px-3 py-2">{row.dayCount}</td>
+                                                <td className="px-3 py-2">{statusBadge}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {isImporting && (
+                            <div className="mt-4 p-4 border rounded-lg bg-blue-50 text-blue-800 flex flex-col items-center justify-center space-y-2">
+                                <span className="font-semibold">Importing... {importProgress} / {importPreviewData.filter(r => r.selected).length}</span>
+                                <div className="w-full bg-blue-200 rounded-full h-2.5">
+                                    <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${(importProgress / Math.max(1, importPreviewData.filter(r => r.selected).length)) * 100}%` }}></div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <DialogFooter className="mt-4 border-t pt-4">
+                        <Button variant="outline" disabled={isImporting} onClick={() => setShowImportDialog(false)}>Cancel</Button>
+                        <Button 
+                            disabled={isImporting || importPreviewData.filter(r => r.selected).length === 0} 
+                            onClick={executeImport}
+                        >
+                            {isImporting ? 'Processing...' : `Confirm Import (${importPreviewData.filter(r => r.selected).length})`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
