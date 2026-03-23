@@ -157,6 +157,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo', 'hr_manager']
     },
+    WorkingDaysCalendar: {
+        name: 'WorkingDaysCalendar',
+        title: 'Working Days Calendar',
+        icon: Calendar,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo', 'hr_manager', 'supervisor']
+    },
 
     // Admin Menu
     Users: {

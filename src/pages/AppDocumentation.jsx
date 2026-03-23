@@ -1595,6 +1595,15 @@ export default function AppDocumentation() {
                                             </p>
                                         </div>
                                     </div>
+                                    <div className="mt-6 bg-indigo-50 border border-indigo-100 rounded-2xl p-6 space-y-4">
+                                        <div className="flex items-center gap-2 font-bold text-sm text-indigo-900">
+                                            <Calendar className="w-4 h-4 text-indigo-600" />
+                                            Working Days Calendar & Calendar Periods
+                                        </div>
+                                        <p className="text-[11px] text-indigo-800 leading-relaxed">
+                                            This centralized tool manages public holidays and authoritative period cutoff dates for the new calendar-based payroll system. The newly added Calendar Periods list and detail pages utilize these dates, backed by two new scalable backend functions (<code>runCalendarAnalysis</code> and <code>createCalendarSalarySnapshots</code>), operating entirely independently from the legacy project system. The CalendarPeriodDetail page renders four dedicated tab components (<code>PeriodRunAnalysisTab</code>, <code>PeriodReportDetailView</code>, <code>PeriodExceptionsTab</code>, <code>PeriodOvertimeTab</code>) under <code>src/components/period-tabs/</code>, each adapted from their project-tabs counterparts with all project references replaced by calendar-period equivalents.
+                                        </p>
+                                    </div>
                                 </section>
 
                                 {/* Section 3: Development & Permissions */}
