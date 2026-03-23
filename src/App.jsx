@@ -40,6 +40,9 @@ import AuditLogs from './pages/AuditLogs';
 import FeatureRequests from './pages/FeatureRequests';
 import ChangeTracker from './pages/developer/ChangeTracker';
 import AppDocumentation from './pages/AppDocumentation';
+import WorkingDaysCalendar from './pages/WorkingDaysCalendar';
+import CalendarPeriods from './pages/CalendarPeriods';
+import CalendarPeriodDetail from './pages/CalendarPeriodDetail';
 
 const W = ({ name, children }) => <Layout currentPageName={name}>{children}</Layout>;
 
@@ -80,6 +83,9 @@ function App() {
           <Route path="/featurerequests" element={<W name="FeatureRequests"><FeatureRequests /></W>} />
           <Route path="/changetracker" element={<W name="ChangeTracker"><ChangeTracker /></W>} />
           <Route path="/appdocumentation" element={<W name="AppDocumentation"><AppDocumentation /></W>} />
+          <Route path="/workingdayscalendar" element={<W name="WorkingDaysCalendar"><WorkingDaysCalendar /></W>} />
+          <Route path="/calendarperiods" element={<W name="CalendarPeriods"><CalendarPeriods /></W>} />
+          <Route path="/calendarperioddetail" element={<W name="CalendarPeriodDetail"><CalendarPeriodDetail /></W>} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
         <Toaster />

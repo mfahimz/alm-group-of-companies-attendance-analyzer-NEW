@@ -323,6 +323,26 @@ export const PAGES_CONFIG = {
         requiresAuth: true,
         availableToAll: false,
         defaultRoles: ['admin']
+    },
+    CalendarPeriods: {
+        name: 'CalendarPeriods',
+        title: 'Calendar Periods',
+        icon: Calendar,
+        category: 'Projects',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo']
+    },
+    CalendarPeriodDetail: {
+        name: 'CalendarPeriodDetail',
+        title: 'Calendar Period Detail',
+        icon: FolderKanban,
+        category: 'Projects',
+        showInNav: false,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo']
     }
 };
 
