@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Check, X, FileText, AlertCircle, Upload } from 'lucide-react';
+import { Plus, Check, X, FileText, AlertCircle, Upload, Loader2, Sparkles } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { formatInUAE } from '@/components/ui/timezone';
@@ -23,6 +23,12 @@ export default function AnnualLeaveManagement() {
     const [editingLeave, setEditingLeave] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
+
+    const [showQuickEntry, setShowQuickEntry] = useState(false);
+    const [quickEntryText, setQuickEntryText] = useState('');
+    const [isParsing, setIsParsing] = useState(false);
+    const [parsingError, setParsingError] = useState(null);
+
     const [formData, setFormData] = useState({
         company: '',
         employee_id: '',
@@ -486,6 +492,73 @@ export default function AnnualLeaveManagement() {
         setShowDialog(true);
     };
 
+    /**
+     * handleQuickEntryParse
+     * 
+     * Uses an LLM to parse natural language leave descriptions into structured data.
+     * Instructed the LLM to return ONLY JSON to ensure reliable parsing in the front-end.
+     * The form remains fully editable after parsing, allowing manual adjustments if needed.
+     */
+    const handleQuickEntryParse = async () => {
+        if (!quickEntryText.trim()) return;
+        setIsParsing(true);
+        setParsingError(null);
+        try {
+            // Prompt construction for LLM extraction
+            const prompt = `Extract the employee name, leave start date in YYYY-MM-DD format, and leave end date in YYYY-MM-DD format from the natural language input and return only a JSON object with fields employee_name, date_from, and date_to. No other text should be returned. Input: "${quickEntryText}"`;
+            
+            // Invoke the LLM integration
+            const response = await base44.integrations.Core.InvokeLLM({ prompt });
+            
+            let data;
+            try {
+                // Clean the response and parse JSON. LLM is instructed to return only JSON.
+                const cleanResponse = typeof response === 'string' ? response.replace(/```json|```/g, '').trim() : response;
+                data = typeof cleanResponse === 'string' ? JSON.parse(cleanResponse) : cleanResponse;
+            } catch (jsonError) {
+                console.error('LLM Parsing Error:', jsonError);
+                setParsingError('The description could not be parsed. Please try again or fill the fields manually.');
+                return;
+            }
+            
+            if (!data.employee_name || !data.date_from || !data.date_to) {
+                setParsingError('The description could not be parsed and is missing required fields. Please try again or fill the fields manually.');
+                return;
+            }
+
+            // Scoping employee match by the currently active company in the form
+            const currentCompany = formData.company || filterCompany;
+            if (!currentCompany) {
+                setParsingError('Please select a company before using Quick Entry so we can match the employee.');
+                return;
+            }
+
+            const companyEmployees = employees.filter(e => e.company === currentCompany);
+            const matchedEmp = companyEmployees.find(e => 
+                e.name.toLowerCase().includes(data.employee_name.toLowerCase()) || 
+                data.employee_name.toLowerCase().includes(e.name.toLowerCase())
+            );
+
+            if (matchedEmp) {
+                setFormData(prev => ({
+                    ...prev,
+                    employee_id: matchedEmp.hrms_id,
+                    date_from: data.date_from,
+                    date_to: data.date_to
+                }));
+                setShowQuickEntry(false);
+                setQuickEntryText('');
+            } else {
+                setParsingError(`Employee "${data.employee_name}" not found in ${currentCompany}.`);
+            }
+        } catch (err) {
+            console.error('Quick Entry Error:', err);
+            setParsingError('The description could not be parsed. Please try again or fill the fields manually.');
+        } finally {
+            setIsParsing(false);
+        }
+    };
+
     const handleSubmit = () => {
         if (!formData.company || !formData.employee_id || !formData.date_from || !formData.date_to) {
             toast.error('Please fill all required fields');
@@ -702,6 +775,62 @@ export default function AnnualLeaveManagement() {
                         <DialogTitle>{editingLeave ? 'Edit' : 'Add'} Annual Leave</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
+                        {/* Quick Entry Feature: Uses LLM to parse natural language descriptions */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <div className="flex justify-between items-center mb-2">
+                                <Label className="flex items-center gap-2 cursor-pointer" onClick={() => setShowQuickEntry(!showQuickEntry)}>
+                                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                                    <span className="font-semibold text-sm">Quick Entry</span>
+                                </Label>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => setShowQuickEntry(!showQuickEntry)}
+                                    className="h-7 text-[10px] uppercase font-bold"
+                                >
+                                    {showQuickEntry ? 'Hide' : 'Enable'}
+                                </Button>
+                            </div>
+
+                            {showQuickEntry && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div>
+                                        <Label className="text-xs text-slate-500 mb-1 block">Describe the leave in plain English</Label>
+                                        <Textarea
+                                            value={quickEntryText}
+                                            onChange={(e) => setQuickEntryText(e.target.value)}
+                                            placeholder="Example: Thomas is on annual leave from 15 April to 22 April 2026."
+                                            className="text-sm bg-white"
+                                            rows={2}
+                                        />
+                                    </div>
+                                    {parsingError && (
+                                        <div className="flex items-start gap-2 p-2 bg-red-50 border border-red-100 rounded text-[11px] text-red-700">
+                                            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                            <span>{parsingError}</span>
+                                        </div>
+                                    )}
+                                    <Button 
+                                        onClick={handleQuickEntryParse} 
+                                        disabled={isParsing || !quickEntryText.trim()}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 h-8"
+                                    >
+                                        {isParsing ? (
+                                            <>
+                                                <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                                                Parsing...
+                                            </>
+                                        ) : (
+                                            'Parse'
+                                        )}
+                                    </Button>
+                                    <p className="text-[10px] text-slate-400 italic">
+                                        Once parsed, you can still manually edit all fields below.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
                         <div>
                             <Label>Company *</Label>
                             {filterCompany ? (
