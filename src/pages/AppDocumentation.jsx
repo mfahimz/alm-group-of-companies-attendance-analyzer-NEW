@@ -484,7 +484,7 @@ export default function AppDocumentation() {
                                                 Punch Management
                                             </h4>
                                             <p className="text-sm text-[#64748B] leading-relaxed">
-                                                Attendance data is ingested via CSV or Excel uploads. The system matches raw punch logs to employees using the <strong>Attendance ID</strong>. To handle hardware noise, a <strong>10-minute duplicate filter</strong> is applied—any subsequent punch within 10 minutes of a recorded entry is discarded as a "ghost punch."
+                                                Attendance data is ingested via CSV or Excel uploads (.csv, .xlsx, .xls). Excel files are automatically converted to CSV format before parsing to ensure consistent processing. The system matches raw punch logs to employees using the <strong>Attendance ID</strong>. To handle hardware noise, a <strong>10-minute duplicate filter</strong> is applied—any subsequent punch within 10 minutes of a recorded entry is discarded as a "ghost punch."
                                             </p>
                                         </div>
                                         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
@@ -493,7 +493,7 @@ export default function AppDocumentation() {
                                                 Shift Configurations
                                             </h4>
                                             <p className="text-sm text-[#64748B] leading-relaxed">
-                                                Shifts define the expected work hours. The system supports <strong>Single Shifts</strong> (Start/End) and <strong>Split Shifts</strong> (AM Start/End + PM Start/End). Special <strong>Friday Shift</strong> overrides are supported globally per employee to accommodate regional work week variations.
+                                                Shifts define the expected work hours. Shifting timing data can be uploaded via CSV or Excel, with Excel files automatically converted to CSV for consistent parsing. The system supports <strong>Single Shifts</strong> (Start/End) and <strong>Split Shifts</strong> (AM Start/End + PM Start/End). Special <strong>Friday Shift</strong> overrides are supported globally per employee to accommodate regional work week variations.
                                             </p>
                                         </div>
                                     </div>

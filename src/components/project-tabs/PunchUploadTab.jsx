@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,11 +50,42 @@ export default function PunchUploadTab({ project }) {
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id })
     });
 
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile) {
             setFile(selectedFile);
-            parseCSV(selectedFile);
+            
+            // Detect file type by its extension to determine parsing strategy
+            const fileExtension = selectedFile.name.split('.').pop().toLowerCase();
+            
+            if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+                /* 
+                   Excel Conversion Logic:
+                   If the file is an Excel file, we use SheetJS (XLSX) to read the binary data,
+                   extract the first sheet, and convert it to CSV format. This CSV string is 
+                   then wrapped in a Blob and passed to the existing parseCSV logic.
+                   This ensures that the parsing logic, validation, and column expectations 
+                   remain identical for both file types.
+                */
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const data = event.target.result;
+                    if (data && data instanceof ArrayBuffer) {
+                        const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const csvData = XLSX.utils.sheet_to_csv(worksheet);
+                        
+                        // Create a blob from the CSV string to satisfy the existing parser's File/Blob requirement
+                        const blob = new Blob([csvData], { type: 'text/csv' });
+                        parseCSV(blob);
+                    }
+                };
+                reader.readAsArrayBuffer(selectedFile);
+            } else {
+                // For standard CSV files, we use the existing parsing logic directly
+                parseCSV(selectedFile);
+            }
         }
     };
 
@@ -432,7 +464,7 @@ export default function PunchUploadTab({ project }) {
                     <div>
                         <Input
                             type="file"
-                            accept=".csv"
+                            accept=".csv, .xlsx, .xls"
                             onChange={handleFileChange}
                         />
                         {project.company === 'Al Maraghi Automotive' ? (
