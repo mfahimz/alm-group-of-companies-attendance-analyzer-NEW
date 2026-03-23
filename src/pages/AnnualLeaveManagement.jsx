@@ -24,7 +24,6 @@ export default function AnnualLeaveManagement() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
 
-    const [showQuickEntry, setShowQuickEntry] = useState(false);
     const [quickEntryText, setQuickEntryText] = useState('');
     const [isParsing, setIsParsing] = useState(false);
     const [parsingError, setParsingError] = useState(null);
@@ -546,7 +545,6 @@ export default function AnnualLeaveManagement() {
                     date_from: data.date_from,
                     date_to: data.date_to
                 }));
-                setShowQuickEntry(false);
                 setQuickEntryText('');
             } else {
                 setParsingError(`Employee "${data.employee_name}" not found in ${currentCompany}.`);
@@ -776,59 +774,47 @@ export default function AnnualLeaveManagement() {
                     </DialogHeader>
                     <div className="space-y-4">
                         {/* Quick Entry Feature: Uses LLM to parse natural language descriptions */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                            <div className="flex justify-between items-center mb-2">
-                                <Label className="flex items-center gap-2 cursor-pointer" onClick={() => setShowQuickEntry(!showQuickEntry)}>
-                                    <Sparkles className="w-4 h-4 text-indigo-600" />
-                                    <span className="font-semibold text-sm">Quick Entry</span>
-                                </Label>
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={() => setShowQuickEntry(!showQuickEntry)}
-                                    className="h-7 text-[10px] uppercase font-bold"
-                                >
-                                    {showQuickEntry ? 'Hide' : 'Enable'}
-                                </Button>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Sparkles className="w-4 h-4 text-indigo-600" />
+                                <span className="font-bold text-sm text-[#0F1E36]">AI Quick Entry</span>
                             </div>
 
-                            {showQuickEntry && (
-                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div>
-                                        <Label className="text-xs text-slate-500 mb-1 block">Describe the leave in plain English</Label>
-                                        <Textarea
-                                            value={quickEntryText}
-                                            onChange={(e) => setQuickEntryText(e.target.value)}
-                                            placeholder="Example: Thomas is on annual leave from 15 April to 22 April 2026."
-                                            className="text-sm bg-white"
-                                            rows={2}
-                                        />
-                                    </div>
-                                    {parsingError && (
-                                        <div className="flex items-start gap-2 p-2 bg-red-50 border border-red-100 rounded text-[11px] text-red-700">
-                                            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                                            <span>{parsingError}</span>
-                                        </div>
-                                    )}
-                                    <Button 
-                                        onClick={handleQuickEntryParse} 
-                                        disabled={isParsing || !quickEntryText.trim()}
-                                        className="w-full bg-indigo-600 hover:bg-indigo-700 h-8"
-                                    >
-                                        {isParsing ? (
-                                            <>
-                                                <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                                                Parsing...
-                                            </>
-                                        ) : (
-                                            'Parse'
-                                        )}
-                                    </Button>
-                                    <p className="text-[10px] text-slate-400 italic">
-                                        Once parsed, you can still manually edit all fields below.
-                                    </p>
+                            <div className="space-y-3">
+                                <div>
+                                    <Label className="text-xs text-slate-500 mb-1 block">Describe the leave in plain English</Label>
+                                    <Textarea
+                                        value={quickEntryText}
+                                        onChange={(e) => setQuickEntryText(e.target.value)}
+                                        placeholder="Example: Thomas is on annual leave from 15 April to 22 April 2026."
+                                        className="text-sm bg-white"
+                                        rows={2}
+                                    />
                                 </div>
-                            )}
+                                {parsingError && (
+                                    <div className="flex items-start gap-2 p-2 bg-red-50 border border-red-100 rounded text-[11px] text-red-700">
+                                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                        <span>{parsingError}</span>
+                                    </div>
+                                )}
+                                <Button 
+                                    onClick={handleQuickEntryParse} 
+                                    disabled={isParsing || !quickEntryText.trim()}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-700 h-9"
+                                >
+                                    {isParsing ? (
+                                        <>
+                                            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                                            Parsing...
+                                        </>
+                                    ) : (
+                                        'Parse Description'
+                                    )}
+                                </Button>
+                                <p className="text-[10px] text-slate-400 italic">
+                                    Once parsed, you can still manually edit all fields below.
+                                </p>
+                            </div>
                         </div>
 
                         <div>
