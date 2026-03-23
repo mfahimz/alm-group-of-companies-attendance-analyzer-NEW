@@ -119,7 +119,7 @@ export const PAGES_CONFIG = {
     },
     HalfYearlyMinutesManagement: {
         name: 'HalfYearlyMinutesManagement',
-        title: 'Half-Yearly Minutes',
+        title: 'Half Yearly Minutes',
         icon: Clock,
         category: 'Admin',
         showInNav: true,
@@ -129,7 +129,7 @@ export const PAGES_CONFIG = {
     },
     GraceMinutesManagement: {
         name: 'GraceMinutesManagement',
-        title: 'Grace Minutes',
+        title: 'Grace Minutes Management',
         icon: Clock,
         category: 'Admin',
         showInNav: true,
@@ -139,7 +139,7 @@ export const PAGES_CONFIG = {
     },
     AnnualLeaveManagement: {
         name: 'AnnualLeaveManagement',
-        title: 'Annual Leave Calendar',
+        title: 'Annual Leave Management',
         icon: Calendar,
         category: 'HRManagement',
         showInNav: true,
@@ -149,7 +149,7 @@ export const PAGES_CONFIG = {
     },
     CompanyManagement: {
         name: 'CompanyManagement',
-        title: 'Companies',
+        title: 'Company Management',
         icon: Settings,
         category: 'Admin',
         showInNav: true,
@@ -181,7 +181,7 @@ export const PAGES_CONFIG = {
     },
     DepartmentHeadSettings: {
         name: 'DepartmentHeadSettings',
-        title: 'Department Heads',
+        title: 'Department Head Settings',
         icon: UserCog,
         category: 'Admin',
         showInNav: true,
@@ -316,7 +316,7 @@ export const PAGES_CONFIG = {
     },
     AppDocumentation: {
         name: 'AppDocumentation',
-        title: 'Software Application Documentation',
+        title: 'Application Documentation',
         icon: BookOpen,
         category: 'Developer',
         showInNav: true,

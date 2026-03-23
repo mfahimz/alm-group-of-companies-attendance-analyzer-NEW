@@ -1649,34 +1649,41 @@ export default function AppDocumentation() {
                                                 </div>
                                                 <p className="text-[11px] text-slate-400 leading-relaxed">
                                                     The system includes two sets of manuals: <strong>Technical Documentation</strong> for architects (covering entity schemas, UAE timezone standards, and API logic) and <strong>Software Documentation</strong> (this page) for operational users.
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {/* Background Glow */}
-                                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 blur-[120px] rounded-full -mr-32 -mt-32"></div>
-                                    </div>
-                                </section>
+                                                 </p>
+                                             </div>
+                                         </div>
+                                         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 blur-[120px] rounded-full -mr-32 -mt-32"></div>
+                                     </div>
+                                 </section>
 
-                                {/* Section 4: Restricted Admin Actions */}
-                                <section className="space-y-6">
-                                    <h3 className="text-xl font-bold text-[#0F1E36] flex items-center gap-2">
-                                        <span className="w-1.5 h-6 bg-indigo-600 rounded-full"></span>
-                                        Admin-Only Restricted Utilities
-                                    </h3>
-                                    <div className="bg-red-50 border border-red-100 rounded-2xl p-6 flex gap-4">
-                                        <Shield className="w-6 h-6 text-red-600 flex-shrink-0" />
-                                        <div className="space-y-1">
-                                            <h4 className="text-xs font-bold text-red-900 uppercase tracking-wider">Critical Guardrails</h4>
-                                            <p className="text-[11px] text-red-800 leading-relaxed">
-                                                Operations such as <strong>Role Elevation</strong>, <strong>Project Re-opening</strong> (unlocking closed payroll months), <strong>Global Sync</strong> for permissions, and <strong>Email Domain Restrictions</strong> are strictly limited to the 'Admin' role. These restrictions prevent accidental data corruption and ensure compliance with company security policies.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </section>
-                            </div>
-                        ) : activeSection === 'Business Rules Reference' ? (
+                                 {/* Section 4: Restricted Admin Actions */}
+                                 <section className="space-y-6 text-left">
+                                     <h3 className="text-xl font-bold text-[#0F1E36] flex items-center gap-2">
+                                         <span className="w-1.5 h-6 bg-indigo-600 rounded-full"></span>
+                                         Admin-Only Restricted Utilities
+                                     </h3>
+                                     <div className="bg-red-50 border border-red-100 rounded-2xl p-6 flex gap-4">
+                                         <Shield className="w-6 h-6 text-red-600 flex-shrink-0" />
+                                         <div className="space-y-1">
+                                             <h4 className="text-xs font-bold text-red-900 uppercase tracking-wider">Critical Guardrails</h4>
+                                             <p className="text-[11px] text-red-800 leading-relaxed">
+                                                 Operations such as <strong>Role Elevation</strong>, <strong>Project Re-opening</strong> (unlocking closed payroll months), <strong>Global Sync</strong> for permissions, and <strong>Email Domain Restrictions</strong> are strictly limited to the 'Admin' role. These restrictions prevent accidental data corruption and ensure compliance with company security policies.
+                                             </p>
+                                         </div>
+                                     </div>
+
+                                     {/* Update Note */}
+                                     <div className="mt-8 p-4 bg-white/50 border border-slate-200 rounded-2xl flex gap-3 text-[11px] text-slate-500 italic">
+                                         <Info className="w-4 h-4 flex-shrink-0 text-indigo-600" />
+                                         <p className="leading-relaxed">
+                                             <strong>Title Update:</strong> Several page titles across the Admin and HR modules were standardized (e.g., adding 'Management' and 'Settings' suffixes) to improve navigation clarity. This change ensures consistent terminology throughout the platform's configuration and user interface.
+                                         </p>
+                                     </div>
+                                 </section>
+                             </div>
+                        ) : activeSection === "Business Rules Reference" ? (
                             <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24 text-left">
-                                {/* Header Section */}
+                                 {/* Header Section */}
                                 <header className="space-y-3">
                                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-100">
                                         <Scale className="w-3 h-3" />
