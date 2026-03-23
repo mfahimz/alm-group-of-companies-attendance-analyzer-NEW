@@ -17,6 +17,7 @@ import PeriodRunAnalysisTab from '../components/period-tabs/PeriodRunAnalysisTab
 import PeriodExceptionsTab from '../components/period-tabs/PeriodExceptionsTab';
 import PeriodOvertimeTab from '../components/period-tabs/PeriodOvertimeTab';
 import PeriodReportDetailView from '../components/period-tabs/PeriodReportDetailView';
+import PeriodPunchesTab from '../components/period-tabs/PeriodPunchesTab';
 
 /*
  * Calendar Period Detail Page
@@ -24,8 +25,9 @@ import PeriodReportDetailView from '../components/period-tabs/PeriodReportDetail
  * Part of the new calendar based payroll system.
  * Completely independent from the existing project system.
  * CalendarPeriod receives initial configuration parameters from WorkingDaysCalendar.
- * Renders PeriodRunAnalysisTab, PeriodExceptionsTab, PeriodOvertimeTab, and
- * PeriodReportDetailView as tab components, passing calendarPeriod as a prop.
+ * Renders PeriodRunAnalysisTab, PeriodExceptionsTab, PeriodOvertimeTab,
+ * PeriodPunchesTab, and PeriodReportDetailView as tab components,
+ * passing calendarPeriod as a prop.
  */
 export default function CalendarPeriodDetail() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -219,7 +221,7 @@ export default function CalendarPeriodDetail() {
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <div className="sticky top-0 z-20 bg-[#F8FAFC]/90 backdrop-blur-xl -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 border-b border-slate-200/50">
                     <TabsList className="bg-white shadow-xl shadow-slate-200/40 rounded-2xl p-1.5 flex flex-wrap h-auto gap-1 border border-slate-100 w-full md:w-fit mx-auto md:mx-0">
-                        {['overview', 'run-analysis', 'exceptions', 'adjustments', 'report'].map((tabValue) => (
+                        {['overview', 'punches', 'run-analysis', 'exceptions', 'adjustments', 'report'].map((tabValue) => (
                             <TabsTrigger 
                                 key={tabValue}
                                 value={tabValue} 
@@ -298,6 +300,14 @@ export default function CalendarPeriodDetail() {
                             </div>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* ================================================================
+                    PUNCHES TAB — Manages punch data linked via calendar_period_id.
+                    Matches punch data identical to project system but scoped.
+                ================================================================ */}
+                <TabsContent value="punches" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <PeriodPunchesTab calendarPeriod={period} />
                 </TabsContent>
 
                 {/* ================================================================

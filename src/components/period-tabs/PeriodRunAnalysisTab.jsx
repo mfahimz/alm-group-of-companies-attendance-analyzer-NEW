@@ -1227,7 +1227,7 @@ export default function PeriodRunAnalysisTab({ calendarPeriod }) {
                                     min={calendarPeriod.date_from}
                                     max={calendarPeriod.date_to}
                                     disabled={isAnalyzing}
-                                    title="Date range must be within project period"
+                                    title="Date range must be within calendar period range"
                                 />
                             </div>
                             <div>
@@ -1236,7 +1236,7 @@ export default function PeriodRunAnalysisTab({ calendarPeriod }) {
                                     type="date"
                                     value={dateTo}
                                     onChange={(e) => {
-                                        // Ensure to date is not before from date and within project range
+                                        // Ensure to date is not before from date and within calendar period range
                                         const newDate = e.target.value;
                                         if (newDate >= dateFrom && newDate <= calendarPeriod.date_to) {
                                             setDateTo(newDate);
@@ -1245,7 +1245,7 @@ export default function PeriodRunAnalysisTab({ calendarPeriod }) {
                                     min={dateFrom}
                                     max={calendarPeriod.date_to}
                                     disabled={isAnalyzing}
-                                    title="Date range must be within project period"
+                                    title="Date range must be within calendar period range"
                                 />
                             </div>
                         </div>

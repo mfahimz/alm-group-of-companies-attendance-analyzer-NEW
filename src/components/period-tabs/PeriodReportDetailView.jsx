@@ -190,7 +190,8 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
         return sourceResults.filter(result =>
             departmentAttendanceIds.includes(String(result.attendance_id))
         );
-    }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, project]);
+        // Added calendarPeriod to dependency array instead of undefined project
+    }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, calendarPeriod]);
 
     // Source of truth for UI display/editing: AnalysisResult.ramadan_gift_minutes per row
     React.useEffect(() => {
@@ -877,13 +878,13 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
     const isAlMaraghiMotors = calendarPeriod?.company === 'Al Maraghi Motors';
     const hasRamadanSchedule = React.useMemo(() => {
         if (!reportRun?.date_from || !reportRun?.date_to) return false;
-        const projectStart = new Date(reportRun.date_from);
-        const projectEnd = new Date(reportRun.date_to);
+        const calendarPeriodStart = new Date(reportRun.date_from); // Changed from projectStart to calendarPeriodStart
+        const calendarPeriodEnd = new Date(reportRun.date_to); // Changed from projectEnd to calendarPeriodEnd
 
         return ramadanSchedules.some(schedule => {
             const start = new Date(schedule.ramadan_start_date);
             const end = new Date(schedule.ramadan_end_date);
-            return start <= projectEnd && end >= projectStart;
+            return start <= calendarPeriodEnd && end >= calendarPeriodStart; // Using calendarPeriodStart/End
         });
     }, [ramadanSchedules, reportRun?.date_from, reportRun?.date_to]);
     const showRamadanGiftColumn = isAlMaraghiMotors && hasRamadanSchedule && (isAdmin || isCEO || isHRManager);
@@ -971,7 +972,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, project, ramadanGiftOverrides]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, calendarPeriod, ramadanGiftOverrides]); // Changed dependency from project to calendarPeriod
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
@@ -1387,7 +1388,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
         onSuccess: async (data) => {
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] }),
-                queryClient.invalidateQueries({ queryKey: ['project', calendarPeriod.id] }),
+                queryClient.invalidateQueries({ queryKey: ['calendarPeriod', calendarPeriod.id] }), // Changed from project to calendarPeriod
                 queryClient.invalidateQueries({ queryKey: ['salarySnapshots', calendarPeriod.id] })
             ]);
             toast.success(`Report un-finalized! ${data.deleted_snapshots} salary snapshots deleted.`);
@@ -1531,7 +1532,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
 
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['project', calendarPeriod.id], refetchType: 'all' }),
+                queryClient.invalidateQueries({ queryKey: ['calendarPeriod', calendarPeriod.id], refetchType: 'all' }), // Changed from project to calendarPeriod
                 queryClient.invalidateQueries({ queryKey: ['salarySnapshots', calendarPeriod.id], refetchType: 'all' })
             ]);
 
@@ -1549,7 +1550,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
 
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['project', calendarPeriod.id], refetchType: 'all' })
+                queryClient.invalidateQueries({ queryKey: ['calendarPeriod', calendarPeriod.id], refetchType: 'all' }) // Changed from project to calendarPeriod
             ]);
 
             const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
@@ -1577,15 +1578,16 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
             // BUSINESS LOGIC: Date-Range Protection & Conflict Prevention
             const newFrom = new Date(reportRun.date_from);
             const newTo = new Date(reportRun.date_to);
-            const projectFrom = new Date(calendarPeriod.date_from);
-            const projectTo = new Date(calendarPeriod.date_to);
+            // Check if dates are within the calendar period range
+            const periodFrom = new Date(calendarPeriod.date_from); // Changed from projectFrom to periodFrom, using calendarPeriod as source
+            const periodTo = new Date(calendarPeriod.date_to);     // Changed from projectTo to periodTo, using calendarPeriod as source
 
-            // Exception: If the report covers the entire project range, bypass the blocking rule
-            const isFullProjectRange = 
-                newFrom.toLocaleDateString() === projectFrom.toLocaleDateString() && 
-                newTo.toLocaleDateString() === projectTo.toLocaleDateString();
+            // Bypass blocking rule if the report range exactly matches the period range
+            const isFullRange = 
+                newFrom.toLocaleDateString() === periodFrom.toLocaleDateString() && 
+                newTo.toLocaleDateString() === periodTo.toLocaleDateString();
 
-            if (!isFullProjectRange) {
+            if (!isFullRange) { // Changed from isFullProjectRange to isFullRange
                 // Blocking Rule: Check for overlaps with already saved reports
                 const overlappingReport = allReportRuns.find(run => {
                     // Only check reports marked as saved, and exclude the current report
@@ -2356,7 +2358,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                                         isAdmin={isAdmin}
                                         isSupervisor={isSupervisor}
                                         isDepartmentHead={isDepartmentHead}
-                                        project={project}
+                                        project={calendarPeriod} // Pass calendarPeriod as project prop to maintain existing child component compatibility
                                         reportRun={reportRun}
                                         showRamadanGiftColumn={showRamadanGiftColumn}
                                         onToggleVerification={toggleVerification}
@@ -2382,7 +2384,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                 exceptions={exceptions}
                 employees={employees}
                 reportRun={reportRun}
-                project={project}
+                project={calendarPeriod} // Use calendarPeriod for project data in dialog
                 parseTime={parseTime}
                 formatTime={formatTime}
                 matchPunchesToShiftPoints={matchPunchesToShiftPoints}
@@ -2418,7 +2420,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                 onClose={() => setEditingDay(null)}
                 onSave={() => queryClient.invalidateQueries({ queryKey: ['results', reportRun.id] })}
                 dayRecord={editingDay}
-                project={project}
+                project={calendarPeriod} // Use calendarPeriod for project context in dialog
                 attendanceId={selectedEmployee?.attendance_id}
                 analysisResult={selectedEmployee}
                 dailyBreakdownData={{}}

@@ -762,16 +762,16 @@ export default function PeriodExceptionsTab({ calendarPeriod }) {
         queryFn: () => base44.entities.Employee.filter({ company: calendarPeriod.company })
     });
 
-    // Fetch project-specific employee overrides
-    const { data: projectEmployees = [] } = useQuery({
-        queryKey: ['projectEmployees', calendarPeriod.id],
+    // Fetch calendarPeriod-specific employee overrides
+    const { data: calendarPeriodEmployees = [] } = useQuery({
+        queryKey: ['calendarPeriodEmployees', calendarPeriod.id],
         queryFn: () => base44.entities.ProjectEmployee.filter({ calendar_period_id: calendarPeriod.id })
     });
 
-    // Combine master employees with project overrides for lookups
+    // Combine master employees with calendarPeriod overrides for lookups
     const employees = React.useMemo(() => {
         const combined = [...masterEmployees];
-        for (const pe of projectEmployees) {
+        for (const pe of calendarPeriodEmployees) {
             // Only add if not already in master list
             if (!masterEmployees.some(e => String(e.attendance_id) === String(pe.attendance_id))) {
                 combined.push({
@@ -786,7 +786,7 @@ export default function PeriodExceptionsTab({ calendarPeriod }) {
         }
         // Filter out employees with empty attendance_id
         return combined.filter(emp => emp.attendance_id && String(emp.attendance_id).trim());
-    }, [masterEmployees, projectEmployees]);
+    }, [masterEmployees, calendarPeriodEmployees]);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -1339,7 +1339,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             : formData;
         
         // Clean up empty string values and convert early_checkout_minutes to number
-         // For SINGLE_SHIFT, use project date range as placeholder
+         // For SINGLE_SHIFT, use calendarPeriod date range as placeholder
          const cleanedData = {
              attendance_id: submitData.attendance_id === 'ALL' ? 'ALL' : String(submitData.attendance_id),
             date_from: submitData.type === 'SINGLE_SHIFT' ? calendarPeriod.date_from : submitData.date_from,
@@ -1561,7 +1561,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     id: taskType,
                     employeeTask: taskDesc,
                     details: task.notes || '-',
-                    context: `${task.is_predefined ? 'Predefined' : 'Project Task'}${task.completed_by ? ` (By: ${task.completed_by})` : ''}`,
+                    context: `${task.is_predefined ? 'Predefined' : 'Calendar Period Task'}${task.completed_by ? ` (By: ${task.completed_by})` : ''}`,
                     sortType: taskType.toLowerCase(),
                     sortName: taskDesc.toLowerCase()
                 };
@@ -1852,7 +1852,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             }}
                                             min={calendarPeriod.date_from}
                                             max={calendarPeriod.date_to}
-                                            title="Date must be within project period"
+                                            title="Date must be within calendar period"
                                         />
                                     </div>
                                     <div>
@@ -1877,7 +1877,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             }}
                                             min={formData.date_from}
                                             max={calendarPeriod.date_to}
-                                            title="Date must be within project period"
+                                            title="Date must be within calendar period"
                                         />
                                     </div>
                                 </div>
@@ -2170,7 +2170,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             onClick={async () => {
                                 try {
                                     const response = await base44.functions.invoke('importAnnualLeavesToProject', {
-                                        projectId: calendarPeriod.id
+                                        calendarPeriodId: calendarPeriod.id
                                     });
                                     if (response.data.success) {
                                         toast.success(response.data.message);
@@ -2332,7 +2332,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         min={calendarPeriod.date_from}
                                         max={calendarPeriod.date_to}
                                         className="h-9"
-                                        title="Date must be within project period"
+                                        title="Date must be within calendar period"
                                     />
                                 </div>
                                 <div>
@@ -2349,7 +2349,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         min={filter.dateFrom || calendarPeriod.date_from}
                                         max={calendarPeriod.date_to}
                                         className="h-9"
-                                        title="Date must be within project period"
+                                        title="Date must be within calendar period"
                                     />
                                 </div>
                                 <div>
@@ -2515,7 +2515,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             </Card>
 
             {/* Payroll Checklist Section */}
-            <ChecklistSection calendarPeriod={project} checklistItems={sortedChecklistItems} />
+            <ChecklistSection calendarPeriod={calendarPeriod} checklistItems={sortedChecklistItems} />
 
             {/* Report-Generated Exceptions */}
             {reportExceptions.length > 0 && (
