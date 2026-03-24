@@ -1142,7 +1142,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     const pEnd = localParseTime(prevShift.pm_end) || localParseTime(prevShift.am_end);
                     if (pEnd) {
                         const h = pEnd.getHours();
-                        if (h === 23 || h === 0) prevShiftEndsNearMidnight = true;
+                        // FIX 1: Broadly identify night shifts including those ending at 01:00 AM.
+                        if (h === 23 || h === 0 || h === 1) prevShiftEndsNearMidnight = true;
                     }
                 }
 
@@ -1150,7 +1151,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
                 let todayPunchesRaw = empPunches.filter(p => p.punch_date === dateStr);
                 
-                if (prevShiftEndsNearMidnight) {
+                // FIX 2 FALLBACK: If no previous shift is found, we assume buffer punches are 
+                // likely carry-forwards from yesterday and exclude them to avoid false mismatches.
+                if (prevShiftEndsNearMidnight || !prevShift) {
                     todayPunchesRaw = todayPunchesRaw.filter(p => !localIsWithinMidnightBuffer(p['timestamp_raw']));
                 }
 
@@ -1161,7 +1164,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 let todayShiftEndsNearMidnight = false;
                 if (tEnd) {
                     const h = tEnd.getHours();
-                    if (h === 23 || h === 0) todayShiftEndsNearMidnight = true;
+                    // FIX 1: Broadly identify night shifts including those ending at 01:00 AM.
+                    if (h === 23 || h === 0 || h === 1) todayShiftEndsNearMidnight = true;
                 }
 
                 // 3. Combine with tomorrow's early buffer (120 mins) ONLY IF today was a night shift.
