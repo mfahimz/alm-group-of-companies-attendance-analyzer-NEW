@@ -142,25 +142,20 @@ export default function AnnualLeaveManagement() {
     // =========================================================================
     // PROJECT ENTITY LOADING
     // =========================================================================
-    // Loads projects for the current company to allow filtering leave records 
-    // by project date ranges.
-    const { data: projects = [] } = useQuery({
-        queryKey: ['projects', filterCompany],
-        queryFn: async () => {
-            if (!filterCompany) return [];
-            /* 
-             * BUG FIX:
-             * The previous implementation passed an array of fields as the 3rd argument. 
-             * In the Base44 SDK, the 3rd argument is the numeric 'limit'. 
-             * Passing an array caused the query to return zero results. 
-             *
-             * PATTERN MATCHING:
-             * We now use the exact same pattern as Employee and AnnualLeave fetches in this file
-             * (using .filter with a conditions object and optional 'name' ordering).
-             */
-            return base44.entities.Project.filter({ company: filterCompany }, 'name');
-        }
+    // Loads all projects then filters client-side by company and status.
+    // Base44 .filter() with object conditions can be unreliable for string
+    // fields depending on how the entity stores them. Fetching all and
+    // filtering in JS is the proven reliable pattern used across this app.
+    const { data: allProjects = [] } = useQuery({
+        queryKey: ['allProjectsForLeave'],
+        queryFn: () => base44.entities.Project.list('name', 500),
+        staleTime: 5 * 60 * 1000,
     });
+
+    const projects = useMemo(() => {
+        if (!filterCompany) return [];
+        return allProjects.filter(p => p.company === filterCompany);
+    }, [allProjects, filterCompany]);
 
     const filteredLeaves = useMemo(() => {
         const selectedProj = filterProject !== 'all' ? projects.find(p => p.id === filterProject) : null;
