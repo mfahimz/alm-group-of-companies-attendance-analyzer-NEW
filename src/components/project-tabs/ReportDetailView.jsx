@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 // Table components used by DailyBreakdownDialog (extracted)
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, ScanLine } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1134,6 +1134,87 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 });
 
                 if (allOutside) {
+                    /* =============================================================
+                       START CHANGE 1: Find Likely Worked Shift
+                       Compares actual punch times against all project ShiftTimings 
+                       to find the shift with the smallest total time difference.
+                       ============================================================= */
+                    let bestShift = null;
+                    let minTotalDiff = Infinity;
+                    
+                    // Iterate through all project shifts to find a candidate match
+                    shifts.forEach(st => {
+                        // Extract shift points for this candidate
+                        const points = [
+                            localParseTime(st.am_start),
+                            localParseTime(st.am_end),
+                            localParseTime(st.pm_start),
+                            localParseTime(st.pm_end)
+                        ].filter(p => p !== null);
+                        
+                        // Handle midnight crossover logic for comparison (same 120m rule)
+                        if (points.length > 0) {
+                            const lastP = points[points.length-1];
+                            const lastPointVal = [st.am_start, st.am_end, st.pm_start, st.pm_end].filter(p => !!p).pop();
+                            if (lastP && lastPointVal === '00:00') {
+                                points[points.length-1] = new Date(lastP.getTime() + 24 * 60 * 60 * 1000);
+                            }
+                        }
+
+                        if (points.length === 0) return;
+
+                        // Calculate sum of minimum differences (punch-to-nearest-point)
+                        let totalDiff = 0;
+                        dayPunches.forEach(p => {
+                            let minPDiff = Infinity;
+                            points.forEach(sp => {
+                                const diff = Math.abs(p.time.getTime() - sp.getTime()) / (1000 * 60);
+                                if (diff < minPDiff) minPDiff = diff;
+                            });
+                            totalDiff += minPDiff;
+                        });
+                        
+                        if (totalDiff < minTotalDiff) {
+                            minTotalDiff = totalDiff;
+                            bestShift = st;
+                        }
+                    });
+
+                    // Compare candidate score against the currently assigned shift score
+                    const assignedPoints = [
+                        localParseTime(shift.am_start),
+                        localParseTime(shift.am_end),
+                        localParseTime(shift.pm_start),
+                        localParseTime(shift.pm_end)
+                    ].filter(p => p !== null);
+                    
+                    if (assignedPoints.length > 0) {
+                        const lastP = assignedPoints[assignedPoints.length-1];
+                        const lastAssignedVal = [shift.am_start, shift.am_end, shift.pm_start, shift.pm_end].filter(p => !!p).pop();
+                        if (lastP && lastAssignedVal === '00:00') {
+                            assignedPoints[assignedPoints.length-1] = new Date(lastP.getTime() + 24 * 60 * 60 * 1000);
+                        }
+                    }
+
+                    let assignedTotalDiff = 0;
+                    dayPunches.forEach(p => {
+                        let minPDiff = Infinity;
+                        assignedPoints.forEach(sp => {
+                            const diff = Math.abs(p.time.getTime() - sp.getTime()) / (1000 * 60);
+                            if (diff < minPDiff) minPDiff = diff;
+                        });
+                        assignedTotalDiff += minPDiff;
+                    });
+
+                    // Suggest alternate if its score is strictly better than the assigned one
+                    let likelyWorkedShift = "No alternate shift found";
+                    if (bestShift && minTotalDiff < assignedTotalDiff) {
+                        const am = bestShift.am_start && bestShift.am_end ? `${bestShift.am_start}-${bestShift.am_end}` : '';
+                        const pm = bestShift.pm_start && bestShift.pm_end ? ` | ${bestShift.pm_start}-${bestShift.pm_end}` : '';
+                        likelyWorkedShift = am + pm;
+                    }
+                    /* END CHANGE 1 */
+
                     flagged.push({
                         id: result.id,
                         attendance_id: employeeAttendanceId,
@@ -1141,7 +1222,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         date: dateStr,
                         displayDate: currentDay.toLocaleDateString(),
                         punches: dayPunches.map(p => extractTime(p['timestamp_raw'])).join(', '),
-                        rawResult: result
+                        rawResult: result,
+                        likelyWorkedShift: likelyWorkedShift // Attach suggestions to UI data
                     });
                 }
             }
@@ -2112,55 +2194,53 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 </CardContent>
             </Card>
 
-            {/* DETECTION SUMMARY PANEL */}
-            <Card className="border shadow-sm overflow-hidden mb-6">
-                <div 
-                    className="flex items-center justify-between p-3 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+            {/* 
+                SHIFT MISMATCH ANALYSIS SECTION
+                Moved to the top of the report output for better visibility.
+                This panel provides live auditing of punch-to-shift binding issues.
+            */}
+            <div className="flex flex-col gap-4 mb-6">
+                <Button 
+                    variant="outline" 
+                    className={`w-fit font-bold border-2 transition-all ${showDetectionPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                     onClick={() => setShowDetectionPanel(!showDetectionPanel)}
                 >
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-700">Audit Panel</span>
-                            <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Live Analysis</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded ${shiftMismatchDetections.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500 opacity-60'}`}>
-                                <span className="text-xs font-bold">Shift Mismatch</span>
-                                <span className="text-xs font-black">{shiftMismatchDetections.length}</span>
-                            </div>
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded ${noMatchDetections.length > 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-500 opacity-60'}`}>
-                                <span className="text-xs font-bold">No Match</span>
-                                <span className="text-xs font-black">{noMatchDetections.length}</span>
-                            </div>
-                        </div>
+                    <ScanLine className="w-4 h-4 mr-2" />
+                    {showDetectionPanel ? 'Hide Shift Mismatch Analysis' : 'Show Shift Mismatch Analysis'}
+                    <div className="ml-3 flex gap-2">
+                        {shiftMismatchDetections.length > 0 && (
+                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px]">{shiftMismatchDetections.length} Mismatches</span>
+                        )}
+                        {noMatchDetections.length > 0 && (
+                            <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px]">{noMatchDetections.length} Unbound</span>
+                        )}
                     </div>
-                    {showDetectionPanel ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+                </Button>
 
                 {showDetectionPanel && (
-                    <div className="border-t">
-                        <div className="flex border-b bg-white">
+                    <Card className="border shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex border-b bg-slate-50/50">
                             <button 
                                 className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'mismatch' ? 'border-amber-500 text-amber-600 bg-amber-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                                 onClick={() => setActiveDetectionTab('mismatch')}
                             >
-                                Shift Mismatch Detections
+                                Shift Mismatch Detections ({shiftMismatchDetections.length})
                             </button>
                             <button 
                                 className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'no-match' ? 'border-rose-500 text-rose-600 bg-rose-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                                 onClick={() => setActiveDetectionTab('no-match')}
                             >
-                                No Match Detections
+                                No Match Detections ({noMatchDetections.length})
                             </button>
                         </div>
                         
-                        <div className="p-4 max-h-[400px] overflow-y-auto bg-white">
+                        <div className="p-4 max-h-[450px] overflow-y-auto bg-white">
                             {activeDetectionTab === 'mismatch' ? (
                                 <div className="space-y-4">
                                     <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
                                         <div className="mt-0.5 text-amber-600 font-bold">ⓘ</div>
                                         <p className="text-xs text-amber-800 leading-relaxed">
-                                            <strong>Detection Rule:</strong> Flags days where ALL recorded punches fall more than <strong>180 minutes</strong> outside the allocated shift start and end times. This typically indicates an employee working on an unscheduled shift or a data entry error. Zero-punch days and days with existing exceptions are automatically excluded.
+                                            <strong>Detection Rule:</strong> Flags days where ALL recorded punches fall more than <strong>180 minutes</strong> outside the allocated shift start and end times. Zero-punch days and days with existing exceptions are automatically excluded.
                                         </p>
                                     </div>
                                     <table className="w-full text-xs">
@@ -2169,46 +2249,58 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                 <th className="pb-2">Employee</th>
                                                 <th className="pb-2">Date</th>
                                                 <th className="pb-2">Punch Times</th>
+                                                <th className="pb-2">Likely Worked Shift</th>
                                                 <th className="pb-2 text-right">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
                                             {shiftMismatchDetections.length === 0 ? (
-                                                <tr><td colSpan="4" className="py-8 text-center text-slate-400 italic">No shift mismatch detections found for this period.</td></tr>
+                                                <tr><td colSpan="5" className="py-8 text-center text-slate-400 italic">No shift mismatch detections found for this period.</td></tr>
                                             ) : (
-                                                shiftMismatchDetections.map((d, i) => (
-                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="py-3">
-                                                            <div className="font-bold text-slate-700">{d.name}</div>
-                                                            <div className="text-[10px] text-slate-400 font-mono">{d.attendance_id}</div>
-                                                        </td>
-                                                        <td className="py-3 text-slate-600 font-medium">{d.displayDate}</td>
-                                                        <td className="py-3 text-slate-500 max-w-[200px] truncate" title={d.punches}>{d.punches}</td>
-                                                        <td className="py-3 text-right">
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant="outline" 
-                                                                className="h-8 text-amber-600 border-amber-200 hover:bg-amber-50"
-                                                                onClick={() => {
-                                                                    setSelectedEmployee(d.rawResult);
-                                                                    // Extract the row data needed for EditDayRecordDialog
-                                                                    const row = {
-                                                                        date: d.displayDate,
-                                                                        dateStr: d.date,
-                                                                        status: 'Present', 
-                                                                        abnormal: false,
-                                                                        shift: 'Mismatch Detected',
-                                                                        lateInfo: '-',
-                                                                        earlyCheckoutInfo: '-'
-                                                                    };
-                                                                    setEditingDay(row);
-                                                                }}
-                                                            >
-                                                                Fix Entry
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                                shiftMismatchDetections.map((d, i) => {
+                                                    // LOOKUP EMPLOYEE NAME FROM LOADED LIST
+                                                    const empLookedUp = employees.find(e => String(e.attendance_id) === String(d.attendance_id));
+                                                    const displayName = empLookedUp ? empLookedUp.name : (d.name || d.attendance_id);
+                                                    
+                                                    return (
+                                                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="py-3">
+                                                                <div className="font-bold text-slate-700">{displayName}</div>
+                                                                <div className="text-[10px] text-slate-400 font-mono">{d.attendance_id}</div>
+                                                            </td>
+                                                            <td className="py-3 text-slate-600 font-medium">{d.displayDate}</td>
+                                                            <td className="py-3 text-slate-500 max-w-[200px] truncate" title={d.punches}>{d.punches}</td>
+                                                            <td className="py-3">
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.likelyWorkedShift === 'No alternate shift found' ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                                                                    {d.likelyWorkedShift}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-3 text-right">
+                                                                {/* CHANGE 2: Edit button that triggers existing EditDayRecordDialog */}
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="outline" 
+                                                                    className="h-8 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                                                    onClick={() => {
+                                                                        setSelectedEmployee(d.rawResult);
+                                                                        const row = {
+                                                                            date: d.displayDate,
+                                                                            dateStr: d.date,
+                                                                            status: 'Present', 
+                                                                            abnormal: false,
+                                                                            shift: 'Mismatch Detected',
+                                                                            lateInfo: '-',
+                                                                            earlyCheckoutInfo: '-'
+                                                                        };
+                                                                        setEditingDay(row);
+                                                                    }}
+                                                                >
+                                                                    Edit
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                             )}
                                         </tbody>
                                     </table>
@@ -2218,7 +2310,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <div className="flex items-start gap-3 p-3 bg-rose-50 border border-rose-100 rounded-lg">
                                         <div className="mt-0.5 text-rose-600 font-bold">ⓘ</div>
                                         <p className="text-xs text-rose-800 leading-relaxed">
-                                            <strong>Detection Rule:</strong> Flags days containing at least one punch that cannot be bound to any shift point (AM Start, AM End, PM Start, PM End) within the accepted time windows. This usually means the employee has extra punches or the shift configuration does not match their actual working hours.
+                                            <strong>Detection Rule:</strong> Flags days containing at least one punch that cannot be bound to any shift point (AM Start, AM End, PM Start, PM End) within 180 minutes.
                                         </p>
                                     </div>
                                     <table className="w-full text-xs">
@@ -2234,49 +2326,55 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             {noMatchDetections.length === 0 ? (
                                                 <tr><td colSpan="4" className="py-8 text-center text-slate-400 italic">No unbound punch detections found for this period.</td></tr>
                                             ) : (
-                                                noMatchDetections.map((d, i) => (
-                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="py-3">
-                                                            <div className="font-bold text-slate-700">{d.name}</div>
-                                                            <div className="text-[10px] text-slate-400 font-mono">{d.attendance_id}</div>
-                                                        </td>
-                                                        <td className="py-3 text-slate-600 font-medium">{d.displayDate}</td>
-                                                        <td className="py-3">
-                                                            <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">{d.noMatchPunches}</span>
-                                                        </td>
-                                                        <td className="py-3 text-right">
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant="outline" 
-                                                                className="h-8 text-rose-600 border-rose-200 hover:bg-rose-50"
-                                                                onClick={() => {
-                                                                    setSelectedEmployee(d.rawResult);
-                                                                    const row = {
-                                                                        date: d.displayDate,
-                                                                        dateStr: d.date,
-                                                                        status: 'Present',
-                                                                        abnormal: false,
-                                                                        shift: 'Binding Error',
-                                                                        lateInfo: '-',
-                                                                        earlyCheckoutInfo: '-'
-                                                                    };
-                                                                    setEditingDay(row);
-                                                                }}
-                                                            >
-                                                                Fix Entry
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                                noMatchDetections.map((d, i) => {
+                                                    // LOOKUP EMPLOYEE NAME FROM LOADED LIST
+                                                    const empLookedUp = employees.find(e => String(e.attendance_id) === String(d.attendance_id));
+                                                    const displayName = empLookedUp ? empLookedUp.name : (d.name || d.attendance_id);
+
+                                                    return (
+                                                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="py-3">
+                                                                <div className="font-bold text-slate-700">{displayName}</div>
+                                                                <div className="text-[10px] text-slate-400 font-mono">{d.attendance_id}</div>
+                                                            </td>
+                                                            <td className="py-3 text-slate-600 font-medium">{d.displayDate}</td>
+                                                            <td className="py-3">
+                                                                <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">{d.noMatchPunches}</span>
+                                                            </td>
+                                                            <td className="py-3 text-right">
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="outline" 
+                                                                    className="h-8 text-rose-600 border-rose-200 hover:bg-rose-50"
+                                                                    onClick={() => {
+                                                                        setSelectedEmployee(d.rawResult);
+                                                                        const row = {
+                                                                            date: d.displayDate,
+                                                                            dateStr: d.date,
+                                                                            status: 'Present',
+                                                                            abnormal: false,
+                                                                            shift: 'Binding Error',
+                                                                            lateInfo: '-',
+                                                                            earlyCheckoutInfo: '-'
+                                                                        };
+                                                                        setEditingDay(row);
+                                                                    }}
+                                                                >
+                                                                    Fix Entry
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                             )}
                                         </tbody>
                                     </table>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </Card>
                 )}
-            </Card>
+            </div>
 
             <Card className="border-0 shadow-sm">
                 <CardHeader>

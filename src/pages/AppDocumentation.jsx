@@ -537,7 +537,7 @@ export default function AppDocumentation() {
                                                 <AlertCircle className="w-4 h-4 text-indigo-500" />
                                             </h4>
                                             <p className="text-sm text-[#4A5568] leading-relaxed">
-                                                The <strong>Audit Panel</strong> detects and flags "Problem Days." These include days with mismatching punch counts, extreme lateness, or where the analysis system had to "guess" a punch's boundary (Extended Matches). This ensures supervisors focus on high-risk discrepancies rather than reviewing thousands of perfect records.
+                                                The <strong>Audit Panel</strong> detects and flags "Problem Days." These include days with mismatching punch counts, extreme lateness, or where the analysis system had to "guess" a punch's boundary (Extended Matches). <em>Note: The Shift Mismatch Analysis button is now located at the top of the Attendance Report for faster access during auditing. This panel now provides alternate shift suggestions and allows direct record editing to streamline correction processes.</em> This ensures supervisors focus on high-risk discrepancies rather than reviewing thousands of perfect records.
                                             </p>
                                         </div>
                                         <div className="space-y-4 border-l-4 border-emerald-500 pl-6">
