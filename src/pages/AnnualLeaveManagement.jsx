@@ -142,19 +142,17 @@ export default function AnnualLeaveManagement() {
     // =========================================================================
     // PROJECT ENTITY LOADING
     // =========================================================================
-    // Loads all projects then filters client-side by company and status.
-    // Base44 .filter() with object conditions can be unreliable for string
-    // fields depending on how the entity stores them. Fetching all and
-    // filtering in JS is the proven reliable pattern used across this app.
+    // Loads all projects then filters client-side by company and non-closed status.
+    // Using .list() with no sort arg is the most reliable Base44 pattern.
     const { data: allProjects = [] } = useQuery({
         queryKey: ['allProjectsForLeave'],
-        queryFn: () => base44.entities.Project.list('name', 500),
+        queryFn: () => base44.entities.Project.list('-created_date', 500),
         staleTime: 5 * 60 * 1000,
     });
 
     const projects = useMemo(() => {
         if (!filterCompany) return [];
-        return allProjects.filter(p => p.company === filterCompany);
+        return allProjects.filter(p => p.company === filterCompany && p.status !== 'closed');
     }, [allProjects, filterCompany]);
 
     const filteredLeaves = useMemo(() => {
@@ -654,7 +652,7 @@ export default function AnnualLeaveManagement() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 gap-4 mb-6">
                 <Card className="p-4">
                     <div className="flex items-center gap-3">
                         <div className="p-3 bg-blue-100 rounded-lg">
@@ -663,28 +661,6 @@ export default function AnnualLeaveManagement() {
                         <div>
                             <p className="text-sm text-[#6B7280]">Total Leaves</p>
                             <p className="text-2xl font-bold text-[#1F2937]">{stats.total}</p>
-                        </div>
-                    </div>
-                </Card>
-                <Card className="p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-amber-100 rounded-lg">
-                            <AlertCircle className="w-6 h-6 text-amber-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-[#6B7280]">Pending Approval</p>
-                            <p className="text-2xl font-bold text-[#1F2937]">{stats.pending}</p>
-                        </div>
-                    </div>
-                </Card>
-                <Card className="p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-green-100 rounded-lg">
-                            <Check className="w-6 h-6 text-green-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-[#6B7280]">Approved</p>
-                            <p className="text-2xl font-bold text-[#1F2937]">{stats.approved}</p>
                         </div>
                     </div>
                 </Card>
@@ -699,29 +675,17 @@ export default function AnnualLeaveManagement() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-64"
                     />
-                    <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="h-9 px-3 border rounded-md text-sm"
-                    >
-                        <option value="all">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                    </select>
-
                     {/* Project Filter: Filters records by overlapping date ranges */}
                     <div className="flex items-center gap-2">
                         <select
                             value={filterProject}
                             onChange={(e) => setFilterProject(e.target.value)}
-                            className="h-9 px-3 border rounded-md text-sm min-w-[200px]"
+                            className="h-9 px-3 border rounded-md text-sm min-w-[280px]"
                         >
                             <option value="all">All Projects</option>
-                            {/* EXCLUDING CLOSED PROJECTS: Done on the frontend because Base44 does not support $ne operator in entity filter calls. */}
-                            {projects.filter(p => p.status !== 'closed').map(p => (
+                            {projects.map(p => (
                                 <option key={p.id} value={p.id}>
-                                    {p.name} ({p.date_from} to {p.date_to})
+                                    {p.name} ({p.date_from} → {p.date_to})
                                 </option>
                             ))}
                         </select>
@@ -750,8 +714,6 @@ export default function AnnualLeaveManagement() {
                                 <th className="px-4 py-3 text-left">Company</th>
                                 <th className="px-4 py-3 text-left">Leave Period</th>
                                 <th className="px-4 py-3 text-left">Days</th>
-                                <th className="px-4 py-3 text-left">Type</th>
-                                <th className="px-4 py-3 text-left">Status</th>
                                 <th className="px-4 py-3 text-left">Applied To Projects</th>
                                 <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
@@ -775,12 +737,6 @@ export default function AnnualLeaveManagement() {
                                             <div className="text-xs text-amber-600">Salary: {leave.salary_leave_days} days</div>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <Badge className={leave.leave_type === 'annual' ? 'badge-info' : 'badge-warning'}>
-                                            {leave.leave_type}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-4 py-3">{getStatusBadge(leave.status)}</td>
                                     <td className="px-4 py-3 text-sm text-[#6B7280]">
                                         {leave.applied_to_projects ? leave.applied_to_projects.split(',').length + ' projects' : 'Not applied'}
                                     </td>
