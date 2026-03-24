@@ -1102,11 +1102,41 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const nextDayObj = new Date(currentDay);
                 nextDayObj.setDate(nextDayObj.getDate() + 1);
                 const nextDateStr = nextDayObj.toISOString().split('T')[0];
+
+                // --- BIDIRECTIONAL MIDNIGHT FIX (Mirrors Backend 'runAnalysis' precision) ---
+                // 1. Identify if the previous day's shift ended near midnight.
+                // If so, early punches today (12:00-02:00 AM) belong to yesterday and must be excluded.
+                const prevDayObj = new Date(currentDay);
+                prevDayObj.setDate(prevDayObj.getDate() - 1);
+                const prevDateStr = prevDayObj.toISOString().split('T')[0];
+                let prevShiftEndsNearMidnight = false;
                 
-                // Fetch and combine today's and crossover punches
+                let prevShift = employeeShifts.find(s => s.date === prevDateStr);
+                if (!prevShift) {
+                    const prevDayOfWeek = prevDayObj.getDay();
+                    prevShift = employeeShifts.find(s => (prevDayOfWeek === 5 ? s.is_friday_shift : !s.is_friday_shift) && !s.date);
+                    if (!prevShift && prevDayOfWeek === 5) prevShift = employeeShifts.find(s => !s.date);
+                }
+                
+                if (prevShift) {
+                    const pEnd = localParseTime(prevShift.pm_end) || localParseTime(prevShift.am_end);
+                    if (pEnd) {
+                        const h = pEnd.getHours();
+                        if (h === 23 || h === 0) prevShiftEndsNearMidnight = true;
+                    }
+                }
+
+                // 2. Fetch today's punches and perform exclusion if necessary.
                 const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
+                let todayPunchesRaw = empPunches.filter(p => p.punch_date === dateStr);
+                
+                if (prevShiftEndsNearMidnight) {
+                    todayPunchesRaw = todayPunchesRaw.filter(p => !localIsWithinMidnightBuffer(p['timestamp_raw']));
+                }
+
+                // 3. Combine with tomorrow's early buffer (120 mins) to form the complete analysis window.
                 const dayPunches = [
-                    ...empPunches.filter(p => p.punch_date === dateStr).map(p => ({ ...p, _isNext: false })),
+                    ...todayPunchesRaw.map(p => ({ ...p, _isNext: false })),
                     ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw'])).map(p => ({ ...p, _isNext: true }))
                 ].map(p => {
                     const pt = localParseTime(p['timestamp_raw']);
@@ -1114,6 +1144,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     const time = p._isNext ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
                     return { ...p, time };
                 }).filter(Boolean).sort((a, b) => a.time.getTime() - b.time.getTime());
+                // --- END BIDIRECTIONAL FIX ---
 
                 if (dayPunches.length === 0) continue;
 
