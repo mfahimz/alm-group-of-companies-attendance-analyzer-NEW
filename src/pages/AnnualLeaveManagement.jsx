@@ -23,6 +23,10 @@ export default function AnnualLeaveManagement() {
     const [editingLeave, setEditingLeave] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
+    const [filterProject, setFilterProject] = useState('all'); // State for project-based range filtering
+
+    const [unmatchedSearchTerm, setUnmatchedSearchTerm] = useState(''); // Search term for manual employee matching in import
+    const [activeUnmatchedIdx, setActiveUnmatchedIdx] = useState(null); // Tracks which row is currently being manually matched
 
     const [quickEntryText, setQuickEntryText] = useState('');
     const [isParsing, setIsParsing] = useState(false);
@@ -135,15 +139,42 @@ export default function AnnualLeaveManagement() {
         }
     });
 
+    // =========================================================================
+    // PROJECT ENTITY LOADING
+    // =========================================================================
+    // Loads projects for the current company to allow filtering leave records 
+    // by project date ranges.
+    const { data: projects = [] } = useQuery({
+        queryKey: ['projects', filterCompany],
+        queryFn: async () => {
+            if (!filterCompany) return [];
+            return base44.entities.Project.filter({ company: filterCompany }, 'name', ['id', 'name', 'date_from', 'date_to']);
+        }
+    });
+
     const filteredLeaves = useMemo(() => {
+        const selectedProj = filterProject !== 'all' ? projects.find(p => p.id === filterProject) : null;
+
         return leaves.filter(leave => {
             const matchesSearch = !searchTerm || 
                 leave.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 leave.attendance_id?.includes(searchTerm);
             const matchesStatus = filterStatus === 'all' || leave.status === filterStatus;
-            return matchesSearch && matchesStatus;
+            
+            // PROJECT RANGE FILTERING LOGIC:
+            // Records are shown if their leave range overlaps with the selected project's range.
+            let matchesProject = true;
+            if (selectedProj) {
+                const leaveStart = new Date(leave.date_from);
+                const leaveEnd = new Date(leave.date_to);
+                const projStart = new Date(selectedProj.date_from);
+                const projEnd = new Date(selectedProj.date_to);
+                matchesProject = leaveStart <= projEnd && leaveEnd >= projStart;
+            }
+
+            return matchesSearch && matchesStatus && matchesProject;
         });
-    }, [leaves, searchTerm, filterStatus]);
+    }, [leaves, searchTerm, filterStatus, filterProject, projects]);
 
     const calculateDays = (from, to) => {
         if (!from || !to) return 0;
@@ -673,6 +704,33 @@ export default function AnnualLeaveManagement() {
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>
+
+                    {/* Project Filter: Filters records by overlapping date ranges */}
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={filterProject}
+                            onChange={(e) => setFilterProject(e.target.value)}
+                            className="h-9 px-3 border rounded-md text-sm min-w-[200px]"
+                        >
+                            <option value="all">All Projects</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>
+                                    {p.name} ({p.date_from} to {p.date_to})
+                                </option>
+                            ))}
+                        </select>
+                        {filterProject !== 'all' && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setFilterProject('all')}
+                                className="text-slate-500 hover:text-red-600 h-9"
+                            >
+                                <X className="w-4 h-4 mr-1" />
+                                Clear
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </Card>
 
@@ -967,6 +1025,9 @@ export default function AnnualLeaveManagement() {
                                                     <span className="text-[10px] text-amber-700">Overlaps {row.existingDuplicate?.date_from} to {row.existingDuplicate?.date_to}</span>
                                                 </div>
                                             );
+                                        } else if (row.status === 'Matched') {
+                                            rowColors = "bg-indigo-50 text-indigo-900";
+                                            statusBadge = <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">Matched</Badge>;
                                         } else {
                                             rowColors = "bg-white";
                                             statusBadge = <Badge className="bg-green-100 text-green-800 border-green-200">Ready</Badge>;
@@ -986,7 +1047,73 @@ export default function AnnualLeaveManagement() {
                                                         }}
                                                     />
                                                 </td>
-                                                <td className="px-3 py-2">{row.originalName}</td>
+                                                <td className="px-3 py-2">
+                                                    <div>{row.originalName}</div>
+                                                    
+                                                    {/* MANUAL EMPLOYEE MATCHING SEARCH */}
+                                                    {/* Displays an inline search for unmatched rows to allow manual linking */}
+                                                    {row.status === 'Unmatched' && (
+                                                        <div className="mt-2 relative">
+                                                            <label className="text-[10px] font-semibold text-slate-500 block mb-1">Search to match employee</label>
+                                                            <Input 
+                                                                size="sm"
+                                                                placeholder="Type name..."
+                                                                className="h-7 text-[11px] bg-white border-red-200 focus:border-indigo-500"
+                                                                value={activeUnmatchedIdx === idx ? unmatchedSearchTerm : ''}
+                                                                onChange={(e) => {
+                                                                    setActiveUnmatchedIdx(idx);
+                                                                    setUnmatchedSearchTerm(e.target.value);
+                                                                }}
+                                                                onFocus={() => {
+                                                                    setActiveUnmatchedIdx(idx);
+                                                                    setUnmatchedSearchTerm('');
+                                                                }}
+                                                            />
+                                                            
+                                                            {activeUnmatchedIdx === idx && unmatchedSearchTerm.length >= 2 && (
+                                                                <>
+                                                                    {/* Overlay to dismiss dropdown on click outside */}
+                                                                    <div 
+                                                                        className="fixed inset-0 z-[60]" 
+                                                                        onClick={() => setActiveUnmatchedIdx(null)}
+                                                                    />
+                                                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-[70] max-h-48 overflow-auto">
+                                                                        {employees
+                                                                            .filter(emp => emp.company === filterCompany && emp.name.toLowerCase().includes(unmatchedSearchTerm.toLowerCase()))
+                                                                            .slice(0, 8)
+                                                                            .map(emp => (
+                                                                                <div 
+                                                                                    key={emp.id}
+                                                                                    className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-[11px] border-b last:border-0"
+                                                                                    onClick={() => {
+                                                                                        const newData = [...importPreviewData];
+                                                                                        newData[idx] = {
+                                                                                            ...newData[idx],
+                                                                                            matchedName: emp.name,
+                                                                                            attendanceId: emp.attendance_id,
+                                                                                            employeeId: emp.hrms_id, // Using hrms_id for consistency with entity creation
+                                                                                            status: 'Matched',
+                                                                                            selected: true
+                                                                                        };
+                                                                                        setImportPreviewData(newData);
+                                                                                        setActiveUnmatchedIdx(null);
+                                                                                        setUnmatchedSearchTerm('');
+                                                                                    }}
+                                                                                >
+                                                                                    <div className="font-bold">{emp.name}</div>
+                                                                                    <div className="text-[10px] text-slate-500">{emp.attendance_id} | {emp.company}</div>
+                                                                                </div>
+                                                                            ))
+                                                                        }
+                                                                        {employees.filter(emp => emp.company === filterCompany && emp.name.toLowerCase().includes(unmatchedSearchTerm.toLowerCase())).length === 0 && (
+                                                                            <div className="px-3 py-2 text-[11px] text-slate-500 italic">No matches found</div>
+                                                                        )}
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td className="px-3 py-2 font-medium">{row.matchedName || '-'}</td>
                                                 <td className="px-3 py-2">{row.attendanceId || '-'}</td>
                                                 <td className="px-3 py-2">{row.leaveStart || '-'}</td>

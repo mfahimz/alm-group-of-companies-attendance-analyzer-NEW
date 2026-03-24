@@ -1228,6 +1228,11 @@ export default function AppDocumentation() {
                                                     <strong>Update:</strong> A new AI-powered Quick Entry feature allows parsing natural language leave descriptions into structured form data. Fields remain fully editable after parsing to ensure final accuracy.
                                                 </p>
                                             </div>
+                                            <div className="bg-indigo-50 border border-indigo-100 rounded p-2 mt-2">
+                                                <p className="text-[10px] text-indigo-700">
+                                                    <strong>Update:</strong> The import preview now supports manual employee searching for unmatched rows, and the main leave table includes a project-based date range filter.
+                                                </p>
+                                            </div>
                                             <div className="bg-slate-50 rounded-lg p-3 text-[10px] text-slate-500 italic">
                                                 <strong>Al Maraghi Motors Exception:</strong> Leaves starting in the project but ending after it are fully included to ensure seamless payroll salary enrollment.
                                             </div>
