@@ -2083,20 +2083,57 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
     const verifiedCount = verifiedEmployees.length;
 
+    // [FIX 1 - Prep] Memoized dailyBreakdownData construction for EditDayRecordDialog when editing from audit panel
+    const auditDailyBreakdownData = React.useMemo(() => {
+        if (!selectedEmployee || !editingDay || !editingDay.dateStr) return {};
+        const attId = String(selectedEmployee.attendance_id);
+        const dateStr = editingDay.dateStr;
+
+        // LOCAL UTILITY FOR MIDNIGHT BUFFER CHECK (Consistency with detectors)
+        const localIsWithinMidnightBuffer = (tsR) => {
+            if (!tsR || tsR === '—' || tsR === '-') return false;
+            const pt = parseTime(tsR);
+            return pt ? (pt.getHours() * 60 + pt.getMinutes() <= 120) : false;
+        };
+
+        const empPunches = punches.filter(p => String(p.attendance_id) === attId);
+        const nextDayObj = new Date(dateStr);
+        nextDayObj.setDate(nextDayObj.getDate() + 1);
+        const nextDateStr = nextDayObj.toISOString().split('T')[0];
+
+        // Filter and combine with midnight crossover support
+        const dayPunches = [
+            ...empPunches.filter(p => p.punch_date === dateStr),
+            ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
+        ];
+
+        return {
+            [attId]: {
+                daily_details: {
+                    [dateStr]: {
+                        punches: dayPunches
+                    }
+                }
+            }
+        };
+    }, [selectedEmployee, editingDay, punches, parseTime]);
+
     return (
         <div className="space-y-6">
             {/* Finalization Progress Dialog */}
             <FinalizationProgressDialog progress={finalizationProgress} />
 
+            {/* Save Status Banner */}
             {saveProgress && (
-                <Card className="border-0 shadow-sm bg-green-50 border-green-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="flex-1">
-                                <p className="font-medium text-green-900">{saveProgress.status}</p>
-                                <p className="text-sm text-green-700 mt-1">
-                                    {saveProgress.current} / {saveProgress.total} completed
-                                </p>
+                <Card className="bg-green-50 border-green-200 shadow-sm border-2 animate-in fade-in slide-in-from-top-4">
+                    <CardContent className="py-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <Loader2 className="w-5 h-5 text-green-600 animate-spin" />
+                                <span className="font-bold text-green-700">Updating Analysis Records...</span>
+                            </div>
+                            <div className="text-sm font-bold text-green-600">
+                                {saveProgress.current} / {saveProgress.total} employees updated
                             </div>
                         </div>
                         <Progress value={saveProgress.total > 0 ? (saveProgress.current / saveProgress.total) * 100 : 0} className="w-full bg-green-200" />
@@ -2307,13 +2344,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                 </span>
                                                             </td>
                                                             <td className="py-3 text-right">
-                                                                {/* CHANGE 2: Edit button that triggers existing EditDayRecordDialog */}
+                                                                {/* FIX 1: Edit button that resolves matching AnalysisResult from results array */}
                                                                 <Button 
                                                                     size="sm" 
                                                                     variant="outline" 
                                                                     className="h-8 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                                                                     onClick={() => {
-                                                                        setSelectedEmployee(d.rawResult);
+                                                                        // Match by attendance_id and optionally date if applicable
+                                                                        const matchingResult = results.find(r => String(r.attendance_id) === String(d.attendance_id));
+                                                                        setSelectedEmployee(matchingResult || d.rawResult);
+                                                                        
                                                                         const row = {
                                                                             date: d.displayDate,
                                                                             dateStr: d.date,
@@ -2373,12 +2413,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                 <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">{d.noMatchPunches}</span>
                                                             </td>
                                                             <td className="py-3 text-right">
+                                                                {/* FIX 1: Fix Entry button that resolves matching AnalysisResult from results array */}
                                                                 <Button 
                                                                     size="sm" 
                                                                     variant="outline" 
                                                                     className="h-8 text-rose-600 border-rose-200 hover:bg-rose-50"
                                                                     onClick={() => {
-                                                                        setSelectedEmployee(d.rawResult);
+                                                                        // Match by attendance_id and optionally date if applicable
+                                                                        const matchingResult = results.find(r => String(r.attendance_id) === String(d.attendance_id));
+                                                                        setSelectedEmployee(matchingResult || d.rawResult);
+                                                                        
                                                                         const row = {
                                                                             date: d.displayDate,
                                                                             dateStr: d.date,
@@ -2540,7 +2584,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}
                 analysisResult={selectedEmployee}
-                dailyBreakdownData={{}}
+                dailyBreakdownData={auditDailyBreakdownData}
             />
         </div>
     );
