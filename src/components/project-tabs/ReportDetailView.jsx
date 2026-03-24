@@ -1453,12 +1453,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (noMatches.length > 0) {
                     // Calculate maxDeviation for severity coloring (Change 2)
                     const pmEndTime = localParseTime(shift.pm_end);
-                    const shiftPoints = [
-                        localParseTime(shift.am_start),
-                        localParseTime(shift.am_end),
-                        localParseTime(shift.pm_start),
-                        (pmEndTime && pmEndTime.getHours() === 0 ? new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000) : pmEndTime)
-                    ].filter(Boolean);
+                    const shiftPointsDetailed = [
+                        { label: 'AM Start', time: localParseTime(shift.am_start) },
+                        { label: 'AM End', time: localParseTime(shift.am_end) },
+                        { label: 'PM Start', time: localParseTime(shift.pm_start) },
+                        { label: 'PM End', time: (pmEndTime && pmEndTime.getHours() === 0 ? new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000) : pmEndTime) }
+                    ].filter(sp => sp.time);
 
                     let maxDeviation = 0;
                     noMatches.forEach(m => {
@@ -1467,8 +1467,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         if (!pt) return;
                         const punchTime = (nextDateStr && m.punch.punch_date === nextDateStr) ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
                         
-                        shiftPoints.forEach(sp => {
-                            const diff = Math.abs(punchTime.getTime() - sp.getTime()) / (1000 * 60);
+                        shiftPointsDetailed.forEach(sp => {
+                            const diff = Math.abs(punchTime.getTime() - sp.time.getTime()) / (1000 * 60);
                             if (diff < minPDiff) minPDiff = diff;
                         });
                         if (minPDiff > maxDeviation) maxDeviation = minPDiff;
@@ -1480,7 +1480,35 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         name: displayName, // BUG 1 FIX: Use resolved display name
                         date: dateStr,
                         displayDate: currentDay.toLocaleDateString(),
-                        noMatchPunches: matches.map(m => ({ raw: m.punch.timestamp_raw, matched: !!m.matchedTo, isPrev: localIsWithinMidnightBuffer(m.punch.timestamp_raw) })), // Updated for Change 4
+                        noMatchPunches: matches.map(m => {
+                            let nearestShiftPoint = null;
+                            let minutesAway = null;
+                            
+                            // Enrich unbound punches with nearest shift point info
+                            if (!m.matchedTo) {
+                                const pt = localParseTime(m.punch.timestamp_raw);
+                                if (pt) {
+                                    const punchTime = (nextDateStr && m.punch.punch_date === nextDateStr) ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
+                                    let minD = Infinity;
+                                    shiftPointsDetailed.forEach(sp => {
+                                        const diff = Math.abs(punchTime.getTime() - sp.time.getTime()) / (1000 * 60);
+                                        if (diff < minD) {
+                                            minD = diff;
+                                            nearestShiftPoint = sp.label;
+                                            minutesAway = Math.round(diff);
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            return { 
+                                raw: m.punch.timestamp_raw, 
+                                matched: !!m.matchedTo, 
+                                isPrev: localIsWithinMidnightBuffer(m.punch.timestamp_raw),
+                                nearestShiftPoint,
+                                minutesAway
+                            };
+                        }), // Updated for Change 4 & Unbound Enrichment
                         rawResult: result,
                         maxDeviation: Math.round(maxDeviation) // Added for Change 2
                     });
@@ -2091,6 +2119,55 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     };
 
+    /**
+     * User Modification: Export Mismatch Report as Excel
+     * Generates a two-sheet Excel file containing detailed Shift Mismatches and Unbound Punches.
+     */
+    const handleExportMismatch = () => {
+        try {
+            const wb = XLSX.utils.book_new();
+
+            // Sheet 1: Shift Mismatches
+            const sheet1Headers = ['Employee Name', 'Attendance ID', 'Date', 'Punch Times', 'Likely Worked Shift', 'Deviation Minutes'];
+            const sheet1Rows = shiftMismatchDetections.map(d => [
+                d.name,
+                d.attendance_id,
+                d.date,
+                d.punches.map(p => {
+                    const time = extractTime(p.raw);
+                    return p.isPrev ? `${time} (prev)` : time;
+                }).join(', '),
+                d.likelyWorkedShift || 'N/A',
+                d.maxDeviation
+            ]);
+            const ws1 = XLSX.utils.aoa_to_sheet([sheet1Headers, ...sheet1Rows]);
+            XLSX.utils.book_append_sheet(wb, ws1, 'Shift Mismatches');
+
+            // Sheet 2: No Match Punches
+            const sheet2Headers = ['Employee Name', 'Attendance ID', 'Date', 'Unbound Punches', 'Max Deviation Minutes'];
+            const sheet2Rows = noMatchDetections.map(d => [
+                d.name,
+                d.attendance_id,
+                d.date,
+                d.noMatchPunches.filter(p => !p.matched).map(p => {
+                    const time = extractTime(p.raw);
+                    const suffix = p.nearestShiftPoint ? ` (${p.nearestShiftPoint} ${p.minutesAway}m)` : '';
+                    return p.isPrev ? `${time} (prev)${suffix}` : `${time}${suffix}`;
+                }).join(', '),
+                d.maxDeviation
+            ]);
+            const ws2 = XLSX.utils.aoa_to_sheet([sheet2Headers, ...sheet2Rows]);
+            XLSX.utils.book_append_sheet(wb, ws2, 'No Match Punches');
+
+            const fileName = `shift_mismatch_report_${reportRun.date_from}_to_${reportRun.date_to}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            toast.success('Mismatch report exported');
+        } catch (error) {
+            console.error('[ReportDetailView] Mismatch export failed:', error);
+            toast.error('Failed to export mismatch report');
+        }
+    };
+
     const executeExcelDownload = () => {
         try {
             const data = [previewHeaders, ...previewData];
@@ -2346,9 +2423,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 Moved to the top of the report output for better visibility.
                 This panel provides live auditing of punch-to-shift binding issues.
             */}
-            <div className="flex flex-col gap-4 mb-6">
-                <Button 
-                    variant="outline" 
+            <div className="flex gap-4 items-center mb-6">
+                <Button
                     className={`w-fit font-bold border-2 transition-all ${showDetectionPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                     onClick={() => setShowDetectionPanel(!showDetectionPanel)}
                 >
@@ -2365,6 +2441,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 </Button>
 
                 {showDetectionPanel && (
+                    <Button
+                        onClick={handleExportMismatch}
+                        variant="outline"
+                        className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold"
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export Mismatch
+                    </Button>
+                )}
+            </div>
+
+            {showDetectionPanel && (
                     <Card className="border shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="flex border-b bg-slate-50/50">
                             <button 
@@ -2397,6 +2485,41 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
                             {activeDetectionTab === 'mismatch' ? (
                                 <div className="space-y-4">
+                                    {/* Top Offenders Summary Bar - Shift Mismatch (User Requested Red Theme) */}
+                                    {(() => {
+                                        if (shiftMismatchDetections.length === 0) return null;
+                                        
+                                        // Group and count flagged days per employee from the raw detection array
+                                        const counts = {};
+                                        shiftMismatchDetections.forEach(d => {
+                                            const aid = String(d.attendance_id);
+                                            if (!counts[aid]) {
+                                                counts[aid] = { name: d.name, count: 0 };
+                                            }
+                                            counts[aid].count++;
+                                        });
+                                        
+                                        // Convert to array and sort by count descending, then take top 5
+                                        const topOffenders = Object.values(counts)
+                                            .sort((a, b) => b.count - a.count)
+                                            .slice(0, 5);
+                                            
+                                        return (
+                                            <div className="flex flex-wrap gap-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                                                <div className="w-full text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">
+                                                    Top Offenders (Flagged Days)
+                                                </div>
+                                                {topOffenders.map((offender, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-rose-50 border border-rose-100 rounded-md shadow-sm">
+                                                        <span className="text-[11px] font-bold text-rose-700">{offender.name}</span>
+                                                        <span className="bg-rose-200 text-rose-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                                                            {offender.count}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
                                         <div className="mt-0.5 text-amber-600 font-bold">ⓘ</div>
                                         <p className="text-xs text-amber-800 leading-relaxed">
@@ -2529,6 +2652,41 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 </div>
                             ) : (
                                 <div className="space-y-4">
+                                    {/* Top Offenders Summary Bar - No Match (User Requested Amber Theme) */}
+                                    {(() => {
+                                        if (noMatchDetections.length === 0) return null;
+                                        
+                                        // Group and count flagged days per employee from the raw detection array
+                                        const counts = {};
+                                        noMatchDetections.forEach(d => {
+                                            const aid = String(d.attendance_id);
+                                            if (!counts[aid]) {
+                                                counts[aid] = { name: d.name, count: 0 };
+                                            }
+                                            counts[aid].count++;
+                                        });
+                                        
+                                        // Convert to array and sort by count descending, then take top 5
+                                        const topOffenders = Object.values(counts)
+                                            .sort((a, b) => b.count - a.count)
+                                            .slice(0, 5);
+                                            
+                                        return (
+                                            <div className="flex flex-wrap gap-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                                                <div className="w-full text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">
+                                                    Top Offenders (Flagged Days)
+                                                </div>
+                                                {topOffenders.map((offender, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-100 rounded-md shadow-sm">
+                                                        <span className="text-[11px] font-bold text-amber-700">{offender.name}</span>
+                                                        <span className="bg-amber-200 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                                                            {offender.count}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="flex items-start gap-3 p-3 bg-rose-50 border border-rose-100 rounded-lg">
                                         <div className="mt-0.5 text-rose-600 font-bold">ⓘ</div>
                                         <p className="text-xs text-rose-800 leading-relaxed">
@@ -2600,6 +2758,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                                     {d.noMatchPunches.map((p, idx) => (
                                                                                         <span key={idx} className={`flex items-center gap-1 border px-1.5 py-0.5 rounded text-[10px] ${p.matched ? 'bg-white text-slate-400' : 'bg-rose-50 border-rose-200 text-rose-700 font-bold'}`}>
                                                                                             {extractTime(p.raw)}
+                                                                                            {/* User Modification: Show nearest shift point and distance for unbound punches */}
+                                                                                            {!p.matched && p.nearestShiftPoint && (
+                                                                                                <span className="text-slate-400 font-normal border-l pl-1 ml-0.5 border-rose-200">
+                                                                                                    {p.nearestShiftPoint} {p.minutesAway}m
+                                                                                                </span>
+                                                                                            )}
                                                                                             {p.isPrev && (
                                                                                                 <span className="bg-blue-100 text-blue-600 px-1 py-0 rounded-[2px] leading-none transform scale-95">prev day</span>
                                                                                             )}
@@ -2657,8 +2821,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         </div>
                     </Card>
                 )}
-            </div>
-
+            
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <CardTitle>Attendance Report</CardTitle>
