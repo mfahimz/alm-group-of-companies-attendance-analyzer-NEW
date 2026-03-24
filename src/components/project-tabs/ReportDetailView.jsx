@@ -88,7 +88,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             // Fallback for closed projects: if no results found by report_run_id,
             // try fetching by project_id (covers cases where finalized results stored under a different run id)
             if (results.length === 0 && project?.id && (project.status === 'closed' || reportRun.is_final)) {
-                console.log('[ReportDetailView] Fallback: fetching results by project_id for closed/finalized report');
                 const byProject = await base44.entities.AnalysisResult.filter({ project_id: project.id }, null, 5000);
                 // Filter to only results that belong to this specific report_run_id if possible
                 const matchingRun = byProject.filter(r => r.report_run_id === reportRun.id);
@@ -1099,6 +1098,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 (e.attendance_id === 'ALL' || String(e.attendance_id) === String(employeeAttendanceId)) &&
                 e.use_in_analysis !== false
             );
+            // Normalize friday-shift flags to booleans so string values do not misroute day matching.
+            const localIsFridayShift = (shiftRow) => shiftRow?.is_friday_shift === true || shiftRow?.is_friday_shift === 'true' || shiftRow?.is_friday_shift === 1 || shiftRow?.is_friday_shift === '1';
 
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const currentDay = new Date(d);
@@ -1114,7 +1115,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 let shift = employeeShifts.find(s => s.date === dateStr);
                 if (!shift) {
                     const dayOfWeek = currentDay.getDay();
-                    shift = employeeShifts.find(s => (dayOfWeek === 5 ? s.is_friday_shift : !s.is_friday_shift) && !s.date);
+                    // Use normalized friday matching to prevent string "false" from being treated as truthy.
+                    shift = employeeShifts.find(s => (dayOfWeek === 5 ? localIsFridayShift(s) : !localIsFridayShift(s)) && !s.date);
                     if (!shift && dayOfWeek === 5) shift = employeeShifts.find(s => !s.date);
                 }
                 if (!shift) continue;
@@ -1134,7 +1136,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 let prevShift = employeeShifts.find(s => s.date === prevDateStr);
                 if (!prevShift) {
                     const prevDayOfWeek = prevDayObj.getDay();
-                    prevShift = employeeShifts.find(s => (prevDayOfWeek === 5 ? s.is_friday_shift : !s.is_friday_shift) && !s.date);
+                    // Use normalized friday matching so previous-day shift lookup picks the correct template.
+                    prevShift = employeeShifts.find(s => (prevDayOfWeek === 5 ? localIsFridayShift(s) : !localIsFridayShift(s)) && !s.date);
                     if (!prevShift && prevDayOfWeek === 5) prevShift = employeeShifts.find(s => !s.date);
                 }
                 
@@ -1558,7 +1561,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const finalizeReportMutation = useMutation({
         mutationFn: async () => {
-            console.log('[ReportDetailView] Starting finalization...');
 
             // Show progress dialog
             setFinalizationProgress({
@@ -1574,7 +1576,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             // before marking final. This ensures what you see = what gets finalized.
             // NO backend recalculation. The frontend is the source of truth.
             // ============================================================
-            console.log('[ReportDetailView] Step 0: Writing UI values to AnalysisResult...');
             const currentEnriched = baseEnrichedResults;
             let updatedCount = 0;
 
@@ -1612,21 +1613,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
 
                 if (needsUpdate) {
-                    console.log(`[ReportDetailView] Syncing UI→DB for ${row.attendance_id}:`, updates);
                     await base44.entities.AnalysisResult.update(row.id, updates);
                     updatedCount++;
                 }
             }
-            console.log(`[ReportDetailView] Step 0 complete: synced ${updatedCount} AnalysisResults with UI values`);
 
             // STEP 1: Mark report as final (no recalculation - just flag it)
-            console.log('[ReportDetailView] Calling markFinalReport...');
             const markResult = await base44.functions.invoke('markFinalReport', {
                 project_id: project.id,
                 report_run_id: reportRun.id
             });
 
-            console.log('[ReportDetailView] markFinalReport result:', markResult.data);
 
             if (markResult.data?.success === false) {
                 console.error('[ReportDetailView] Backend validation failed:', markResult.data?.error);
@@ -1677,7 +1674,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
-            console.log('[ReportDetailView] All snapshots created successfully');
             return markResult.data;
         },
         onSuccess: async () => {
