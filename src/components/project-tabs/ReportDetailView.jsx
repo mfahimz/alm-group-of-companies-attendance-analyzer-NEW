@@ -1088,6 +1088,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
         results.forEach(result => {
             const employeeAttendanceId = result.attendance_id;
+            
+            /* BUG 1 FIX: Resolve employee name from already loaded employees list
+               Ensures group headers show correct name instead of ID number. */
+            const employee = employees.find(e => String(e.attendance_id) === String(employeeAttendanceId));
+            const displayName = employee?.name || String(employeeAttendanceId);
+
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === String(employeeAttendanceId));
             const employeeExceptions = exceptions.filter(e => 
                 (e.attendance_id === 'ALL' || String(e.attendance_id) === String(employeeAttendanceId)) &&
@@ -1148,10 +1154,23 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     todayPunchesRaw = todayPunchesRaw.filter(p => !localIsWithinMidnightBuffer(p['timestamp_raw']));
                 }
 
-                // 3. Combine with tomorrow's early buffer (120 mins) to form the complete analysis window.
+                /* BUG 2 FIX: Gate tomorrow's buffer punches by today's shift configuration.
+                   Identify if today's shift ends near midnight. If it does NOT, we should not
+                   include next-day punches in today's analysis window to avoid false mismatches. */
+                const tEnd = localParseTime(shift.pm_end) || localParseTime(shift.am_end);
+                let todayShiftEndsNearMidnight = false;
+                if (tEnd) {
+                    const h = tEnd.getHours();
+                    if (h === 23 || h === 0) todayShiftEndsNearMidnight = true;
+                }
+
+                // 3. Combine with tomorrow's early buffer (120 mins) ONLY IF today was a night shift.
                 const dayPunches = [
                     ...todayPunchesRaw.map(p => ({ ...p, _isNext: false })),
-                    ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw'])).map(p => ({ ...p, _isNext: true }))
+                    ...(todayShiftEndsNearMidnight 
+                        ? empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw']))
+                        : []
+                    ).map(p => ({ ...p, _isNext: true }))
                 ].map(p => {
                     const pt = localParseTime(p['timestamp_raw']);
                     if (!pt) return null;
@@ -1274,7 +1293,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     flagged.push({
                         id: result.id,
                         attendance_id: employeeAttendanceId,
-                        name: result.name,
+                        name: displayName, // BUG 1 FIX: Use resolved display name
                         date: dateStr,
                         displayDate: currentDay.toLocaleDateString(),
                         punches: dayPunches.map(p => ({ raw: p['timestamp_raw'], isPrev: localIsWithinMidnightBuffer(p['timestamp_raw']) })), // Updated for Change 4
@@ -1351,6 +1370,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
         results.forEach(result => {
             const employeeAttendanceId = result.attendance_id;
+            
+            /* BUG 1 FIX: Resolve employee name from already loaded employees list
+               Ensures group headers show correct name instead of ID number. */
+            const employee = employees.find(e => String(e.attendance_id) === String(employeeAttendanceId));
+            const displayName = employee?.name || String(employeeAttendanceId);
+
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === String(employeeAttendanceId));
             const employeeExceptions = exceptions.filter(e => 
                 (e.attendance_id === 'ALL' || String(e.attendance_id) === String(employeeAttendanceId)) &&
@@ -1418,7 +1443,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     flagged.push({
                         id: result.id,
                         attendance_id: employeeAttendanceId,
-                        name: result.name,
+                        name: displayName, // BUG 1 FIX: Use resolved display name
                         date: dateStr,
                         displayDate: currentDay.toLocaleDateString(),
                         noMatchPunches: matches.map(m => ({ raw: m.punch.timestamp_raw, matched: !!m.matchedTo, isPrev: localIsWithinMidnightBuffer(m.punch.timestamp_raw) })), // Updated for Change 4
