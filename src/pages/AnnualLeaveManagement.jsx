@@ -148,7 +148,12 @@ export default function AnnualLeaveManagement() {
         queryKey: ['projects', filterCompany],
         queryFn: async () => {
             if (!filterCompany) return [];
-            return base44.entities.Project.filter({ company: filterCompany }, 'name', ['id', 'name', 'date_from', 'date_to']);
+            // EXCLUDING CLOSED PROJECTS: Loads only active/non-closed projects 
+            // for the filter dropdown to maintain focus on current operations.
+            return base44.entities.Project.filter({ 
+                company: filterCompany, 
+                status: { $ne: 'closed' } 
+            }, 'name', ['id', 'name', 'date_from', 'date_to']);
         }
     });
 
