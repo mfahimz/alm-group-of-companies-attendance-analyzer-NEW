@@ -651,20 +651,7 @@ export default function AnnualLeaveManagement() {
                 </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 gap-4 mb-6">
-                <Card className="p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-blue-100 rounded-lg">
-                            <FileText className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-[#6B7280]">Total Leaves</p>
-                            <p className="text-2xl font-bold text-[#1F2937]">{stats.total}</p>
-                        </div>
-                    </div>
-                </Card>
-            </div>
+
 
             {/* Filters */}
             <Card className="p-4 mb-6">
