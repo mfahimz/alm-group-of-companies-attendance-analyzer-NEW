@@ -21,7 +21,7 @@ export default function Layout({ children, currentPageName }) {
     // Use permissions hook
     const { user: currentUser, isLoading, error, userRole, canAccessPage } = usePermissions();
 
-    const isDepartmentHead = userRole === 'department_head';
+    const isDepartmentHead = userRole === 'department_head' || userRole === 'assistant_gm';
     const isHRManager = userRole === 'hr_manager';
     const isCEO = userRole === 'ceo';
 

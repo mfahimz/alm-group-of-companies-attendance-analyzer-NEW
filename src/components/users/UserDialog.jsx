@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 const ROLE_OPTIONS = [
     { value: 'user', label: 'User', description: 'Company-specific access only' },
     { value: 'department_head', label: 'Department Head', description: 'Department approval access only' },
+    { value: 'assistant_gm', label: 'Assistant General Manager', description: 'Same access as Department Head' },
     { value: 'hr_manager', label: 'HR Manager', description: 'HR operations, salary increments, and team management' },
     { value: 'supervisor', label: 'Supervisor', description: 'All projects & employees, no system settings' },
     { value: 'ceo', label: 'CEO', description: 'Executive access with optional department head role' },
@@ -37,6 +38,7 @@ export default function UserDialog({ open, onClose, user }) {
     });
 
     const needsDeptHeadData = formData.extended_role === 'department_head' ||
+                               formData.extended_role === 'assistant_gm' ||
                                formData.extended_role === 'ceo' ||
                                formData.extended_role === 'hr_manager';
 
@@ -68,7 +70,7 @@ export default function UserDialog({ open, onClose, user }) {
 
     // Get departments that have active department heads in this company (for department_head role)
     const availableDepartments = React.useMemo(() => {
-        if (!formData.company || formData.extended_role !== 'department_head') return [];
+        if (!formData.company || (formData.extended_role !== 'department_head' && formData.extended_role !== 'assistant_gm')) return [];
 
         const activeDeptHeads = deptHeads.filter(dh =>
             dh.company === formData.company && dh.active
@@ -147,7 +149,7 @@ export default function UserDialog({ open, onClose, user }) {
     useEffect(() => {
         if (!user?.hrms_id) return;
         const role = user.extended_role || user.role || '';
-        if (role !== 'ceo' && role !== 'hr_manager' && role !== 'department_head') return;
+        if (role !== 'ceo' && role !== 'hr_manager' && role !== 'department_head' && role !== 'assistant_gm') return;
         if (employees.length === 0 || deptHeads.length === 0) return;
         const emp = employees.find(e => e.hrms_id === user.hrms_id);
         if (!emp) return;
@@ -161,7 +163,7 @@ export default function UserDialog({ open, onClose, user }) {
     // Use a ref to avoid triggering on formData.department itself (loop risk)
     const prevDeptRef = React.useRef('');
     useEffect(() => {
-        if (formData.extended_role !== 'department_head' || !formData.company || !formData.department) return;
+        if ((formData.extended_role !== 'department_head' && formData.extended_role !== 'assistant_gm') || !formData.company || !formData.department) return;
         const deptHasHead = Object.keys(availableDepartments).includes(formData.department);
         if (!deptHasHead && formData.department !== prevDeptRef.current) {
             prevDeptRef.current = formData.department;
@@ -200,7 +202,7 @@ export default function UserDialog({ open, onClose, user }) {
             await base44.entities.User.update(id, data);
 
             // If setting as department_head, create/update DepartmentHead record
-            if (data.extended_role === 'department_head' && data.hrms_id && data.company && data.department) {
+            if ((data.extended_role === 'department_head' || data.extended_role === 'assistant_gm') && data.hrms_id && data.company && data.department) {
                 try {
                     const empRecords = await base44.entities.Employee.filter({
                         hrms_id: data.hrms_id
@@ -239,10 +241,10 @@ export default function UserDialog({ open, onClose, user }) {
             }
 
             // If removing department_head role, deactivate DepartmentHead record
-            if (data.extended_role !== 'department_head' && previousUser?.hrms_id) {
-                // Only deactivate if the previous role was department_head
+            if (data.extended_role !== 'department_head' && data.extended_role !== 'assistant_gm' && previousUser?.hrms_id) {
+                // Only deactivate if the previous role was department_head or assistant_gm
                 const prevRole = previousUser.extended_role || previousUser.role || 'user';
-                if (prevRole === 'department_head') {
+                if (prevRole === 'department_head' || prevRole === 'assistant_gm') {
                     try {
                         const empRecords = await base44.entities.Employee.filter({
                             hrms_id: previousUser.hrms_id
@@ -321,21 +323,21 @@ export default function UserDialog({ open, onClose, user }) {
 
         // Validate company assignment for roles that require it
         // HR Manager does NOT require a company - they have access to all companies
-        const rolesRequiringCompany = ['user', 'department_head', 'ceo'];
+        const rolesRequiringCompany = ['user', 'department_head', 'assistant_gm', 'ceo'];
         if (rolesRequiringCompany.includes(formData.extended_role) && !formData.company) {
             toast.error('Please assign a company to this user');
             return;
         }
 
         // Validate department assignment for department_head role
-        if (formData.extended_role === 'department_head' && !formData.department) {
-            toast.error('Please assign a department for the department head');
+        if ((formData.extended_role === 'department_head' || formData.extended_role === 'assistant_gm') && !formData.department) {
+            toast.error('Please assign a department for this role');
             return;
         }
 
         // Validate employee link for department_head role
-        if (formData.extended_role === 'department_head' && !formData.hrms_id) {
-            toast.error('Please link this department head to an employee');
+        if ((formData.extended_role === 'department_head' || formData.extended_role === 'assistant_gm') && !formData.hrms_id) {
+            toast.error('Please link this user to an employee');
             return;
         }
 
@@ -352,9 +354,9 @@ export default function UserDialog({ open, onClose, user }) {
             extended_role: formData.extended_role
         };
 
-        if (formData.extended_role === 'user' || formData.extended_role === 'department_head') {
+        if (formData.extended_role === 'user' || formData.extended_role === 'department_head' || formData.extended_role === 'assistant_gm') {
             dataToSubmit.company = formData.company;
-            if (formData.extended_role === 'department_head') {
+            if (formData.extended_role === 'department_head' || formData.extended_role === 'assistant_gm') {
                 dataToSubmit.department = formData.department;
                 dataToSubmit.hrms_id = formData.hrms_id;
             } else {
@@ -468,7 +470,7 @@ export default function UserDialog({ open, onClose, user }) {
                         </div>
 
                         {/* Company field for user, department_head, ceo only. HR Manager = all companies */}
-                        {['user', 'department_head', 'ceo'].includes(formData.extended_role) && (
+                        {['user', 'department_head', 'assistant_gm', 'ceo'].includes(formData.extended_role) && (
                             <div>
                                 <Label htmlFor="company">Assigned Company *</Label>
                                 <Select
@@ -497,7 +499,7 @@ export default function UserDialog({ open, onClose, user }) {
                         )}
 
                         {/* Department head specific fields */}
-                        {formData.extended_role === 'department_head' && formData.company && (
+                        {(formData.extended_role === 'department_head' || formData.extended_role === 'assistant_gm') && formData.company && (
                             <>
                                 <div>
                                     <Label htmlFor="department">Assigned Department *</Label>

@@ -55,18 +55,18 @@ const PAGE_DISPLAY_NAMES = {
 
 const DEFAULT_PAGES = [
     // Main
-    { page_name: 'Home', description: 'Smart home dashboard (routes by role)', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'Home', description: 'Smart home dashboard (routes by role)', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' },
     { page_name: 'Dashboard', description: 'Main dashboard with project overview', allowed_roles: 'admin,supervisor,user,ceo,hr_manager' },
-    { page_name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', allowed_roles: 'department_head,ceo,hr_manager' },
+    { page_name: 'DepartmentHeadDashboard', description: 'Department head approvals and reports', allowed_roles: 'department_head,assistant_gm,ceo,hr_manager' },
     // Projects
-    { page_name: 'Projects', description: 'Project management and listing', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
-    { page_name: 'ProjectDetail', description: 'Individual project details and management', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
-    { page_name: 'ReportDetail', description: 'Detailed attendance report view', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'Projects', description: 'Project management and listing', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' },
+    { page_name: 'ProjectDetail', description: 'Individual project details and management', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' },
+    { page_name: 'ReportDetail', description: 'Detailed attendance report view', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' },
     // HR Management
-    { page_name: 'Employees', description: 'Employee master data management', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
+    { page_name: 'Employees', description: 'Employee master data management', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' },
     { page_name: 'Salaries', description: 'Employee salary management', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
     { page_name: 'SalaryIncrements', description: 'Salary increment management', allowed_roles: 'admin,supervisor,ceo,hr_manager' },
-    { page_name: 'AnnualLeaveManagement', description: 'Annual leave calendar', allowed_roles: 'admin,supervisor,user,ceo,hr_manager' },
+    { page_name: 'AnnualLeaveManagement', description: 'Annual leave calendar', allowed_roles: 'admin,supervisor,user,ceo,assistant_gm,hr_manager' },
     { page_name: 'RamadanSchedules', description: 'Ramadan shift schedule management', allowed_roles: 'admin,user,ceo,hr_manager' },
     { page_name: 'ResumeScanner', description: 'AI resume scanner for recruitment', allowed_roles: 'admin,supervisor' },
     // Admin
@@ -86,9 +86,9 @@ const DEFAULT_PAGES = [
     { page_name: 'FeatureRequests', description: 'Feature request tracking', allowed_roles: 'admin' },
     { page_name: 'DeveloperModule', description: 'Developer tools (direct URL only)', allowed_roles: 'admin' },
     // Hidden
-    { page_name: 'EmployeeProfile', description: 'Employee profile details', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
-    { page_name: 'UserProfile', description: 'User profile settings', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' },
-    { page_name: 'Maintenance', description: 'Maintenance mode page (public)', allowed_roles: 'admin,supervisor,user,ceo,department_head,hr_manager' }
+    { page_name: 'EmployeeProfile', description: 'Employee profile details', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' },
+    { page_name: 'UserProfile', description: 'User profile settings', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' },
+    { page_name: 'Maintenance', description: 'Maintenance mode page (public)', allowed_roles: 'admin,supervisor,user,ceo,department_head,assistant_gm,hr_manager' }
 ];
 
 export default function Users() {
@@ -195,6 +195,8 @@ export default function Users() {
         } else if (currentRole === 'supervisor') {
             newRole = 'department_head';
         } else if (currentRole === 'department_head') {
+            newRole = 'assistant_gm';
+        } else if (currentRole === 'assistant_gm') {
             newRole = 'user';
         } else {
             newRole = 'admin';
@@ -411,17 +413,20 @@ export default function Users() {
                                                           displayRole === 'hr_manager' ? 'bg-teal-100 text-teal-700' :
                                                           displayRole === 'supervisor' ? 'bg-blue-100 text-blue-700' :
                                                           displayRole === 'department_head' ? 'bg-green-100 text-green-700' :
+                                                          displayRole === 'assistant_gm' ? 'bg-emerald-100 text-emerald-700' :
                                                           'bg-slate-100 text-slate-700'}
                                                     `}>
                                                         {displayRole === 'admin' ? <Shield className="w-3 h-3" /> :
                                                          displayRole === 'ceo' ? <Shield className="w-3 h-3" /> :
                                                          displayRole === 'department_head' ? <Shield className="w-3 h-3" /> :
+                                                         displayRole === 'assistant_gm' ? <Shield className="w-3 h-3" /> :
                                                          <UserIcon className="w-3 h-3" />}
                                                         {displayRole === 'admin' ? 'Admin' :
                                                          displayRole === 'ceo' ? 'CEO' :
                                                          displayRole === 'hr_manager' ? 'HR Manager' :
                                                          displayRole === 'supervisor' ? 'Supervisor' :
                                                          displayRole === 'department_head' ? 'Dept Head' :
+                                                         displayRole === 'assistant_gm' ? 'Asst GM' :
                                                          'User'}
                                                     </span>
                                                 );
@@ -443,7 +448,7 @@ export default function Users() {
                                                     variant="outline"
                                                     onClick={() => handleToggleRole(user)}
                                                     disabled={updateUserMutation.isPending}
-                                                    title="Toggle role (Admin → CEO → HR Manager → Supervisor → Dept Head → User → Admin)"
+                                                    title="Toggle role (Admin → CEO → HR Manager → Supervisor → Dept Head → Asst GM → User → Admin)"
                                                 >
                                                     <Shield className="w-4 h-4" />
                                                 </Button>
@@ -525,6 +530,7 @@ export default function Users() {
                                             <TableHead className="text-center font-semibold">Supervisor</TableHead>
                                             <TableHead className="text-center font-semibold">CEO</TableHead>
                                             <TableHead className="text-center font-semibold">Dept Head</TableHead>
+                                            <TableHead className="text-center font-semibold">Asst GM</TableHead>
                                             <TableHead className="text-center font-semibold">HR Manager</TableHead>
                                             <TableHead className="text-center font-semibold">User</TableHead>
                                         </TableRow>
@@ -559,8 +565,12 @@ export default function Users() {
                                                         </Button>
                                                     </TableCell>
                                                     <TableCell className="text-center">
+                                                        <Button size="sm" variant={hasPageRole(permission, 'assistant_gm') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'assistant_gm')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'assistant_gm') ? 'bg-emerald-600 hover:bg-emerald-700' : ''}>
+                                                            {hasPageRole(permission, 'assistant_gm') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
                                                         <Button size="sm" variant={hasPageRole(permission, 'hr_manager') ? 'default' : 'outline'} onClick={() => togglePageRole(permission, 'hr_manager')} disabled={updatePermissionMutation.isPending} className={hasPageRole(permission, 'hr_manager') ? 'bg-teal-600 hover:bg-teal-700' : ''}>
-                                                            {hasPageRole(permission, 'hr_manager') ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                                                         </Button>
                                                     </TableCell>
                                                     <TableCell className="text-center">
@@ -583,7 +593,7 @@ export default function Users() {
                             </p>
                             <ul className="text-sm text-blue-900 space-y-1 list-disc list-inside">
                                 <li>Click a button to toggle access for that role</li>
-                                <li>Purple = Admin, Blue = Supervisor, Indigo = CEO, Green = Dept Head, Teal = HR Manager, Gray = User</li>
+                                <li>Purple = Admin, Blue = Supervisor, Indigo = CEO, Green = Dept Head, Emerald = Asst GM, Teal = HR Manager, Gray = User</li>
                                 <li>Each page must have at least one role with access</li>
                                 <li>Changes take effect immediately for all users</li>
                             </ul>

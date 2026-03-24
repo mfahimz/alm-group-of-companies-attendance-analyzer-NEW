@@ -51,7 +51,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'hr_manager'],
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager'],
         isDefaultLandingPage: true,
         smartRoute: true  // Routes to Dashboard or DepartmentHeadDashboard based on role
     },
@@ -74,7 +74,7 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['department_head', 'ceo', 'hr_manager']
+        defaultRoles: ['department_head', 'assistant_gm', 'ceo', 'hr_manager']
     },
     // Projects Menu
     Projects: {
@@ -85,7 +85,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
     },
     Employees: {
         name: 'Employees',
@@ -95,7 +95,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
     },
     Salaries: {
         name: 'Salaries',
@@ -145,7 +145,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'assistant_gm', 'hr_manager']
     },
     CompanyManagement: {
         name: 'CompanyManagement',
@@ -272,7 +272,7 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
     },
     ReportDetail: {
         name: 'ReportDetail',
@@ -282,7 +282,7 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
     },
     EmployeeProfile: {
         name: 'EmployeeProfile',
@@ -292,7 +292,7 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
     },
     Maintenance: {
         name: 'Maintenance',

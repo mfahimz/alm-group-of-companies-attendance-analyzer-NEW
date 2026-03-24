@@ -121,9 +121,9 @@ export const usePermissions = () => {
     };
 
     // Check if user is restricted to their own department
-    // HR Manager has access to all companies - only department_head is restricted
+    // HR Manager has access to all companies - only department_head and assistant_gm are restricted
     const isRestrictedToOwnDepartment = () => {
-        return userRole === 'department_head';
+        return userRole === 'department_head' || userRole === 'assistant_gm';
     };
 
     return {
