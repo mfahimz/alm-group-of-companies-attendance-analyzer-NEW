@@ -612,7 +612,7 @@ export default function DepartmentHeadDashboard() {
                             <div className="flex-1">
                                 <h2 className="text-xl font-semibold text-slate-900">{currentProject.name}</h2>
                                 <p className="text-slate-600 mt-1">
-                                    {format(parseISO(currentProject.date_from), 'dd MMM yyyy')} - {format(parseISO(currentProject.date_to), 'dd MMM yyyy')}
+                                    Last date for pre-approved entries: <span className="font-medium">{format(parseISO(currentProject.date_to), 'dd MMM yyyy')}</span>
                                 </p>
                                 {approvalPeriodEnded && (
                                     <div className="mt-3 bg-amber-100 border border-amber-300 rounded-lg p-3">
