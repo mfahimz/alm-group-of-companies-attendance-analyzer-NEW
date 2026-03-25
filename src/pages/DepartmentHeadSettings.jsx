@@ -28,6 +28,7 @@ export default function DepartmentHeadSettings() {
     const [managedEmployeesSearch, setManagedEmployeesSearch] = useState('');
     const [editManagedEmployeesSearch, setEditManagedEmployeesSearch] = useState('');
     const [activeTab, setActiveTab] = useState('manage');
+    const [isAGM, setIsAGM] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: employees = [] } = useQuery({
@@ -50,11 +51,6 @@ export default function DepartmentHeadSettings() {
         queryFn: () => base44.entities.User.list()
     });
 
-    const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions'],
-        queryFn: () => base44.entities.Exception.list()
-    });
-
     const { data: companiesData = [] } = useQuery({
         queryKey: ['companies'],
         queryFn: () => base44.entities.Company.list()
@@ -69,870 +65,206 @@ export default function DepartmentHeadSettings() {
         return ['Admin', 'Executive', ...setting.departments.split(',').map(d => d.trim()).filter(Boolean)];
     }, [selectedCompany, companySettings]);
 
-    // Get all employee IDs that are already assigned as department heads
-    const assignedDeptHeadIds = deptHeads
-        .filter(dh => dh.active)
-        .map(dh => dh.employee_id);
+    const assignedDeptHeadIds = deptHeads.filter(dh => dh.active).map(dh => dh.employee_id);
+    const managedEmployeeIds = deptHeads.filter(dh => dh.active && dh.managed_employee_ids).flatMap(dh => dh.managed_employee_ids.split(',').filter(Boolean));
 
-    // Get all employee IDs that are managed by ANY department head (assigned to a dept head)
-    const managedEmployeeIds = deptHeads
-        .filter(dh => dh.active && dh.managed_employee_ids)
-        .flatMap(dh => dh.managed_employee_ids.split(',').filter(Boolean));
-
-    // Available employees = company match, active, and NOT already a dept head (unless editing that specific head)
     const availableEmployees = employees.filter(e => {
         if (e.company !== selectedCompany || !e.active) return false;
-        // If editing, allow the current dept head employee to remain in list
         if (editingHead && e.id === editingHead.employee_id) return true;
-        // Otherwise, exclude employees who are already dept heads
         return !assignedDeptHeadIds.includes(e.id);
     });
 
-    // Get department heads that can be reported to (exclude self if editing)
-    // Sort with Executive (CEO) department heads at the top
     const availableReportsTo = deptHeads
-        .filter(dh => 
-            dh.company === selectedCompany && 
-            dh.active && 
-            (!editingHead || dh.id !== editingHead.id)
-        )
+        .filter(dh => dh.company === selectedCompany && dh.active && (!editingHead || dh.id !== editingHead.id))
         .sort((a, b) => {
-            // Sort Executive (CEO) department heads to the top
             if (a.department === 'Executive' && b.department !== 'Executive') return -1;
             if (b.department === 'Executive' && a.department !== 'Executive') return 1;
             return 0;
         });
 
-    const createMutation = useMutation({
-        mutationFn: async () => {
-            // For Executive (CEO) department - require user selection instead of employee
-            if (selectedDepartment === 'Executive') {
-                if (!selectedCompany || !selectedCEOUser) {
-                    throw new Error('Please select company and CEO user');
-                }
+    const isAssistantGM = (dh) => {
+        if (!dh.employee_id) return false;
+        const emp = employees.find(e => e.id === dh.employee_id);
+        const user = users.find(u => u.hrms_id === emp?.hrms_id);
+        return user?.extended_role === 'assistant_gm';
+    };
 
-                // Check if this user is already assigned as CEO
-                const existingCEO = deptHeads.find(dh => 
-                    dh.active && 
-                    dh.department === 'Executive' &&
-                    dh.user_email === selectedCEOUser
-                );
-                
-                if (existingCEO) {
-                    const ceoUser = users.find(u => u.email === selectedCEOUser);
-                    throw new Error(`${ceoUser?.full_name || selectedCEOUser} is already assigned as CEO for ${existingCEO.company}`);
-                }
-
-                // Check if this company already has a CEO
-                const duplicateCEO = deptHeads.find(dh => 
-                    dh.active && 
-                    dh.company === selectedCompany && 
-                    dh.department === 'Executive'
-                );
-                
-                if (duplicateCEO) {
-                    const ceoUser = users.find(u => u.email === duplicateCEO.user_email);
-                    throw new Error(`${selectedCompany} already has a CEO: ${ceoUser?.full_name || 'Unknown'}`);
-                }
-
-                // Create CEO department head assignment
-                await base44.entities.DepartmentHead.create({
-                    company: selectedCompany,
-                    department: 'Executive',
-                    employee_id: null,
-                    user_email: selectedCEOUser,
-                    managed_employee_ids: selectedManagedEmployees.join(','),
-                    reports_to: selectedReportsTo || null,
-                    active: true
-                });
-
-                // Update user role and company - preserve existing role if already ceo or hr_manager
-                const selectedUser = users.find(u => u.email === selectedCEOUser);
-                if (selectedUser) {
-                    const currentRole = selectedUser.extended_role || selectedUser.role || 'user';
-                    const updateData = { company: selectedCompany };
-                    // Only set to ceo if user is not already ceo or hr_manager
-                    if (currentRole !== 'ceo' && currentRole !== 'hr_manager') {
-                        updateData.extended_role = 'ceo';
-                    }
-                    await base44.entities.User.update(selectedUser.id, updateData);
-                }
-            } else {
-                // Regular department head - require employee selection
-                if (!selectedCompany || !selectedDepartment || !selectedEmployee) {
-                    throw new Error('Please select company, department, and employee');
-                }
-
-                // Check if this employee is already assigned as a department head anywhere
-                const existingAssignment = deptHeads.find(dh => 
-                    dh.active && 
-                    dh.employee_id === selectedEmployee
-                );
-                
-                if (existingAssignment) {
-                    const empName = getDeptHeadName(selectedEmployee);
-                    throw new Error(`${empName} is already assigned as department head for ${existingAssignment.department} in ${existingAssignment.company}`);
-                }
-
-                // Check if this company+department combination already has a department head
-                const duplicateDept = deptHeads.find(dh => 
-                    dh.active && 
-                    dh.company === selectedCompany && 
-                    dh.department === selectedDepartment
-                );
-                
-                if (duplicateDept) {
-                    throw new Error(`${selectedDepartment} in ${selectedCompany} already has a department head: ${getDeptHeadName(duplicateDept.employee_id)}`);
-                }
-
-                await base44.entities.DepartmentHead.create({
-                    company: selectedCompany,
-                    department: selectedDepartment,
-                    employee_id: selectedEmployee,
-                    user_email: null,
-                    managed_employee_ids: selectedManagedEmployees.join(','),
-                    reports_to: selectedReportsTo || null,
-                    active: true
-                });
+    const getDeptHeadName = (deptHeadOrId) => {
+        if (!deptHeadOrId) return 'Unknown';
+        if (typeof deptHeadOrId === 'object') {
+            if (deptHeadOrId.department === 'Executive' && deptHeadOrId.user_email) {
+                const user = users.find(u => u.email === deptHeadOrId.user_email);
+                return user?.full_name || deptHeadOrId.user_email;
             }
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['deptHeads']);
-            queryClient.invalidateQueries(['users']);
-            setSelectedCompany('');
-            setSelectedDepartment('');
-            setSelectedEmployee('');
-            setSelectedCEOUser('');
-            setSelectedManagedEmployees([]);
-            setSelectedReportsTo('');
-            toast.success(selectedDepartment === 'Executive' ? 'CEO assigned successfully' : 'Department head assigned successfully');
-        },
-        onError: (error) => {
-            toast.error(error.message);
+            const emp = employees.find(e => e.id === deptHeadOrId.employee_id);
+            return emp?.name || 'Unknown';
         }
-    });
-
-    const updateMutation = useMutation({
-        mutationFn: async (data) => {
-            await base44.entities.DepartmentHead.update(editingHead.id, {
-                managed_employee_ids: data.managed_employee_ids,
-                reports_to: data.reports_to || null
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['deptHeads']);
-            setShowEditDialog(false);
-            setEditingHead(null);
-            toast.success('Department head updated successfully');
-        },
-        onError: (error) => {
-            toast.error(error.message);
-        }
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: (id) => base44.entities.DepartmentHead.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['deptHeads']);
-            toast.success('Department head removed');
-        }
-    });
-
-    const getDeptHeadName = (deptHead) => {
-        // For CEO (Executive department), return user's full name
-        if (deptHead.department === 'Executive' && deptHead.user_email) {
-            const user = users.find(u => u.email === deptHead.user_email);
-            return user?.full_name || deptHead.user_email;
-        }
-        // For regular department heads, return employee name
-        const emp = employees.find(e => e.id === deptHead.employee_id);
+        const emp = employees.find(e => e.id === deptHeadOrId);
         return emp?.name || 'Unknown';
     };
 
     const getReportsToName = (reportsToValue) => {
-        // Check if it's HR Manager
-        if (reportsToValue === 'HR_MANAGER') {
-            const hrManagers = users.filter(u => (u.extended_role || u.role) === 'hr_manager');
-            if (hrManagers.length > 0) {
-                return `HR Manager (${hrManagers.map(h => h.full_name).join(', ')})`;
-            }
-            return 'HR Manager';
+        if (reportsToValue === 'HR_MANAGER' || reportsToValue === 'none') {
+            return reportsToValue === 'HR_MANAGER' ? 'HR Manager' : '—';
         }
-        
-        // Check if it's a department head
         const dh = deptHeads.find(d => d.id === reportsToValue);
         if (!dh) return '—';
         const name = getDeptHeadName(dh);
-        // If reports to Executive department head (CEO), show as CEO
-        if (dh.department === 'Executive') {
-            return `👑 CEO - ${name}`;
-        }
+        if (dh.department === 'Executive') return `👑 CEO - ${name}`;
+        if (isAssistantGM(dh)) return `🛡️ AGM - ${name}`;
         return name;
     };
 
-    const handleEditClick = (deptHead) => {
-        setEditingHead(deptHead);
-        // If no managed employees set, auto-select from department
-        const managedIds = deptHead.managed_employee_ids ? deptHead.managed_employee_ids.split(',').filter(Boolean) : [];
-        if (managedIds.length === 0) {
-            const deptEmployees = employees
-                .filter(e => e.company === deptHead.company && e.active && e.department === deptHead.department)
-                .map(e => e.id);
-            setSelectedManagedEmployees(deptEmployees);
-        } else {
-            setSelectedManagedEmployees(managedIds);
-        }
-        setSelectedReportsTo(deptHead.reports_to || '');
+    const createMutation = useMutation({
+        mutationFn: async () => {
+            if (selectedDepartment === 'Executive') {
+                if (!selectedCompany || !selectedCEOUser) throw new Error('Company and CEO required');
+                const dup = deptHeads.find(dh => dh.active && dh.company === selectedCompany && dh.department === 'Executive');
+                if (dup) throw new Error('Company already has a CEO');
+                await base44.entities.DepartmentHead.create({ company: selectedCompany, department: 'Executive', employee_id: null, user_email: selectedCEOUser, managed_employee_ids: selectedManagedEmployees.join(','), reports_to: selectedReportsTo === 'none' ? null : selectedReportsTo, active: true });
+                const user = users.find(u => u.email === selectedCEOUser);
+                if (user && !['ceo', 'hr_manager'].includes(user.extended_role || user.role)) {
+                    await base44.entities.User.update(user.id, { extended_role: 'ceo', company: selectedCompany });
+                }
+            } else if (isAGM) {
+                if (!selectedCompany || !selectedDepartment || !selectedEmployee) throw new Error('All fields required');
+                const dup = deptHeads.find(dh => dh.active && dh.company === selectedCompany && isAssistantGM(dh));
+                if (dup) throw new Error('Company already has Assistant GM');
+                await base44.entities.DepartmentHead.create({ company: selectedCompany, department: selectedDepartment, employee_id: selectedEmployee, user_email: null, managed_employee_ids: selectedManagedEmployees.join(','), reports_to: selectedReportsTo === 'none' ? null : selectedReportsTo, active: true });
+                const emp = employees.find(e => e.id === selectedEmployee);
+                const user = users.find(u => u.hrms_id === emp?.hrms_id);
+                if (user) await base44.entities.User.update(user.id, { extended_role: 'assistant_gm', company: selectedCompany });
+            } else {
+                if (!selectedCompany || !selectedDepartment || !selectedEmployee) throw new Error('All fields required');
+                const dup = deptHeads.find(dh => dh.active && dh.company === selectedCompany && dh.department === selectedDepartment);
+                if (dup) throw new Error('Department head exists for this department');
+                await base44.entities.DepartmentHead.create({ company: selectedCompany, department: selectedDepartment, employee_id: selectedEmployee, user_email: null, managed_employee_ids: selectedManagedEmployees.join(','), reports_to: selectedReportsTo === 'none' ? null : selectedReportsTo, active: true });
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['deptHeads'] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+            setSelectedCompany(''); setSelectedDepartment(''); setSelectedEmployee(''); setSelectedCEOUser(''); setSelectedManagedEmployees([]); setSelectedReportsTo(''); setIsAGM(false);
+            toast.success('Assigned successfully');
+        },
+        onError: (err) => toast.error(err.message)
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: async (data) => {
+            await base44.entities.DepartmentHead.update(editingHead.id, { managed_employee_ids: data.managed_employee_ids, reports_to: data.reports_to === 'none' ? null : data.reports_to });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['deptHeads'] });
+            setShowEditDialog(false); setEditingHead(null);
+            toast.success('Updated successfully');
+        },
+        onError: (err) => toast.error(err.message)
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id) => base44.entities.DepartmentHead.delete(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['deptHeads'] }); toast.success('Removed'); }
+    });
+
+    const handleEditClick = (dh) => {
+        setEditingHead(dh);
+        const managed = dh.managed_employee_ids ? dh.managed_employee_ids.split(',').filter(Boolean) : [];
+        setSelectedManagedEmployees(managed.length ? managed : employees.filter(e => e.company === dh.company && e.active && e.department === dh.department).map(e => e.id));
+        setSelectedReportsTo(dh.reports_to || 'none');
         setEditManagedEmployeesSearch('');
         setShowEditDialog(true);
     };
 
-    const handleSaveEdit = () => {
-        updateMutation.mutate({
-            managed_employee_ids: selectedManagedEmployees.join(','),
-            reports_to: selectedReportsTo
-        });
-    };
-
-    const toggleManagedEmployee = (employeeId) => {
-        // Check if trying to select someone who is already a dept head
-        const isAlreadyDeptHead = assignedDeptHeadIds.includes(employeeId);
-        
-        if (isAlreadyDeptHead && !selectedManagedEmployees.includes(employeeId)) {
-            const emp = employees.find(e => e.id === employeeId);
-            const deptHeadAssignment = deptHeads.find(dh => dh.active && dh.employee_id === employeeId);
-            toast.error(`${emp?.name || 'Employee'} is already assigned as department head for ${deptHeadAssignment?.department || 'another department'} in ${deptHeadAssignment?.company || 'another company'}`);
+    const toggleManagedEmployee = (id) => {
+        if (assignedDeptHeadIds.includes(id) && !selectedManagedEmployees.includes(id)) {
+            toast.error('Employee is already a head');
             return;
         }
-
-        setSelectedManagedEmployees(prev => 
-            prev.includes(employeeId) 
-                ? prev.filter(id => id !== employeeId)
-                : [...prev, employeeId]
-        );
+        setSelectedManagedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
-
-
-    // Filter department heads
-    const filteredDeptHeads = deptHeads.filter(dh => {
-        if (!dh.active) return false;
-        
-        const matchesSearch = searchTerm === '' || 
-            getDeptHeadName(dh.employee_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-            dh.department.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesCompany = filterCompany === 'all' || dh.company === filterCompany;
-        const matchesDepartment = filterDepartment === 'all' || dh.department === filterDepartment;
-        
-        return matchesSearch && matchesCompany && matchesDepartment;
-    });
-
-    const allDepartments = [...new Set(deptHeads.filter(dh => dh.active).map(dh => dh.department))];
-
-
+    const filtered = deptHeads.filter(dh => dh.active && dh.department !== 'Executive' && !isAssistantGM(dh) && (searchTerm === '' || getDeptHeadName(dh).toLowerCase().includes(searchTerm.toLowerCase()) || dh.department.toLowerCase().includes(searchTerm.toLowerCase())) && (filterCompany === 'all' || dh.company === filterCompany) && (filterDepartment === 'all' || dh.department === filterDepartment));
+    const agms = deptHeads.filter(dh => dh.active && isAssistantGM(dh) && (searchTerm === '' || getDeptHeadName(dh).toLowerCase().includes(searchTerm.toLowerCase())) && (filterCompany === 'all' || dh.company === filterCompany));
+    const ceos = deptHeads.filter(dh => dh.active && dh.department === 'Executive' && (searchTerm === '' || getDeptHeadName(dh).toLowerCase().includes(searchTerm.toLowerCase())) && (filterCompany === 'all' || dh.company === filterCompany));
 
     return (
         <div className="space-y-6">
             <Breadcrumb items={[{ label: 'Settings', href: 'RulesSettings' }, { label: 'Department Heads' }]} />
+            <div><h1 className="text-3xl font-bold">Department Head Settings</h1><p className="text-slate-600">Manage hierarchies, AGMs, and CEOs</p></div>
 
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900">Department Head Settings</h1>
-                <p className="text-slate-600 mt-2">Manage department heads, their teams, and approval workflows</p>
+            <div className="flex gap-2 border-b border-slate-200">
+                <button onClick={() => setActiveTab('manage')} className={`px-4 py-3 font-medium border-b-2 ${activeTab === 'manage' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-600'}`}>Manage</button>
+                <button onClick={() => setActiveTab('tree')} className={`px-4 py-3 font-medium border-b-2 inline-flex items-center gap-2 ${activeTab === 'tree' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-600'}`}><TreePine className="w-4 h-4" />Tree View</button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-2 border-b border-slate-200 -mx-4 px-4">
-                <button
-                    onClick={() => setActiveTab('manage')}
-                    className={`px-4 py-3 font-medium border-b-2 transition-colors ${
-                        activeTab === 'manage'
-                            ? 'border-indigo-600 text-indigo-600'
-                            : 'border-transparent text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                    Manage
-                </button>
-                <button
-                    onClick={() => setActiveTab('tree')}
-                    className={`px-4 py-3 font-medium border-b-2 transition-colors flex items-center gap-2 ${
-                        activeTab === 'tree'
-                            ? 'border-indigo-600 text-indigo-600'
-                            : 'border-transparent text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                    <TreePine className="w-4 h-4" />
-                    Hierarchy Tree
-                </button>
-            </div>
-
-            {/* Statistics Cards */}
             {activeTab === 'manage' && (
-                <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-slate-600">Total Dept Heads</p>
-                                <p className="text-2xl font-bold text-slate-900">{deptHeads.filter(dh => dh.active).length}</p>
-                            </div>
-                            <Users className="w-8 h-8 text-indigo-600 opacity-20" />
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-slate-600">Total Managed Employees</p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    {deptHeads.filter(dh => dh.active).reduce((sum, dh) => {
-                                        return sum + (dh.managed_employee_ids ? dh.managed_employee_ids.split(',').filter(Boolean).length : 0);
-                                    }, 0)}
-                                </p>
-                            </div>
-                            <Users className="w-8 h-8 text-blue-600 opacity-20" />
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-slate-600">Companies Covered</p>
-                                <p className="text-2xl font-bold text-purple-600">
-                                    {[...new Set(deptHeads.filter(dh => dh.active).map(dh => dh.company))].length}
-                                </p>
-                            </div>
-                            <CheckCircle className="w-8 h-8 text-purple-600 opacity-20" />
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card className="border-0 shadow-md">
-                <CardHeader>
-                    <CardTitle>Assign New Department Head</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <Label>Company</Label>
-                            <Select value={selectedCompany} onValueChange={(val) => {
-                                setSelectedCompany(val);
-                                setSelectedDepartment('');
-                                setSelectedEmployee('');
-                                setSelectedManagedEmployees([]);
-                                setSelectedReportsTo('');
-                            }}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select company" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {companies.map(c => (
-                                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label>Department</Label>
-                            <Select 
-                                value={selectedDepartment} 
-                                onValueChange={(val) => {
-                                    setSelectedDepartment(val);
-                                    // Auto-select employees from this department
-                                    const deptEmployees = availableEmployees
-                                        .filter(e => e.department === val)
-                                        .map(e => e.id);
-                                    setSelectedManagedEmployees(deptEmployees);
-                                }}
-                                disabled={!selectedCompany}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select department" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {departments.map(d => (
-                                        <SelectItem key={d} value={d}>{d}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {selectedDepartment === 'Executive' ? (
-                        <div>
-                        <Label>CEO User</Label>
-                        <Select 
-                        value={selectedCEOUser} 
-                        onValueChange={setSelectedCEOUser}
-                        disabled={!selectedCompany}
-                        >
-                        <SelectTrigger>
-                        <SelectValue placeholder="Select user for CEO role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        {users.filter(u => {
-                            const role = u.extended_role || u.role;
-                            return role === 'admin' || role === 'ceo' || role === 'hr_manager';
-                        }).map(u => (
-                            <SelectItem key={u.id} value={u.email}>
-                                {(u.extended_role || u.role) === 'hr_manager' ? '📋' : '👑'} {u.full_name} ({u.email})
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                        </Select>
-                        <p className="text-xs text-slate-500 mt-1">
-                        Select admin, CEO, or HR Manager user for the executive role
-                        </p>
-                        </div>
-                        ) : (
-                        <div>
-                        <Label>Employee (Department Head)</Label>
-                        <Select 
-                        value={selectedEmployee} 
-                        onValueChange={(val) => {
-                        setSelectedEmployee(val);
-                        // Auto-uncheck the selected employee from managed employees
-                        setSelectedManagedEmployees(prev => prev.filter(id => id !== val));
-                        }}
-                        disabled={!selectedCompany}
-                        >
-                        <SelectTrigger>
-                        <SelectValue placeholder="Select employee" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        {availableEmployees.length === 0 ? (
-                            <div className="p-2 text-sm text-slate-500">
-                                No available employees (all assigned as dept heads)
-                            </div>
-                        ) : (
-                            availableEmployees.map(e => (
-                                <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                            ))
-                        )}
-                        </SelectContent>
-                        </Select>
-                        <p className="text-xs text-slate-500 mt-1">
-                        Only employees not assigned as department heads are shown
-                        </p>
-                        </div>
-                        )}
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card><CardContent className="p-4 flex justify-between"><div><p className="text-sm text-slate-500">Heads</p><p className="text-2xl font-bold">{deptHeads.filter(d => d.active).length}</p></div><Users className="w-8 h-8 opacity-10" /></CardContent></Card>
+                        <Card><CardContent className="p-4 flex justify-between"><div><p className="text-sm text-slate-500">Managed</p><p className="text-2xl font-bold text-blue-600">{deptHeads.filter(d => d.active).reduce((s, h) => s + (h.managed_employee_ids ? h.managed_employee_ids.split(',').filter(Boolean).length : 0), 0)}</p></div><Users className="w-8 h-8 opacity-10 text-blue-600" /></CardContent></Card>
+                        <Card><CardContent className="p-4 flex justify-between"><div><p className="text-sm text-slate-500">Companies</p><p className="text-2xl font-bold text-purple-600">{[...new Set(deptHeads.filter(d => d.active).map(d => d.company))].length}</p></div><CheckCircle className="w-8 h-8 opacity-10 text-purple-600" /></CardContent></Card>
                     </div>
 
-                    {selectedCompany && (
-                        <>
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <Label>Managed Employees (Optional)</Label>
-                                    {selectedManagedEmployees.length > 0 && (
-                                        <span className="text-xs text-indigo-600 font-medium">
-                                            {selectedManagedEmployees.length} selected
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="border rounded-lg bg-slate-50">
-                                    <div className="p-2 border-b bg-white">
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                            <Input
-                                                placeholder="Search employees..."
-                                                value={managedEmployeesSearch}
-                                                onChange={(e) => setManagedEmployeesSearch(e.target.value)}
-                                                className="pl-9 h-9"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="p-3 max-h-48 overflow-y-auto">
-                                        {availableEmployees.length === 0 ? (
-                                            <p className="text-sm text-slate-500">No employees available</p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {availableEmployees
-                                                    .filter(emp => {
-                                                        if (!managedEmployeesSearch) return true;
-                                                        const search = managedEmployeesSearch.toLowerCase();
-                                                        const attendanceIdStr = emp.attendance_id != null ? String(emp.attendance_id) : '';
-                                                        return emp.name.toLowerCase().includes(search) || 
-                                                               attendanceIdStr.toLowerCase().includes(search);
-                                                    })
-                                                    .map(emp => {
-                                                         const isDeptHeadForThis = emp.id === selectedEmployee;
-                                                         const isAssignedToAnyDeptHead = managedEmployeeIds.includes(emp.id);
-
-                                                         return (
-                                                             <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
-                                                                 <input
-                                                                     type="checkbox"
-                                                                     checked={selectedManagedEmployees.includes(emp.id)}
-                                                                     onChange={() => toggleManagedEmployee(emp.id)}
-                                                                     disabled={isDeptHeadForThis}
-                                                                     className="rounded border-slate-300"
-                                                                 />
-                                                                 <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
-                                                                     {emp.name} ({emp.attendance_id})
-                                                                 </span>
-                                                                 {!isAssignedToAnyDeptHead && !isDeptHeadForThis && (
-                                                                     <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                                                         Not Assigned
-                                                                     </span>
-                                                                 )}
-                                                             </label>
-                                                         );
-                                                     })}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Select employees managed by this department head. Department head cannot manage themselves.
-                                </p>
+                    <Card className="border-0 shadow-lg">
+                        <CardHeader><CardTitle>Assign New Head / AGM / CEO</CardTitle></CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="space-y-2"><Label>Company</Label><Select value={selectedCompany} onValueChange={v => { setSelectedCompany(v); setSelectedDepartment(''); setSelectedEmployee(''); setSelectedManagedEmployees([]); setSelectedReportsTo(''); setIsAGM(false); }}><SelectTrigger><SelectValue placeholder="Company" /></SelectTrigger><SelectContent>{companies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
+                                <div className="space-y-2"><Label>Department</Label><Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={!selectedCompany}><SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger><SelectContent>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
+                                {selectedDepartment === 'Executive' ? (
+                                    <div className="space-y-2"><Label>CEO User</Label><Select value={selectedCEOUser} onValueChange={setSelectedCEOUser} disabled={!selectedCompany}><SelectTrigger><SelectValue placeholder="CEO" /></SelectTrigger><SelectContent>{users.filter(u => ['admin', 'ceo', 'hr_manager'].includes(u.extended_role || u.role)).map(u => <SelectItem key={u.id} value={u.email}>{u.full_name}</SelectItem>)}</SelectContent></Select></div>
+                                ) : (
+                                    <div className="space-y-2"><Label>Employee</Label><Select value={selectedEmployee} onValueChange={setSelectedEmployee} disabled={!selectedCompany}><SelectTrigger><SelectValue placeholder="Employee" /></SelectTrigger><SelectContent>{availableEmployees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent></Select></div>
+                                )}
                             </div>
-
-                            <div>
-                                <Label>Reports To (Optional)</Label>
-                                <Select 
-                                    value={selectedReportsTo} 
-                                    onValueChange={setSelectedReportsTo}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select reporting head (none)" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={null}>None</SelectItem>
-                                        <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
-                                        {availableReportsTo.map(dh => (
-                                           <SelectItem key={dh.id} value={dh.id}>
-                                               {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh)} ({dh.department})
-                                           </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Set reporting hierarchy if needed
-                                </p>
-                            </div>
-                        </>
-                    )}
-
-                    <Button
-                        onClick={() => createMutation.mutate()}
-                        disabled={
-                            !selectedCompany || 
-                            !selectedDepartment || 
-                            (selectedDepartment === 'Executive' ? !selectedCEOUser : !selectedEmployee) ||
-                            createMutation.isPending
-                        }
-                        className="bg-indigo-600 hover:bg-indigo-700"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        {selectedDepartment === 'Executive' ? 'Assign CEO' : 'Assign Department Head'}
-                    </Button>
-                </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-md">
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Current Department Heads</CardTitle>
-                        <div className="flex gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <Input
-                                    placeholder="Search..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10 w-64"
-                                />
-                            </div>
-                            <Select value={filterCompany} onValueChange={setFilterCompany}>
-                                <SelectTrigger className="w-48">
-                                    <Filter className="w-4 h-4 mr-2" />
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Companies</SelectItem>
-                                    {companies.map(c => (
-                                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                                <SelectTrigger className="w-48">
-                                    <SelectValue placeholder="All Departments" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Departments</SelectItem>
-                                    {allDepartments.map(d => (
-                                        <SelectItem key={d} value={d}>{d}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {filteredDeptHeads.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
-                            No department heads assigned yet
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Company</TableHead>
-                                    <TableHead>Department</TableHead>
-                                    <TableHead>Department Head</TableHead>
-                                    <TableHead>Managed Employees</TableHead>
-                                    <TableHead>Reports To</TableHead>
-                                    <TableHead>Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredDeptHeads.map(dh => {
-                                    const managedCount = dh.managed_employee_ids 
-                                        ? dh.managed_employee_ids.split(',').filter(Boolean).length 
-                                        : 0;
-                                    
-                                    return (
-                                        <TableRow key={dh.id}>
-                                            <TableCell className="text-sm">{dh.company}</TableCell>
-                                            <TableCell className="font-medium">
-                                                {dh.department === 'Executive' ? '👑 ' : ''}{dh.department}
-                                            </TableCell>
-                                            <TableCell className="font-medium text-slate-900">
-                                                {getDeptHeadName(dh)}
-                                                {dh.department === 'Executive' && (
-                                                    <span className="ml-2 text-xs text-indigo-600 font-normal">(CEO - No employee profile)</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Users className="w-4 h-4 text-slate-400" />
-                                                    <span className="text-sm font-medium">{managedCount}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-sm text-slate-600">
-                                                {dh.reports_to ? getReportsToName(dh.reports_to) : '—'}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex gap-1">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => handleEditClick(dh)}
-                                                        title="Edit"
-                                                    >
-                                                        <Edit className="w-4 h-4 text-indigo-600" />
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => {
-                                                            if (window.confirm('Remove this department head assignment?')) {
-                                                                deleteMutation.mutate(dh.id);
-                                                            }
-                                                        }}
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-red-600" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
-                </>
-            )}
-
-            {/* Tree View Tab */}
-            {activeTab === 'tree' && (
-                <Card className="border-0 shadow-md">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>Department Head Hierarchy</CardTitle>
-                                <p className="text-sm text-slate-600 mt-2">Visual representation of department heads and their managed employees</p>
-                            </div>
-                            <Select value={filterCompany} onValueChange={setFilterCompany}>
-                                <SelectTrigger className="w-48">
-                                    <Filter className="w-4 h-4 mr-2" />
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Companies</SelectItem>
-                                    {companies.map(c => (
-                                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <HierarchyTree 
-                            deptHeads={deptHeads} 
-                            employees={employees}
-                            filterCompany={filterCompany}
-                        />
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Edit Dialog */}
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Edit Department Head: {editingHead && getDeptHeadName(editingHead)}</DialogTitle>
-                    </DialogHeader>
-                    
-                    {editingHead && (
-                        <div className="space-y-4 py-4">
-                            <div className="grid grid-cols-2 gap-4 p-3 bg-slate-50 rounded-lg">
-                                <div>
-                                    <p className="text-xs text-slate-500">Company</p>
-                                    <p className="font-medium">{editingHead.company}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-slate-500">Department</p>
-                                    <p className="font-medium">{editingHead.department}</p>
-                                </div>
-                            </div>
-
-                            {selectedManagedEmployees.length > 0 && (
-                                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                                    <p className="text-xs font-medium text-indigo-900 mb-2">
-                                        Selected Employees ({selectedManagedEmployees.length})
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {selectedManagedEmployees.map(empId => {
-                                            const emp = employees.find(e => e.id === empId);
-                                            return emp ? (
-                                                <span key={empId} className="inline-flex items-center px-2 py-1 bg-white border border-indigo-200 rounded text-xs text-slate-700">
-                                                    {emp.name}
-                                                </span>
-                                            ) : null;
-                                        })}
-                                    </div>
+                            {selectedDepartment && selectedDepartment !== 'Executive' && (
+                                <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center gap-3">
+                                    <input type="checkbox" id="isagm" checked={isAGM} onChange={e => setIsAGM(e.target.checked)} /><Label htmlFor="isagm" className="cursor-pointer font-bold text-indigo-900">Mark as Assistant General Manager (Max 1/company)</Label>
                                 </div>
                             )}
-
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <Label>Managed Employees</Label>
-                                    {selectedManagedEmployees.length > 0 && (
-                                        <span className="text-xs text-indigo-600 font-medium">
-                                            {selectedManagedEmployees.length} selected
-                                        </span>
-                                    )}
+                            {selectedCompany && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2"><Label>Managed Team ({selectedManagedEmployees.length})</Label><div className="border rounded-lg bg-slate-50 overflow-hidden"><div className="p-2 border-b bg-white"><Input placeholder="Search..." value={managedEmployeesSearch} onChange={e => setManagedEmployeesSearch(e.target.value)} /></div><div className="p-2 max-h-40 overflow-y-auto">{availableEmployees.filter(e => e.name.toLowerCase().includes(managedEmployeesSearch.toLowerCase())).map(e => <label key={e.id} className="flex items-center gap-2 p-1 hover:bg-slate-200 rounded cursor-pointer"><input type="checkbox" checked={selectedManagedEmployees.includes(e.id)} onChange={() => toggleManagedEmployee(e.id)} disabled={e.id === selectedEmployee} /><span className="text-sm">{e.name}</span></label>)}</div></div></div>
+                                    <div className="space-y-2"><Label>Reports To</Label><Select value={selectedReportsTo} onValueChange={setSelectedReportsTo}><SelectTrigger><SelectValue placeholder="Superior" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="HR_MANAGER">HR Manager</SelectItem>{availableReportsTo.map(dh => <SelectItem key={dh.id} value={dh.id}>{getDeptHeadName(dh)} ({dh.department})</SelectItem>)}</SelectContent></Select></div>
                                 </div>
-                                <div className="border rounded-lg bg-slate-50">
-                                    <div className="p-2 border-b bg-white">
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                            <Input
-                                                placeholder="Search employees..."
-                                                value={editManagedEmployeesSearch}
-                                                onChange={(e) => setEditManagedEmployeesSearch(e.target.value)}
-                                                className="pl-9 h-9"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="p-3 max-h-64 overflow-y-auto">
-                                        {employees.filter(e => e.company === editingHead.company && e.active).length === 0 ? (
-                                            <p className="text-sm text-slate-500">No employees available</p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {employees
-                                                     .filter(e => {
-                                                         if (e.company !== editingHead.company || !e.active) return false;
-                                                         if (e.id === editingHead.employee_id) return true;
-                                                         return !assignedDeptHeadIds.includes(e.id);
-                                                     })
-                                                     .filter(emp => {
-                                                         if (!editManagedEmployeesSearch) return true;
-                                                         const search = editManagedEmployeesSearch.toLowerCase();
-                                                         const attendanceIdStr = emp.attendance_id != null ? String(emp.attendance_id) : '';
-                                                         return emp.name.toLowerCase().includes(search) || 
-                                                                attendanceIdStr.toLowerCase().includes(search);
-                                                     })
-                                                     .map(emp => {
-                                                          const isDeptHeadForThis = emp.id === editingHead.employee_id;
-                                                         const isAssignedToAnyDeptHead = managedEmployeeIds.includes(emp.id);
+                            )}
+                            <div className="flex justify-end"><Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !selectedCompany} className="bg-indigo-600 hover:bg-indigo-700">{createMutation.isPending ? 'Saving...' : 'Assign User'}</Button></div>
+                        </CardContent>
+                    </Card>
 
-                                                         return (
-                                                             <label key={emp.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 rounded">
-                                                                 <input
-                                                                     type="checkbox"
-                                                                     checked={selectedManagedEmployees.includes(emp.id)}
-                                                                     onChange={() => toggleManagedEmployee(emp.id)}
-                                                                     disabled={isDeptHeadForThis}
-                                                                     className="rounded border-slate-300"
-                                                                 />
-                                                                 <span className={`text-sm flex-1 ${isDeptHeadForThis ? 'text-slate-400' : ''}`}>
-                                                                     {emp.name} ({emp.attendance_id})
-                                                                 </span>
-                                                                 {!isAssignedToAnyDeptHead && !isDeptHeadForThis && (
-                                                                     <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                                                         Not Assigned
-                                                                     </span>
-                                                                 )}
-                                                             </label>
-                                                         );
-                                                     })}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label>Reports To</Label>
-                                <Select value={selectedReportsTo} onValueChange={setSelectedReportsTo}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select reporting head (none)" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={null}>None</SelectItem>
-                                        <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
-                                        {deptHeads.filter(dh => 
-                                            dh.company === editingHead.company && 
-                                            dh.active && 
-                                            dh.id !== editingHead.id
-                                        ).sort((a, b) => {
-                                            // Sort Executive (CEO) department heads to the top
-                                            if (a.department === 'Executive' && b.department !== 'Executive') return -1;
-                                            if (b.department === 'Executive' && a.department !== 'Executive') return 1;
-                                            return 0;
-                                        }).map(dh => (
-                                            <SelectItem key={dh.id} value={dh.id}>
-                                                {dh.department === 'Executive' ? '👑 CEO - ' : ''}{getDeptHeadName(dh)} ({dh.department})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-4">
-                                <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-                                    Cancel
-                                </Button>
-                                <Button 
-                                    onClick={handleSaveEdit}
-                                    disabled={updateMutation.isPending}
-                                    className="bg-indigo-600 hover:bg-indigo-700"
-                                >
-                                    Save Changes
-                                </Button>
-                            </div>
-                        </div>
+                    {agms.length > 0 && (
+                        <Card className="border-2 border-indigo-200 shadow-lg"><CardHeader className="bg-indigo-50"><CardTitle className="text-indigo-900">Assistant General Managers</CardTitle></CardHeader><CardContent className="p-0">
+                            <Table><TableHeader className="bg-indigo-50/50"><TableRow><TableHead>Company</TableHead><TableHead>Department</TableHead><TableHead>Name</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{agms.map(dh => <TableRow key={dh.id} className="hover:bg-indigo-50/20"><TableCell className="font-bold">{dh.company}</TableCell><TableCell>{dh.department}</TableCell><TableCell className="font-bold">{getDeptHeadName(dh)} <span className="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full ml-2">AGM</span></TableCell><TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => handleEditClick(dh)}><Edit className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => { if (window.confirm('Delete AGM?')) deleteMutation.mutate(dh.id); }}><Trash2 className="w-4 h-4 text-red-600" /></Button></TableCell></TableRow>)}</TableBody></Table>
+                        </CardContent></Card>
                     )}
-                </DialogContent>
-            </Dialog>
+
+                    <Card className="border-0 shadow-md">
+                        <CardHeader className="flex flex-row items-center justify-between"><CardTitle>Heads & CEOs</CardTitle><div className="flex gap-2"><Input placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-40" /><Select value={filterCompany} onValueChange={setFilterCompany}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{companies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div></CardHeader>
+                        <CardContent className="p-0">
+                            <Table><TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Department</TableHead><TableHead>Name</TableHead><TableHead>Reports To</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
+                                {ceos.map(dh => <TableRow key={dh.id} className="bg-indigo-50/20 font-medium"><TableCell>{dh.company}</TableCell><TableCell className="text-indigo-700">👑 CEO</TableCell><TableCell>{getDeptHeadName(dh)}</TableCell><TableCell>{getReportsToName(dh.reports_to)}</TableCell><TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => handleEditClick(dh)}><Edit className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => { if (window.confirm('Delete?')) deleteMutation.mutate(dh.id); }}><Trash2 className="w-4 h-4 text-red-600" /></Button></TableCell></TableRow>)}
+                                {filtered.map(dh => <TableRow key={dh.id}><TableCell>{dh.company}</TableCell><TableCell>{dh.department}</TableCell><TableCell>{getDeptHeadName(dh)}</TableCell><TableCell>{getReportsToName(dh.reports_to)}</TableCell><TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => handleEditClick(dh)}><Edit className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => { if (window.confirm('Delete?')) deleteMutation.mutate(dh.id); }}><Trash2 className="w-4 h-4 text-red-600" /></Button></TableCell></TableRow>)}
+                            </TableBody></Table>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {activeTab === 'tree' && (
+                <Card className="border-0 shadow-md"><CardHeader><CardTitle>Hierarchy Tree</CardTitle></CardHeader><CardContent><HierarchyTree deptHeads={deptHeads} employees={employees} filterCompany={filterCompany === 'all' ? selectedCompany : filterCompany} /></CardContent></Card>
+            )}
+
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}><DialogContent className="max-w-xl">
+                <DialogHeader><DialogTitle>Edit: {editingHead && getDeptHeadName(editingHead)}</DialogTitle></DialogHeader>
+                {editingHead && (
+                    <div className="space-y-6 pt-4">
+                        <div className="space-y-2"><Label>Reports To</Label><Select value={selectedReportsTo} onValueChange={setSelectedReportsTo}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="HR_MANAGER">HR Manager</SelectItem>{deptHeads.filter(h => h.active && h.company === editingHead.company && h.id !== editingHead.id).map(h => <SelectItem key={h.id} value={h.id}>{getDeptHeadName(h)} ({h.department})</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-2"><Label>Team ({selectedManagedEmployees.length})</Label><div className="border rounded bg-slate-50"><div className="p-2 border-b bg-white"><Input placeholder="Search..." value={editManagedEmployeesSearch} onChange={e => setEditManagedEmployeesSearch(e.target.value)} /></div><div className="p-2 max-h-40 overflow-y-auto">{employees.filter(e => e.company === editingHead.company && e.active && e.name.toLowerCase().includes(editManagedEmployeesSearch.toLowerCase())).map(e => <label key={e.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-200 rounded cursor-pointer"><input type="checkbox" checked={selectedManagedEmployees.includes(e.id)} onChange={() => toggleManagedEmployee(e.id)} disabled={e.id === editingHead.employee_id} /><span>{e.name}</span></label>)}</div></div></div>
+                        <div className="flex justify-end gap-2 pt-4"><Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button><Button onClick={() => updateMutation.mutate({ managed_employee_ids: selectedManagedEmployees.join(','), reports_to: selectedReportsTo })} disabled={updateMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700">Save</Button></div>
+                    </div>
+                )}
+            </DialogContent></Dialog>
         </div>
     );
 }

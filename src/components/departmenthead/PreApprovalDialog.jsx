@@ -45,6 +45,10 @@ export default function PreApprovalDialog({
     // Admin and CEO bypass logic — must remain completely untouched
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
 
+    // Change 1: Identify if the current user is an AGM approving for themselves.
+    // Must simultaneously be role assistant_gm AND be the same employee as linked assignment.
+    const isAssistantGM = userRole === 'assistant_gm';
+
     const todayUAE = nowInUAE();
     const minAllowedDate = formatDateForInput(subDays(todayUAE, 5));
     const maxAllowedDate = formatDateForInput(addDays(todayUAE, 5));
@@ -54,6 +58,10 @@ export default function PreApprovalDialog({
 
     // Fetch half-yearly minutes for selected employee based on date
     const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);
+
+    // Change 1 (continued): Complete the self-approval check once selectedEmployee is defined.
+    const isAGMSelfApproval = isAssistantGM && 
+        selectedEmployee?.id === deptHeadVerification?.assignment?.employee_id;
     const { data: halfYearlyMinutes } = useQuery({
         queryKey: ['employeeHalfYearlyMinutes', selectedEmployee?.hrms_id, formData.date_from],
         queryFn: async () => {
@@ -85,9 +93,14 @@ export default function PreApprovalDialog({
                 const availableMinutes = halfYearlyMinutes?.remaining_minutes || 0;
 
                 // Admin and CEO bypass the limit; however, excess minutes are intentionally not tracked in used_minutes
-                const minutesToUpdate = isAdminOrCEO
-                    ? Math.min(minutesToApprove, availableMinutes)
-                    : minutesToApprove;
+                // Change 3: Handle the saving logic for AGM self-approval.
+                // When an AGM approves for themselves, the entire amount is saved as ALLOWED_MINUTES
+                // and the remaining balance is completely consumed (bringing it to zero).
+                const minutesToUpdate = isAGMSelfApproval
+                    ? availableMinutes // Use full available balance to zero it out
+                    : isAdminOrCEO
+                        ? Math.min(minutesToApprove, availableMinutes)
+                        : minutesToApprove;
 
                 if (minutesToUpdate > 0) {
                     const updateResponse = await base44.functions.invoke('updateQuarterlyMinutes', {
@@ -261,7 +274,9 @@ export default function PreApprovalDialog({
         if (supportsHalfYearlyMinutes) {
             const availableMinutes = halfYearlyMinutes?.remaining_minutes || 0;
             // Admin and CEO bypass the balance check validation
-            if (!isAdminOrCEO && minutes > availableMinutes) {
+            // Change 2 & 4: Remove the minutes cap and suppress the warning for AGM self-approval only.
+            // Normal department heads are still capped by their available balance and see the warning.
+            if (!isAdminOrCEO && !isAGMSelfApproval && minutes > availableMinutes) {
                 // Show yellow warning inside the dialog (fixes the uncloseable popup issue)
                 setShowLimitWarning(true);
                 return;
