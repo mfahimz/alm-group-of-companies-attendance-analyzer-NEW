@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
                 project_id: projectId, 
                 is_auto_created: true 
             });
-            const relevant = existingTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes');
+            const relevant = existingTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes' || t.task_type === 'Double Deduction Days');
             
             let deletedCount = 0;
             for (const task of relevant) {
@@ -59,6 +59,7 @@ Deno.serve(async (req) => {
             const attId = res.attendance_id || '';
             const lop = Number(res.full_absence_count) || 0;
             const other = Number(res.other_minutes) || 0;
+            const lopAdj = Number(res.lop_adjacent_weekly_off_count) || 0;
             const nameKey = name.replace(/\s+/g, '');
 
             if (lop > 0) {
@@ -80,11 +81,22 @@ Deno.serve(async (req) => {
                     notes: `Employee: ${name}\nID: ${attId}\nOther: ${other} min\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
                 });
             }
+
+            // --- Double Deduction Days Task (lop_adjacent_weekly_off_count > 0) ---
+            if (lopAdj > 0) {
+                const fp = `DoubleDeduction_${projectId}_${attId}_${lopAdj}_${nameKey}`;
+                expectedTasks.push({
+                    fingerprint: fp,
+                    type: 'Double Deduction Days',
+                    description: `${name} | Double Deduction Days: ${lopAdj} | Report: ${reportName}`,
+                    notes: `Employee ${name} has ${lopAdj} additional day(s) deducted due to Weekly Off or Public Holiday falling adjacent to LOP days. These are included in the total absence deduction as double deduction days.\n\nEmployee: ${name}\nID: ${attId}\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
+                });
+            }
         }
 
         const expectedFingerprints = new Set(expectedTasks.map(t => t.fingerprint));
         const existingProjectTasks = await base44.asServiceRole.entities.ChecklistItem.filter({ project_id: projectId, is_auto_created: true });
-        const relevantExisting = existingProjectTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes');
+        const relevantExisting = existingProjectTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes' || t.task_type === 'Double Deduction Days');
 
         let deleted = 0;
         for (const task of relevantExisting) {
