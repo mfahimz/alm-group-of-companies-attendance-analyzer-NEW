@@ -127,15 +127,22 @@ export default function Layout({ children, currentPageName }) {
         console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
     }, []);
 
-    // Redirect to appropriate default dashboard on first load
+    // Redirect department heads/assistant GMs to their dashboard immediately
+    // This fires before any child page renders, preventing multiple loading screens
     useEffect(() => {
-        if (currentUser && currentPageName === 'Dashboard') {
-            if (isDepartmentHead) {
-                navigate('/DepartmentHeadDashboard', { replace: true });
-            }
-            // HR Manager, CEO, admin, supervisor all stay on the main Dashboard
+        if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
+            navigate('/DepartmentHeadDashboard', { replace: true });
         }
     }, [currentUser, isDepartmentHead, currentPageName, navigate]);
+
+    // Block rendering for dept heads on Dashboard to prevent flash of wrong content
+    if (currentUser && isDepartmentHead && currentPageName === 'Dashboard') {
+        return (
+            <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
+                <div className="text-[#6B7280]">Loading...</div>
+            </div>
+        );
+    }
 
     // If auth failed (not logged in), redirect to login
     if (error && !isLoading) {

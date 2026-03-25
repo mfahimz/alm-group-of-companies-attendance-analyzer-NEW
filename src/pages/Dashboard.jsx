@@ -8,24 +8,31 @@ import AdminDashboard from '../components/dashboard/AdminDashboard';
 import SupervisorDashboard from '../components/dashboard/SupervisorDashboard';
 import UserDashboard from '../components/dashboard/UserDashboard';
 import { useCompanyFilter } from '../components/context/CompanyContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
     usePageTitle('Dashboard');
+    const navigate = useNavigate();
     const { selectedCompany } = useCompanyFilter();
     const { data: currentUser, isLoading: userLoading } = useQuery({
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
 
-    // Redirect department heads immediately (before any rendering)
+    // Redirect department heads immediately via React Router (no full page reload)
+    const userRoleForRedirect = currentUser?.extended_role || currentUser?.role || 'user';
+    const isDeptHead = userRoleForRedirect === 'department_head' || userRoleForRedirect === 'assistant_gm';
+    
     React.useEffect(() => {
-        if (currentUser) {
-            const userRole = currentUser.extended_role || currentUser.role || 'user';
-            if (userRole === 'department_head' || userRole === 'assistant_gm') {
-                window.location.replace('/DepartmentHeadDashboard');
-            }
+        if (currentUser && isDeptHead) {
+            navigate('/DepartmentHeadDashboard', { replace: true });
         }
-    }, [currentUser]);
+    }, [currentUser, isDeptHead, navigate]);
+
+    // Don't render anything for dept heads - they'll be redirected instantly
+    if (isDeptHead) {
+        return null;
+    }
 
     const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
         queryKey: ['projects', selectedCompany],
