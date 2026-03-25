@@ -60,8 +60,9 @@ export default function PreApprovalDialog({
     const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);
 
     // Change 1 (continued): Complete the self-approval check once selectedEmployee is defined.
+    // Use String() comparison to avoid type mismatch between number and string IDs
     const isAGMSelfApproval = isAssistantGM && 
-        selectedEmployee?.id === deptHeadVerification?.assignment?.employee_id;
+        String(selectedEmployee?.id) === String(deptHeadVerification?.assignment?.employee_id);
     const { data: halfYearlyMinutes } = useQuery({
         queryKey: ['employeeHalfYearlyMinutes', selectedEmployee?.hrms_id, formData.date_from],
         queryFn: async () => {

@@ -248,14 +248,16 @@ export default function DepartmentHeadDashboard() {
             });
             
             // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
-            // CRITICAL: Exclude department head from the list (cannot self-approve)
+            // assistant_gm can see themselves in the list (self-approval allowed)
+            // Regular department_head is excluded from their own list (cannot self-approve)
+            const isAssistantGM = userRole === 'assistant_gm';
             return allEmployees.filter(emp => 
                 managedIds.includes(String(emp.id)) && 
-                String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
+                (isAssistantGM || String(emp.id) !== String(deptHeadVerification.assignment.employee_id))
             );
         },
         enabled: !!deptHeadVerification?.verified || isAdminOrCEO,
-        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -270,16 +272,11 @@ export default function DepartmentHeadDashboard() {
         queryFn: async () => {
             if (!currentProject) return [];
 
-            // Determine current half from today's date
-            // Half determination rule:
-            // Months 1–6  (Jan–Jun) → half 1 (H1)
-            // Months 7–12 (Jul–Dec) → half 2 (H2)
             const today = nowInUAE();
             const currentYear = today.getFullYear();
-            const currentMonth = today.getMonth() + 1; // 1-12
+            const currentMonth = today.getMonth() + 1;
             const currentHalf = currentMonth <= 6 ? 1 : 2;
 
-            // Fetch half-yearly minutes for current half
             const allMinutes = await base44.entities.EmployeeQuarterlyMinutes.filter({
                 company: currentProject.company,
                 year: currentYear,
@@ -296,7 +293,7 @@ export default function DepartmentHeadDashboard() {
         refetchOnMount: false
     });
 
-    // Get remaining minutes for an employee (handle both string and number IDs)
+    // Get remaining minutes for an employee
     const getEmployeeRemainingMinutes = (employeeId) => {
         const record = halfYearlyMinutes.find(hm => String(hm.employee_id) === String(employeeId));
         return record?.remaining_minutes || 0;
@@ -316,7 +313,7 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    // After loading completes, check for errors/issues (base44 handles auth redirect)
+    // After loading completes, check for errors/issues
     if (!currentUser || !deptHeadVerification?.verified) {
         const errorMessage = deptHeadVerification?.error || 'You are not assigned as a department head.';
         return (
@@ -337,7 +334,7 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    // Check if not Al Maraghi Motors (after all data is loaded)
+    // Check if not Al Maraghi Motors
     if (deptHeadAssignment && deptHeadAssignment.company !== 'Al Maraghi Motors') {
         return (
             <div className="max-w-4xl mx-auto p-6">
@@ -395,7 +392,6 @@ export default function DepartmentHeadDashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Department-Filtered Report Table */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Attendance Report - {deptHeadAssignment.department} Department</CardTitle>
