@@ -253,6 +253,9 @@ export default function Layout({ children, currentPageName }) {
                                       <p className="text-sm font-medium text-[#1F2937]">
                                           {currentUser?.display_name || currentUser?.full_name}
                                       </p>
+                                      <p className="text-xs text-[#6B7280] capitalize">
+                                          {(userRole || 'user').replace(/_/g, ' ')}
+                                      </p>
                                   </div>
                                 <button
                                       onClick={handleLogout}
