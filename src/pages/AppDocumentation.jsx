@@ -1811,7 +1811,7 @@ export default function AppDocumentation() {
                                                     Approvals & Overages
                                                 </div>
                                                 <p className="text-[11px] text-slate-600 leading-relaxed">
-                                                    Dept heads consume minutes via the pre-approval dialog; Admin and CEO have <strong>no limit</strong>. Any minutes exceeding the balance automatically create a <code>MANUAL_OTHER_MINUTES</code> exception.
+                                                    Dept heads consume minutes via the pre-approval dialog; Admin and CEO have <strong>no limit</strong>. AGM self-approvals now support the full project period without the standard 5-day restriction, and the "Both" option has been removed from pre-approvals to prioritize specific record targeting.
                                                 </p>
                                             </div>
                                         </div>

@@ -25,7 +25,7 @@ export default function PreApprovalDialog({
         date_from: '',
         date_to: '',
         allowed_minutes: '',
-        allowed_minutes_type: 'both',
+        allowed_minutes_type: 'late', // Change 2: Default to 'late' instead of 'both'
         details: ''
     });
 
@@ -45,24 +45,31 @@ export default function PreApprovalDialog({
     // Admin and CEO bypass logic — must remain completely untouched
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
 
-    // Change 1: Identify if the current user is an AGM approving for themselves.
-    // Must simultaneously be role assistant_gm AND be the same employee as linked assignment.
+    // Move Change 1 logic here to use it for date restrictions
+    // Identify if the current user is an AGM approving for themselves.
     const isAssistantGM = userRole === 'assistant_gm';
-
-    const todayUAE = nowInUAE();
-    const minAllowedDate = formatDateForInput(subDays(todayUAE, 5));
-    const maxAllowedDate = formatDateForInput(addDays(todayUAE, 5));
-
+    
     // Check if company supports half-yearly minutes
     const supportsHalfYearlyMinutes = currentProject?.company === 'Al Maraghi Motors';
 
     // Fetch half-yearly minutes for selected employee based on date
     const selectedEmployee = employees.find(emp => String(emp.attendance_id) === formData.attendance_id);
 
-    // Change 1 (continued): Complete the self-approval check once selectedEmployee is defined.
-    // Use String() comparison to avoid type mismatch between number and string IDs
+    // Identify if it's a self-approval to determine date restrictions
     const isAGMSelfApproval = isAssistantGM && 
         String(selectedEmployee?.id) === String(deptHeadVerification?.assignment?.employee_id);
+
+    // Change 1: Calculate allowed date range based on approval type
+    // AGMs approving for themselves get the full project period; others get +/- 5 days.
+    const todayUAE = nowInUAE();
+    const minAllowedDate = isAGMSelfApproval && currentProject?.date_from
+        ? currentProject.date_from
+        : formatDateForInput(subDays(todayUAE, 5));
+    const maxAllowedDate = isAGMSelfApproval && currentProject?.date_to
+        ? currentProject.date_to
+        : formatDateForInput(addDays(todayUAE, 5));
+
+
     const { data: halfYearlyMinutes } = useQuery({
         queryKey: ['employeeHalfYearlyMinutes', selectedEmployee?.hrms_id, formData.date_from],
         queryFn: async () => {
@@ -142,7 +149,7 @@ export default function PreApprovalDialog({
                     date_to: data.date_to,
                     type: 'ALLOWED_MINUTES',
                     allowed_minutes: minutesToApprove,
-                    allowed_minutes_type: data.allowed_minutes_type || 'both',
+                    allowed_minutes_type: data.allowed_minutes_type, // Change 2: Removed fallback to 'both'
                     approval_status: 'approved_dept_head',
                     approved_by_dept_head: deptHeadVerification.assignment.employee_id,
                     dept_head_approval_date: new Date().toISOString(),
@@ -197,7 +204,7 @@ export default function PreApprovalDialog({
                 attendance_id: data.attendance_id,
                 date_from: data.date_from,
                 date_to: data.date_from, // single-day approval
-                allowed_minutes_type: data.allowed_minutes_type || 'both',
+                allowed_minutes_type: data.allowed_minutes_type, // Change 2: Removed fallback to 'both'
                 approval_status: 'approved_dept_head',
                 approved_by_dept_head: deptHeadVerification.assignment.employee_id,
                 dept_head_approval_date: new Date().toISOString(),
@@ -325,7 +332,7 @@ export default function PreApprovalDialog({
             date_from: '',
             date_to: '',
             allowed_minutes: '',
-            allowed_minutes_type: 'both',
+            allowed_minutes_type: 'late', // Change 2: Default to 'late' instead of 'both'
             details: ''
         });
         onClose();
@@ -474,7 +481,7 @@ export default function PreApprovalDialog({
                                         <SelectContent>
                                             <SelectItem value="late">Late Arrivals Only</SelectItem>
                                             <SelectItem value="early">Early Checkouts Only</SelectItem>
-                                            <SelectItem value="both">Both Late &amp; Early</SelectItem>
+                                            {/* Change 2: Removed 'both' (Both Late & Early) option */}
                                         </SelectContent>
                                     </Select>
                                 </div>
