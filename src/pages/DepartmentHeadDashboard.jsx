@@ -221,11 +221,25 @@ export default function DepartmentHeadDashboard() {
         enabled: !!previousReport && !!deptHeadAssignment && viewingPreviousReport
     });
 
-    // SECURITY: Server-side filtered employees for this department head (only managed subordinates)
+    // NEW: Fetch all department head assignments for the company to build the reporting hierarchy
+    const { data: deptHeads = [] } = useQuery({
+        queryKey: ['deptHeads', deptHeadAssignment?.company],
+        queryFn: () => base44.entities.DepartmentHead.filter({ 
+            company: deptHeadAssignment.company,
+            active: true 
+        }),
+        enabled: !!deptHeadAssignment?.company && !isAdminOrCEO,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false
+    });
+
+    // UPDATED: Server-side filtered employees for this department head (now includes hierarchical subordinates)
     const { data: employees = [] } = useQuery({
-        queryKey: ['deptEmployees', deptHeadAssignment?.company, deptHeadAssignment?.department, deptHeadVerification?.assignment?.managed_employee_ids],
+        queryKey: ['deptEmployees', deptHeadAssignment?.company, deptHeadAssignment?.department, deptHeadVerification?.assignment?.managed_employee_ids, deptHeads.length],
         queryFn: async () => {
-            // Admin and CEO load all active employees for the company directly
+            // Admin and CEO load all active employees for the company directly (remains unchanged)
             if (isAdminOrCEO) {
                 return await base44.entities.Employee.filter({
                     company: currentUser.company,
@@ -235,34 +249,125 @@ export default function DepartmentHeadDashboard() {
 
             if (!deptHeadVerification?.verified) return [];
             
-            const managedIds = deptHeadVerification.assignment.managed_employee_ids 
+            // Start with current DH's direct managed IDs from verification
+            const directManagedIds = deptHeadVerification.assignment.managed_employee_ids 
                 ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
                 : [];
             
-            if (managedIds.length === 0) return [];
+            // Change 1: Resolve the full recursive reporting chain
+            const allManagedIds = new Set(directManagedIds);
+            const visited = new Set();
             
-            // Fetch all managed employees by their IDs
+            // Find the current user's DepartmentHead record ID to start the recursive resolve
+            const currentDH = deptHeads.find(dh => 
+                dh.company === deptHeadAssignment.company && 
+                dh.department === deptHeadAssignment.department &&
+                (dh.employee_id === deptHeadAssignment.employee_id || dh.user_email === currentUser?.email)
+            );
+            
+            if (currentDH) {
+                // Recursively find all employees managed by heads reporting to the current user
+                const resolveReportingChain = (parentId) => {
+                    if (visited.has(parentId)) return;
+                    visited.add(parentId);
+                    
+                    // Find all subordinate heads that report to this specific parent
+                    const reportingHeads = deptHeads.filter(h => h.reports_to === parentId && h.active);
+                    reportingHeads.forEach(head => {
+                        if (head.managed_employee_ids) {
+                            head.managed_employee_ids.split(',').forEach(id => {
+                                allManagedIds.add(String(id.trim()));
+                            });
+                        }
+                        // Continue descending the reporting tree recursively
+                        resolveReportingChain(head.id);
+                    });
+                };
+                resolveReportingChain(currentDH.id);
+            }
+            
+            // Fetch all active employees for the company to filter against the resolved IDs
             const allEmployees = await base44.entities.Employee.filter({
                 company: deptHeadVerification.assignment.company,
                 active: true
             });
             
-            // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
-            // assistant_gm can see themselves in the list (self-approval allowed)
-            // Regular department_head is excluded from their own list (cannot self-approve)
+            // Filter to combined managed subordinates (direct + recursive)
+            // Existing self-approval rules (assistant_gm vs regular head) remain active
             const isAssistantGM = userRole === 'assistant_gm';
             return allEmployees.filter(emp => 
-                managedIds.includes(String(emp.id)) && 
+                allManagedIds.has(String(emp.id)) && 
                 (isAssistantGM || String(emp.id) !== String(deptHeadVerification.assignment.employee_id))
             );
         },
-        enabled: !!deptHeadVerification?.verified || isAdminOrCEO,
+        enabled: (!!deptHeadVerification?.verified && (isAdminOrCEO || deptHeads.length > 0)) || isAdminOrCEO,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
     });
+
+    // Change 2: Build grouped employee structure with department labels for hierarchical visibility
+    const employeeGroups = React.useMemo(() => {
+        if (!deptHeadVerification?.verified || !employees.length || (deptHeads.length === 0 && !isAdminOrCEO)) return [];
+
+        // For Admin/CEO, we return a single group labeled with their company or 'All Departments'
+        if (isAdminOrCEO) {
+            return [{
+                department: deptHeadVerification?.assignment?.department || 'Executive',
+                employees: employees
+            }];
+        }
+
+        const currentDH = deptHeads.find(dh => 
+            dh.company === deptHeadAssignment.company && 
+            dh.department === deptHeadAssignment.department &&
+            (dh.employee_id === deptHeadAssignment.employee_id || dh.user_email === currentUser?.email)
+        );
+
+        if (!currentDH) return [];
+
+        const groups = [];
+        const visitedHeads = new Set();
+        
+        // Helper to find employees from the flat list based on a comma-separated ID string
+        const getEmployeesByIds = (idString) => {
+            const ids = idString ? idString.split(',').map(id => String(id.trim())) : [];
+            return employees.filter(emp => ids.includes(String(emp.id)));
+        };
+
+        // 1. Root group: The current department head's direct subordinates
+        const rootEmps = getEmployeesByIds(currentDH.managed_employee_ids);
+        if (rootEmps.length > 0) {
+            groups.push({
+                department: currentDH.department,
+                employees: rootEmps
+            });
+        }
+
+        // 2. Recursive groups: Employees managed by reporting department heads down the chain
+        const addReportingGroupsRecursive = (parentId) => {
+            if (visitedHeads.has(parentId)) return;
+            visitedHeads.add(parentId);
+
+            const reportingHeads = deptHeads.filter(h => h.reports_to === parentId && h.active);
+            reportingHeads.forEach(head => {
+                const headEmps = getEmployeesByIds(head.managed_employee_ids);
+                if (headEmps.length > 0) {
+                    groups.push({
+                        department: head.department,
+                        employees: headEmps
+                    });
+                }
+                // Recursively add groups for heads reporting to this head
+                addReportingGroupsRecursive(head.id);
+            });
+        };
+
+        addReportingGroupsRecursive(currentDH.id);
+        return groups;
+    }, [deptHeads, employees, deptHeadVerification, deptHeadAssignment, currentUser, isAdminOrCEO]);
 
     // No auto-initialization needed - using calendar halves directly
 
@@ -573,6 +678,7 @@ export default function DepartmentHeadDashboard() {
                 onClose={() => setShowPreApprovalDialog(false)}
                 projectId={currentProject?.id}
                 employees={employees}
+                employeeGroups={employeeGroups}
                 deptHeadAssignment={deptHeadAssignment}
                 deptHeadVerification={deptHeadVerification}
                 currentProject={currentProject}

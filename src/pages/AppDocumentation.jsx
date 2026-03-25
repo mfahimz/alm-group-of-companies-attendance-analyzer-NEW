@@ -274,7 +274,7 @@ export default function AppDocumentation() {
                                     <div className="grid sm:grid-cols-2 gap-6 mt-4">
                                         <div className="space-y-2">
                                             <h4 className="text-indigo-300 font-bold text-sm">Subordinate Management</h4>
-                                            <p className="text-xs text-slate-400">Heads manage a dynamically defined list of <strong>Managed Employees</strong>. Access is strictly enforced: a head can only see and approve data for their subordinates and cannot self-approve their own records (excluding AGMs).</p>
+                                            <p className="text-xs text-slate-400">Heads manage a dynamically defined list of <strong>Managed Employees</strong>, now including all subordinates in their recursive reporting chain with an organized department-wise selection view. Access is strictly enforced: a head can only see and approve data for their subordinates and cannot self-approve their own records (excluding AGMs).</p>
                                         </div>
                                         <div className="space-y-2">
                                             <h4 className="text-indigo-300 font-bold text-sm">Assistant General Manager (AGM)</h4>

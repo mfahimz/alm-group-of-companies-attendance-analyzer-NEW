@@ -4,7 +4,7 @@ import { AlertTriangle, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ export default function PreApprovalDialog({
     onClose,
     projectId,
     employees,
+    employeeGroups,
     deptHeadVerification,
     currentProject,
     onSuccess
@@ -410,11 +411,28 @@ export default function PreApprovalDialog({
                                         <SelectValue placeholder="Select employee" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {employees.length === 0 ? (
+                                        {employeeGroups && employeeGroups.length > 0 ? (
+                                            /* Change: Render employees grouped by department when hierarchical data is available */
+                                            employeeGroups.map((group, gIdx) => (
+                                                <SelectGroup key={`group-${gIdx}`}>
+                                                    <SelectLabel className="bg-[#EEF2FF] text-[#0F1E36] font-bold py-1 px-3 mb-1 sticky top-0 z-10 border-b border-[#E2E6EC]">
+                                                        {group.department}
+                                                    </SelectLabel>
+                                                    {group.employees.map(emp => (
+                                                        <SelectItem key={emp.id} value={String(emp.attendance_id)}>
+                                                            {emp.name} (ID: {emp.attendance_id})
+                                                        </SelectItem>
+                                                    ))}
+                                                    {/* Add separator between departments for visual clarity */}
+                                                    {gIdx < employeeGroups.length - 1 && <SelectSeparator className="my-1" />}
+                                                </SelectGroup>
+                                            ))
+                                        ) : employees.length === 0 ? (
                                             <div className="p-2 text-sm text-slate-500">
                                                 No subordinate employees available
                                             </div>
                                         ) : (
+                                            /* Fallback: Render flat list of employees if groups not provided */
                                             employees.map(emp => (
                                                 <SelectItem key={emp.id} value={String(emp.attendance_id)}>
                                                     {emp.name} (ID: {emp.attendance_id})
